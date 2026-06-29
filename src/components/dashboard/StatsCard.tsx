@@ -6,32 +6,32 @@ interface StatsCardProps {
   change?: string
   changeType?: 'up' | 'down' | 'neutral'
   icon: LucideIcon
-  color?: 'indigo' | 'green' | 'purple' | 'orange'
+  color?: 'yellow' | 'green' | 'blue' | 'red'
 }
 
 const colors = {
-  indigo: { bg: 'bg-indigo-50', icon: 'text-indigo-600', badge: 'bg-indigo-100 text-indigo-700' },
-  green: { bg: 'bg-green-50', icon: 'text-green-600', badge: 'bg-green-100 text-green-700' },
-  purple: { bg: 'bg-purple-50', icon: 'text-purple-600', badge: 'bg-purple-100 text-purple-700' },
-  orange: { bg: 'bg-orange-50', icon: 'text-orange-600', badge: 'bg-orange-100 text-orange-700' },
+  yellow: { bg: 'bg-yellow-400/10 border-yellow-400/20', icon: 'text-yellow-400' },
+  green: { bg: 'bg-green-400/10 border-green-400/20', icon: 'text-green-400' },
+  blue: { bg: 'bg-blue-400/10 border-blue-400/20', icon: 'text-blue-400' },
+  red: { bg: 'bg-red-400/10 border-red-400/20', icon: 'text-red-400' },
 }
 
-export function StatsCard({ title, value, change, changeType, icon: Icon, color = 'indigo' }: StatsCardProps) {
+export function StatsCard({ title, value, change, changeType, icon: Icon, color = 'yellow' }: StatsCardProps) {
   const c = colors[color]
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+    <div className="glass-dark rounded-2xl p-6 border border-[#222] hover:border-[#FFC107]/20 transition-all hover:shadow-[0_0_20px_rgba(255,193,7,0.05)]">
       <div className="flex items-center justify-between mb-4">
-        <div className={`w-12 h-12 ${c.bg} rounded-xl flex items-center justify-center`}>
-          <Icon size={24} className={c.icon} />
+        <div className={`w-11 h-11 ${c.bg} border rounded-xl flex items-center justify-center`}>
+          <Icon size={20} className={c.icon} />
         </div>
         {change && (
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${c.badge}`}>
+          <span className={`text-xs font-medium px-2 py-1 rounded-full ${changeType === 'up' ? 'bg-green-400/10 text-green-400' : changeType === 'down' ? 'bg-red-400/10 text-red-400' : 'bg-gray-400/10 text-gray-400'}`}>
             {changeType === 'up' ? '↑' : changeType === 'down' ? '↓' : ''} {change}
           </span>
         )}
       </div>
-      <div className="text-3xl font-bold text-slate-900 mb-1">{value}</div>
-      <div className="text-sm text-slate-500">{title}</div>
+      <div className="text-3xl font-black text-white mb-1">{value}</div>
+      <div className="text-sm text-gray-500">{title}</div>
     </div>
   )
 }

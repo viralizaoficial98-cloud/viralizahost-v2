@@ -1,11 +1,25 @@
 import { Metadata } from 'next'
-import { Plus, Server, ExternalLink } from 'lucide-react'
+import { Server, HardDrive, Wifi, Shield, ExternalLink, Cpu, RefreshCw } from 'lucide-react'
 
-export const metadata: Metadata = { title: 'Hospedagem' }
+export const metadata: Metadata = { title: 'Hospedagem — ViralizaHost' }
 
-const hostings = [
-  { domain: 'meusite.com', plan: 'Business', status: 'active', diskUsed: 12, diskTotal: 50, expires: '01/08/2025' },
-  { domain: 'loja.ao', plan: 'Starter', status: 'active', diskUsed: 3, diskTotal: 10, expires: '15/09/2025' },
+const plans = [
+  {
+    name: 'Plano Business', domain: 'meusite.com', status: 'Ativo',
+    storage: { used: 6, total: 10, pct: 60 },
+    bandwidth: { used: 32, total: 100, pct: 32 },
+    emails: { used: 8, total: 20 },
+    databases: { used: 3, total: 10 },
+    php: '8.2', ssl: true, expiry: '01 Ago 2026',
+  },
+  {
+    name: 'Plano Starter', domain: 'loja.ao', status: 'Ativo',
+    storage: { used: 1, total: 5, pct: 20 },
+    bandwidth: { used: 4, total: 50, pct: 8 },
+    emails: { used: 2, total: 5 },
+    databases: { used: 1, total: 3 },
+    php: '8.1', ssl: true, expiry: '20 Ago 2026',
+  },
 ]
 
 export default function HostingPage() {
@@ -13,48 +27,68 @@ export default function HostingPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Hospedagem</h1>
-          <p className="text-slate-500 mt-1">Gerencie os seus planos de hospedagem</p>
+          <h1 className="text-2xl font-black text-white">Hospedagem</h1>
+          <p className="text-gray-500 text-sm mt-1">Gerencie os seus planos de hospedagem</p>
         </div>
-        <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium transition-colors">
-          <Plus size={18} /> Novo Plano
-        </button>
+        <a href="/billing" className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold">
+          <Server size={16} /> Adicionar Plano
+        </a>
       </div>
-      <div className="grid gap-6">
-        {hostings.map((h) => (
-          <div key={h.domain} className="bg-white rounded-2xl border border-slate-200 p-6">
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center">
-                  <Server size={24} className="text-indigo-600" />
-                </div>
-                <div>
-                  <div className="font-semibold text-slate-900">{h.domain}</div>
-                  <div className="text-sm text-slate-500">Plano {h.plan}</div>
-                </div>
+
+      <div className="space-y-4">
+        {plans.map((plan) => (
+          <div key={plan.name} className="glass-dark rounded-2xl border border-[#222] hover:border-[#FFC107]/20 transition-all overflow-hidden">
+            <div className="p-5 border-b border-[#1A1A1A] flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center">
+                <Server size={18} className="text-yellow-400" />
+              </div>
+              <div className="flex-1">
+                <div className="font-bold text-white">{plan.name}</div>
+                <div className="text-xs text-gray-600">{plan.domain} · Expira: {plan.expiry}</div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="bg-green-100 text-green-700 text-xs font-medium px-2.5 py-1 rounded-full">Ativo</span>
-                <button className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 font-medium">
-                  <ExternalLink size={14} /> cPanel
-                </button>
+                {plan.ssl && <span className="text-xs text-green-400 bg-green-400/10 border border-green-400/20 px-2 py-0.5 rounded-full flex items-center gap-1"><Shield size={10} /> SSL</span>}
+                <span className="badge-yellow text-xs px-2 py-0.5 rounded-full">{plan.status}</span>
               </div>
+              <button className="text-gray-600 hover:text-yellow-400 transition-colors ml-2">
+                <ExternalLink size={16} />
+              </button>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <div>
-                <div className="text-xs text-slate-500 mb-2">Disco Usado</div>
-                <div className="bg-slate-100 rounded-full h-2 mb-1">
-                  <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${(h.diskUsed / h.diskTotal) * 100}%` }} />
+                <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-2">
+                  <HardDrive size={12} /> Armazenamento
                 </div>
-                <div className="text-xs text-slate-600">{h.diskUsed} GB / {h.diskTotal} GB</div>
+                <div className="text-white font-bold text-sm mb-1">{plan.storage.used} GB / {plan.storage.total} GB</div>
+                <div className="h-2 bg-[#1A1A1A] rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${plan.storage.pct > 80 ? 'bg-red-400' : 'bg-yellow-400'}`} style={{ width: `${plan.storage.pct}%` }} />
+                </div>
+                <div className="text-xs text-gray-700 mt-1">{plan.storage.pct}% usado</div>
               </div>
               <div>
-                <div className="text-xs text-slate-500 mb-1">Vencimento</div>
-                <div className="text-sm font-medium text-slate-900">{h.expires}</div>
+                <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-2">
+                  <Wifi size={12} /> Bandwidth
+                </div>
+                <div className="text-white font-bold text-sm mb-1">{plan.bandwidth.used} GB / {plan.bandwidth.total} GB</div>
+                <div className="h-2 bg-[#1A1A1A] rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-400 rounded-full" style={{ width: `${plan.bandwidth.pct}%` }} />
+                </div>
+                <div className="text-xs text-gray-700 mt-1">{plan.bandwidth.pct}% usado</div>
               </div>
-              <div className="flex items-end gap-2">
-                <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">Gerenciar</button>
-                <button className="text-sm text-slate-500 hover:text-slate-700">Renovar</button>
+              <div>
+                <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-2">
+                  <Cpu size={12} /> PHP / Databases
+                </div>
+                <div className="text-white font-bold text-sm">PHP {plan.php}</div>
+                <div className="text-xs text-gray-600 mt-1">{plan.databases.used}/{plan.databases.total} DBs · {plan.emails.used}/{plan.emails.total} Emails</div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <button className="w-full py-2 px-3 bg-[#1A1A1A] hover:bg-[#222] border border-[#333] rounded-lg text-xs text-gray-400 hover:text-white transition-all flex items-center justify-center gap-1.5">
+                  <ExternalLink size={12} /> Abrir cPanel
+                </button>
+                <button className="w-full py-2 px-3 bg-[#1A1A1A] hover:bg-[#222] border border-[#333] rounded-lg text-xs text-gray-400 hover:text-white transition-all flex items-center justify-center gap-1.5">
+                  <RefreshCw size={12} /> Backup Agora
+                </button>
               </div>
             </div>
           </div>
