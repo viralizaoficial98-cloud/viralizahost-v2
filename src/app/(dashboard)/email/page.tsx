@@ -1,40 +1,49 @@
 import { Metadata } from 'next'
-import { Mail, Plus, Trash2, Key, Settings } from 'lucide-react'
+import { Mail, Plus, HardDrive } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = { title: 'Emails — ViralizaHost' }
 
-const emails = [
-  { address: 'contato@meusite.com', domain: 'meusite.com', quota: { used: 120, total: 500 }, status: 'Ativo' },
-  { address: 'suporte@meusite.com', domain: 'meusite.com', quota: { used: 45, total: 500 }, status: 'Ativo' },
-  { address: 'admin@meusite.com', domain: 'meusite.com', quota: { used: 890, total: 500 }, status: 'Lotado' },
-  { address: 'loja@loja.ao', domain: 'loja.ao', quota: { used: 10, total: 200 }, status: 'Ativo' },
-]
+export default async function EmailPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
-export default function EmailPage() {
+  const { data: emailsRaw } = await supabase
+    .from('emails')
+    .select('*, hosting_accounts(primary_domain)')
+    .eq('profile_id', user.id)
+    .order('created_at', { ascending: false })
+  const emails = emailsRaw as any[]
+
+  const totalQuota = emails?.reduce((s: number, e: any) => s + e.quota_mb, 0) ?? 0
+  const totalUsed = emails?.reduce((s: number, e: any) => s + e.used_mb, 0) ?? 0
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-white">Emails Corporativos</h1>
-          <p className="text-gray-500 text-sm mt-1">Gerencie as contas de email profissionais</p>
+          <h1 className="text-2xl font-black text-white">Email Corporativo</h1>
+          <p className="text-gray-500 text-sm mt-1">Gerencie as suas contas de email</p>
         </div>
         <button className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold">
-          <Plus size={16} /> Criar Email
+          <Plus size={16} /> Nova Conta
         </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="glass-dark rounded-xl border border-[#222] p-4 text-center">
-          <div className="text-2xl font-black text-white">12</div>
-          <div className="text-xs text-gray-600 mt-1">Contas ativas</div>
+        <div className="glass-dark rounded-xl border border-yellow-400/20 p-4">
+          <div className="text-xs text-gray-600 mb-1">Total de contas</div>
+          <div className="text-2xl font-black text-white">{emails?.length ?? 0}</div>
         </div>
-        <div className="glass-dark rounded-xl border border-[#222] p-4 text-center">
-          <div className="text-2xl font-black text-white">20</div>
-          <div className="text-xs text-gray-600 mt-1">Total disponível</div>
+        <div className="glass-dark rounded-xl border border-[#222] p-4">
+          <div className="text-xs text-gray-600 mb-1">Armazenamento usado</div>
+          <div className="text-2xl font-black text-white">{totalUsed} MB</div>
         </div>
-        <div className="glass-dark rounded-xl border border-[#222] p-4 text-center">
-          <div className="text-2xl font-black text-yellow-400">8</div>
-          <div className="text-xs text-gray-600 mt-1">Slots restantes</div>
+        <div className="glass-dark rounded-xl border border-[#222] p-4">
+          <div className="text-xs text-gray-600 mb-1">Cota total</div>
+          <div className="text-2xl font-black text-white">{totalQuota} MB</div>
         </div>
       </div>
 
@@ -42,30 +51,41 @@ export default function EmailPage() {
         <div className="p-5 border-b border-[#1A1A1A] flex items-center gap-2">
           <Mail size={16} className="text-yellow-400" />
           <h2 className="font-bold text-white">Contas de Email</h2>
+          <span className="ml-auto text-xs text-gray-600 bg-[#1A1A1A] px-2.5 py-1 rounded-full">{emails?.length ?? 0} contas</span>
         </div>
         <div className="divide-y divide-[#1A1A1A]">
-          {emails.map((email) => (
-            <div key={email.address} className="p-5 flex items-center gap-4 hover:bg-[#111] transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-[#1A1A1A] flex items-center justify-center flex-shrink-0">
-                <Mail size={16} className="text-yellow-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-white text-sm">{email.address}</div>
-                <div className="text-xs text-gray-600 mt-0.5">{email.quota.used} MB / {email.quota.total} MB usados</div>
-                <div className="h-1 bg-[#222] rounded-full mt-1.5 w-32">
-                  <div className={`h-full rounded-full ${email.status === 'Lotado' ? 'bg-red-400' : 'bg-yellow-400'}`} style={{ width: `${Math.min((email.quota.used / email.quota.total) * 100, 100)}%` }} />
+          {emails && emails.length > 0 ? emails.map((em) => {
+            const usedPct = em.quota_mb > 0 ? Math.round((em.used_mb / em.quota_mb) * 100) : 0
+            const barColor = usedPct > 80 ? 'bg-red-400' : usedPct > 60 ? 'bg-yellow-400' : 'bg-green-400'
+            return (
+              <div key={em.id} className="p-5 flex items-center gap-4 hover:bg-[#111] transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-[#1A1A1A] flex items-center justify-center flex-shrink-0">
+                  <Mail size={18} className="text-yellow-400" />
                 </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-white text-sm">{em.email_address}</div>
+                  {em.display_name && <div className="text-xs text-gray-600 mt-0.5">{em.display_name}</div>}
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-[#222] rounded-full overflow-hidden">
+                      <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${Math.min(usedPct, 100)}%` }} />
+                    </div>
+                    <span className="text-xs text-gray-600 flex-shrink-0 flex items-center gap-1">
+                      <HardDrive size={10} /> {em.used_mb}/{em.quota_mb} MB
+                    </span>
+                  </div>
+                </div>
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${em.status === 'active' ? 'bg-green-400/10 text-green-400 border border-green-400/20' : 'bg-gray-400/10 text-gray-500 border border-gray-400/20'}`}>
+                  {em.status === 'active' ? 'Ativo' : 'Inativo'}
+                </span>
               </div>
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${email.status === 'Ativo' ? 'bg-green-400/10 text-green-400 border border-green-400/20' : 'bg-red-400/10 text-red-400 border border-red-400/20'}`}>
-                {email.status}
-              </span>
-              <div className="flex items-center gap-1">
-                <button className="p-2 text-gray-600 hover:text-yellow-400 hover:bg-[#1A1A1A] rounded-lg transition-all"><Key size={14} /></button>
-                <button className="p-2 text-gray-600 hover:text-yellow-400 hover:bg-[#1A1A1A] rounded-lg transition-all"><Settings size={14} /></button>
-                <button className="p-2 text-gray-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"><Trash2 size={14} /></button>
-              </div>
+            )
+          }) : (
+            <div className="p-12 text-center">
+              <Mail size={32} className="text-gray-700 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm">Nenhuma conta de email criada</p>
+              <button className="mt-4 btn-primary text-xs px-4 py-2 rounded-xl font-bold">Criar primeiro email</button>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
