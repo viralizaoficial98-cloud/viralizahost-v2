@@ -9,9 +9,7 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
+        getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
@@ -25,18 +23,18 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const protectedPrefixes = ['/dashboard', '/domains', '/hosting', '/email', '/tickets', '/billing', '/settings']
-  const adminPrefixes = ['/admin']
-  const authRoutes = ['/login', '/register', '/forgot-password']
   const path = request.nextUrl.pathname
+  const protectedPaths = ['/dashboard', '/domains', '/hosting', '/email', '/tickets', '/billing', '/settings']
+  const adminPaths = ['/admin']
+  const authRoutes = ['/login', '/register', '/forgot-password']
 
-  if (protectedPrefixes.some(r => path.startsWith(r)) && !user) {
+  if (protectedPaths.some(p => path.startsWith(p)) && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
-  if (adminPrefixes.some(r => path.startsWith(r)) && !user) {
+  if (adminPaths.some(p => path.startsWith(p)) && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
-  if (authRoutes.some(r => path.startsWith(r)) && user) {
+  if (authRoutes.some(p => path.startsWith(p)) && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
