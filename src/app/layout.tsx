@@ -1,23 +1,27 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { APP_NAME, APP_DESCRIPTION } from '@/lib/constants'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
   title: {
-    default: APP_NAME,
-    template: `%s | ${APP_NAME}`,
+    default: 'ViralizaHost — Hospedagem Web Premium',
+    template: '%s | ViralizaHost',
   },
-  description: APP_DESCRIPTION,
-  keywords: ['hospedagem', 'hosting', 'domínios', 'email', 'cPanel', 'Angola', 'Brasil'],
+  description: 'Hospedagem web premium com LiteSpeed, NVMe SSD, cPanel e suporte 24/7. Planos a partir de Kz 4.500/mês. Uptime 99.9% garantido.',
+  keywords: ['hospedagem web', 'hosting angola', 'hosting brasil', 'cpanel', 'domínios', 'email corporativo', 'ssl grátis'],
+  openGraph: {
+    title: 'ViralizaHost — Hospedagem Web Premium',
+    description: 'Hospedagem web premium com LiteSpeed, NVMe SSD e suporte 24/7.',
+    type: 'website',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${inter.variable} font-sans antialiased`}>
         {children}
       </body>
     </html>

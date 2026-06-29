@@ -1,8 +1,12 @@
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { HeroSection } from '@/components/landing/HeroSection'
-import { FeaturesSection } from '@/components/landing/FeaturesSection'
+import { StatsSection } from '@/components/landing/StatsSection'
+import { ServicesSection } from '@/components/landing/ServicesSection'
+import { BenefitsSection } from '@/components/landing/BenefitsSection'
 import { PricingSection } from '@/components/landing/PricingSection'
+import { TestimonialsSection } from '@/components/landing/TestimonialsSection'
+import { FAQSection } from '@/components/landing/FAQSection'
 import { CTASection } from '@/components/landing/CTASection'
 
 export default function HomePage() {
@@ -11,8 +15,12 @@ export default function HomePage() {
       <Header />
       <main>
         <HeroSection />
-        <FeaturesSection />
+        <StatsSection />
+        <ServicesSection />
+        <BenefitsSection />
         <PricingSection />
+        <TestimonialsSection />
+        <FAQSection />
         <CTASection />
       </main>
       <Footer />
