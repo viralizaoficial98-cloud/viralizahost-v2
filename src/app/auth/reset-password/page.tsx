@@ -53,7 +53,7 @@ export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-[#0D0D0D] flex flex-col">
       <header className="flex items-center justify-between px-6 py-4 border-b border-[#1A1A1A]">
-        <Logo size="sm" />
+        <Logo variant="light" size="sm" />
         <Link href="/login" className="text-sm text-gray-500 hover:text-yellow-400 transition-colors">← Voltar ao login</Link>
       </header>
       <div className="flex-1 flex items-center justify-center px-4 py-12">

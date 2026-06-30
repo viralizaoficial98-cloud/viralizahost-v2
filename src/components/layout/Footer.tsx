@@ -40,7 +40,7 @@ export function Footer() {
 
           {/* Brand col */}
           <div className="lg:col-span-2 space-y-5">
-            <Logo size="md" />
+            <Logo variant="light" size="md" />
             <p className="text-sm leading-relaxed text-gray-500">
               Hospedagem web premium com performance LiteSpeed, segurança avançada e suporte 24/7.
               Servindo Angola, Brasil e o mundo.

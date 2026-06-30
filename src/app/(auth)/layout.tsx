@@ -5,7 +5,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="min-h-screen bg-[#0D0D0D] flex flex-col">
       <header className="flex items-center justify-between px-6 py-4 border-b border-[#1A1A1A]">
-        <Logo size="sm" />
+        <Logo variant="light" size="sm" />
         <Link href="/" className="text-sm text-gray-500 hover:text-yellow-400 transition-colors">← Voltar ao site</Link>
       </header>
       <div className="fixed inset-0 pointer-events-none overflow-hidden">

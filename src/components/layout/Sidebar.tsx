@@ -29,7 +29,7 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-[#0A0A0A] border-r border-[#1A1A1A] flex flex-col h-full flex-shrink-0">
       <div className="p-6 border-b border-[#1A1A1A]">
-        <Logo size="sm" />
+        <Logo variant="light" size="sm" />
       </div>
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map(({ href, icon: Icon, label }) => {

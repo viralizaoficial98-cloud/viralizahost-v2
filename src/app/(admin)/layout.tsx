@@ -30,7 +30,7 @@ function AdminSidebar() {
   return (
     <aside className="w-64 bg-[#0A0A0A] border-r border-[#1A1A1A] flex flex-col flex-shrink-0 h-full">
       <div className="p-5 border-b border-[#1A1A1A]">
-        <Logo size="sm" />
+        <Logo variant="light" size="sm" />
         <div className="mt-2 flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
           <span className="text-xs text-yellow-400 font-medium">Painel Admin</span>
