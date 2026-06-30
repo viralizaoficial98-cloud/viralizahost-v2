@@ -1,155 +1,293 @@
 'use client'
 import Link from 'next/link'
-import { useState } from 'react'
-import { Search, Shield, Zap, Server, ArrowRight, Check, Star } from 'lucide-react'
-import { useCurrency } from '@/hooks/useCurrency'
-import { HOSTING_PLANS } from '@/lib/constants'
-import { Currency } from '@/types'
+import { useState, useEffect, useCallback } from 'react'
+import { ChevronLeft, ChevronRight, Server, Bot, Mail, ArrowRight, Shield, Zap, Star } from 'lucide-react'
 
-const DOMAIN_EXTENSIONS = ['.com', '.net', '.org', '.ao', '.com.br', '.store', '.tech', '.io']
+const slides = [
+  {
+    id: 0,
+    tag: 'Infraestrutura Premium',
+    title: 'Servidores Premium para\nAlta Performance',
+    subtitle: 'Cloud Hosting, VPS, Dedicated Servers e soluções enterprise para escalar o seu negócio.',
+    cta: 'Ver Planos de Hospedagem',
+    ctaHref: '#planos',
+    ctaSecondary: 'Falar com Especialista',
+    ctaSecondaryHref: '/tickets',
+    icon: Server,
+    gradient: 'from-[#0A0A0A] via-[#1a1a2e] to-[#16213e]',
+    accent: 'from-[#F5B700] to-[#FFD54F]',
+    features: ['LiteSpeed Enterprise', 'NVMe SSD Gen4', 'DDoS Protection'],
+    bgPattern: `radial-gradient(ellipse at 20% 80%, rgba(245,183,0,0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(99,102,241,0.2) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(245,183,0,0.05) 0%, transparent 70%)`,
+  },
+  {
+    id: 1,
+    tag: 'Inteligência Artificial',
+    title: 'Automatize processos com\nInteligência Artificial',
+    subtitle: 'Chatbots, automações inteligentes e agentes IA para transformar o seu negócio.',
+    cta: 'Explorar Soluções IA',
+    ctaHref: '#servicos',
+    ctaSecondary: 'Saiba Mais',
+    ctaSecondaryHref: '#servicos',
+    icon: Bot,
+    gradient: 'from-[#0d0d1a] via-[#0f0f2e] to-[#1a0a2e]',
+    accent: 'from-[#F5B700] to-[#f59e0b]',
+    features: ['Chatbots Inteligentes', 'Automação de Processos', 'Agentes IA'],
+    bgPattern: `radial-gradient(ellipse at 70% 30%, rgba(139,92,246,0.2) 0%, transparent 50%),
+                radial-gradient(ellipse at 20% 70%, rgba(245,183,0,0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 90%, rgba(59,130,246,0.1) 0%, transparent 50%)`,
+  },
+  {
+    id: 2,
+    tag: 'E-mail Corporativo',
+    title: 'E-mail Corporativo Seguro\ne Profissional',
+    subtitle: 'Caixas corporativas com alta segurança, proteção anti-spam e integração completa.',
+    cta: 'Ver Planos de E-mail',
+    ctaHref: '#email-plans',
+    ctaSecondary: 'Começar Agora',
+    ctaSecondaryHref: '/register',
+    icon: Mail,
+    gradient: 'from-[#0a1628] via-[#0f1e3d] to-[#0a2d2d]',
+    accent: 'from-[#F5B700] to-[#10b981]',
+    features: ['Anti-Spam Avançado', 'SPF/DKIM/DMARC', 'Backup Diário'],
+    bgPattern: `radial-gradient(ellipse at 30% 20%, rgba(16,185,129,0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(245,183,0,0.12) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(59,130,246,0.08) 0%, transparent 60%)`,
+  },
+]
+
+const SLIDE_DURATION = 6000
 
 export function HeroSection() {
-  const { format, currency } = useCurrency()
-  const [domain, setDomain] = useState('')
-  const [searching, setSearching] = useState(false)
+  const [current, setCurrent] = useState(0)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [progress, setProgress] = useState(0)
 
-  const starterPlan = HOSTING_PLANS[0]
-  const prices: Record<Currency, number> = { AKZ: starterPlan.price_akz, BRL: starterPlan.price_brl, USD: starterPlan.price_usd }
+  const goTo = useCallback((index: number) => {
+    if (isTransitioning) return
+    setIsTransitioning(true)
+    setProgress(0)
+    setTimeout(() => {
+      setCurrent(index)
+      setIsTransitioning(false)
+    }, 400)
+  }, [isTransitioning])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!domain.trim()) return
-    setSearching(true)
-    setTimeout(() => setSearching(false), 1500)
-  }
+  const next = useCallback(() => goTo((current + 1) % slides.length), [current, goTo])
+  const prev = useCallback(() => goTo((current - 1 + slides.length) % slides.length), [current, goTo])
+
+  /* Auto-play */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setProgress(0)
+      next()
+    }, SLIDE_DURATION)
+    return () => clearInterval(interval)
+  }, [next])
+
+  /* Progress bar */
+  useEffect(() => {
+    setProgress(0)
+    const start = Date.now()
+    const tick = () => {
+      const elapsed = Date.now() - start
+      setProgress(Math.min((elapsed / SLIDE_DURATION) * 100, 100))
+      if (elapsed < SLIDE_DURATION) requestAnimationFrame(tick)
+    }
+    const raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [current])
+
+  /* Keyboard nav */
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') prev()
+      if (e.key === 'ArrowRight') next()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [prev, next])
+
+  const slide = slides[current]
+  const Icon = slide.icon
 
   return (
-    <section className="relative overflow-hidden bg-hero noise min-h-screen flex flex-col justify-center">
-      {/* Animated orbs */}
-      <div className="absolute inset-0 bg-mesh pointer-events-none" />
-      <div className="absolute top-20 left-10 w-72 h-72 bg-indigo-600/20 rounded-full blur-3xl animate-pulse-slow" />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl animate-pulse-slow delay-500" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-900/10 rounded-full blur-3xl" />
+    <section className="relative min-h-screen flex flex-col overflow-hidden" aria-label="Hero Slideshow">
+      {/* Background layers */}
+      {slides.map((s, i) => (
+        <div
+          key={s.id}
+          className={`absolute inset-0 bg-gradient-to-br ${s.gradient} transition-opacity duration-700`}
+          style={{
+            opacity: i === current ? 1 : 0,
+            background: `linear-gradient(135deg, #0A0A0A 0%, #111111 60%, #0A0A0A 100%)`,
+          }}
+        />
+      ))}
+
+      {/* Dynamic pattern overlay */}
+      <div
+        className="absolute inset-0 transition-all duration-700"
+        style={{ background: slide.bgPattern }}
+      />
 
       {/* Grid pattern */}
-      <div className="absolute inset-0 opacity-5"
-        style={{ backgroundImage: 'linear-gradient(rgba(99,102,241,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.5) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+      <div className="absolute inset-0 opacity-[0.04]"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)',
+          backgroundSize: '64px 64px',
+        }}
+      />
 
-      <div className="relative container mx-auto px-4 py-20 lg:py-28">
-        <div className="max-w-5xl mx-auto text-center">
+      {/* Animated orbs */}
+      <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-yellow-500/8 rounded-full blur-3xl animate-pulse-slow pointer-events-none" />
+      <div className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-yellow-400/5 rounded-full blur-3xl animate-pulse-slow delay-300 pointer-events-none" />
 
-          {/* Top badge */}
-          <div className="inline-flex items-center gap-2 glass rounded-full px-5 py-2.5 mb-8 animate-fade-in-up">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-sm text-slate-300 font-medium">99.9% Uptime Garantido • Servidores Online</span>
-            <span className="bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">PRO</span>
-          </div>
+      {/* Content */}
+      <div className="relative flex-1 flex flex-col justify-center pt-24 pb-16">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
 
-          {/* Main headline */}
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-white leading-tight mb-6 animate-fade-in-up delay-100">
-            Hospedagem Web{' '}
-            <span className="gradient-text">Premium</span>
-            <br />
-            para o seu{' '}
-            <span className="relative inline-block">
-              <span className="gradient-text">Negócio</span>
-              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none">
-                <path d="M2 8C50 3 150 1 298 8" stroke="url(#u1)" strokeWidth="3" strokeLinecap="round"/>
-                <defs><linearGradient id="u1" x1="0" y1="0" x2="300" y2="0"><stop stopColor="#818cf8"/><stop offset="1" stopColor="#c084fc"/></linearGradient></defs>
-              </svg>
-            </span>
-          </h1>
+            {/* Tag */}
+            <div
+              key={`tag-${current}`}
+              className="animate-fade-in-up mb-6"
+            >
+              <span className="inline-flex items-center gap-2 bg-white/10 backdrop-blur border border-white/15 text-white/90 text-xs font-semibold tracking-widest uppercase px-4 py-2 rounded-full">
+                <Icon size={13} className="text-[#F5B700]" />
+                {slide.tag}
+                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+              </span>
+            </div>
 
-          <p className="text-lg md:text-xl text-slate-400 mb-10 max-w-3xl mx-auto leading-relaxed animate-fade-in-up delay-200">
-            Performance ultrarrápida com <strong className="text-indigo-400">LiteSpeed</strong> e <strong className="text-indigo-400">NVMe SSD</strong>.
-            SSL grátis, cPanel Premium e suporte 24/7. Comece hoje a partir de{' '}
-            <strong className="text-white">{format(prices[currency])}/mês</strong>.
-          </p>
+            {/* Title */}
+            <h1
+              key={`title-${current}`}
+              className={`text-5xl md:text-6xl lg:text-7xl font-black text-white leading-[1.05] mb-6 animate-fade-in-up delay-100 ${isTransitioning ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+            >
+              {slide.title.split('\n').map((line, i) => (
+                <span key={i}>
+                  {i === 0 ? line : (
+                    <><br /><span className="bg-gradient-to-r from-[#F5B700] to-[#FFD54F] bg-clip-text text-transparent">{line}</span></>
+                  )}
+                </span>
+              ))}
+            </h1>
 
-          {/* Domain search */}
-          <div className="max-w-2xl mx-auto mb-10 animate-fade-in-up delay-300">
-            <form onSubmit={handleSearch} className="relative">
-              <div className="flex glass rounded-2xl p-2 border border-indigo-500/30 focus-within:border-indigo-400/60 transition-all">
-                <div className="flex items-center pl-4">
-                  <Search size={20} className="text-slate-400" />
+            {/* Subtitle */}
+            <p
+              key={`sub-${current}`}
+              className={`text-lg md:text-xl text-white/65 mb-10 max-w-2xl leading-relaxed animate-fade-in-up delay-200 ${isTransitioning ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+            >
+              {slide.subtitle}
+            </p>
+
+            {/* Feature pills */}
+            <div
+              key={`features-${current}`}
+              className="flex flex-wrap gap-3 mb-10 animate-fade-in-up delay-300"
+            >
+              {slide.features.map((f) => (
+                <span key={f}
+                  className="inline-flex items-center gap-2 bg-white/8 border border-white/12 text-white/80 text-xs font-medium px-4 py-2 rounded-full backdrop-blur">
+                  <Zap size={11} className="text-[#F5B700]" />
+                  {f}
+                </span>
+              ))}
+            </div>
+
+            {/* CTAs */}
+            <div
+              key={`cta-${current}`}
+              className="flex flex-col sm:flex-row gap-4 animate-fade-in-up delay-400"
+            >
+              <Link href={slide.ctaHref}
+                className="btn-shimmer btn-primary inline-flex items-center justify-center gap-2 px-10 py-4 rounded-2xl text-base font-bold shadow-[0_8px_30px_rgba(245,183,0,0.4)] hover:shadow-[0_12px_40px_rgba(245,183,0,0.5)]">
+                {slide.cta}
+                <ArrowRight size={18} />
+              </Link>
+              <Link href={slide.ctaSecondaryHref}
+                className="inline-flex items-center justify-center gap-2 border-2 border-white/20 hover:border-white/40 text-white hover:bg-white/8 px-10 py-4 rounded-2xl text-base font-bold transition-all">
+                {slide.ctaSecondary}
+              </Link>
+            </div>
+
+            {/* Trust row */}
+            <div className="flex items-center gap-6 mt-12 animate-fade-in-up delay-500">
+              <div className="flex -space-x-2">
+                {['A','B','C','D','E'].map((l, i) => (
+                  <div key={i}
+                    className="w-8 h-8 rounded-full border-2 border-black/40 bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center text-black text-xs font-bold">
+                    {l}
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div className="flex items-center gap-1 mb-0.5">
+                  {[...Array(5)].map((_, i) => <Star key={i} size={13} className="text-[#F5B700] fill-[#F5B700]" />)}
                 </div>
-                <input
-                  type="text"
-                  value={domain}
-                  onChange={e => setDomain(e.target.value)}
-                  placeholder="Pesquise o seu domínio ideal..."
-                  className="flex-1 bg-transparent text-white placeholder-slate-500 px-4 py-3 text-lg focus:outline-none domain-input"
-                />
+                <p className="text-white/60 text-sm"><strong className="text-white">+5.000</strong> clientes satisfeitos</p>
+              </div>
+              <div className="hidden sm:flex items-center gap-4 ml-4 border-l border-white/10 pl-6">
+                <div className="flex items-center gap-2 text-white/60 text-sm">
+                  <Shield size={14} className="text-green-400" />
+                  Uptime 99.9%
+                </div>
+                <div className="flex items-center gap-2 text-white/60 text-sm">
+                  <Zap size={14} className="text-[#F5B700]" />
+                  LiteSpeed
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Slide controls */}
+      <div className="relative pb-10">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between max-w-5xl mx-auto">
+
+            {/* Dot indicators + progress */}
+            <div className="flex items-center gap-4">
+              {slides.map((s, i) => (
                 <button
-                  type="submit"
-                  disabled={searching}
-                  className="btn-shimmer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-8 py-3 rounded-xl font-semibold transition-all flex items-center gap-2 disabled:opacity-60"
+                  key={s.id}
+                  onClick={() => goTo(i)}
+                  className="relative h-1 rounded-full overflow-hidden transition-all duration-300 focus:outline-none"
+                  style={{ width: i === current ? '48px' : '24px', background: i === current ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.25)' }}
+                  aria-label={`Slide ${i + 1}`}
                 >
-                  {searching ? (
-                    <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Pesquisando...</>
-                  ) : (
-                    <>Pesquisar<ArrowRight size={16} /></>
+                  {i === current && (
+                    <div
+                      className="absolute left-0 top-0 h-full bg-[#F5B700] rounded-full"
+                      style={{ width: `${progress}%`, transition: 'width 0.1s linear' }}
+                    />
                   )}
                 </button>
-              </div>
-            </form>
-            {/* Domain extensions */}
-            <div className="flex flex-wrap justify-center gap-2 mt-4">
-              {DOMAIN_EXTENSIONS.map(ext => (
-                <button
-                  key={ext}
-                  onClick={() => setDomain(domain.replace(/\.[^.]+$/, '') + ext)}
-                  className="text-xs text-slate-400 hover:text-indigo-400 bg-slate-800/60 hover:bg-indigo-900/40 border border-slate-700 hover:border-indigo-600 px-3 py-1.5 rounded-lg transition-all font-mono"
-                >
-                  {ext}
-                </button>
               ))}
+              <span className="text-white/40 text-xs font-mono ml-2">
+                {String(current + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
+              </span>
             </div>
-          </div>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16 animate-fade-in-up delay-400">
-            <Link href="/register"
-              className="btn-shimmer animate-glow bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-10 py-4 rounded-2xl font-bold text-lg transition-all hover:scale-105 shadow-2xl shadow-indigo-500/30 flex items-center justify-center gap-2">
-              Começar Agora — Grátis
-              <ArrowRight size={20} />
-            </Link>
-            <Link href="/#planos"
-              className="border-2 border-white/20 hover:border-indigo-400/60 text-white hover:text-indigo-300 px-10 py-4 rounded-2xl font-bold text-lg transition-all hover:bg-indigo-950/50 flex items-center justify-center gap-2">
-              Ver Todos os Planos
-            </Link>
-          </div>
-
-          {/* Trust badges */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto animate-fade-in-up delay-500">
-            {[
-              { icon: Zap, label: 'LiteSpeed', sublabel: '10x mais rápido', color: 'text-yellow-400' },
-              { icon: Shield, label: 'DDoS Protection', sublabel: 'Proteção total', color: 'text-green-400' },
-              { icon: Server, label: 'cPanel Premium', sublabel: 'Interface completa', color: 'text-blue-400' },
-              { icon: Star, label: 'Suporte 24/7', sublabel: 'Sempre disponível', color: 'text-purple-400' },
-            ].map(({ icon: Icon, label, sublabel, color }) => (
-              <div key={label} className="glass rounded-2xl p-4 text-center card-hover border border-white/5">
-                <Icon size={28} className={`${color} mx-auto mb-2`} />
-                <div className="text-white font-semibold text-sm">{label}</div>
-                <div className="text-slate-500 text-xs mt-0.5">{sublabel}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Social proof */}
-          <div className="flex items-center justify-center gap-6 mt-12 animate-fade-in-up delay-600">
-            <div className="flex -space-x-2">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="w-8 h-8 rounded-full border-2 border-indigo-900 bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
-                  {String.fromCharCode(65 + i)}
-                </div>
-              ))}
-            </div>
-            <div className="text-left">
-              <div className="flex items-center gap-1">
-                {[...Array(5)].map((_, i) => <Star key={i} size={14} className="text-yellow-400 fill-yellow-400" />)}
-              </div>
-              <p className="text-slate-400 text-sm"><strong className="text-white">+5.000</strong> clientes satisfeitos</p>
+            {/* Arrow controls */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={prev}
+                className="w-10 h-10 rounded-xl bg-white/8 border border-white/12 flex items-center justify-center text-white hover:bg-white/16 hover:border-white/25 transition-all focus:outline-none"
+                aria-label="Slide anterior"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                onClick={next}
+                className="w-10 h-10 rounded-xl bg-white/8 border border-white/12 flex items-center justify-center text-white hover:bg-white/16 hover:border-white/25 transition-all focus:outline-none"
+                aria-label="Próximo slide"
+              >
+                <ChevronRight size={18} />
+              </button>
             </div>
           </div>
         </div>

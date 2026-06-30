@@ -51,44 +51,51 @@ export function FAQSection() {
   const toggle = (i: number) => setOpenIndex(openIndex === i ? null : i)
 
   return (
-    <section id="faq" className="py-24 bg-slate-950 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent" />
-      <div className="absolute inset-0 bg-mesh opacity-20" />
+    <section id="faq" className="py-24 bg-white relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#E8E8E8] to-transparent" />
 
       <div className="container mx-auto px-4 relative">
+        {/* Header */}
         <div className="text-center mb-16">
-          <span className="inline-block text-indigo-400 text-sm font-semibold tracking-widest uppercase mb-4 bg-indigo-950 px-4 py-2 rounded-full border border-indigo-800">
-            FAQ
-          </span>
-          <h2 className="text-4xl lg:text-5xl font-black text-white mb-6">
+          <span className="section-tag mb-5 inline-flex">FAQ</span>
+          <h2 className="text-4xl lg:text-5xl font-black text-[#0A0A0A] mb-5">
             Perguntas <span className="gradient-text">Frequentes</span>
           </h2>
-          <p className="text-slate-400 text-xl max-w-2xl mx-auto">
+          <p className="text-gray-500 text-xl max-w-2xl mx-auto">
             Encontre respostas para as dúvidas mais comuns. Não encontrou? Contacte o nosso suporte.
           </p>
         </div>
 
-        <div className="max-w-4xl mx-auto space-y-3">
+        {/* Accordion */}
+        <div className="max-w-3xl mx-auto space-y-3">
           {faqs.map((faq, i) => (
             <div key={i}
               className={`border rounded-2xl overflow-hidden transition-all duration-300 ${
-                openIndex === i ? 'border-indigo-500/50 bg-indigo-950/30' : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'
+                openIndex === i
+                  ? 'border-[#F5B700]/50 bg-[#FFFDF0] shadow-sm'
+                  : 'border-[#E8E8E8] bg-white hover:border-[#F5B700]/30'
               }`}
             >
               <button
                 onClick={() => toggle(i)}
-                className="w-full flex items-center justify-between p-6 text-left gap-4"
+                className="w-full flex items-center justify-between p-6 text-left gap-4 group"
               >
-                <span className="text-white font-semibold text-base leading-snug">{faq.q}</span>
-                <div className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center transition-all ${
-                  openIndex === i ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                <span className={`font-semibold text-sm leading-snug transition-colors ${
+                  openIndex === i ? 'text-[#B88900]' : 'text-[#0A0A0A] group-hover:text-[#B88900]'
                 }`}>
-                  {openIndex === i ? <Minus size={16} /> : <Plus size={16} />}
+                  {faq.q}
+                </span>
+                <div className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center transition-all ${
+                  openIndex === i
+                    ? 'bg-[#F5B700] text-[#0A0A0A]'
+                    : 'bg-[#F8F8F8] text-gray-400 group-hover:bg-[#FFF8E1] group-hover:text-[#B88900]'
+                }`}>
+                  {openIndex === i ? <Minus size={15} /> : <Plus size={15} />}
                 </div>
               </button>
 
-              <div className={`overflow-hidden transition-all duration-300 ${openIndex === i ? 'max-h-60' : 'max-h-0'}`}>
-                <div className="px-6 pb-6 text-slate-400 leading-relaxed text-sm border-t border-slate-800 pt-4">
+              <div className={`overflow-hidden transition-all duration-300 ${openIndex === i ? 'max-h-64' : 'max-h-0'}`}>
+                <div className="px-6 pb-6 text-gray-600 leading-relaxed text-sm border-t border-[#F0F0F0] pt-4">
                   {faq.a}
                 </div>
               </div>
@@ -96,10 +103,11 @@ export function FAQSection() {
           ))}
         </div>
 
+        {/* Bottom CTA */}
         <div className="text-center mt-12">
-          <p className="text-slate-400 mb-4">Ainda tem dúvidas?</p>
+          <p className="text-gray-500 mb-4 text-sm">Ainda tem dúvidas? Estamos aqui para ajudar.</p>
           <a href="/tickets"
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-2xl font-semibold transition-all hover:scale-105">
+            className="inline-flex items-center gap-2 btn-dark px-8 py-3 rounded-2xl font-semibold text-sm">
             Falar com Suporte →
           </a>
         </div>
