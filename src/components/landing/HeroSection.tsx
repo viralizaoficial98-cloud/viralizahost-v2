@@ -57,22 +57,12 @@ const slides: Slide[] = [
   },
   {
     id: 2,
-    tag: 'E-mail Corporativo',
-    title: 'Webmail Profissional e\nMicrosoft 365 Outlook',
-    subtitle: 'E-mails corporativos com alta segurança, sincronização total e disponibilidade garantida para o seu negócio.',
-    cta: 'Ver Planos de E-mail',
-    ctaHref: '#email-plans',
-    ctaSecondary: 'Começar Agora',
-    ctaSecondaryHref: '/register',
-    icon: Mail,
+    imageOnly: true,
     bgImage: '/viraliza-email-banner.png',
-    bgPosition: 'right center',
-    bgSize: 'contain',
+    bgPosition: 'center',
     bgColor: '#000000',
     overlayColor: 'transparent',
-    overlayGradient: 'linear-gradient(to right, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.82) 32%, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0.08) 100%)',
     accentColor: '#34D399',
-    features: ['Microsoft 365 Outlook', 'SPF/DKIM/DMARC', 'Alta Disponibilidade'],
   },
 ]
 
@@ -155,19 +145,19 @@ export function HeroSection() {
         >
           <div className="absolute inset-0" style={{ background: s.bgColor }} />
 
-          {s.bgSize === 'contain' ? (
-            /* contain: sem parallax/zoom, imagem mantém proporção */
+          {(s.bgSize === 'contain' || s.imageOnly) ? (
+            /* imageOnly ou contain: sem parallax, imagem fullscreen estática */
             <div
-              className="absolute inset-0 hero-bg-contain"
+              className={s.bgSize === 'contain' ? 'absolute inset-0 hero-bg-contain' : 'absolute inset-0'}
               style={{
                 backgroundImage: `url(${s.bgImage})`,
-                backgroundSize: 'contain',
-                backgroundPosition: s.bgPosition ?? 'right center',
+                backgroundSize: s.bgSize === 'contain' ? 'contain' : 'cover',
+                backgroundPosition: s.bgPosition ?? (s.bgSize === 'contain' ? 'right center' : 'center'),
                 backgroundRepeat: 'no-repeat',
               }}
             />
           ) : (
-            /* cover: parallax + zoom padrão */
+            /* cover com parallax + zoom padrão */
             <div
               className="absolute inset-[-10%]"
               style={{
