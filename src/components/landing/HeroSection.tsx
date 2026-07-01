@@ -35,7 +35,7 @@ const slides: Slide[] = [
     ctaSecondary: 'Saiba Mais',
     ctaSecondaryHref: '#servicos',
     icon: Bot,
-    bgImage: '/images/viraliza-ai-banner.png',
+    bgImage: '/viraliza-ai-banner.png',
     bgPosition: 'right center',
     bgColor: '#000000',
     overlayColor: 'transparent',
@@ -47,7 +47,7 @@ const slides: Slide[] = [
   {
     id: 1,
     imageOnly: true,
-    bgImage: '/images/servidores-premium-banner.png',
+    bgImage: '/servidores_banner.png',
     bgPosition: 'center',
     bgColor: '#000000',
     overlayColor: 'rgba(0,0,0,0.08)',
