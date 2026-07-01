@@ -417,3 +417,15 @@ body {
   padding: 0.375rem 1rem;
   border-radius: 9999px;
 }
+
+/* Hero slide com contain — responsivo */
+.hero-bg-contain {
+  background-size: contain;
+  background-position: right center;
+}
+@media (max-width: 1023px) {
+  .hero-bg-contain {
+    background-size: cover;
+    background-position: center;
+  }
+}

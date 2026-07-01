@@ -8,6 +8,7 @@ type Slide = {
   bgImage: string
   bgColor: string
   bgPosition?: string
+  bgSize?: string
   overlayColor?: string
   overlayGradient?: string
   glowGradient?: string
@@ -48,7 +49,8 @@ const slides: Slide[] = [
     id: 1,
     imageOnly: true,
     bgImage: '/servidores_banner.png',
-    bgPosition: 'center',
+    bgPosition: 'right center',
+    bgSize: 'contain',
     bgColor: '#000000',
     overlayColor: 'rgba(0,0,0,0.08)',
     accentColor: '#F5B700',
@@ -150,17 +152,31 @@ export function HeroSection() {
         >
           <div className="absolute inset-0" style={{ background: s.bgColor }} />
 
-          <div
-            className="absolute inset-[-10%]"
-            style={{
-              backgroundImage: `url(${s.bgImage})`,
-              backgroundSize: 'cover',
-              backgroundPosition: s.bgPosition ?? 'center',
-              backgroundRepeat: 'no-repeat',
-              transform: `translateY(${i === current ? scrollY : 0}px) scale(${isTransitioning && i === current ? 1.02 : 1.05})`,
-              transition: isTransitioning ? 'transform 0.7s ease, opacity 0.5s ease' : 'transform 0.1s linear',
-            }}
-          />
+          {s.bgSize === 'contain' ? (
+            /* contain: sem parallax/zoom, imagem mantém proporção */
+            <div
+              className="absolute inset-0 hero-bg-contain"
+              style={{
+                backgroundImage: `url(${s.bgImage})`,
+                backgroundSize: 'contain',
+                backgroundPosition: s.bgPosition ?? 'right center',
+                backgroundRepeat: 'no-repeat',
+              }}
+            />
+          ) : (
+            /* cover: parallax + zoom padrão */
+            <div
+              className="absolute inset-[-10%]"
+              style={{
+                backgroundImage: `url(${s.bgImage})`,
+                backgroundSize: 'cover',
+                backgroundPosition: s.bgPosition ?? 'center',
+                backgroundRepeat: 'no-repeat',
+                transform: `translateY(${i === current ? scrollY : 0}px) scale(${isTransitioning && i === current ? 1.02 : 1.05})`,
+                transition: isTransitioning ? 'transform 0.7s ease, opacity 0.5s ease' : 'transform 0.1s linear',
+              }}
+            />
+          )}
 
           {s.overlayColor && s.overlayColor !== 'transparent' && (
             <div className="absolute inset-0" style={{ background: s.overlayColor }} />
