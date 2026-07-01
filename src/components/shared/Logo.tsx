@@ -20,7 +20,7 @@ export function Logo({ variant = 'dark', size = 'md', href = '/', className = ''
   return (
     <Link href={href} className={`flex items-center shrink-0 ${className}`} aria-label="ViralizaHost — Página inicial">
       <Image
-        src="/images/logo-viraliza-yellow.png"
+        src="/logo-viraliza-yellow.png"
         alt="ViralizaHost"
         width={w}
         height={h}
