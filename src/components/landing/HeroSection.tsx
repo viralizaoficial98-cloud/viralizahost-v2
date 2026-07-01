@@ -152,18 +152,17 @@ export function HeroSection() {
           <div className="absolute inset-0" style={{ background: s.bgColor }} />
 
           {/* Background image with parallax + zoom */}
-          {(imagesLoaded[i] || i === 0) && (
-            <div
-              className="absolute inset-[-10%]"
-              style={{
-                backgroundImage: `url(${s.bgImage})`,
-                backgroundSize: 'cover',
-                backgroundPosition: (s as { bgPosition?: string }).bgPosition ?? 'center',
-                transform: `translateY(${i === current ? scrollY : 0}px) scale(${isTransitioning && i === current ? 1.02 : 1.05})`,
-                transition: isTransitioning ? 'transform 0.7s ease, opacity 0.5s ease' : 'transform 0.1s linear',
-              }}
-            />
-          )}
+          <div
+            className="absolute inset-[-10%]"
+            style={{
+              backgroundImage: `url(${s.bgImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: (s as { bgPosition?: string }).bgPosition ?? 'center',
+              backgroundRepeat: 'no-repeat',
+              transform: `translateY(${i === current ? scrollY : 0}px) scale(${isTransitioning && i === current ? 1.02 : 1.05})`,
+              transition: isTransitioning ? 'transform 0.7s ease, opacity 0.5s ease' : 'transform 0.1s linear',
+            }}
+          />
 
           {/* Dark overlay (flat or transparent if using gradient) */}
           {s.overlayColor !== 'transparent' && (
