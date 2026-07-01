@@ -30,7 +30,7 @@ const slides = [
     ctaSecondary: 'Saiba Mais',
     ctaSecondaryHref: '#servicos',
     icon: Bot,
-    bgImage: '/images/viraliza-ai-banner.webp',
+    bgImage: '/images/viraliza-ai-banner.png',
     bgPosition: 'right center',
     bgColor: '#000000',
     overlayColor: 'transparent',
