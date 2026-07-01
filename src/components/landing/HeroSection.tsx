@@ -30,10 +30,13 @@ const slides = [
     ctaSecondary: 'Saiba Mais',
     ctaSecondaryHref: '#servicos',
     icon: Bot,
-    bgImage: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=1920&q=85&auto=format&fit=crop',
-    bgColor: '#06040f',
-    overlayColor: 'rgba(6, 4, 20, 0.65)',
-    accentColor: '#A78BFA',
+    bgImage: '/images/viraliza-ai-banner.webp',
+    bgPosition: 'right center',
+    bgColor: '#000000',
+    overlayColor: 'transparent',
+    overlayGradient: 'linear-gradient(to right, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.82) 32%, rgba(0,0,0,0.52) 58%, rgba(0,0,0,0.12) 100%)',
+    glowGradient: 'radial-gradient(ellipse 55% 70% at 82% 50%, rgba(245,183,0,0.08), transparent)',
+    accentColor: '#F5B700',
     features: ['Chatbots Inteligentes', 'Automação de Processos', 'Agentes IA'],
   },
   {
@@ -155,15 +158,29 @@ export function HeroSection() {
               style={{
                 backgroundImage: `url(${s.bgImage})`,
                 backgroundSize: 'cover',
-                backgroundPosition: 'center',
+                backgroundPosition: (s as { bgPosition?: string }).bgPosition ?? 'center',
                 transform: `translateY(${i === current ? scrollY : 0}px) scale(${isTransitioning && i === current ? 1.02 : 1.05})`,
                 transition: isTransitioning ? 'transform 0.7s ease, opacity 0.5s ease' : 'transform 0.1s linear',
               }}
             />
           )}
 
-          {/* Dark overlay */}
-          <div className="absolute inset-0" style={{ background: s.overlayColor }} />
+          {/* Dark overlay (flat or transparent if using gradient) */}
+          {s.overlayColor !== 'transparent' && (
+            <div className="absolute inset-0" style={{ background: s.overlayColor }} />
+          )}
+
+          {/* Directional gradient overlay */}
+          {(s as { overlayGradient?: string }).overlayGradient && (
+            <div className="absolute inset-0"
+              style={{ background: (s as { overlayGradient?: string }).overlayGradient }} />
+          )}
+
+          {/* Golden/accent glow */}
+          {(s as { glowGradient?: string }).glowGradient && (
+            <div className="absolute inset-0"
+              style={{ background: (s as { glowGradient?: string }).glowGradient }} />
+          )}
 
           {/* Radial gradient vignette */}
           <div
