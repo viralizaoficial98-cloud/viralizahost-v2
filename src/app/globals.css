@@ -419,13 +419,22 @@ body {
 }
 
 /* Hero slide com contain — responsivo */
+/* Mobile base: cover centro */
 .hero-bg-contain {
-  background-size: contain;
-  background-position: right center;
+  background-size: cover;
+  background-position: center center;
 }
-@media (max-width: 1023px) {
+/* Tablet (768px-1439px): contain centro */
+@media (min-width: 768px) and (max-width: 1439px) {
+  .hero-bg-contain {
+    background-size: contain;
+    background-position: center center;
+  }
+}
+/* Desktop grande (1440px+): cover alinhado à direita */
+@media (min-width: 1440px) {
   .hero-bg-contain {
     background-size: cover;
-    background-position: center;
+    background-position: center right;
   }
 }
