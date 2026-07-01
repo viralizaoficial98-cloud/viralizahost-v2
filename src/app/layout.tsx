@@ -11,6 +11,13 @@ export const metadata: Metadata = {
   },
   description: 'Hospedagem web premium com LiteSpeed, NVMe SSD, cPanel e suporte 24/7. Planos a partir de Kz 4.500/mês. Uptime 99.9% garantido.',
   keywords: ['hospedagem web', 'hosting angola', 'hosting brasil', 'cpanel', 'domínios', 'email corporativo', 'ssl grátis'],
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
   openGraph: {
     title: 'ViralizaHost — Hospedagem Web Premium',
     description: 'Hospedagem web premium com LiteSpeed, NVMe SSD e suporte 24/7.',

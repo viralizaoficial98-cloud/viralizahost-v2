@@ -42,8 +42,13 @@ export function Header() {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex items-center justify-between h-[68px]">
 
-          {/* Logo */}
-          <Logo variant="dark" size="md" />
+          {/* Logo — 55px desktop / 42px mobile via responsive wrapper */}
+          <div className="hidden sm:block">
+            <Logo variant="dark" size="md" />
+          </div>
+          <div className="block sm:hidden">
+            <Logo variant="dark" size="sm" />
+          </div>
 
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-0.5 flex-1 justify-center max-w-2xl mx-auto">
