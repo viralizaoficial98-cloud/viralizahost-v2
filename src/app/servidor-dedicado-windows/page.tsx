@@ -73,7 +73,7 @@ export default function ServidorDedicadoWindowsPage() {
           ctaHref="#planos"
           ctaSecondary="Falar com Especialista"
           ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1597733336794-12d05021d510?w=1920&q=80&auto=format&fit=crop"
+          bgImage="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920&q=80&auto=format&fit=crop"
           bgColor="#060810"
           highlights={['Windows Server 2022', 'Plesk Incluído', 'MS SQL Server', 'Remote Desktop']}
         />

@@ -75,7 +75,7 @@ export default function VPSn8nPage() {
           ctaHref="#planos"
           ctaSecondary="Falar com Especialista"
           ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1518186285589-2f7649de83e0?w=1920&q=80&auto=format&fit=crop"
+          bgImage="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=80&auto=format&fit=crop"
           bgColor="#060b14"
           highlights={['n8n Pré-instalado', 'Fluxos Ilimitados', 'WhatsApp Integrado', 'Root Access']}
         />

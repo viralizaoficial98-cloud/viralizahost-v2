@@ -73,7 +73,7 @@ export default function HospedagemWordPressPage() {
           ctaHref="#planos"
           ctaSecondary="Falar com Especialista"
           ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=1920&q=80&auto=format&fit=crop"
+          bgImage="https://images.unsplash.com/photo-1629654297299-c8506221ca97?w=1920&q=80&auto=format&fit=crop"
           bgColor="#0a0f1e"
           highlights={['WordPress Pré-instalado', 'Criador com IA', 'CDN Global', 'Backup Diário']}
         />

@@ -75,7 +75,7 @@ export default function VPSEvolutionAPIPage() {
           ctaHref="#planos"
           ctaSecondary="Falar com Especialista"
           ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1611746872915-64382b5c76da?w=1920&q=80&auto=format&fit=crop"
+          bgImage="https://images.unsplash.com/photo-1617791160536-598cf32026fb?w=1920&q=80&auto=format&fit=crop"
           bgColor="#062006"
           highlights={['Evolution API Instalada', 'Múltiplos Números', 'Webhooks Avançados', 'Integrações CRM']}
         />

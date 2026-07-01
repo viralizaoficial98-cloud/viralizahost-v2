@@ -81,7 +81,7 @@ export default function RevendaDeHospedagemPage() {
           ctaHref="#planos"
           ctaSecondary="Falar com Comercial"
           ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1920&q=80&auto=format&fit=crop"
+          bgImage="https://images.unsplash.com/photo-1591808216268-1e7c1b31b9d2?w=1920&q=80&auto=format&fit=crop"
           bgColor="#0a0a14"
           highlights={['WHM/cPanel Incluído', 'DNS Whitelabel', 'SSL por Conta', 'Suporte Revendedor']}
         />

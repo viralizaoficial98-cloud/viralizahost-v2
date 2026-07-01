@@ -73,7 +73,7 @@ export default function ConstrutorWordPressPage() {
           ctaHref="#planos"
           ctaSecondary="Falar com Especialista"
           ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=1920&q=80&auto=format&fit=crop"
+          bgImage="https://images.unsplash.com/photo-1580584126903-c17d41830450?w=1920&q=80&auto=format&fit=crop"
           bgColor="#0a0c14"
           highlights={['Builder Visual', 'Plugins Premium', 'WordPress Pré-instalado', 'CDN Global']}
         />
