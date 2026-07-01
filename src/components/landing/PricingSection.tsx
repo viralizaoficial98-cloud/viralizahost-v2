@@ -124,12 +124,12 @@ export function PricingSection() {
       <div className="container mx-auto px-4 relative">
         {/* Header */}
         <div className="text-center mb-16">
-          <span className="section-tag mb-5 inline-flex">Planos & Preços</span>
+          <span className="section-tag mb-5 inline-flex">Hospedagem Premium</span>
           <h2 className="text-4xl lg:text-5xl font-black text-[#0A0A0A] mb-5">
-            Escolha o Plano <span className="gradient-text">Ideal</span> para Si
+            Planos de <span className="gradient-text">Hospedagem</span>
           </h2>
           <p className="text-gray-500 text-xl max-w-2xl mx-auto mb-8">
-            Todos os planos incluem SSL grátis, cPanel Premium, backup e suporte 24/7. Sem taxas ocultas.
+            Escolha o plano ideal para escalar o seu negócio. SSL grátis, cPanel Premium, backup e suporte 24/7.
           </p>
 
           {/* Billing toggle */}

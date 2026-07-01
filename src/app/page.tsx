@@ -3,11 +3,10 @@ import { Footer } from '@/components/layout/Footer'
 import { FloatingChat } from '@/components/layout/FloatingChat'
 import { HeroSection } from '@/components/landing/HeroSection'
 import { DomainSearchBar } from '@/components/landing/DomainSearchBar'
-import { ServicesGridSection } from '@/components/landing/ServicesGridSection'
+import { EmailCorpSection } from '@/components/landing/EmailCorpSection'
 import { StatsSection } from '@/components/landing/StatsSection'
-import { BenefitsSection } from '@/components/landing/BenefitsSection'
+import { ServicesGridSection } from '@/components/landing/ServicesGridSection'
 import { PricingSection } from '@/components/landing/PricingSection'
-import { EmailPricingSection } from '@/components/landing/EmailPricingSection'
 import { GlobalPresenceSection } from '@/components/landing/GlobalPresenceSection'
 import { TestimonialsSection } from '@/components/landing/TestimonialsSection'
 import { FAQSection } from '@/components/landing/FAQSection'
@@ -18,13 +17,19 @@ export default function HomePage() {
     <>
       <Header />
       <main>
+        {/* 1 — Hero Banner */}
         <HeroSection />
+        {/* 2 — Pesquisa de Domínios (wave LED + cards premium) */}
         <DomainSearchBar />
-        <ServicesGridSection />
+        {/* 3 — E-mails Corporativos Premium */}
+        <EmailCorpSection />
+        {/* 4 — Barra Preta de Métricas */}
         <StatsSection />
-        <BenefitsSection />
+        {/* 5 — O que oferecemos */}
+        <ServicesGridSection />
+        {/* 6 — Planos de Hospedagem */}
         <PricingSection />
-        <EmailPricingSection />
+        {/* 7 — Presença Global */}
         <GlobalPresenceSection />
         <TestimonialsSection />
         <FAQSection />
