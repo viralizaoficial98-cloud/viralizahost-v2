@@ -1,78 +1,248 @@
 'use client'
 import { useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search, Shield, Zap, Headphones, Lock, Globe, RefreshCw, Server } from 'lucide-react'
 
-const tlds = ['.com', '.net', '.org', '.ao', '.com.br', '.io']
+const extensions = [
+  { tld: '.com', label: 'O mais popular', price: 'Kz 4.500/ano', popular: true },
+  { tld: '.net', label: 'Tecnologia & redes', price: 'Kz 5.200/ano' },
+  { tld: '.org', label: 'Organizações', price: 'Kz 4.800/ano' },
+  { tld: '.ao', label: 'Angola oficial', price: 'Kz 8.000/ano' },
+  { tld: '.com.br', label: 'Brasil', price: 'R$ 49/ano' },
+  { tld: '.io', label: 'Startups & tech', price: 'Kz 18.000/ano' },
+]
+
+const benefits = [
+  { icon: Lock, title: 'Protecção de Privacidade', desc: 'WHOIS protegido e dados ocultos' },
+  { icon: Globe, title: 'DNS Premium', desc: 'Propagação ultrarrápida' },
+  { icon: Shield, title: 'Segurança Avançada', desc: 'DNSSEC activado por padrão' },
+  { icon: RefreshCw, title: 'Renovação Automática', desc: 'Nunca perca o seu domínio' },
+  { icon: Headphones, title: 'Suporte Especializado', desc: 'Equipa técnica 24/7' },
+]
+
+const trustItems = [
+  { icon: Shield, text: 'Pesquisa 100% segura' },
+  { icon: Zap, text: 'Activação rápida' },
+  { icon: Headphones, text: 'Suporte especializado' },
+]
 
 export function DomainSearchBar() {
   const [query, setQuery] = useState('')
-  const [activeTld, setActiveTld] = useState('.com')
+
+  const handleSearch = () => {
+    if (query.trim()) alert(`A pesquisar: ${query}`)
+  }
 
   return (
-    <section className="bg-white py-14 border-b border-[#F0F0F0]">
-      <div className="container mx-auto px-4 max-w-3xl">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl md:text-3xl font-black text-[#0A0A0A] mb-2">
-            Encontre o domínio ideal para o seu negócio
-          </h2>
-          <p className="text-[#666] text-sm md:text-base">
-            Pesquise disponibilidade e registe já o seu domínio
-          </p>
-        </div>
-
-        {/* Search box */}
-        <div className="flex rounded-2xl shadow-[0_4px_32px_rgba(0,0,0,0.10)] overflow-hidden border border-[#E8E8E8]">
-          <div className="flex items-center px-4 bg-[#F8F8F8] border-r border-[#E8E8E8] text-[#999] font-semibold text-sm select-none">
-            www
-          </div>
-          <input
-            type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && query && alert(`A pesquisar: ${query}${activeTld}`)}
-            placeholder="Pesquise seu domínio..."
-            className="flex-1 px-4 py-4 text-[#0A0A0A] text-sm md:text-base outline-none bg-white placeholder:text-[#BBB]"
+    <>
+      {/* Moon curve separator — hero → domains */}
+      <div className="relative bg-black" style={{ marginBottom: '-2px' }}>
+        <svg
+          viewBox="0 0 1440 80"
+          xmlns="http://www.w3.org/2000/svg"
+          preserveAspectRatio="none"
+          className="w-full block"
+          style={{ height: 80 }}
+        >
+          <defs>
+            <filter id="glow-curve">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          {/* White fill underneath curve */}
+          <path d="M0,80 Q720,0 1440,80 L1440,80 L0,80 Z" fill="#ffffff" />
+          {/* Golden glow line on the curve edge */}
+          <path
+            d="M0,80 Q720,0 1440,80"
+            fill="none"
+            stroke="#F5B700"
+            strokeWidth="2.5"
+            filter="url(#glow-curve)"
+            opacity="0.7"
           />
-          <button
-            onClick={() => query && alert(`A pesquisar: ${query}${activeTld}`)}
-            className="btn-primary px-6 py-4 text-sm font-bold flex items-center gap-2 rounded-none shrink-0"
-          >
-            <Search size={16} />
-            Pesquisar
-          </button>
-        </div>
-
-        {/* TLD pills */}
-        <div className="flex flex-wrap justify-center gap-2 mt-5">
-          {tlds.map(tld => (
-            <button
-              key={tld}
-              onClick={() => setActiveTld(tld)}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                activeTld === tld
-                  ? 'bg-[#F5B700] border-[#F5B700] text-[#0A0A0A]'
-                  : 'bg-white border-[#E8E8E8] text-[#666] hover:border-[#F5B700] hover:text-[#0A0A0A]'
-              }`}
-            >
-              {tld}
-            </button>
-          ))}
-        </div>
-
-        {/* Popular TLD prices */}
-        <div className="flex flex-wrap justify-center gap-6 mt-6 text-center">
-          {[
-            { tld: '.com', price: 'Kz 4.500/ano' },
-            { tld: '.net', price: 'Kz 5.200/ano' },
-            { tld: '.ao', price: 'Kz 8.000/ano' },
-            { tld: '.com.br', price: 'R$ 49/ano' },
-          ].map(({ tld, price }) => (
-            <div key={tld} className="text-xs text-[#888]">
-              <span className="font-bold text-[#0A0A0A]">{tld}</span> — {price}
-            </div>
-          ))}
-        </div>
+        </svg>
       </div>
-    </section>
+
+      {/* Domain Section */}
+      <section className="bg-white pt-0 pb-20">
+        <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
+
+          {/* Heading */}
+          <div className="text-center mb-12 pt-4">
+            <div className="flex items-center justify-center gap-4 mb-4">
+              <div className="h-px w-16 bg-gradient-to-r from-transparent to-[#F5B700]" />
+              <p className="text-[#F5B700] text-xs font-bold tracking-widest uppercase">Registo de Domínios</p>
+              <div className="h-px w-16 bg-gradient-to-l from-transparent to-[#F5B700]" />
+            </div>
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-[#0A0A0A] leading-tight mb-4">
+              Encontre o{' '}
+              <span className="text-[#F5B700]">domínio ideal</span>
+              {' '}para<br className="hidden md:block" /> o seu negócio
+            </h2>
+            <p className="text-[#666] text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+              Pesquise, registe e proteja o nome da sua marca com rapidez,<br className="hidden md:block" /> segurança e o melhor preço.
+            </p>
+          </div>
+
+          {/* Search bar */}
+          <div className="max-w-3xl mx-auto mb-5">
+            <div
+              className="flex items-center bg-white rounded-[20px] border border-[#E8E8E8] overflow-hidden transition-all duration-200"
+              style={{
+                height: 72,
+                boxShadow: '0 8px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(245,183,0,0.08)',
+              }}
+            >
+              <div className="flex items-center pl-5 pr-3 shrink-0">
+                <Search size={22} className="text-[#BBB]" />
+              </div>
+              <input
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                placeholder="Digite o nome do domínio desejado"
+                className="flex-1 text-[#0A0A0A] text-base md:text-lg outline-none bg-transparent placeholder:text-[#C0C0C0] pr-3"
+              />
+              <div className="pr-2 shrink-0">
+                <button
+                  onClick={handleSearch}
+                  className="h-[54px] px-7 rounded-[14px] font-bold text-sm md:text-base text-[#0A0A0A] transition-all duration-200 flex items-center gap-2 shrink-0"
+                  style={{
+                    background: '#F5B700',
+                    boxShadow: '0 4px 20px rgba(245,183,0,0.35)',
+                  }}
+                  onMouseEnter={e => {
+                    const el = e.currentTarget
+                    el.style.background = '#0A0A0A'
+                    el.style.color = '#F5B700'
+                    el.style.boxShadow = '0 4px 20px rgba(0,0,0,0.25)'
+                  }}
+                  onMouseLeave={e => {
+                    const el = e.currentTarget
+                    el.style.background = '#F5B700'
+                    el.style.color = '#0A0A0A'
+                    el.style.boxShadow = '0 4px 20px rgba(245,183,0,0.35)'
+                  }}
+                >
+                  <Search size={16} />
+                  Pesquisar Domínio
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Trust bar */}
+          <div className="flex flex-wrap justify-center gap-6 mb-14">
+            {trustItems.map(({ icon: Icon, text }) => (
+              <div key={text} className="flex items-center gap-2 text-[#555] text-sm">
+                <Icon size={14} className="text-[#F5B700]" />
+                <span>{text}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Extension cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            {extensions.map(({ tld, label, price, popular }) => (
+              <div
+                key={tld}
+                className="group relative flex flex-col items-center text-center bg-white border rounded-2xl p-5 cursor-pointer transition-all duration-200"
+                style={{
+                  borderColor: popular ? '#F5B700' : '#EBEBEB',
+                  boxShadow: popular
+                    ? '0 4px 24px rgba(245,183,0,0.18)'
+                    : '0 2px 12px rgba(0,0,0,0.05)',
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget
+                  el.style.borderColor = '#F5B700'
+                  el.style.boxShadow = '0 8px 32px rgba(245,183,0,0.22)'
+                  el.style.transform = 'translateY(-3px)'
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget
+                  el.style.borderColor = popular ? '#F5B700' : '#EBEBEB'
+                  el.style.boxShadow = popular
+                    ? '0 4px 24px rgba(245,183,0,0.18)'
+                    : '0 2px 12px rgba(0,0,0,0.05)'
+                  el.style.transform = 'translateY(0)'
+                }}
+              >
+                {popular && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#F5B700] text-[#0A0A0A] text-[10px] font-black px-3 py-0.5 rounded-full tracking-wide uppercase">
+                    Popular
+                  </span>
+                )}
+                <div className="text-2xl font-black text-[#0A0A0A] mb-1">{tld}</div>
+                <div className="text-[11px] text-[#999] mb-3 leading-tight">{label}</div>
+                <div className="text-[13px] font-bold text-[#0A0A0A] mb-4">{price}</div>
+                <button
+                  className="w-full py-2 rounded-xl text-xs font-bold transition-all duration-200 border"
+                  style={{
+                    background: popular ? '#F5B700' : 'transparent',
+                    borderColor: popular ? '#F5B700' : '#D0D0D0',
+                    color: popular ? '#0A0A0A' : '#444',
+                  }}
+                  onMouseEnter={e => {
+                    const el = e.currentTarget
+                    el.style.background = '#F5B700'
+                    el.style.borderColor = '#F5B700'
+                    el.style.color = '#0A0A0A'
+                  }}
+                  onMouseLeave={e => {
+                    const el = e.currentTarget
+                    el.style.background = popular ? '#F5B700' : 'transparent'
+                    el.style.borderColor = popular ? '#F5B700' : '#D0D0D0'
+                    el.style.color = popular ? '#0A0A0A' : '#444'
+                  }}
+                >
+                  Registar
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* CTA link */}
+          <div className="text-center mb-16">
+            <a
+              href="#"
+              className="inline-flex items-center gap-2 text-[#F5B700] font-bold text-sm hover:gap-3 transition-all duration-200"
+            >
+              Ver todos os domínios disponíveis
+              <span>→</span>
+            </a>
+          </div>
+
+          {/* Benefits bar */}
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-px bg-[#F0F0F0] rounded-2xl overflow-hidden"
+            style={{ boxShadow: '0 2px 20px rgba(0,0,0,0.06)' }}
+          >
+            {benefits.map(({ icon: Icon, title, desc }) => (
+              <div
+                key={title}
+                className="bg-white px-6 py-6 flex flex-col items-center text-center gap-3 group hover:bg-[#FAFAFA] transition-colors duration-200"
+              >
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center transition-colors duration-200"
+                  style={{ background: '#FFF8E1' }}
+                >
+                  <Icon size={20} className="text-[#F5B700]" />
+                </div>
+                <div>
+                  <p className="text-[#0A0A0A] font-bold text-sm leading-tight mb-1">{title}</p>
+                  <p className="text-[#999] text-xs leading-snug">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      </section>
+    </>
   )
 }
