@@ -34,34 +34,99 @@ export function DomainSearchBar() {
 
   return (
     <>
-      {/* Moon curve separator — hero → domains */}
-      <div className="relative bg-black" style={{ marginBottom: '-2px' }}>
+      {/* Premium LED wave separator */}
+      <div className="relative w-full overflow-hidden" style={{ background: '#000000', marginBottom: '-1px' }}>
+        <style>{`
+          @keyframes wave-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.72; }
+          }
+          @keyframes wave-shift {
+            0%, 100% { transform: translateX(0px); }
+            50% { transform: translateX(6px); }
+          }
+          .led-wave-glow { animation: wave-pulse 3.5s ease-in-out infinite; }
+          .led-wave-line { animation: wave-shift 6s ease-in-out infinite; }
+        `}</style>
         <svg
-          viewBox="0 0 1440 80"
+          viewBox="0 0 1440 56"
           xmlns="http://www.w3.org/2000/svg"
           preserveAspectRatio="none"
           className="w-full block"
-          style={{ height: 80 }}
+          style={{ height: 56 }}
         >
           <defs>
-            <filter id="glow-curve">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
+            {/* Outer bloom — widest, softest */}
+            <filter id="glow-bloom" x="-10%" y="-200%" width="120%" height="500%">
+              <feGaussianBlur stdDeviation="10" result="bloom" />
+            </filter>
+            {/* Mid glow */}
+            <filter id="glow-mid" x="-5%" y="-150%" width="110%" height="400%">
+              <feGaussianBlur stdDeviation="5" result="mid" />
+            </filter>
+            {/* Inner crisp glow */}
+            <filter id="glow-inner" x="-2%" y="-80%" width="104%" height="260%">
+              <feGaussianBlur stdDeviation="2" result="inner" />
             </filter>
           </defs>
-          {/* White fill underneath curve */}
-          <path d="M0,80 Q720,0 1440,80 L1440,80 L0,80 Z" fill="#ffffff" />
-          {/* Golden glow line on the curve edge */}
+
+          {/* White fill — domain section background */}
           <path
-            d="M0,80 Q720,0 1440,80"
+            d="M0,56 L0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22 L1440,56 Z"
+            fill="#ffffff"
+          />
+
+          {/* Layer 1 — outer bloom (widest, most diffuse, amber) */}
+          <path
+            className="led-wave-glow"
+            d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22"
             fill="none"
             stroke="#F5B700"
-            strokeWidth="2.5"
-            filter="url(#glow-curve)"
+            strokeWidth="12"
+            filter="url(#glow-bloom)"
+            opacity="0.25"
+          />
+
+          {/* Layer 2 — mid glow (yellow) */}
+          <path
+            className="led-wave-glow"
+            d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22"
+            fill="none"
+            stroke="#F5B700"
+            strokeWidth="6"
+            filter="url(#glow-mid)"
+            opacity="0.55"
+          />
+
+          {/* Layer 3 — inner glow (brighter yellow) */}
+          <path
+            className="led-wave-glow"
+            d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22"
+            fill="none"
+            stroke="#FFD54F"
+            strokeWidth="3"
+            filter="url(#glow-inner)"
+            opacity="0.85"
+          />
+
+          {/* Layer 4 — white core (LED hotspot) */}
+          <path
+            className="led-wave-line"
+            d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="1.2"
             opacity="0.7"
+          />
+
+          {/* Layer 5 — solid yellow main line */}
+          <path
+            className="led-wave-line"
+            d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22"
+            fill="none"
+            stroke="#F5B700"
+            strokeWidth="2"
+            opacity="1"
           />
         </svg>
       </div>
