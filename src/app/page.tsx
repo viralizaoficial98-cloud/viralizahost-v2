@@ -5,7 +5,6 @@ import { HeroSection } from '@/components/landing/HeroSection'
 import { DomainSearchBar } from '@/components/landing/DomainSearchBar'
 import { EmailCorpSection } from '@/components/landing/EmailCorpSection'
 import { StatsSection } from '@/components/landing/StatsSection'
-import { ServicesGridSection } from '@/components/landing/ServicesGridSection'
 import { PricingSection } from '@/components/landing/PricingSection'
 import { GlobalPresenceSection } from '@/components/landing/GlobalPresenceSection'
 import { TestimonialsSection } from '@/components/landing/TestimonialsSection'
@@ -26,14 +25,12 @@ export default function HomePage() {
         <EmailCorpSection />
         {/* 4 — Barra Preta de Métricas */}
         <StatsSection />
-        {/* 5 — O que oferecemos */}
-        <ServicesGridSection />
+        {/* 5 — Time / Estrutura Organizacional */}
+        <TeamSection />
         {/* 6 — Planos de Hospedagem */}
         <PricingSection />
         {/* 7 — Presença Global */}
         <GlobalPresenceSection />
-        {/* 8 — Time / Estrutura Organizacional */}
-        <TeamSection />
         <TestimonialsSection />
         <FAQSection />
         <CTASection />
