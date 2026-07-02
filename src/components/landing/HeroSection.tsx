@@ -56,22 +56,9 @@ const slides: Slide[] = [
     features: ['Chatbots Inteligentes', 'Automação de Processos', 'Agentes IA'],
   },
 
-  /* ── SLIDE 2 — Servidores Premium ────────────────────────── */
+  /* ── SLIDE 2 — E-mail Corporativo ───────────────────────── */
   {
     id: 1,
-    imageOnly: true,
-    bgImage: '/servidores_banner.png',
-    bgColor: '#000000',
-    bgSize: 'contain',
-    desktopPosition: 'center center',
-    tabletPosition: 'center center',
-    mobilePosition: 'center center',
-    accentColor: '#F5B700',
-  },
-
-  /* ── SLIDE 3 — E-mail Corporativo ────────────────────────── */
-  {
-    id: 2,
     imageOnly: true,
     bgImage: '/viraliza-email-banner.png',
     bgColor: '#000000',
@@ -80,6 +67,19 @@ const slides: Slide[] = [
     tabletPosition: 'center center',
     mobilePosition: 'center center',
     accentColor: '#34D399',
+  },
+
+  /* ── SLIDE 3 — Servidores Premium ────────────────────────── */
+  {
+    id: 2,
+    imageOnly: true,
+    bgImage: '/servidores_banner.png',
+    bgColor: '#000000',
+    bgSize: 'contain',
+    desktopPosition: 'center center',
+    tabletPosition: 'center center',
+    mobilePosition: 'center center',
+    accentColor: '#F5B700',
   },
 ]
 
