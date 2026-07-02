@@ -56,19 +56,19 @@ const servicosColumns: ColDef[] = [
       { icon: Users,     label: 'Revenda de Hospedagem', desc: 'WHM/cPanel para revendedores',       href: '/revenda-de-hospedagem' },
       { icon: Cpu,       label: 'VPS Linux',             desc: 'Servidores VPS de alto desempenho',  href: '/servidor-vps' },
       { icon: HardDrive, label: 'Servidores Dedicados',  desc: 'Máximo poder e performance',         href: '/servidor-dedicado' },
-      { icon: Mail,      label: 'E-mail Corporativo',    desc: 'Soluções profissionais de e-mail',   href: '/#email-plans' },
-      { icon: Globe,     label: 'Domínios',              desc: 'Registe o seu domínio ideal',        href: '/#dominios' },
+      { icon: Mail,      label: 'E-mail Corporativo',    desc: 'Soluções profissionais de e-mail',   href: '/email-corporativo' },
+      { icon: Globe,     label: 'Domínios',              desc: 'Registe o seu domínio ideal',        href: '/dominios' },
     ],
   },
   {
     title: 'Soluções',
     items: [
       { icon: Code,      label: 'Criador de Sites',  desc: 'Crie o seu site facilmente',   href: '/criador-de-sites' },
-      { icon: Lock,      label: 'Certificado SSL',   desc: 'Segurança para o seu site',    href: '/ssl' },
-      { icon: RefreshCw, label: 'Backup Cloud',      desc: 'Protecção e backup automático',href: '/backup' },
-      { icon: Shield,    label: 'Protecção de Site', desc: 'Anti-malware e Firewall',      href: '/seguranca' },
-      { icon: Zap,       label: 'Migração Grátis',   desc: 'Migração sem custo',           href: '/migracao' },
-      { icon: Gauge,     label: 'CDN Premium',       desc: 'Velocidade global',            href: '/cdn' },
+      { icon: Lock,      label: 'Certificado SSL',   desc: 'Segurança para o seu site',    href: '/certificado-ssl' },
+      { icon: RefreshCw, label: 'Backup Cloud',      desc: 'Protecção e backup automático',href: '/backup-cloud' },
+      { icon: Shield,    label: 'Protecção de Site', desc: 'Anti-malware e Firewall',      href: '/protecao-de-site' },
+      { icon: Zap,       label: 'Migração Grátis',   desc: 'Migração sem custo',           href: '/migracao-gratis' },
+      { icon: Gauge,     label: 'CDN Premium',       desc: 'Velocidade global',            href: '/cdn-premium' },
     ],
   },
   {
@@ -77,8 +77,8 @@ const servicosColumns: ColDef[] = [
       { icon: BookOpen,  label: 'Base de Conhecimento', desc: 'Tutoriais e guias',          href: '/base-conhecimento' },
       { icon: Rss,       label: 'Blog',                 desc: 'Conteúdo e novidades',       href: '/blog' },
       { icon: Wrench,    label: 'Ferramentas',           desc: 'Utilitários e suporte',      href: '/ferramentas' },
-      { icon: Handshake, label: 'Parcerias',             desc: 'Seja nosso parceiro',        href: '/parceiros' },
-      { icon: Activity,  label: 'Status do Sistema',    desc: 'Verificar disponibilidade',  href: '/status' },
+      { icon: Handshake, label: 'Parcerias',             desc: 'Seja nosso parceiro',        href: '/parcerias' },
+      { icon: Activity,  label: 'Status do Sistema',    desc: 'Verificar disponibilidade',  href: '/suporte/status' },
     ],
   },
 ]
@@ -88,10 +88,10 @@ const dominiosColumns: ColDef[] = [
   {
     title: 'Registo de Domínios',
     items: [
-      { icon: Search,    label: 'Pesquisar Domínio',        desc: 'Verifique a disponibilidade do seu domínio', href: '/#dominios' },
-      { icon: Globe,     label: 'Registar Domínio .ao',     desc: 'Domínio oficial de Angola',                  href: '/dominios/ao' },
-      { icon: Globe,     label: 'Registar Domínio .com',    desc: 'O domínio mais popular do mundo',            href: '/dominios/com' },
-      { icon: Globe,     label: 'Registar Domínio .com.br', desc: 'Domínio oficial do Brasil',                  href: '/dominios/com-br' },
+      { icon: Search,    label: 'Pesquisar Domínio',        desc: 'Verifique a disponibilidade do seu domínio', href: '/dominios/pesquisar' },
+      { icon: Globe,     label: 'Registar Domínio .ao',     desc: 'Domínio oficial de Angola',                  href: '/dominios/registrar-ao' },
+      { icon: Globe,     label: 'Registar Domínio .com',    desc: 'O domínio mais popular do mundo',            href: '/dominios/registrar-com' },
+      { icon: Globe,     label: 'Registar Domínio .com.br', desc: 'Domínio oficial do Brasil',                  href: '/dominios/registrar-com-br' },
       { icon: MoveRight, label: 'Transferir Domínio',       desc: 'Transfira o seu domínio com segurança',      href: '/dominios/transferir' },
       { icon: RotateCcw, label: 'Renovar Domínio',          desc: 'Renove antes do prazo e poupe',              href: '/dominios/renovar' },
     ],
@@ -99,9 +99,9 @@ const dominiosColumns: ColDef[] = [
   {
     title: 'Segurança e Gestão',
     items: [
-      { icon: Gauge,    label: 'DNS Premium',              desc: 'Propagação ultrarrápida e fiável',      href: '/dominios/dns' },
-      { icon: Lock,     label: 'Proteção WHOIS',           desc: 'Oculte os seus dados de contacto',     href: '/dominios/whois-protecao' },
-      { icon: ShieldCheck, label: 'Certificado SSL',       desc: 'HTTPS gratuito para o seu domínio',    href: '/ssl' },
+      { icon: Gauge,    label: 'DNS Premium',              desc: 'Propagação ultrarrápida e fiável',      href: '/dominios/dns-premium' },
+      { icon: Lock,     label: 'Proteção WHOIS',           desc: 'Oculte os seus dados de contacto',     href: '/dominios/whois' },
+      { icon: ShieldCheck, label: 'Certificado SSL',       desc: 'HTTPS gratuito para o seu domínio',    href: '/dominios/ssl' },
       { icon: MoveRight, label: 'Redirecionamento',        desc: 'Redirecione domínios com facilidade',  href: '/dominios/redirecionamento' },
       { icon: Layers,   label: 'Subdomínios',              desc: 'Crie subdomínios ilimitados',          href: '/dominios/subdominios' },
       { icon: Database, label: 'Gestão de Nameservers',    desc: 'Controle total dos seus nameservers',  href: '/dominios/nameservers' },
@@ -112,9 +112,9 @@ const dominiosColumns: ColDef[] = [
     items: [
       { icon: BookOpen,  label: 'Preços de Domínios',      desc: 'Tabela completa de preços',            href: '/dominios/precos' },
       { icon: Search,    label: 'Consulta WHOIS',          desc: 'Quem é o dono do domínio?',            href: '/dominios/whois' },
-      { icon: Wrench,    label: 'Base de Conhecimento',    desc: 'Guias e tutoriais de domínios',        href: '/base-conhecimento' },
-      { icon: Handshake, label: 'Suporte para Domínios',   desc: 'Equipa técnica especializada',         href: '/tickets' },
-      { icon: Rss,       label: 'Perguntas Frequentes',    desc: 'Respostas às dúvidas mais comuns',     href: '/faq' },
+      { icon: Wrench,    label: 'Base de Conhecimento',    desc: 'Guias e tutoriais de domínios',        href: '/dominios/base-conhecimento' },
+      { icon: Handshake, label: 'Suporte para Domínios',   desc: 'Equipa técnica especializada',         href: '/suporte/tickets' },
+      { icon: Rss,       label: 'Perguntas Frequentes',    desc: 'Respostas às dúvidas mais comuns',     href: '/suporte/faq' },
     ],
   },
 ]
@@ -124,29 +124,29 @@ const emailColumns: ColDef[] = [
   {
     title: 'Planos de E-mail',
     items: [
-      { icon: Mail,    label: 'E-mail Starter',         desc: '5 contas, webmail premium e SSL',             href: '/register?plan=webmail-start' },
-      { icon: Zap,     label: 'E-mail Business',        desc: '15 contas, backup diário e DMARC',            href: '/register?plan=webmail-business', badge: 'Popular' },
-      { icon: Server,  label: 'E-mail Enterprise',      desc: '50 contas, IP dedicada e SLA garantido',      href: '/register?plan=webmail-enterprise' },
-      { icon: Monitor, label: 'Microsoft 365 Outlook',  desc: 'Outlook, Teams e OneDrive 1 TB incluídos',    href: '/register?plan=microsoft365', badge: 'Microsoft' },
+      { icon: Mail,    label: 'E-mail Starter',         desc: '5 contas, webmail premium e SSL',             href: '/email/starter' },
+      { icon: Zap,     label: 'E-mail Business',        desc: '15 contas, backup diário e DMARC',            href: '/email/business', badge: 'Popular' },
+      { icon: Server,  label: 'E-mail Enterprise',      desc: '50 contas, IP dedicada e SLA garantido',      href: '/email/enterprise' },
+      { icon: Monitor, label: 'Microsoft 365 Outlook',  desc: 'Outlook, Teams e OneDrive 1 TB incluídos',    href: '/email/microsoft-365-outlook', badge: 'Microsoft' },
     ],
   },
   {
     title: 'Segurança',
     items: [
       { icon: AlertTriangle, label: 'AntiSpam Premium',          desc: 'Bloqueio avançado de spam',                  href: '/email/antispam' },
-      { icon: ShieldCheck,   label: 'SPF / DKIM / DMARC',       desc: 'Autenticação de e-mail profissional',        href: '/email/autenticacao' },
+      { icon: ShieldCheck,   label: 'SPF / DKIM / DMARC',       desc: 'Autenticação de e-mail profissional',        href: '/email/spf-dkim-dmarc' },
       { icon: Archive,       label: 'Backup de E-mails',         desc: 'Cópias de segurança diárias automáticas',    href: '/email/backup' },
-      { icon: Shield,        label: 'Proteção contra Malware',   desc: 'Análise e quarentena de ameaças',            href: '/email/seguranca' },
-      { icon: Activity,      label: 'Alta Disponibilidade',      desc: 'Infraestrutura redundante 99.9% uptime',     href: '/email/disponibilidade' },
+      { icon: Shield,        label: 'Proteção contra Malware',   desc: 'Análise e quarentena de ameaças',            href: '/email/malware' },
+      { icon: Activity,      label: 'Alta Disponibilidade',      desc: 'Infraestrutura redundante 99.9% uptime',     href: '/email/alta-disponibilidade' },
     ],
   },
   {
     title: 'Produtividade',
     items: [
       { icon: Globe,      label: 'Webmail Profissional',    desc: 'Acesso ao e-mail em qualquer browser',   href: '/email/webmail' },
-      { icon: Monitor,    label: 'Outlook 365',             desc: 'Cliente desktop premium da Microsoft',   href: '/register?plan=microsoft365' },
+      { icon: Monitor,    label: 'Outlook 365',             desc: 'Cliente desktop premium da Microsoft',   href: '/email/outlook-365' },
       { icon: Smartphone, label: 'Sincronização Mobile',    desc: 'IMAP/ActiveSync para iOS e Android',     href: '/email/mobile' },
-      { icon: Calendar,   label: 'Calendário e Contactos',  desc: 'Agenda partilhada e sincronizada',       href: '/email/calendario' },
+      { icon: Calendar,   label: 'Calendário e Contactos',  desc: 'Agenda partilhada e sincronizada',       href: '/email/calendario-contactos' },
       { icon: MoveRight,  label: 'Migração de E-mails',     desc: 'Migre os seus e-mails sem perder dados', href: '/email/migracao' },
     ],
   },
@@ -156,10 +156,10 @@ type MegaType = 'hosting' | 'services' | 'domains' | 'email' | null
 
 const navLinks = [
   { label: 'Hospedagem e Sites', href: '/hospedagem-de-sites', mega: 'hosting'   as MegaType },
-  { label: 'Domínios',           href: '/#dominios',           mega: 'domains'   as MegaType },
-  { label: 'Serviços',           href: '/#servicos',           mega: 'services'  as MegaType },
-  { label: 'E-mail Corporativo', href: '/#email-plans',        mega: 'email'     as MegaType },
-  { label: 'Suporte',            href: '/tickets',             mega: null },
+  { label: 'Domínios',           href: '/dominios',            mega: 'domains'   as MegaType },
+  { label: 'Serviços',           href: '/servicos',            mega: 'services'  as MegaType },
+  { label: 'E-mail Corporativo', href: '/email-corporativo',   mega: 'email'     as MegaType },
+  { label: 'Suporte',            href: '/suporte',             mega: null },
 ]
 
 const BADGE_STYLE: Record<string, string> = {
@@ -252,7 +252,7 @@ function DarkMegaFooter({ onClose }: { onClose: () => void }) {
       </div>
       <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.28)' }}>
         Dúvidas?{' '}
-        <Link href="/tickets" onClick={onClose} style={{ color: '#F5B700' }} className="font-semibold hover:underline">
+        <Link href="/suporte/tickets" onClick={onClose} style={{ color: '#F5B700' }} className="font-semibold hover:underline">
           Fale com um especialista
         </Link>
       </p>
@@ -523,7 +523,7 @@ export function Header() {
                 <p className="text-[11px] mb-3 leading-relaxed" style={{ color: 'rgba(255,255,255,0.38)' }}>
                   Nossa equipa está online 24/7 para si.
                 </p>
-                <Link href="/tickets" onClick={killMega}
+                <Link href="/suporte/tickets" onClick={killMega}
                   className="block text-center text-[11px] font-bold py-2 rounded-xl transition-all duration-150 w-full"
                   style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.78)', border: '1px solid rgba(255,255,255,0.12)' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,183,0,0.15)'; (e.currentTarget as HTMLElement).style.color = '#F5B700'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(245,183,0,0.35)' }}
@@ -555,7 +555,7 @@ export function Header() {
             </div>
             <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.28)' }}>
               Dúvidas?{' '}
-              <Link href="/tickets" onClick={killMega}
+              <Link href="/suporte/tickets" onClick={killMega}
                 className="font-semibold hover:underline transition-colors"
                 style={{ color: '#F5B700' }}>
                 Fale com um especialista →
@@ -618,7 +618,7 @@ export function Header() {
                     ))}
                   </div>
                 </div>
-                <Link href="/#dominios" onClick={killMega}
+                <Link href="/dominios/pesquisar" onClick={killMega}
                   className="mt-5 inline-flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl transition-all duration-150 w-full justify-center"
                   style={{ background: '#F5B700', color: '#0B0B0B' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FFD54F' }}
@@ -638,7 +638,7 @@ export function Header() {
                 <p className="text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.38)' }}>
                   Equipa disponível 24/7 para si.
                 </p>
-                <Link href="/tickets" onClick={killMega}
+                <Link href="/suporte/tickets" onClick={killMega}
                   className="block text-center text-xs font-bold py-2 rounded-xl transition-all duration-150 w-full"
                   style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.12)' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,183,0,0.15)'; (e.currentTarget as HTMLElement).style.color = '#F5B700' }}
@@ -715,7 +715,7 @@ export function Header() {
                   <span className="text-white text-xs font-bold">Precisa de ajuda?</span>
                 </div>
                 <p className="text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.38)' }}>A nossa equipa está online 24/7 para si.</p>
-                <Link href="/tickets" onClick={killMega}
+                <Link href="/suporte/tickets" onClick={killMega}
                   className="block text-center text-xs font-bold py-2 rounded-xl transition-all duration-150 w-full"
                   style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.12)' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,183,0,0.15)'; (e.currentTarget as HTMLElement).style.color = '#F5B700' }}
@@ -780,7 +780,7 @@ export function Header() {
                     ))}
                   </div>
                 </div>
-                <Link href="/#email-plans" onClick={killMega}
+                <Link href="/email-corporativo" onClick={killMega}
                   className="mt-5 inline-flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl transition-all duration-150 w-full justify-center"
                   style={{ background: '#F5B700', color: '#0B0B0B' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FFD54F' }}
@@ -799,7 +799,7 @@ export function Header() {
                 <p className="text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.38)' }}>
                   Configure o seu e-mail corporativo em minutos.
                 </p>
-                <Link href="/register?plan=webmail-business" onClick={killMega}
+                <Link href="/email/business" onClick={killMega}
                   className="block text-center text-xs font-bold py-2 rounded-xl transition-all duration-150 w-full"
                   style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.12)' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,183,0,0.15)'; (e.currentTarget as HTMLElement).style.color = '#F5B700' }}
@@ -922,7 +922,7 @@ export function Header() {
           </div>
 
           {/* Suporte */}
-          <Link href="/tickets"
+          <Link href="/suporte"
             className="block text-[#3D3D3D] hover:text-[#0A0A0A] hover:bg-[#F5F5F5] px-4 py-3 rounded-xl text-sm font-medium transition-colors"
             onClick={() => setMobileOpen(false)}>
             Suporte
