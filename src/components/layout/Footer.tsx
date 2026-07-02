@@ -261,9 +261,13 @@ function PixBadge() {
 function MulticaixaBadge() {
   return (
     <div className="group flex flex-col items-center gap-1.5 cursor-default">
-      <div className="flex items-center justify-center gap-1 w-[58px] h-[36px] rounded-lg border border-[#E0E0E0] bg-[#E8041C] shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:scale-105 group-hover:border-[#F5B700]/40 px-1">
-        <CreditCard size={11} className="text-white shrink-0" />
-        <span className="text-white font-black text-[9px] leading-tight">MULTI<br/>CAIXA</span>
+      <div className="flex items-center justify-center w-[58px] h-[36px] rounded-lg border border-[#E0E0E0] bg-white shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:scale-105 group-hover:border-[#F5B700]/40 overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/multicaixa.jpg"
+          alt="Multicaixa"
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+        />
       </div>
       <span className="text-[10px] text-[#999]">Multicaixa</span>
     </div>
