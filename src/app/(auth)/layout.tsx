@@ -95,12 +95,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <header className="relative z-10 flex items-center justify-between px-6 md:px-10 py-5">
         <Link href="/" aria-label="ViralizaHost — Página inicial" className="flex items-center shrink-0">
           <Image
-            src="/logo-viraliza-yellow.png"
+            src="/logotipo_branco.png"
             alt="ViralizaHost"
-            width={200}
-            height={50}
+            width={160}
+            height={45}
             priority
-            style={{ height: 46, width: 'auto', objectFit: 'contain' }}
+            className="object-contain"
+            style={{ height: 'auto', width: 160 }}
           />
         </Link>
         <Link
