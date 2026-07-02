@@ -74,14 +74,14 @@ const slides: Slide[] = [
     id: 2,
     imageOnly: true,
     bgImage: '/viraliza-email-banner.png',
-    /* Email: banner centrado em todos os breakpoints */
+    /* Email: contain para não cortar nenhum elemento da imagem */
     desktopPosition: 'center center',
     tabletPosition: 'center center',
     mobilePosition: 'center center',
+    bgSize: 'contain',          // <<< imagem inteira, proporcional, sem corte
     bgColor: '#000000',
-    /* overlay leve para contraste premium sem esconder a imagem */
     overlayColor: 'transparent',
-    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.30) 100%)',
+    overlayGradient: undefined,
     accentColor: '#34D399',
   },
 ]
@@ -194,15 +194,14 @@ export function HeroSection() {
 
             {s.imageOnly ? (
               /*
-               * imageOnly: div preenche exactamente o contêiner.
-               * background-size: cover mantém proporção e preenche sem distorção.
-               * Sem parallax, sem inset negativo — a imagem cobre o painel limpo.
+               * imageOnly: usa bgSize do slide se definido (contain para imagens
+               * que não devem ser cortadas), senão cover por defeito.
                */
               <div
                 className="absolute inset-0"
                 style={{
                   backgroundImage: `url(${s.bgImage})`,
-                  backgroundSize: 'cover',
+                  backgroundSize: s.bgSize ?? 'cover',
                   backgroundPosition: pos,
                   backgroundRepeat: 'no-repeat',
                 }}
