@@ -44,10 +44,10 @@ export default async function AdminPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Total de Clientes" value={String(totalClients ?? 0)} icon={Users} color="yellow" />
-        <StatsCard title="Planos Ativos" value={String(activeServices ?? 0)} icon={Server} color="green" />
-        <StatsCard title="Receita este Mês" value={`$${monthTotal.toFixed(0)}`} icon={CreditCard} color="blue" />
-        <StatsCard title="Tickets Abertos" value={String(openTickets ?? 0)} icon={MessageSquare} color="red" />
+        <StatsCard title="Total de Clientes" value={String(totalClients ?? 0)} type="clients" />
+        <StatsCard title="Planos Ativos"     value={String(activeServices ?? 0)} type="hosting" />
+        <StatsCard title="Receita este Mês" value={`$${monthTotal.toFixed(0)}`} type="revenue" />
+        <StatsCard title="Tickets Abertos"  value={String(openTickets ?? 0)} type="messages" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
