@@ -3,24 +3,27 @@ import Link from 'next/link'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Bot, ArrowRight, Shield, Zap, Star } from 'lucide-react'
 
+/* ─── Types ─────────────────────────────────────────────────── */
 type Slide = {
   id: number
   bgImage: string
   bgColor: string
-  /** Desktop background-position */
   desktopPosition?: string
-  /** Tablet background-position (≥768px <1024px) */
   tabletPosition?: string
-  /** Mobile background-position (<768px) */
   mobilePosition?: string
   bgSize?: string
   overlayColor?: string
   overlayGradient?: string
-  /** Mobile-specific overlay gradient (lighter so image shows) */
   mobileOverlayGradient?: string
   glowGradient?: string
   accentColor: string
+  /** Full-width background image slide (no text) — legacy mode */
   imageOnly?: boolean
+  /**
+   * Split layout: left half = black bg, right half = <img> object-fit:contain
+   * Desktop/tablet: side by side (1fr 1fr). Mobile: image full-width below.
+   */
+  splitLayout?: boolean
   tag?: string
   title?: string
   subtitle?: string
@@ -32,7 +35,9 @@ type Slide = {
   features?: string[]
 }
 
+/* ─── Slide data ─────────────────────────────────────────────── */
 const slides: Slide[] = [
+  /* ── SLIDE 1 — IA (NOT CHANGED) ─────────────────────────── */
   {
     id: 0,
     tag: 'Inteligência Artificial',
@@ -44,7 +49,6 @@ const slides: Slide[] = [
     ctaSecondaryHref: '#servicos',
     icon: Bot,
     bgImage: '/viraliza-ai-banner.png',
-    /* IA slide: sujeito à direita — desktop usa right center para mostrar a face */
     desktopPosition: 'right center',
     tabletPosition: 'right center',
     mobilePosition: 'center center',
@@ -56,38 +60,32 @@ const slides: Slide[] = [
     accentColor: '#F5B700',
     features: ['Chatbots Inteligentes', 'Automação de Processos', 'Agentes IA'],
   },
+
+  /* ── SLIDE 2 — Servidores Premium (SPLIT LAYOUT) ─────────── */
   {
     id: 1,
-    imageOnly: true,
+    splitLayout: true,
     bgImage: '/servidores_banner.png',
-    /* Servidores: banner centrado em todos os breakpoints */
-    desktopPosition: 'center center',
-    tabletPosition: 'center center',
-    mobilePosition: 'center center',
     bgColor: '#000000',
-    /* overlay leve para contraste premium sem esconder a imagem */
-    overlayColor: 'transparent',
-    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.35) 100%)',
     accentColor: '#F5B700',
+    /* overlayGradient applied only over the right image panel */
+    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.04) 50%, rgba(0,0,0,0.28) 100%)',
   },
+
+  /* ── SLIDE 3 — E-mail Corporativo (SPLIT LAYOUT) ─────────── */
   {
     id: 2,
-    imageOnly: true,
+    splitLayout: true,
     bgImage: '/viraliza-email-banner.png',
-    /* Email: cover para preencher sem distorcer, centrado em todos os breakpoints */
-    desktopPosition: 'center center',
-    tabletPosition: 'center center',
-    mobilePosition: 'center center',
     bgColor: '#000000',
-    overlayColor: 'transparent',
-    /* overlay escuro suave para legibilidade sem esconder a imagem */
-    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.10) 50%, rgba(0,0,0,0.45) 100%)',
     accentColor: '#34D399',
+    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.04) 50%, rgba(0,0,0,0.28) 100%)',
   },
 ]
 
 const SLIDE_DURATION = 7000
 
+/* ─── Breakpoint hook ────────────────────────────────────────── */
 function useBreakpoint() {
   const [bp, setBp] = useState<'mobile' | 'tablet' | 'desktop'>('desktop')
   useEffect(() => {
@@ -108,6 +106,7 @@ function getBgPosition(s: Slide, bp: 'mobile' | 'tablet' | 'desktop') {
   return s.desktopPosition ?? 'center center'
 }
 
+/* ─── Component ──────────────────────────────────────────────── */
 export function HeroSection() {
   const [current, setCurrent] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -116,6 +115,7 @@ export function HeroSection() {
   const sectionRef = useRef<HTMLElement>(null)
   const bp = useBreakpoint()
 
+  /* scroll parallax — only used by slide 0 */
   useEffect(() => {
     const onScroll = () => {
       if (sectionRef.current) {
@@ -131,10 +131,7 @@ export function HeroSection() {
     if (isTransitioning) return
     setIsTransitioning(true)
     setProgress(0)
-    setTimeout(() => {
-      setCurrent(index)
-      setIsTransitioning(false)
-    }, 500)
+    setTimeout(() => { setCurrent(index); setIsTransitioning(false) }, 500)
   }, [isTransitioning])
 
   const next = useCallback(() => goTo((current + 1) % slides.length), [current, goTo])
@@ -175,28 +172,69 @@ export function HeroSection() {
       ref={sectionRef}
       className="relative flex flex-col overflow-hidden"
       style={{
+        background: '#000',
         minHeight: bp === 'mobile' ? '760px' : bp === 'tablet' ? '720px' : 'calc(100vh - 80px)',
       }}
       aria-label="Hero Slideshow"
     >
-      {/* Background slides */}
+      {/* ── Background slide layers ─────────────────────────── */}
       {slides.map((s, i) => {
         const pos = getBgPosition(s, bp)
+        const active = i === current
+
         return (
           <div
             key={s.id}
             className="absolute inset-0 transition-opacity duration-700"
-            style={{ opacity: i === current ? 1 : 0 }}
-            aria-hidden={i !== current}
+            style={{ opacity: active ? 1 : 0 }}
+            aria-hidden={!active}
           >
-            {/* Base color */}
+            {/* Base colour fill */}
             <div className="absolute inset-0" style={{ background: s.bgColor }} />
 
-            {s.imageOnly ? (
+            {/* ── Split layout (slides 2 & 3) ──────────────── */}
+            {s.splitLayout ? (
               /*
-               * imageOnly: usa bgSize do slide se definido (contain para imagens
-               * que não devem ser cortadas), senão cover por defeito.
+               * Desktop/tablet: left 50% black + right 50% image (object-fit: contain)
+               * Mobile: left panel collapsed, image takes full height below
                */
+              <div className="absolute inset-0 flex flex-col md:flex-row">
+                {/* Left panel — dark background (content area) */}
+                <div
+                  className="hidden md:block md:w-1/2 h-full"
+                  style={{
+                    background: 'linear-gradient(to right, #000000 60%, rgba(0,0,0,0.80) 85%, transparent 100%)',
+                  }}
+                />
+
+                {/* Right panel — image, full proportional */}
+                <div className="relative w-full md:w-1/2 flex-1 flex items-center justify-center overflow-hidden">
+                  {/* subtle vignette on the image panel */}
+                  <div className="absolute inset-0 pointer-events-none z-10"
+                    style={{
+                      background: 'linear-gradient(to left, rgba(0,0,0,0.12) 0%, transparent 40%), linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, transparent 30%, rgba(0,0,0,0.30) 100%)',
+                    }} />
+                  <img
+                    src={s.bgImage}
+                    alt=""
+                    draggable={false}
+                    className="select-none"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      objectPosition: 'center',
+                      display: 'block',
+                    }}
+                  />
+                </div>
+
+                {/* Mobile: thin left-edge gradient so image bleeds to left */}
+                <div className="absolute inset-y-0 left-0 w-8 md:hidden pointer-events-none"
+                  style={{ background: 'linear-gradient(to right, #000, transparent)' }} />
+              </div>
+            ) : s.imageOnly ? (
+              /* Legacy full-bg mode (unused but kept for safety) */
               <div
                 className="absolute inset-0"
                 style={{
@@ -207,11 +245,7 @@ export function HeroSection() {
                 }}
               />
             ) : (
-              /*
-               * Slide com conteúdo (slide 0 — IA):
-               * inset-[-8%] deixa margem para o parallax/scale sem bordas visíveis.
-               * Mantém cover sem distorção — o scale via transform não altera proporção.
-               */
+              /* Slide 0 — IA: parallax content slide */
               <div
                 className="absolute"
                 style={{
@@ -220,35 +254,29 @@ export function HeroSection() {
                   backgroundSize: 'cover',
                   backgroundPosition: pos,
                   backgroundRepeat: 'no-repeat',
-                  transform: `translateY(${i === current ? scrollY * 0.4 : 0}px) scale(${isTransitioning && i === current ? 1.01 : 1.04})`,
-                  transition: isTransitioning
-                    ? 'transform 0.7s ease'
-                    : 'transform 0.12s linear',
+                  transform: `translateY(${active ? scrollY * 0.4 : 0}px) scale(${isTransitioning && active ? 1.01 : 1.04})`,
+                  transition: isTransitioning ? 'transform 0.7s ease' : 'transform 0.12s linear',
                 }}
               />
             )}
 
-            {/* Overlay sólido (quando não transparente) */}
+            {/* Overlay gradients */}
             {s.overlayColor && s.overlayColor !== 'transparent' && (
               <div className="absolute inset-0" style={{ background: s.overlayColor }} />
             )}
-
-            {/* Overlay gradiente — versão mobile adaptada para slide IA */}
-            {s.overlayGradient && (
+            {s.overlayGradient && !s.splitLayout && (
               <div className="absolute inset-0" style={{
                 background: bp === 'mobile' && s.mobileOverlayGradient
                   ? s.mobileOverlayGradient
                   : s.overlayGradient,
               }} />
             )}
-
-            {/* Glow opcional */}
             {s.glowGradient && (
               <div className="absolute inset-0" style={{ background: s.glowGradient }} />
             )}
 
-            {/* Vignette lateral + fade inferior apenas no slide com conteúdo */}
-            {!s.imageOnly && (
+            {/* Slide 0 vignette */}
+            {!s.imageOnly && !s.splitLayout && (
               <>
                 <div className="absolute inset-0"
                   style={{ background: 'radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.45) 100%)' }} />
@@ -260,7 +288,7 @@ export function HeroSection() {
         )
       })}
 
-      {/* Grid overlay */}
+      {/* Grid dot overlay */}
       <div
         className="absolute inset-0 pointer-events-none z-[1]"
         style={{
@@ -269,9 +297,9 @@ export function HeroSection() {
         }}
       />
 
-      {/* Content — hidden for imageOnly slides */}
+      {/* ── Slide content (slide 0 only) ─────────────────────── */}
       <div className={`relative z-10 flex-1 flex flex-col justify-center ${bp === 'mobile' ? 'pt-20 pb-8' : 'pt-28 pb-16'}`}>
-        {!slide.imageOnly && (
+        {!slide.imageOnly && !slide.splitLayout && (
           <div className="container mx-auto px-4 lg:px-8">
             <div className={bp === 'mobile' ? 'max-w-[85%]' : 'max-w-4xl'}>
 
@@ -291,8 +319,7 @@ export function HeroSection() {
                   <span key={i}>
                     {i === 0
                       ? line
-                      : (<><br /><span style={{ color: slide.accentColor }}>{line}</span></>)
-                    }
+                      : (<><br /><span style={{ color: slide.accentColor }}>{line}</span></>)}
                   </span>
                 ))}
               </h1>
@@ -306,15 +333,14 @@ export function HeroSection() {
 
               <div key={`feat-${current}`} className={`flex flex-wrap gap-2 animate-fade-in-up delay-300 ${bp === 'mobile' ? 'mb-5' : 'mb-10'}`}>
                 {slide.features!.map((f) => (
-                  <span key={f}
-                    className="inline-flex items-center gap-2 bg-white/8 backdrop-blur-sm border border-white/12 text-white/80 text-xs font-medium px-3 py-1.5 rounded-full">
+                  <span key={f} className="inline-flex items-center gap-2 bg-white/8 backdrop-blur-sm border border-white/12 text-white/80 text-xs font-medium px-3 py-1.5 rounded-full">
                     <Zap size={10} style={{ color: slide.accentColor }} />
                     {f}
                   </span>
                 ))}
               </div>
 
-              <div key={`cta-${current}`} className={`flex flex-col sm:flex-row gap-3 animate-fade-in-up delay-400`}>
+              <div key={`cta-${current}`} className="flex flex-col sm:flex-row gap-3 animate-fade-in-up delay-400">
                 <Link
                   href={slide.ctaHref!}
                   className={`btn-shimmer btn-primary inline-flex items-center justify-center gap-2 rounded-2xl font-bold shadow-[0_8px_30px_rgba(245,183,0,0.40)] hover:shadow-[0_12px_40px_rgba(245,183,0,0.55)] hover:scale-105 transition-all ${bp === 'mobile' ? 'px-6 py-3 text-sm' : 'px-9 py-4 text-base'}`}
@@ -333,7 +359,7 @@ export function HeroSection() {
               <div className={`flex items-center flex-wrap gap-4 animate-fade-in-up delay-500 ${bp === 'mobile' ? 'mt-6' : 'mt-12'}`}>
                 <div className="flex items-center gap-3">
                   <div className="flex -space-x-2">
-                    {['A','B','C','D','E'].map((l, i) => (
+                    {['A', 'B', 'C', 'D', 'E'].map((l, i) => (
                       <div key={i}
                         className="w-7 h-7 rounded-full border-2 border-black/30 flex items-center justify-center text-black text-xs font-black"
                         style={{ background: 'linear-gradient(135deg, #F5B700, #D9A300)' }}>
@@ -367,7 +393,7 @@ export function HeroSection() {
         )}
       </div>
 
-      {/* Slide controls */}
+      {/* ── Slide controls ───────────────────────────────────── */}
       <div className="relative z-10 pb-10">
         <div className="container mx-auto px-4 lg:px-8">
           <div className="flex items-center justify-between max-w-4xl">
@@ -378,20 +404,13 @@ export function HeroSection() {
                   key={s.id}
                   onClick={() => goTo(i)}
                   className="relative h-[3px] rounded-full overflow-hidden focus:outline-none transition-all duration-300"
-                  style={{
-                    width: i === current ? 52 : 20,
-                    background: 'rgba(255,255,255,0.2)',
-                  }}
+                  style={{ width: i === current ? 52 : 20, background: 'rgba(255,255,255,0.2)' }}
                   aria-label={`Ir para slide ${i + 1}`}
                 >
                   {i === current && (
                     <div
                       className="absolute left-0 top-0 h-full rounded-full"
-                      style={{
-                        width: `${progress}%`,
-                        background: slide.accentColor,
-                        transition: 'width 0.15s linear',
-                      }}
+                      style={{ width: `${progress}%`, background: slide.accentColor, transition: 'width 0.15s linear' }}
                     />
                   )}
                 </button>
@@ -402,18 +421,14 @@ export function HeroSection() {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={prev}
+              <button onClick={prev}
                 className="w-10 h-10 rounded-xl bg-white/8 border border-white/12 flex items-center justify-center text-white hover:bg-white/18 hover:border-white/28 transition-all focus:outline-none backdrop-blur-sm"
-                aria-label="Slide anterior"
-              >
+                aria-label="Slide anterior">
                 <ChevronLeft size={18} />
               </button>
-              <button
-                onClick={next}
+              <button onClick={next}
                 className="w-10 h-10 rounded-xl bg-white/8 border border-white/12 flex items-center justify-center text-white hover:bg-white/18 hover:border-white/28 transition-all focus:outline-none backdrop-blur-sm"
-                aria-label="Próximo slide"
-              >
+                aria-label="Próximo slide">
                 <ChevronRight size={18} />
               </button>
             </div>
