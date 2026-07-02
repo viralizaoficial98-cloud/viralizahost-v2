@@ -5,6 +5,7 @@ import {
   Users, Target, Lightbulb,
   TrendingUp, Palette, Server, BarChart3, Film,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 /* ─── Data ───────────────────────────────────────────────────── */
 
@@ -185,10 +186,61 @@ function ConnectorLines({ count }: { count: number }) {
   )
 }
 
+type DbTeamMember = {
+  id: string
+  is_ceo: boolean
+  name: string
+  role: string | null
+  title: string | null
+  bio: string | null
+  photo_url: string | null
+  flag: string | null
+  accent_color: string
+  position: number
+}
+
 /* ─── Main ───────────────────────────────────────────────────── */
 export function TeamSection() {
   const ref = useRef<HTMLElement>(null)
   const [visible, setVisible] = useState(false)
+  const [activeCEO, setActiveCEO] = useState(CEO)
+  const [activeTeam, setActiveTeam] = useState(TEAM)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('site_team')
+      .select('*')
+      .order('is_ceo', { ascending: false })
+      .order('position')
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const members = data as DbTeamMember[]
+          const ceoData = members.find(m => m.is_ceo)
+          const teamData = members.filter(m => !m.is_ceo)
+          if (ceoData) {
+            setActiveCEO({
+              name: ceoData.name,
+              role: ceoData.role ?? '',
+              photo: ceoData.photo_url ?? '',
+              flag: ceoData.flag ?? '🇦🇴',
+              bio: ceoData.bio ?? '',
+            })
+          }
+          if (teamData.length > 0) {
+            setActiveTeam(teamData.map(m => ({
+              name: m.name,
+              role: m.role ?? '',
+              photo: m.photo_url ?? '',
+              flag: m.flag ?? '',
+              icon: TrendingUp,
+              color: m.accent_color ?? '#F5B700',
+              bio: m.bio ?? '',
+            })))
+          }
+        }
+      })
+  }, [])
 
   useEffect(() => {
     const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true) }, { threshold: 0.08 })
@@ -255,11 +307,11 @@ export function TeamSection() {
                   <animate attributeName="stroke-opacity" values="0.12;0;0.12" dur="2.8s" repeatCount="indefinite" />
                 </circle>
               </svg>
-              <img src={CEO.photo} alt={CEO.name}
+              <img src={activeCEO.photo} alt={activeCEO.name}
                 className="w-24 h-24 rounded-full object-cover object-top"
                 style={{ border: '3px solid #FDBA00', boxShadow: '0 0 20px rgba(253,186,0,0.30)' }} />
               <span className="absolute bottom-0 right-0 text-xl" style={{ filter: 'drop-shadow(0 1px 3px #000)' }}>
-                {CEO.flag}
+                {activeCEO.flag}
               </span>
             </div>
 
@@ -268,9 +320,9 @@ export function TeamSection() {
                 style={{ background: 'rgba(253,186,0,0.10)', border: '1px solid rgba(253,186,0,0.30)', color: '#FDBA00' }}>
                 👑 CEO & Fundador
               </span>
-              <h3 className="text-3xl font-black text-white leading-tight mb-1">{CEO.name}</h3>
-              <p className="text-sm font-semibold mb-4" style={{ color: '#FDBA00' }}>{CEO.role}</p>
-              <p className="text-white/55 text-sm leading-relaxed mb-5 max-w-md">{CEO.bio}</p>
+              <h3 className="text-3xl font-black text-white leading-tight mb-1">{activeCEO.name}</h3>
+              <p className="text-sm font-semibold mb-4" style={{ color: '#FDBA00' }}>{activeCEO.role}</p>
+              <p className="text-white/55 text-sm leading-relaxed mb-5 max-w-md">{activeCEO.bio}</p>
               <div className="inline-flex items-center gap-2 text-xs text-white/35">
                 <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#FDBA00' }} />
                 Expansão —{' '}
@@ -300,12 +352,12 @@ export function TeamSection() {
 
         {/* ─ Animated connector lines ─ */}
         <div className="max-w-5xl mx-auto">
-          <ConnectorLines count={TEAM.length} />
+          <ConnectorLines count={activeTeam.length} />
         </div>
 
         {/* ─ Team grid ─ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 max-w-5xl mx-auto">
-          {TEAM.map((m, i) => (
+          {activeTeam.map((m, i) => (
             <MemberCard key={m.name} member={m} index={i} visible={visible} />
           ))}
         </div>

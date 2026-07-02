@@ -37,7 +37,8 @@ const empty: Omit<Banner, 'id' | 'position'> = {
 }
 
 export default function BannersPage() {
-  const supabase = createClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createClient() as any
   const [banners, setBanners] = useState<Banner[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)

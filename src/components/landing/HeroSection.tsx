@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Bot, ArrowRight, Shield, Zap, Star } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 /* ─── Types ─────────────────────────────────────────────────── */
 type Slide = {
@@ -83,6 +84,41 @@ const slides: Slide[] = [
   },
 ]
 
+/* ─── DB Banner type ─────────────────────────────────────────── */
+type DbBanner = {
+  id: string
+  position: number
+  bg_image: string | null
+  bg_color: string | null
+  accent_color: string | null
+  tag: string | null
+  title: string | null
+  subtitle: string | null
+  cta_text: string | null
+  cta_href: string | null
+  cta_secondary_text: string | null
+  cta_secondary_href: string | null
+  features: string[] | null
+}
+
+function dbToSlide(b: DbBanner, i: number): Slide {
+  return {
+    id: i,
+    bgImage: b.bg_image ?? '',
+    bgColor: b.bg_color ?? '#000000',
+    accentColor: b.accent_color ?? '#F5B700',
+    tag: b.tag ?? undefined,
+    title: b.title ?? undefined,
+    subtitle: b.subtitle ?? undefined,
+    cta: b.cta_text ?? undefined,
+    ctaHref: b.cta_href ?? undefined,
+    ctaSecondary: b.cta_secondary_text ?? undefined,
+    ctaSecondaryHref: b.cta_secondary_href ?? undefined,
+    features: b.features ?? undefined,
+    imageOnly: !b.title && !b.tag,
+  }
+}
+
 const SLIDE_DURATION = 7000
 
 /* ─── Breakpoint hook ────────────────────────────────────────── */
@@ -108,12 +144,27 @@ function getBgPosition(s: Slide, bp: 'mobile' | 'tablet' | 'desktop') {
 
 /* ─── Component ──────────────────────────────────────────────── */
 export function HeroSection() {
+  const [activeSlides, setActiveSlides] = useState<Slide[]>(slides)
   const [current, setCurrent] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [scrollY, setScrollY] = useState(0)
   const sectionRef = useRef<HTMLElement>(null)
   const bp = useBreakpoint()
+
+  /* fetch banners from DB, fallback to hardcoded */
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('site_banners')
+      .select('*')
+      .order('position')
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setActiveSlides((data as DbBanner[]).map(dbToSlide))
+        }
+      })
+  }, [])
 
   /* scroll parallax — only used by slide 0 */
   useEffect(() => {
@@ -134,8 +185,8 @@ export function HeroSection() {
     setTimeout(() => { setCurrent(index); setIsTransitioning(false) }, 500)
   }, [isTransitioning])
 
-  const next = useCallback(() => goTo((current + 1) % slides.length), [current, goTo])
-  const prev = useCallback(() => goTo((current - 1 + slides.length) % slides.length), [current, goTo])
+  const next = useCallback(() => goTo((current + 1) % activeSlides.length), [current, goTo, activeSlides.length])
+  const prev = useCallback(() => goTo((current - 1 + activeSlides.length) % activeSlides.length), [current, goTo, activeSlides.length])
 
   useEffect(() => {
     const interval = setInterval(next, SLIDE_DURATION)
@@ -164,8 +215,8 @@ export function HeroSection() {
     return () => window.removeEventListener('keydown', handler)
   }, [prev, next])
 
-  const slide = slides[current]
-  const Icon = slide.icon
+  const slide = activeSlides[current] ?? activeSlides[0]
+  const Icon = slide?.icon
 
   return (
     <section
@@ -178,7 +229,7 @@ export function HeroSection() {
       aria-label="Hero Slideshow"
     >
       {/* ── Background slide layers ─────────────────────────── */}
-      {slides.map((s, i) => {
+      {activeSlides.map((s, i) => {
         const pos = getBgPosition(s, bp)
         const active = i === current
 
@@ -359,7 +410,7 @@ export function HeroSection() {
           <div className="flex items-center justify-between max-w-4xl">
 
             <div className="flex items-center gap-3">
-              {slides.map((s, i) => (
+              {activeSlides.map((s, i) => (
                 <button
                   key={s.id}
                   onClick={() => goTo(i)}
@@ -370,13 +421,13 @@ export function HeroSection() {
                   {i === current && (
                     <div
                       className="absolute left-0 top-0 h-full rounded-full"
-                      style={{ width: `${progress}%`, background: slide.accentColor, transition: 'width 0.15s linear' }}
+                      style={{ width: `${progress}%`, background: slide?.accentColor, transition: 'width 0.15s linear' }}
                     />
                   )}
                 </button>
               ))}
               <span className="text-white/35 text-xs font-mono ml-1 tabular-nums">
-                {String(current + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
+                {String(current + 1).padStart(2, '0')} / {String(activeSlides.length).padStart(2, '0')}
               </span>
             </div>
 

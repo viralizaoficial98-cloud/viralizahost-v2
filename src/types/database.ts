@@ -278,6 +278,210 @@ export interface Database {
         Insert: Omit<Database['viralizahost']['Tables']['activity_logs']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['viralizahost']['Tables']['activity_logs']['Insert']>
       }
+      site_banners: {
+        Row: {
+          id: string
+          position: number
+          active: boolean
+          bg_image: string | null
+          bg_color: string | null
+          accent_color: string | null
+          tag: string | null
+          title: string | null
+          subtitle: string | null
+          cta_text: string | null
+          cta_href: string | null
+          cta_secondary_text: string | null
+          cta_secondary_href: string | null
+          features: string[] | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          position?: number
+          active?: boolean
+          bg_image?: string | null
+          bg_color?: string | null
+          accent_color?: string | null
+          tag?: string | null
+          title?: string | null
+          subtitle?: string | null
+          cta_text?: string | null
+          cta_href?: string | null
+          cta_secondary_text?: string | null
+          cta_secondary_href?: string | null
+          features?: string[] | null
+        }
+        Update: {
+          position?: number
+          active?: boolean
+          bg_image?: string | null
+          bg_color?: string | null
+          accent_color?: string | null
+          tag?: string | null
+          title?: string | null
+          subtitle?: string | null
+          cta_text?: string | null
+          cta_href?: string | null
+          cta_secondary_text?: string | null
+          cta_secondary_href?: string | null
+          features?: string[] | null
+        }
+      }
+      site_domains: {
+        Row: {
+          id: string
+          extension: string
+          price_monthly: number | null
+          price_annual: number | null
+          currency: string
+          popular: boolean
+          active: boolean
+          position: number
+          created_at: string
+        }
+        Insert: {
+          extension: string
+          price_monthly?: number | null
+          price_annual?: number | null
+          currency?: string
+          popular?: boolean
+          active?: boolean
+          position?: number
+        }
+        Update: {
+          extension?: string
+          price_monthly?: number | null
+          price_annual?: number | null
+          currency?: string
+          popular?: boolean
+          active?: boolean
+          position?: number
+        }
+      }
+      site_email_plans: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          badge: string | null
+          price_monthly: number | null
+          price_annual: number | null
+          discount_annual: number
+          features: string[] | null
+          active: boolean
+          featured: boolean
+          position: number
+          created_at: string
+        }
+        Insert: {
+          name: string
+          description?: string | null
+          badge?: string | null
+          price_monthly?: number | null
+          price_annual?: number | null
+          discount_annual?: number
+          features?: string[] | null
+          active?: boolean
+          featured?: boolean
+          position?: number
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          badge?: string | null
+          price_monthly?: number | null
+          price_annual?: number | null
+          discount_annual?: number
+          features?: string[] | null
+          active?: boolean
+          featured?: boolean
+          position?: number
+        }
+      }
+      site_team: {
+        Row: {
+          id: string
+          is_ceo: boolean
+          name: string
+          role: string | null
+          title: string | null
+          bio: string | null
+          photo_url: string | null
+          flag: string | null
+          country: string | null
+          accent_color: string
+          position: number
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          is_ceo?: boolean
+          name: string
+          role?: string | null
+          title?: string | null
+          bio?: string | null
+          photo_url?: string | null
+          flag?: string | null
+          country?: string | null
+          accent_color?: string
+          position?: number
+          active?: boolean
+        }
+        Update: {
+          is_ceo?: boolean
+          name?: string
+          role?: string | null
+          title?: string | null
+          bio?: string | null
+          photo_url?: string | null
+          flag?: string | null
+          country?: string | null
+          accent_color?: string
+          position?: number
+          active?: boolean
+        }
+      }
+      site_hosting_plans: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          badge: string | null
+          price_monthly: number | null
+          price_annual: number | null
+          discount_annual: number
+          features: string[] | null
+          active: boolean
+          featured: boolean
+          position: number
+          created_at: string
+        }
+        Insert: {
+          name: string
+          description?: string | null
+          badge?: string | null
+          price_monthly?: number | null
+          price_annual?: number | null
+          discount_annual?: number
+          features?: string[] | null
+          active?: boolean
+          featured?: boolean
+          position?: number
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          badge?: string | null
+          price_monthly?: number | null
+          price_annual?: number | null
+          discount_annual?: number
+          features?: string[] | null
+          active?: boolean
+          featured?: boolean
+          position?: number
+        }
+      }
     }
     Views: Record<string, never>
     Functions: {
