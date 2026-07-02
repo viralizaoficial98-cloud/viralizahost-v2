@@ -11,6 +11,7 @@ import { GlobalPresenceSection } from '@/components/landing/GlobalPresenceSectio
 import { TestimonialsSection } from '@/components/landing/TestimonialsSection'
 import { FAQSection } from '@/components/landing/FAQSection'
 import { CTASection } from '@/components/landing/CTASection'
+import { TeamSection } from '@/components/landing/TeamSection'
 
 export default function HomePage() {
   return (
@@ -31,6 +32,8 @@ export default function HomePage() {
         <PricingSection />
         {/* 7 — Presença Global */}
         <GlobalPresenceSection />
+        {/* 8 — Time / Estrutura Organizacional */}
+        <TeamSection />
         <TestimonialsSection />
         <FAQSection />
         <CTASection />
