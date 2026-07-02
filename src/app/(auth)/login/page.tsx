@@ -38,7 +38,16 @@ export default function LoginPage() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="glass-dark rounded-3xl p-8 border border-[#FFC107]/10">
+      <div
+        className="rounded-3xl p-8 md:p-9"
+        style={{
+          background: 'rgba(8,10,16,0.82)',
+          backdropFilter: 'blur(28px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(28px) saturate(160%)',
+          border: '1px solid rgba(245,183,0,0.18)',
+          boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset, 0 32px 80px rgba(0,0,0,0.65), 0 0 60px rgba(245,183,0,0.06)',
+        }}
+      >
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-yellow-400/10 border border-yellow-400/20 mb-4">
@@ -119,12 +128,13 @@ export default function LoginPage() {
       </div>
 
       {/* Trust indicators */}
-      <div className="flex items-center justify-center gap-6 mt-6 text-xs text-gray-700">
-        <span>🔒 SSL Seguro</span>
-        <span>•</span>
-        <span>✓ Dados protegidos</span>
-        <span>•</span>
-        <span>24/7 Suporte</span>
+      <div className="flex items-center justify-center flex-wrap gap-4 mt-6 text-xs font-medium"
+        style={{ color: 'rgba(255,255,255,0.28)' }}>
+        <span className="flex items-center gap-1.5">🔒 SSL Seguro</span>
+        <span style={{ color: 'rgba(245,183,0,0.25)' }}>|</span>
+        <span className="flex items-center gap-1.5">✓ Dados Protegidos</span>
+        <span style={{ color: 'rgba(245,183,0,0.25)' }}>|</span>
+        <span className="flex items-center gap-1.5">⚡ 24/7 Suporte</span>
       </div>
     </div>
   )
