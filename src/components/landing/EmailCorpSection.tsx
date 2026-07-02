@@ -1,226 +1,267 @@
 'use client'
 import Link from 'next/link'
-import { Check, Mail, Monitor, Globe } from 'lucide-react'
+import { Check, X, Mail, Briefcase, Building2, Monitor } from 'lucide-react'
+import { useState } from 'react'
 
 const plans = [
   {
-    id: 'webmail',
+    id: 'webmail-start',
+    name: 'Webmail Start',
     icon: Mail,
-    name: 'Webmail Profissional',
-    price: 'Kz 300.000',
-    period: '/ano',
-    description: 'E-mail corporativo com acesso via browser e mobile.',
-    popular: false,
+    description: 'Ideal para pequenas empresas.',
+    tagline: 'Para começar',
+    priceMonthly: 8500,
+    priceAnnual: 6800,
+    accent: '#3B82F6',
+    is_popular: false,
+    badge: null,
     features: [
-      '10 contas de e-mail',
-      'Webmail Premium',
-      'Protecção AntiSpam',
-      'SPF / DKIM / DMARC',
-      'Backup diário',
-      'SSL seguro',
-      'Acesso Mobile',
+      { text: '5 Contas de E-mail', included: true },
+      { text: 'Webmail Premium', included: true },
+      { text: '5 GB por conta', included: true },
+      { text: 'SSL Seguro', included: true },
+      { text: 'AntiSpam', included: true },
+      { text: 'Backup Semanal', included: true },
+      { text: 'SPF / DKIM', included: true },
+      { text: 'DMARC', included: false },
+      { text: 'IP Dedicada', included: false },
+      { text: 'Backup Diário', included: false },
     ],
-    cta: 'Contratar Webmail',
-    href: '/register?plan=webmail',
+  },
+  {
+    id: 'webmail-business',
+    name: 'Webmail Business',
+    icon: Briefcase,
+    description: 'Ideal para empresas em crescimento.',
+    tagline: 'Mais popular',
+    priceMonthly: 18500,
+    priceAnnual: 14800,
+    accent: '#F5B700',
+    is_popular: true,
+    badge: 'MAIS POPULAR',
+    features: [
+      { text: '15 Contas de E-mail', included: true },
+      { text: 'Webmail Premium', included: true },
+      { text: '15 GB por conta', included: true },
+      { text: 'Backup Diário', included: true },
+      { text: 'AntiSpam Premium', included: true },
+      { text: 'SPF / DKIM / DMARC', included: true },
+      { text: 'Alta Entregabilidade', included: true },
+      { text: 'SSL Seguro', included: true },
+      { text: 'IP Dedicada', included: false },
+      { text: 'Suporte prioritário', included: false },
+    ],
+  },
+  {
+    id: 'webmail-enterprise',
+    name: 'Webmail Enterprise',
+    icon: Building2,
+    description: 'Alta performance para grandes equipas.',
+    tagline: 'Empresarial',
+    priceMonthly: 35000,
+    priceAnnual: 28000,
+    accent: '#8B5CF6',
+    is_popular: false,
+    badge: 'EMPRESARIAL',
+    features: [
+      { text: '50 Contas de E-mail', included: true },
+      { text: '50 GB por conta', included: true },
+      { text: 'Backup Diário', included: true },
+      { text: 'AntiSpam Avançado', included: true },
+      { text: 'DMARC Premium', included: true },
+      { text: 'IP Dedicada', included: true },
+      { text: 'Alta Disponibilidade', included: true },
+      { text: 'SPF / DKIM / DMARC', included: true },
+      { text: 'Suporte prioritário', included: true },
+      { text: 'SLA garantido', included: true },
+    ],
   },
   {
     id: 'microsoft365',
-    icon: Monitor,
     name: 'Microsoft 365 Outlook',
-    price: 'Kz 850.000',
-    period: '/ano',
-    description: 'Suite completa Microsoft para empresas exigentes.',
-    popular: true,
-    badge: 'Mais Popular',
+    icon: Monitor,
+    description: 'Solução premium Microsoft.',
+    tagline: 'Microsoft 365',
+    priceMonthly: 65000,
+    priceAnnual: 52000,
+    accent: '#EF4444',
+    is_popular: false,
+    badge: 'MICROSOFT 365',
     features: [
-      'Outlook Premium',
-      'Microsoft Teams',
-      'OneDrive 1TB',
-      'Word & Excel',
-      'Segurança Microsoft',
-      'Backup Cloud',
-      'Sincronização Total',
-      'Suporte prioritário',
+      { text: 'Outlook Premium', included: true },
+      { text: 'Microsoft Teams', included: true },
+      { text: 'OneDrive 1 TB', included: true },
+      { text: 'Word & Excel', included: true },
+      { text: 'Exchange Online', included: true },
+      { text: 'Backup Cloud', included: true },
+      { text: 'Segurança Microsoft', included: true },
+      { text: 'SPF / DKIM / DMARC', included: true },
+      { text: 'Suporte especializado', included: true },
+      { text: 'Alta Disponibilidade', included: true },
     ],
-    cta: 'Contratar 365',
-    href: '/register?plan=microsoft365',
-  },
-  {
-    id: 'workspace',
-    icon: Globe,
-    name: 'Google Workspace',
-    price: 'Kz 950.000',
-    period: '/ano',
-    description: 'Ecossistema Google completo para a sua equipa.',
-    popular: false,
-    features: [
-      'Gmail Corporativo',
-      'Google Drive',
-      'Google Meet',
-      'Google Calendar',
-      'Segurança Google',
-      'Backup Cloud',
-      'Alta Disponibilidade',
-    ],
-    cta: 'Contratar Workspace',
-    href: '/register?plan=workspace',
   },
 ]
 
 export function EmailCorpSection() {
+  const [billing, setBilling] = useState<'monthly' | 'annual'>('annual')
+
+  const getPrice = (plan: typeof plans[0]) =>
+    billing === 'annual' ? plan.priceAnnual : plan.priceMonthly
+
+  const fmt = (v: number) =>
+    `Kz ${v.toLocaleString('pt-AO')}`
+
   return (
-    <section className="bg-white py-20 border-b border-[#F0F0F0]">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
+    <section id="email-plans" className="py-24 bg-[#F8F8F8] relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#E8E8E8] to-transparent" />
 
-        {/* Heading */}
-        <div className="text-center mb-14">
-          <div className="flex items-center justify-center gap-4 mb-4">
-            <div className="h-px w-16 bg-gradient-to-r from-transparent to-[#F5B700]" />
-            <p className="text-[#F5B700] text-xs font-bold tracking-widest uppercase">Comunicação Profissional</p>
-            <div className="h-px w-16 bg-gradient-to-l from-transparent to-[#F5B700]" />
-          </div>
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-[#0A0A0A] leading-tight mb-4">
-            E-mails Corporativos <span className="text-[#F5B700]">Premium</span>
+      <div className="container mx-auto px-4 relative">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <span className="section-tag mb-5 inline-flex">Comunicação Profissional</span>
+          <h2 className="text-4xl lg:text-5xl font-black text-[#0A0A0A] mb-5">
+            E-mails Corporativos <span className="gradient-text">Premium</span>
           </h2>
-          <p className="text-[#666] text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Soluções profissionais para Webmail, Microsoft 365 e Google Workspace.
+          <p className="text-gray-500 text-xl max-w-2xl mx-auto mb-8">
+            Escolha a solução ideal de e-mail profissional para a sua empresa.
           </p>
-        </div>
 
-        {/* Pricing cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-          {plans.map(({ id, icon: Icon, name, price, period, description, popular, badge, features, cta, href }) => (
-            <div
-              key={id}
-              className="relative flex flex-col rounded-3xl border transition-all duration-300"
-              style={{
-                background: popular ? '#0A0A0A' : '#ffffff',
-                borderColor: popular ? '#F5B700' : '#EBEBEB',
-                boxShadow: popular
-                  ? '0 8px 48px rgba(245,183,0,0.22), 0 2px 16px rgba(0,0,0,0.18)'
-                  : '0 2px 16px rgba(0,0,0,0.05)',
-              }}
+          {/* Billing toggle */}
+          <div className="inline-flex items-center gap-2 bg-white border border-[#E8E8E8] rounded-2xl p-1.5 shadow-sm">
+            <button
+              onClick={() => setBilling('monthly')}
+              className={`px-6 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                billing === 'monthly'
+                  ? 'bg-[#0A0A0A] text-white shadow-sm'
+                  : 'text-gray-500 hover:text-[#0A0A0A]'
+              }`}
             >
-              {/* Popular badge */}
-              {badge && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                  <span className="bg-[#F5B700] text-[#0A0A0A] text-xs font-black px-4 py-1.5 rounded-full tracking-wider uppercase shadow-lg">
-                    {badge}
-                  </span>
-                </div>
-              )}
-
-              <div className="p-8 flex flex-col flex-1">
-                {/* Icon + name */}
-                <div className="flex items-center gap-3 mb-5">
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: popular ? 'rgba(245,183,0,0.15)' : '#FFF8E1' }}
-                  >
-                    <Icon size={20} style={{ color: '#F5B700' }} />
-                  </div>
-                  <h3
-                    className="font-black text-lg leading-tight"
-                    style={{ color: popular ? '#FFFFFF' : '#0A0A0A' }}
-                  >
-                    {name}
-                  </h3>
-                </div>
-
-                {/* Description */}
-                <p
-                  className="text-sm mb-6 leading-relaxed"
-                  style={{ color: popular ? 'rgba(255,255,255,0.55)' : '#888' }}
-                >
-                  {description}
-                </p>
-
-                {/* Price */}
-                <div className="mb-6">
-                  <div className="flex items-end gap-1">
-                    <span
-                      className="text-3xl font-black leading-none"
-                      style={{ color: popular ? '#F5B700' : '#0A0A0A' }}
-                    >
-                      {price}
-                    </span>
-                    <span
-                      className="text-sm font-medium pb-0.5"
-                      style={{ color: popular ? 'rgba(255,255,255,0.45)' : '#AAA' }}
-                    >
-                      {period}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div
-                  className="w-full h-px mb-6"
-                  style={{ background: popular ? 'rgba(255,255,255,0.10)' : '#F0F0F0' }}
-                />
-
-                {/* Features */}
-                <ul className="flex flex-col gap-3 mb-8 flex-1">
-                  {features.map(f => (
-                    <li key={f} className="flex items-start gap-3">
-                      <div
-                        className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                        style={{ background: popular ? 'rgba(245,183,0,0.18)' : '#FFF8E1' }}
-                      >
-                        <Check size={11} style={{ color: '#F5B700' }} strokeWidth={3} />
-                      </div>
-                      <span
-                        className="text-sm leading-snug"
-                        style={{ color: popular ? 'rgba(255,255,255,0.80)' : '#444' }}
-                      >
-                        {f}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-
-                {/* CTA */}
-                <Link
-                  href={href}
-                  className="w-full py-3.5 rounded-2xl font-bold text-sm text-center transition-all duration-200 block"
-                  style={{
-                    background: popular ? '#F5B700' : 'transparent',
-                    color: popular ? '#0A0A0A' : '#0A0A0A',
-                    border: popular ? 'none' : '2px solid #D0D0D0',
-                  }}
-                  onMouseEnter={e => {
-                    const el = e.currentTarget
-                    if (popular) {
-                      el.style.background = '#FFD54F'
-                      el.style.boxShadow = '0 4px 20px rgba(245,183,0,0.40)'
-                    } else {
-                      el.style.background = '#F5B700'
-                      el.style.borderColor = '#F5B700'
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    const el = e.currentTarget
-                    if (popular) {
-                      el.style.background = '#F5B700'
-                      el.style.boxShadow = 'none'
-                    } else {
-                      el.style.background = 'transparent'
-                      el.style.borderColor = '#D0D0D0'
-                    }
-                  }}
-                >
-                  {cta}
-                </Link>
-              </div>
-            </div>
-          ))}
+              Mensal
+            </button>
+            <button
+              onClick={() => setBilling('annual')}
+              className={`px-6 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 ${
+                billing === 'annual'
+                  ? 'bg-[#F5B700] text-[#0A0A0A] shadow-sm'
+                  : 'text-gray-500 hover:text-[#0A0A0A]'
+              }`}
+            >
+              Anual
+              <span className="bg-[#0A0A0A] text-white text-xs px-2 py-0.5 rounded-full font-bold">-20%</span>
+            </button>
+          </div>
         </div>
 
-        {/* Footer note */}
-        <p className="text-center text-[#AAA] text-xs mt-8">
-          Todos os planos incluem SSL grátis, suporte 24/7 e activação imediata.
-        </p>
+        {/* Plans grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {plans.map((plan) => {
+            const Icon = plan.icon
+            return (
+              <div
+                key={plan.id}
+                className={`relative rounded-3xl overflow-hidden transition-all duration-300 hover-lift ${
+                  plan.is_popular
+                    ? 'bg-[#0A0A0A] border-2 border-[#F5B700] shadow-[0_20px_60px_rgba(0,0,0,0.15)]'
+                    : 'bg-white border border-[#E8E8E8] shadow-sm hover:border-[#F5B700]/40'
+                }`}
+              >
+                {/* Badge */}
+                {plan.badge && (
+                  <div
+                    className={`text-center py-2.5 text-xs font-black tracking-widest ${
+                      plan.is_popular ? 'bg-[#F5B700] text-[#0A0A0A]' : 'text-white text-[10px]'
+                    }`}
+                    style={!plan.is_popular ? { background: plan.accent } : {}}
+                  >
+                    ★ {plan.badge}
+                  </div>
+                )}
 
+                <div className={`p-7 ${plan.badge ? 'pt-6' : ''}`}>
+                  {/* Icon & name */}
+                  <div className="flex items-center gap-3 mb-5">
+                    <div
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm"
+                      style={{
+                        background: plan.is_popular ? `${plan.accent}25` : `${plan.accent}12`,
+                        border: `1px solid ${plan.accent}30`,
+                      }}
+                    >
+                      <Icon size={20} style={{ color: plan.accent }} />
+                    </div>
+                    <div>
+                      <div className={`font-bold text-base leading-tight ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
+                        {plan.name}
+                      </div>
+                      <div className="text-xs mt-0.5 text-gray-400">{plan.tagline}</div>
+                    </div>
+                  </div>
+
+                  <p className={`text-sm mb-6 leading-relaxed ${plan.is_popular ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {plan.description}
+                  </p>
+
+                  {/* Price */}
+                  <div className="mb-6">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className={`text-3xl font-black ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
+                        {fmt(getPrice(plan))}
+                      </span>
+                      <span className={`text-sm ${plan.is_popular ? 'text-gray-500' : 'text-gray-400'}`}>/mês</span>
+                    </div>
+                    {billing === 'annual' && (
+                      <div className={`text-xs line-through ${plan.is_popular ? 'text-gray-600' : 'text-gray-400'}`}>
+                        {fmt(plan.priceMonthly)}/mês
+                      </div>
+                    )}
+                    {billing === 'annual' && (
+                      <div className="text-xs text-green-500 font-semibold mt-1">✓ Economize 20% no plano anual</div>
+                    )}
+                  </div>
+
+                  {/* CTA */}
+                  <Link
+                    href={`/register?plan=${plan.id}`}
+                    className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
+                      plan.is_popular
+                        ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'
+                        : 'bg-[#0A0A0A] text-white hover:bg-[#222] shadow-sm'
+                    }`}
+                  >
+                    Começar Agora →
+                  </Link>
+
+                  {/* Divider */}
+                  <div className={`mb-6 h-px ${plan.is_popular ? 'bg-white/10' : 'bg-[#F0F0F0]'}`} />
+
+                  {/* Features */}
+                  <div className="space-y-3">
+                    {plan.features.map((f) => (
+                      <div
+                        key={f.text}
+                        className={`flex items-center gap-3 text-sm ${
+                          f.included
+                            ? plan.is_popular ? 'text-gray-300' : 'text-gray-700'
+                            : plan.is_popular ? 'text-gray-600' : 'text-gray-300'
+                        }`}
+                      >
+                        {f.included
+                          ? <Check size={15} className="text-green-500 flex-shrink-0" />
+                          : <X size={15} className="text-gray-300 flex-shrink-0" />
+                        }
+                        {f.text}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <p className="text-center text-gray-400 text-sm mt-10">
+          ✓ Sem contratos &nbsp;•&nbsp; ✓ Cancele a qualquer momento &nbsp;•&nbsp; ✓ Activação imediata
+        </p>
       </div>
     </section>
   )
