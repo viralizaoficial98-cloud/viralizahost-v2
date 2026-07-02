@@ -337,59 +337,235 @@ export function Header() {
         </div>
       </div>
 
-      {/* ── MEGA MENU — HOSPEDAGEM (branco) ── */}
+      {/* ── MEGA MENU — HOSPEDAGEM (preto premium) ── */}
       <div
         onMouseEnter={() => openMega('hosting')}
         onMouseLeave={closeMega}
-        className={`absolute top-full left-0 right-0 bg-white border-b border-[#F0F0F0] shadow-[0_16px_48px_rgba(0,0,0,0.10)] transition-all duration-200 origin-top hidden lg:block ${
+        className={`absolute top-full left-0 right-0 hidden lg:block transition-all duration-220 origin-top ${
           megaOpen === 'hosting' ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none'
         }`}
-        style={{ transitionProperty: 'opacity, transform' }}
+        style={{
+          transitionProperty: 'opacity, transform',
+          background: '#090909',
+          borderBottom: '1px solid rgba(245,183,0,0.28)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(245,183,0,0.10), inset 0 0 120px rgba(245,183,0,0.025)',
+        }}
       >
-        <div className="container mx-auto px-4 lg:px-8 py-7">
-          <div className="grid grid-cols-3 gap-10">
-            {megaColumns.map((col) => (
-              <div key={col.title}>
-                <div className="text-[10px] font-black text-[#999] uppercase tracking-[0.15em] mb-4 flex items-center gap-2">
-                  <div className="w-4 h-px bg-[#F5B700]" />
-                  {col.title}
+        {/* top glow line */}
+        <div style={{ height: 1, background: 'linear-gradient(to right, transparent 0%, #F5B700 40%, #F5B700 60%, transparent 100%)', opacity: 0.55 }} />
+
+        <div className="container mx-auto px-4 lg:px-8 py-8">
+          <div className="grid gap-8" style={{ gridTemplateColumns: '1fr 1fr 1.4fr 260px' }}>
+
+            {/* ── COL 1: HOSPEDAGEM ── */}
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.20em] mb-5 flex items-center gap-2.5" style={{ color: '#F5B700' }}>
+                <div className="w-3 h-px" style={{ background: '#F5B700' }} />
+                Hospedagem
+              </div>
+              <div className="space-y-1">
+                {([
+                  { icon: Server, label: 'Hospedagem de Sites',   desc: 'cPanel, LiteSpeed, NVMe SSD e SSL grátis',    href: '/hospedagem-de-sites' },
+                  { icon: Globe,  label: 'Hospedagem WordPress',  desc: 'WordPress otimizado com IA e CDN',            href: '/hospedagem-wordpress', badge: 'Recomendado' },
+                  { icon: Users,  label: 'Revenda de Hospedagem', desc: 'WHM/cPanel para revenda profissional',        href: '/revenda-de-hospedagem' },
+                ] as ColItemDef[]).map(({ icon: Icon, label, desc, href, badge }) => (
+                  <Link key={label} href={href} onClick={killMega}
+                    className="group flex items-start gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 cursor-pointer"
+                    style={{ background: 'transparent' }}
+                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(245,183,0,0.07)'; el.style.boxShadow = 'inset 0 0 0 1px rgba(245,183,0,0.18)' }}
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.boxShadow = 'none' }}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-all duration-150"
+                      style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.15)' }}>
+                      <Icon size={16} style={{ color: '#F5B700' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-white text-[13px] font-semibold leading-tight group-hover:text-[#F5B700] transition-colors duration-150">{label}</span>
+                        {badge && <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${BADGE_STYLE[badge] ?? 'bg-[#F5B700] text-black'}`}>{badge}</span>}
+                      </div>
+                      <span className="text-[11px] leading-snug mt-0.5 block" style={{ color: 'rgba(255,255,255,0.38)' }}>{desc}</span>
+                    </div>
+                    <ChevronRight size={11} className="shrink-0 mt-2 opacity-0 group-hover:opacity-100 transition-all duration-150" style={{ color: '#F5B700' }} />
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* ── COL 2: CRIAÇÃO DE SITES ── */}
+            <div style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: '2rem' }}>
+              <div className="text-[10px] font-black uppercase tracking-[0.20em] mb-5 flex items-center gap-2.5" style={{ color: '#F5B700' }}>
+                <div className="w-3 h-px" style={{ background: '#F5B700' }} />
+                Criação de Sites
+              </div>
+              <div className="space-y-1">
+                {([
+                  { icon: Zap,  label: 'Criador de Sites com IA', desc: 'Crie um site profissional em minutos',           href: '/criador-de-sites',    badge: 'Com IA' },
+                  { icon: Code, label: 'Construtor WordPress',     desc: 'WordPress com builder visual e plugins premium', href: '/construtor-wordpress' },
+                ] as ColItemDef[]).map(({ icon: Icon, label, desc, href, badge }) => (
+                  <Link key={label} href={href} onClick={killMega}
+                    className="group flex items-start gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 cursor-pointer"
+                    style={{ background: 'transparent' }}
+                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(245,183,0,0.07)'; el.style.boxShadow = 'inset 0 0 0 1px rgba(245,183,0,0.18)' }}
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.boxShadow = 'none' }}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-all duration-150"
+                      style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.15)' }}>
+                      <Icon size={16} style={{ color: '#F5B700' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-white text-[13px] font-semibold leading-tight group-hover:text-[#F5B700] transition-colors duration-150">{label}</span>
+                        {badge && <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${BADGE_STYLE[badge] ?? 'bg-[#F5B700] text-black'}`}>{badge}</span>}
+                      </div>
+                      <span className="text-[11px] leading-snug mt-0.5 block" style={{ color: 'rgba(255,255,255,0.38)' }}>{desc}</span>
+                    </div>
+                    <ChevronRight size={11} className="shrink-0 mt-2 opacity-0 group-hover:opacity-100 transition-all duration-150" style={{ color: '#F5B700' }} />
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* ── COL 3: INFRAESTRUTURA ── */}
+            <div style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: '2rem' }}>
+              <div className="text-[10px] font-black uppercase tracking-[0.20em] mb-5 flex items-center gap-2.5" style={{ color: '#F5B700' }}>
+                <div className="w-3 h-px" style={{ background: '#F5B700' }} />
+                Infraestrutura
+              </div>
+              <div className="space-y-1">
+                {([
+                  { icon: Cpu,           label: 'Servidor VPS',              desc: 'Alta performance e escalabilidade total',          href: '/servidor-vps' },
+                  { icon: Workflow,      label: 'VPS n8n Auto-hospedado',    desc: 'Automações e workflows sem código',                href: '/servidor-vps/n8n',              badge: 'Novo' },
+                  { icon: Shield,        label: 'Servidor VPS OpenClaw',     desc: 'Agentes de IA com autonomia total',               href: '/servidor-vps/openclaw' },
+                  { icon: MessageCircle, label: 'VPS Evolution API',         desc: 'WhatsApp Business e chatbots',                    href: '/servidor-vps/evolution-api',    badge: 'Novo' },
+                  { icon: Bot,           label: 'Viraliza AI Cloud',         desc: 'Agentes IA prontos para o negócio',               href: '/servidor-vps/viraliza-ai-cloud',badge: 'Com IA' },
+                  { icon: HardDrive,     label: 'Servidor Dedicado Linux',   desc: 'Infraestrutura exclusiva de alta performance',    href: '/servidor-dedicado' },
+                  { icon: Monitor,       label: 'Servidor Dedicado Windows', desc: 'Windows Server com Plesk e acesso remoto',        href: '/servidor-dedicado-windows' },
+                ] as ColItemDef[]).map(({ icon: Icon, label, desc, href, badge }) => (
+                  <Link key={label} href={href} onClick={killMega}
+                    className="group flex items-start gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 cursor-pointer"
+                    style={{ background: 'transparent' }}
+                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(245,183,0,0.07)'; el.style.boxShadow = 'inset 0 0 0 1px rgba(245,183,0,0.18)' }}
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.boxShadow = 'none' }}
+                  >
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-all duration-150"
+                      style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.14)' }}>
+                      <Icon size={14} style={{ color: '#F5B700' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-white text-[13px] font-semibold leading-tight group-hover:text-[#F5B700] transition-colors duration-150">{label}</span>
+                        {badge && <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${BADGE_STYLE[badge] ?? 'bg-[#F5B700] text-black'}`}>{badge}</span>}
+                      </div>
+                      <span className="text-[11px] leading-snug mt-0.5 block" style={{ color: 'rgba(255,255,255,0.38)' }}>{desc}</span>
+                    </div>
+                    <ChevronRight size={11} className="shrink-0 mt-2 opacity-0 group-hover:opacity-100 transition-all duration-150" style={{ color: '#F5B700' }} />
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* ── COL 4: CARD LATERAL PREMIUM ── */}
+            <div className="flex flex-col gap-3" style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: '1.5rem' }}>
+
+              {/* Card principal com imagem */}
+              <div className="flex-1 rounded-2xl overflow-hidden flex flex-col"
+                style={{
+                  background: 'linear-gradient(160deg, #111111 0%, #0d0d0d 100%)',
+                  border: '1px solid rgba(245,183,0,0.32)',
+                  boxShadow: '0 0 32px rgba(245,183,0,0.08), inset 0 1px 0 rgba(245,183,0,0.14)',
+                }}>
+                {/* Imagem */}
+                <div className="relative w-full flex items-center justify-center"
+                  style={{ height: 148, background: '#080808', borderBottom: '1px solid rgba(245,183,0,0.14)' }}>
+                  <Image
+                    src="/infrastructure-world-class.png"
+                    alt="Infraestrutura Premium"
+                    width={230} height={132}
+                    style={{ objectFit: 'contain', maxHeight: 132, width: '100%' }}
+                    priority={false}
+                  />
+                  {/* gradient overlay bottom */}
+                  <div className="absolute bottom-0 left-0 right-0 h-8"
+                    style={{ background: 'linear-gradient(to top, #0d0d0d, transparent)' }} />
                 </div>
-                <div className="space-y-0.5">
-                  {col.items.map(({ icon: Icon, label, desc, href, badge }) => (
-                    <Link key={label} href={href}
-                      onClick={killMega}
-                      className="flex items-start gap-3 px-3 py-2.5 rounded-xl hover:bg-[#FAFAFA] group transition-colors">
-                      <div className="w-9 h-9 rounded-xl bg-[#F5F5F5] group-hover:bg-[#FFFDF0] flex items-center justify-center shrink-0 transition-colors mt-0.5">
-                        <Icon size={16} className="text-[#666] group-hover:text-[#B88900] transition-colors" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[#0A0A0A] text-[13px] font-semibold group-hover:text-[#B88900] transition-colors">{label}</span>
-                          {badge && <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${BADGE_STYLE[badge] ?? 'bg-[#F5B700] text-black'}`}>{badge}</span>}
-                        </div>
-                        <span className="text-gray-400 text-[12px] leading-snug block">{desc}</span>
-                      </div>
-                      <ChevronRight size={12} className="text-gray-300 group-hover:text-[#F5B700] mt-2 shrink-0 opacity-0 group-hover:opacity-100 transition-all" />
-                    </Link>
-                  ))}
+
+                {/* Conteúdo */}
+                <div className="p-4 flex flex-col flex-1">
+                  <div className="text-[9px] font-black uppercase tracking-[0.22em] mb-1.5" style={{ color: 'rgba(245,183,0,0.65)' }}>
+                    Infraestrutura Premium
+                  </div>
+                  <h4 className="text-white font-black text-[13px] leading-tight mb-2">
+                    Infraestrutura de{' '}
+                    <span style={{ color: '#F5B700' }}>Classe Mundial</span>
+                  </h4>
+                  <p className="text-[11px] leading-relaxed mb-4 flex-1" style={{ color: 'rgba(255,255,255,0.42)' }}>
+                    Servidores de última geração com desempenho máximo e 99.9% de uptime garantido.
+                  </p>
+                  <Link href="/servidor-dedicado" onClick={killMega}
+                    className="block text-center text-xs font-black py-2.5 rounded-xl transition-all duration-150 w-full"
+                    style={{ background: '#F5B700', color: '#090909' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FFD54F' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#F5B700' }}
+                  >
+                    Ver Infraestrutura →
+                  </Link>
                 </div>
               </div>
-            ))}
-          </div>
-          <div className="mt-6 pt-5 border-t border-[#F0F0F0] flex items-center justify-between">
-            <p className="text-xs text-[#999]">
-              Dúvidas?{' '}
-              <Link href="/tickets" className="text-[#F5B700] font-semibold hover:underline" onClick={killMega}>
-                Fale com um especialista
-              </Link>
-            </p>
-            <div className="flex gap-4 text-xs text-[#999]">
-              <span className="flex items-center gap-1.5 text-green-600"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" /> Uptime 99.9%</span>
-              <span>Suporte 24/7</span>
-              <span>Garantia 30 dias</span>
+
+              {/* Card suporte */}
+              <div className="rounded-2xl p-4"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0" />
+                  <span className="text-white text-xs font-bold">Precisa de ajuda?</span>
+                </div>
+                <p className="text-[11px] mb-3 leading-relaxed" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                  Nossa equipa está online 24/7 para si.
+                </p>
+                <Link href="/tickets" onClick={killMega}
+                  className="block text-center text-[11px] font-bold py-2 rounded-xl transition-all duration-150 w-full"
+                  style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.78)', border: '1px solid rgba(255,255,255,0.12)' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,183,0,0.15)'; (e.currentTarget as HTMLElement).style.color = '#F5B700'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(245,183,0,0.35)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.78)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.12)' }}
+                >
+                  Falar com Suporte →
+                </Link>
+              </div>
             </div>
           </div>
+
+          {/* ── BARRA INFERIOR ── */}
+          <div className="mt-7 pt-5 flex items-center justify-between"
+            style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="flex items-center gap-6">
+              <span className="flex items-center gap-1.5 text-[11px] text-green-400 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block animate-pulse" />
+                Uptime 99.9%
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                <Shield size={11} style={{ color: '#F5B700' }} /> Proteção avançada
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                <Zap size={11} style={{ color: '#F5B700' }} /> LiteSpeed Enterprise
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                <Archive size={11} style={{ color: '#F5B700' }} /> Backup diário
+              </span>
+            </div>
+            <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.28)' }}>
+              Dúvidas?{' '}
+              <Link href="/tickets" onClick={killMega}
+                className="font-semibold hover:underline transition-colors"
+                style={{ color: '#F5B700' }}>
+                Fale com um especialista →
+              </Link>
+            </p>
+          </div>
         </div>
+
+        {/* bottom glow line */}
+        <div style={{ height: 1, background: 'linear-gradient(to right, transparent, #F5B700, transparent)', opacity: 0.28 }} />
       </div>
 
       {/* ── MEGA MENU — DOMÍNIOS (preto + dourado) ── */}
