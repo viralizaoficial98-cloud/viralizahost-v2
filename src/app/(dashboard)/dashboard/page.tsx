@@ -13,44 +13,47 @@ const cardStyle = {
   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
 }
 
+async function getDashboardData(userId: string) {
+  const supabase = await createClient()
+
+  const [r0, r1, r2, r3, r4, r5, r6] = await Promise.allSettled([
+    supabase.from('domains').select('*', { count: 'exact', head: true }).eq('profile_id', userId).eq('status', 'active'),
+    supabase.from('services').select('*', { count: 'exact', head: true }).eq('profile_id', userId).eq('status', 'active'),
+    supabase.from('emails').select('*', { count: 'exact', head: true }).eq('profile_id', userId),
+    supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('profile_id', userId).in('status', ['open', 'in_progress'] as any),
+    supabase.from('services').select('id, notes, expires_at, plans(name), hosting_accounts(primary_domain)').eq('profile_id', userId).eq('status', 'active').order('expires_at').limit(5),
+    supabase.from('activity_logs').select('action, description, created_at').eq('profile_id', userId).order('created_at', { ascending: false }).limit(5),
+    supabase.from('services').select('id, plans(name, disk_gb, bandwidth_gb), hosting_accounts(primary_domain, disk_used_mb, bandwidth_used_mb), expires_at').eq('profile_id', userId).eq('status', 'active').limit(4),
+  ])
+
+  const count = (r: typeof r0) => (r.status === 'fulfilled' ? (r.value.count ?? 0) : 0)
+  const rows  = (r: typeof r4) => (r.status === 'fulfilled' ? ((r.value as any).data ?? []) : [])
+
+  return {
+    domainsCount:  count(r0),
+    servicesCount: count(r1),
+    emailsCount:   count(r2),
+    ticketsCount:  count(r3),
+    expiringItems:  rows(r4),
+    recentActivity: rows(r5),
+    activeServices: rows(r6),
+  }
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  // redirect() must be outside try/catch — it throws a special Next.js exception internally
   if (!user) redirect('/login')
 
-  let domainsCount = 0
-  let servicesCount = 0
-  let emailsCount = 0
-  let ticketsCount = 0
-  let expiringItems: any[] = []
-  let recentActivity: any[] = []
-  let activeServices: any[] = []
-
-  try {
-    const [r0, r1, r2, r3, r4, r5, r6] = await Promise.all([
-      supabase.from('domains').select('*', { count: 'exact', head: true }).eq('profile_id', user.id).eq('status', 'active'),
-      supabase.from('services').select('*', { count: 'exact', head: true }).eq('profile_id', user.id).eq('status', 'active'),
-      supabase.from('emails').select('*', { count: 'exact', head: true }).eq('profile_id', user.id),
-      supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('profile_id', user.id).in('status', ['open', 'in_progress'] as any),
-      supabase.from('services').select('id, notes, expires_at, plans(name), hosting_accounts(primary_domain)').eq('profile_id', user.id).eq('status', 'active').order('expires_at').limit(5),
-      supabase.from('activity_logs').select('action, description, created_at').eq('profile_id', user.id).order('created_at', { ascending: false }).limit(5),
-      supabase.from('services').select('id, plans(name, disk_gb, bandwidth_gb), hosting_accounts(primary_domain, disk_used_mb, bandwidth_used_mb), expires_at').eq('profile_id', user.id).eq('status', 'active').limit(4),
-    ])
-
-    domainsCount  = r0.count ?? 0
-    servicesCount = r1.count ?? 0
-    emailsCount   = r2.count ?? 0
-    ticketsCount  = r3.count ?? 0
-    expiringItems  = r4.data ?? []
-    recentActivity = r5.data ?? []
-    activeServices = r6.data ?? []
-  } catch {
-    // DB unavailable — show zeros/empty state
-  }
+  const {
+    domainsCount, servicesCount, emailsCount, ticketsCount,
+    expiringItems, recentActivity, activeServices,
+  } = await getDashboardData(user.id)
 
   const now = new Date()
   const in30days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-  const hasUrgent = expiringItems.some(s => s.expires_at && new Date(s.expires_at) < in30days)
+  const hasUrgent = expiringItems.some((s: any) => s.expires_at && new Date(s.expires_at) < in30days)
 
   return (
     <div className="space-y-7">
