@@ -2,26 +2,25 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { Shield, Lock, Globe, Zap, RefreshCw, Smartphone, Gauge, Mail, Activity } from 'lucide-react'
+import { Calendar, Users, Smartphone, Globe, RefreshCw, Shield, Zap, Lock, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Calendário e Contactos | ViralizaHost',
+  title: 'Calendário e Contactos — ViralizaHost',
   description: 'Agenda partilhada e contactos sincronizados com todos os seus dispositivos.',
 }
 
-const features = [
-  { icon: Shield, title: 'Calendário Partilhado', desc: 'Agenda partilhada com a sua equipa em tempo real.' },
-  { icon: Lock, title: 'Contactos Centralizados', desc: 'Lista de contactos unificada para toda a empresa.' },
-  { icon: Globe, title: 'Sincronização Total', desc: 'Sincronizado em todos os dispositivos e apps.' },
-  { icon: Zap, title: 'Convites de Reunião', desc: 'Envie e receba convites de calendário facilmente.' },
-  { icon: RefreshCw, title: 'Backup Automático', desc: 'Contactos e eventos protegidos com backup diário.' },
-  { icon: Smartphone, title: 'Apps Mobile', desc: 'Aceda em iOS e Android com sincronização em tempo real.' },
-  { icon: Gauge, title: 'Gestão de Grupos', desc: 'Listas de distribuição e grupos de contactos.' },
-  { icon: Mail, title: 'Integração E-mail', desc: 'Calendário e contactos integrados no webmail.' },
-  { icon: Activity, title: 'Histórico', desc: 'Registo completo de reuniões e interacções.' },
-]
-
-export default function Page() {
+export default function CalendarioContactosPage() {
+  const features = [
+    { icon: Calendar, title: 'Calendário Partilhado', desc: 'Agenda partilhada entre toda a equipa com visualização de disponibilidade.' },
+    { icon: Users, title: 'Contactos Empresariais', desc: 'Lista de contactos centralizada acessível por todos os colaboradores.' },
+    { icon: Smartphone, title: 'Sync em Todos os Dispositivos', desc: 'Calendário e contactos sincronizados em desktop, tablet e smartphone.' },
+    { icon: Globe, title: 'CalDAV e CardDAV', desc: 'Suporte a protocolos padrão para máxima compatibilidade com qualquer cliente.' },
+    { icon: RefreshCw, title: 'Sincronização Instantânea', desc: 'Alterações refletidas em tempo real em todos os dispositivos da equipa.' },
+    { icon: Shield, title: 'Convites por E-mail', desc: 'Envie e aceite convites de reunião diretamente pelo e-mail com confirmação automática.' },
+    { icon: Zap, title: 'Lembretes Automáticos', desc: 'Notificações por e-mail e push antes de reuniões e eventos importantes.' },
+    { icon: Lock, title: 'Controlo de Acesso', desc: 'Defina permissões de visualização e edição por utilizador ou grupo.' },
+    { icon: Activity, title: 'Integração com E-mail', desc: 'Calendário e contactos totalmente integrados com o cliente de e-mail.' },
+  ]
   return (
     <>
       <Header />
@@ -30,7 +29,7 @@ export default function Page() {
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(245,183,0,0.18) 0%, transparent 70%)' }} />
           <div className="container mx-auto px-4 lg:px-8 relative z-10 text-center max-w-4xl">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.30)', color: '#F5B700' }}>
-              Produtividade
+              PRODUTIVIDADE
             </div>
             <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">
               Calendário e <span style={{ color: '#F5B700' }}>Contactos</span>

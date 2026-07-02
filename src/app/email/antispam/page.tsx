@@ -2,26 +2,25 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { Shield, Lock, Zap, Globe, Activity, Archive, Database, Gauge, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Shield, Lock, Zap, RefreshCw, Globe, Activity, Database, Search } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'AntiSpam Premium | ViralizaHost',
+  title: 'AntiSpam Premium — ViralizaHost',
   description: 'Bloqueio avançado de spam com IA para manter a sua caixa de entrada limpa.',
 }
 
-const features = [
-  { icon: Shield, title: 'Bloqueio em Tempo Real', desc: 'Filtragem instantânea de 99.9% de spam.' },
-  { icon: Lock, title: 'Listas Negras', desc: 'Base de dados global de remetentes maliciosos.' },
-  { icon: Zap, title: 'IA Inteligente', desc: 'Aprendizagem automática para melhor detecção.' },
-  { icon: Globe, title: 'Proteção Multi-nível', desc: 'Análise de conteúdo, remetente e padrões.' },
-  { icon: Activity, title: 'Relatórios Detalhados', desc: 'Veja tudo que foi bloqueado e porquê.' },
-  { icon: Archive, title: 'Quarentena', desc: 'E-mails suspeitos em quarentena antes da entrega.' },
-  { icon: Database, title: 'Whitelist/Blacklist', desc: 'Personalize regras de filtragem facilmente.' },
-  { icon: Gauge, title: 'Painel AntiSpam', desc: 'Controlo total das suas regras de filtragem.' },
-  { icon: RefreshCw, title: 'Actualizações Automáticas', desc: 'Base de dados de ameaças sempre actualizada.' },
-]
-
-export default function Page() {
+export default function AntiSpamPage() {
+  const features = [
+    { icon: AlertTriangle, title: 'Deteção por IA', desc: 'Inteligência artificial que aprende e melhora a filtragem de spam continuamente.' },
+    { icon: Shield, title: 'Taxa de Bloqueio 99.9%', desc: 'Eficácia comprovada que bloqueia praticamente todo o spam antes de chegar à caixa.' },
+    { icon: Lock, title: 'Anti-Phishing', desc: 'Proteção contra e-mails de phishing que tentam roubar dados e credenciais.' },
+    { icon: Zap, title: 'Análise em Tempo Real', desc: 'Cada e-mail é analisado em milissegundos antes de ser entregue.' },
+    { icon: RefreshCw, title: 'Listas Atualizadas', desc: 'Base de dados de remetentes maliciosos atualizada em tempo real globalmente.' },
+    { icon: Globe, title: 'Reputação de IP', desc: 'Verificação automática da reputação de todos os IPs remetentes.' },
+    { icon: Activity, title: 'Relatórios Detalhados', desc: 'Dashboard com estatísticas de spam bloqueado e categorias de ameaças.' },
+    { icon: Database, title: 'Quarentena', desc: 'E-mails suspeitos colocados em quarentena para revisão antes da entrega.' },
+    { icon: Search, title: 'Pesquisa em Quarentena', desc: 'Encontre e liberte e-mails retidos na quarentena com pesquisa avançada.' },
+  ]
   return (
     <>
       <Header />
@@ -30,7 +29,7 @@ export default function Page() {
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(245,183,0,0.18) 0%, transparent 70%)' }} />
           <div className="container mx-auto px-4 lg:px-8 relative z-10 text-center max-w-4xl">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.30)', color: '#F5B700' }}>
-              AntiSpam Premium
+              ANTISPAM PREMIUM
             </div>
             <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">
               AntiSpam <span style={{ color: '#F5B700' }}>Premium</span>
@@ -40,7 +39,7 @@ export default function Page() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
-                Ativar AntiSpam →
+                Começar Agora →
               </Link>
               <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
                 Falar com Suporte
@@ -68,7 +67,7 @@ export default function Page() {
             <h2 className="text-3xl lg:text-4xl font-black text-white mb-4">Pronto para <span style={{ color: '#F5B700' }}>começar</span>?</h2>
             <p className="text-base mb-8" style={{ color: 'rgba(255,255,255,0.55)' }}>Junte-se a milhares de empresas que confiam na ViralizaHost.</p>
             <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
-              Ativar AntiSpam →
+              Começar Agora →
             </Link>
           </div>
         </section>

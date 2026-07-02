@@ -2,26 +2,25 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { Mail, Shield, Globe, Zap, RefreshCw, Database, Gauge, Lock, Activity } from 'lucide-react'
+import { MessageCircle, Mail, Headphones, Globe, Shield, Clock, Users, Zap, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Contacte-nos Agora | ViralizaHost',
+  title: 'Contactar — ViralizaHost',
   description: 'Fale diretamente com a nossa equipa por chat, ticket ou telefone.',
 }
 
-const features = [
-  { icon: Mail, title: 'E-mail Directo', desc: 'Envie-nos um e-mail e respondemos em 2 horas.' },
-  { icon: Shield, title: 'Chat ao Vivo', desc: 'Fale connosco em tempo real pelo chat.' },
-  { icon: Globe, title: 'Redes Sociais', desc: 'Encontre-nos no Facebook, Instagram e LinkedIn.' },
-  { icon: Zap, title: 'Resposta Rápida', desc: 'Garantimos resposta em menos de 2 horas úteis.' },
-  { icon: RefreshCw, title: 'Suporte Técnico', desc: 'Especialistas disponíveis 24 horas por dia.' },
-  { icon: Database, title: 'Ticket de Suporte', desc: 'Sistema de tickets para acompanhamento completo.' },
-  { icon: Gauge, title: 'Centro de Ajuda', desc: 'Encontre respostas na nossa base de conhecimento.' },
-  { icon: Lock, title: 'Dados Seguros', desc: 'As suas informações são tratadas com confidencialidade.' },
-  { icon: Activity, title: 'Online 24/7', desc: 'Equipa disponível todos os dias, sem excepção.' },
-]
-
-export default function Page() {
+export default function ContactarPage() {
+  const features = [
+    { icon: MessageCircle, title: 'Chat ao Vivo', desc: 'Converse em tempo real com um técnico especialista pelo chat do painel.' },
+    { icon: Mail, title: 'E-mail', desc: 'Envie-nos um e-mail e receba resposta em menos de 2 horas.' },
+    { icon: Headphones, title: 'Suporte Telefónico', desc: 'Fale diretamente com a nossa equipa técnica por telefone em horário alargado.' },
+    { icon: Globe, title: 'Portal de Suporte', desc: 'Aceda ao portal de suporte para abrir e acompanhar tickets online.' },
+    { icon: Shield, title: 'Suporte Seguro', desc: 'Todas as comunicações de suporte são encriptadas e protegidas.' },
+    { icon: Clock, title: 'Disponibilidade 24/7', desc: 'Estamos disponíveis todos os dias do ano, 24 horas por dia.' },
+    { icon: Users, title: 'Equipa Especializada', desc: 'Técnicos certificados prontos para resolver qualquer problema.' },
+    { icon: Zap, title: 'Resposta Rápida', desc: 'Comprometemo-nos com tempos de resposta rápidos em todos os canais.' },
+    { icon: Activity, title: 'Acompanhamento', desc: 'Seguimos cada caso até à resolução completa e confirmação da satisfação.' },
+  ]
   return (
     <>
       <Header />
@@ -30,10 +29,10 @@ export default function Page() {
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(245,183,0,0.18) 0%, transparent 70%)' }} />
           <div className="container mx-auto px-4 lg:px-8 relative z-10 text-center max-w-4xl">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.30)', color: '#F5B700' }}>
-              Contactar
+              CONTACTAR
             </div>
             <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">
-              Contacte-nos <span style={{ color: '#F5B700' }}>Agora</span>
+              <span style={{ color: '#F5B700' }}>Contacte-nos</span>
             </h1>
             <p className="text-lg lg:text-xl leading-relaxed mb-10 max-w-2xl mx-auto" style={{ color: 'rgba(255,255,255,0.60)' }}>
               Fale diretamente com a nossa equipa por chat, ticket ou telefone.
@@ -42,8 +41,8 @@ export default function Page() {
               <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
                 Enviar Mensagem →
               </Link>
-              <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
-                Falar com Suporte
+              <Link href="/suporte/base-conhecimento" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
+                Base de Conhecimento
               </Link>
             </div>
           </div>

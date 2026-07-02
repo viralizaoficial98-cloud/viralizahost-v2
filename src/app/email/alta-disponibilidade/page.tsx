@@ -5,23 +5,22 @@ import { Footer } from '@/components/layout/Footer'
 import { Activity, Server, Globe, Shield, Zap, RefreshCw, Database, Lock, Gauge } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Alta Disponibilidade | ViralizaHost',
+  title: 'Alta Disponibilidade de E-mail — ViralizaHost',
   description: 'Infraestrutura redundante com 99.9% de uptime garantido para os seus e-mails.',
 }
 
-const features = [
-  { icon: Activity, title: '99.9% Uptime', desc: 'SLA garantido com compensação se não cumprido.' },
-  { icon: Server, title: 'Servidores Redundantes', desc: 'Múltiplos servidores para zero single point of failure.' },
-  { icon: Globe, title: 'Multi-Datacenter', desc: 'Infraestrutura distribuída em vários datacenters.' },
-  { icon: Shield, title: 'Failover Automático', desc: 'Troca automática para servidor secundário.' },
-  { icon: Zap, title: 'Balanceamento', desc: 'Distribuição de carga para máxima performance.' },
-  { icon: RefreshCw, title: 'Monitorização 24/7', desc: 'Alertas imediatos em caso de anomalia.' },
-  { icon: Database, title: 'Replicação', desc: 'Dados replicados em tempo real entre servidores.' },
-  { icon: Lock, title: 'Protecção DDoS', desc: 'Mitigação automática de ataques volumétricos.' },
-  { icon: Gauge, title: 'Dashboard Status', desc: 'Veja o estado em tempo real da infraestrutura.' },
-]
-
-export default function Page() {
+export default function AltaDisponibilidadePage() {
+  const features = [
+    { icon: Activity, title: 'Uptime 99.9%', desc: 'SLA de 99.9% de disponibilidade garantida com compensação em caso de incidente.' },
+    { icon: Server, title: 'Infraestrutura Redundante', desc: 'Múltiplos servidores em paralelo para eliminar pontos únicos de falha.' },
+    { icon: Globe, title: 'Multi-Datacenter', desc: 'Dados replicados em tempo real entre datacenters em diferentes localizações.' },
+    { icon: Shield, title: 'Failover Automático', desc: 'Comutação automática para servidor de backup em caso de falha sem interrupção.' },
+    { icon: Zap, title: 'Monitorização 24/7', desc: 'Sistemas monitorizados continuamente com alertas automáticos para a equipa técnica.' },
+    { icon: RefreshCw, title: 'Recuperação Automática', desc: 'Recuperação automatizada de falhas sem necessidade de intervenção manual.' },
+    { icon: Database, title: 'Replicação em Tempo Real', desc: 'Todos os e-mails replicados instantaneamente para evitar perda de dados.' },
+    { icon: Lock, title: 'Dados Seguros Sempre', desc: 'Segurança mantida mesmo durante procedimentos de failover e manutenção.' },
+    { icon: Gauge, title: 'Performance Consistente', desc: 'Balanceamento de carga para manter a performance mesmo em picos de tráfego.' },
+  ]
   return (
     <>
       <Header />
@@ -30,7 +29,7 @@ export default function Page() {
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(245,183,0,0.18) 0%, transparent 70%)' }} />
           <div className="container mx-auto px-4 lg:px-8 relative z-10 text-center max-w-4xl">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.30)', color: '#F5B700' }}>
-              Alta Disponibilidade
+              ALTA DISPONIBILIDADE
             </div>
             <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">
               Alta <span style={{ color: '#F5B700' }}>Disponibilidade</span>
@@ -40,7 +39,7 @@ export default function Page() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
-                Contratar Agora →
+                Começar Agora →
               </Link>
               <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
                 Falar com Suporte
@@ -68,7 +67,7 @@ export default function Page() {
             <h2 className="text-3xl lg:text-4xl font-black text-white mb-4">Pronto para <span style={{ color: '#F5B700' }}>começar</span>?</h2>
             <p className="text-base mb-8" style={{ color: 'rgba(255,255,255,0.55)' }}>Junte-se a milhares de empresas que confiam na ViralizaHost.</p>
             <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
-              Contratar Agora →
+              Começar Agora →
             </Link>
           </div>
         </section>

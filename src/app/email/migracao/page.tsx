@@ -2,26 +2,25 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { MoveRight, Archive, Shield, Zap, RefreshCw, Globe, Lock, Database, Activity } from 'lucide-react'
+import { MoveRight, Archive, Shield, Zap, RefreshCw, Globe, Lock, Database, Headphones } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Migração de E-mails | ViralizaHost',
+  title: 'Migração de E-mails — ViralizaHost',
   description: 'Migre todos os seus e-mails para a ViralizaHost sem perder dados.',
 }
 
-const features = [
-  { icon: MoveRight, title: 'Migração Guiada', desc: 'A nossa equipa gere todo o processo de migração.' },
-  { icon: Archive, title: 'Zero Perda de Dados', desc: 'Todos os e-mails, pastas e anexos migrados.' },
-  { icon: Shield, title: 'Sem Downtime', desc: 'Migração em paralelo sem interrupção do serviço.' },
-  { icon: Zap, title: 'Migração Rápida', desc: 'Processo optimizado para migrar grandes volumes.' },
-  { icon: RefreshCw, title: 'Compatibilidade', desc: 'Migramos de qualquer provedor: Google, Outlook, Zimbra.' },
-  { icon: Globe, title: 'Migração Remota', desc: 'Não precisa de acesso físico ao servidor anterior.' },
-  { icon: Lock, title: 'Dados Seguros', desc: 'Transferência encriptada de todos os seus dados.' },
-  { icon: Database, title: 'Backup Pré-Migração', desc: 'Fazemos backup antes de iniciar a migração.' },
-  { icon: Activity, title: 'Suporte Especializado', desc: 'Equipa dedicada disponível durante toda a migração.' },
-]
-
-export default function Page() {
+export default function EmailMigracaoPage() {
+  const features = [
+    { icon: MoveRight, title: 'Migração Completa', desc: 'Migramos todas as suas mensagens, pastas, contactos e calendários.' },
+    { icon: Archive, title: 'Histórico Preservado', desc: 'Todos os e-mails antigos migrados com datas e metadados originais preservados.' },
+    { icon: Shield, title: 'Zero Perda de Dados', desc: 'Processo verificado que garante que nenhuma mensagem é perdida durante a migração.' },
+    { icon: Zap, title: 'Migração Rápida', desc: 'A maioria das migrações de e-mail concluída em menos de 24 horas.' },
+    { icon: RefreshCw, title: 'Qualquer Fornecedor', desc: 'Migramos de Gmail, Outlook, cPanel, Zimbra, Exchange e qualquer outro serviço.' },
+    { icon: Globe, title: 'Sem Interrupção', desc: 'Continue a receber e-mails normalmente durante todo o processo de migração.' },
+    { icon: Lock, title: 'Transferência Segura', desc: 'Todos os dados transferidos com encriptação SSL/TLS de ponta a ponta.' },
+    { icon: Database, title: 'Verificação Final', desc: 'Verificação completa após a migração para confirmar a integridade de todos os dados.' },
+    { icon: Headphones, title: 'Suporte Dedicado', desc: 'Técnico dedicado acompanha o processo de migração do início ao fim.' },
+  ]
   return (
     <>
       <Header />
@@ -30,7 +29,7 @@ export default function Page() {
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(245,183,0,0.18) 0%, transparent 70%)' }} />
           <div className="container mx-auto px-4 lg:px-8 relative z-10 text-center max-w-4xl">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.30)', color: '#F5B700' }}>
-              Migração E-mail
+              MIGRAÇÃO E-MAIL
             </div>
             <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">
               Migração de <span style={{ color: '#F5B700' }}>E-mails</span>
@@ -39,8 +38,8 @@ export default function Page() {
               Migre todos os seus e-mails para a ViralizaHost sem perder dados.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
-                Iniciar Migração →
+              <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
+                Começar Agora →
               </Link>
               <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
                 Falar com Suporte
@@ -67,8 +66,8 @@ export default function Page() {
           <div className="container mx-auto px-4 lg:px-8 text-center max-w-2xl">
             <h2 className="text-3xl lg:text-4xl font-black text-white mb-4">Pronto para <span style={{ color: '#F5B700' }}>começar</span>?</h2>
             <p className="text-base mb-8" style={{ color: 'rgba(255,255,255,0.55)' }}>Junte-se a milhares de empresas que confiam na ViralizaHost.</p>
-            <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
-              Iniciar Migração →
+            <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
+              Começar Agora →
             </Link>
           </div>
         </section>

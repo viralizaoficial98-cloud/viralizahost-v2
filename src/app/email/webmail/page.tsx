@@ -2,26 +2,25 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { Globe, Mail, Smartphone, Shield, Zap, Lock, Database, Gauge, Activity } from 'lucide-react'
+import { Globe, Mail, Smartphone, Calendar, Shield, Zap, Lock, Search, RefreshCw } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Webmail Profissional | ViralizaHost',
+  title: 'Webmail Profissional — ViralizaHost',
   description: 'Aceda ao seu e-mail em qualquer browser com interface moderna e intuitiva.',
 }
 
-const features = [
-  { icon: Globe, title: 'Acesso Universal', desc: 'Funciona em qualquer browser, sistema operativo.' },
-  { icon: Mail, title: 'Interface Moderna', desc: 'Design intuitivo inspirado nos melhores clientes.' },
-  { icon: Smartphone, title: 'Responsivo', desc: 'Optimizado para desktop, tablet e telemóvel.' },
-  { icon: Shield, title: 'Sessão Segura', desc: 'HTTPS com autenticação de dois factores disponível.' },
-  { icon: Zap, title: 'Alta Velocidade', desc: 'Interface leve e rápida mesmo em conexões lentas.' },
-  { icon: Lock, title: 'Encriptação', desc: 'Dados encriptados em trânsito e em repouso.' },
-  { icon: Database, title: 'Filtros Avançados', desc: 'Organize e-mails com pastas e regras automáticas.' },
-  { icon: Gauge, title: 'Calendário Integrado', desc: 'Agenda e contactos acessíveis no webmail.' },
-  { icon: Activity, title: 'Notificações', desc: 'Alertas em tempo real de novos e-mails.' },
-]
-
-export default function Page() {
+export default function WebmailPage() {
+  const features = [
+    { icon: Globe, title: 'Acesso Universal', desc: 'Aceda ao seu e-mail em qualquer browser, em qualquer dispositivo, em qualquer lugar.' },
+    { icon: Mail, title: 'Interface Moderna', desc: 'Design limpo e intuitivo com todas as funcionalidades num único ecrã.' },
+    { icon: Smartphone, title: 'Responsivo', desc: 'Interface totalmente adaptada para smartphones e tablets.' },
+    { icon: Calendar, title: 'Calendário Integrado', desc: 'Agenda completa integrada no webmail com suporte a convites e lembretes.' },
+    { icon: Shield, title: 'Sessão Segura', desc: 'Acesso sempre via HTTPS com proteção contra sessões não autorizadas.' },
+    { icon: Zap, title: 'Carregamento Rápido', desc: 'Interface otimizada para carregar rapidamente mesmo em ligações lentas.' },
+    { icon: Lock, title: 'Logout Automático', desc: 'Encerramento automático de sessão após período de inatividade para maior segurança.' },
+    { icon: Search, title: 'Pesquisa Avançada', desc: 'Encontre qualquer e-mail rapidamente com filtros por data, remetente e assunto.' },
+    { icon: RefreshCw, title: 'Sincronização Instantânea', desc: 'E-mails sincronizados em tempo real entre webmail e clientes de e-mail.' },
+  ]
   return (
     <>
       <Header />
@@ -30,7 +29,7 @@ export default function Page() {
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(245,183,0,0.18) 0%, transparent 70%)' }} />
           <div className="container mx-auto px-4 lg:px-8 relative z-10 text-center max-w-4xl">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.30)', color: '#F5B700' }}>
-              Webmail
+              WEBMAIL
             </div>
             <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">
               Webmail <span style={{ color: '#F5B700' }}>Profissional</span>
@@ -39,8 +38,8 @@ export default function Page() {
               Aceda ao seu e-mail em qualquer browser com interface moderna e intuitiva.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/login" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
-                Acessar Webmail →
+              <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
+                Começar Agora →
               </Link>
               <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
                 Falar com Suporte
@@ -67,8 +66,8 @@ export default function Page() {
           <div className="container mx-auto px-4 lg:px-8 text-center max-w-2xl">
             <h2 className="text-3xl lg:text-4xl font-black text-white mb-4">Pronto para <span style={{ color: '#F5B700' }}>começar</span>?</h2>
             <p className="text-base mb-8" style={{ color: 'rgba(255,255,255,0.55)' }}>Junte-se a milhares de empresas que confiam na ViralizaHost.</p>
-            <Link href="/login" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
-              Acessar Webmail →
+            <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
+              Começar Agora →
             </Link>
           </div>
         </section>

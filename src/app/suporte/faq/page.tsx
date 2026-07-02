@@ -2,26 +2,25 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { Shield, Lock, Globe, Zap, RefreshCw, Database, Gauge, Mail, Activity } from 'lucide-react'
+import { Search, BookOpen, Globe, Shield, Zap, RefreshCw, Lock, Activity, Headphones } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Perguntas Frequentes | ViralizaHost',
+  title: 'FAQ — Perguntas Frequentes — ViralizaHost',
   description: 'As respostas para as dúvidas mais comuns sobre os nossos serviços.',
 }
 
-const features = [
-  { icon: Shield, title: 'Hospedagem', desc: 'Perguntas sobre cPanel, WordPress e planos de hosting.' },
-  { icon: Mail, title: 'E-mail', desc: 'Dúvidas sobre configuração e planos de e-mail corporativo.' },
-  { icon: Globe, title: 'Domínios', desc: 'Tudo sobre registo, transferência e gestão de domínios.' },
-  { icon: Zap, title: 'Pagamentos', desc: 'Métodos de pagamento, faturas e reembolsos.' },
-  { icon: RefreshCw, title: 'Migração', desc: 'Como migrar o seu site ou e-mail para a ViralizaHost.' },
-  { icon: Lock, title: 'Segurança', desc: 'SSL, firewalls e protecção do seu site.' },
-  { icon: Database, title: 'Servidores VPS', desc: 'Perguntas sobre configuração e gestão de VPS.' },
-  { icon: Gauge, title: 'Performance', desc: 'Optimização de velocidade e uptime do seu site.' },
-  { icon: Activity, title: 'Cancelamentos', desc: 'Políticas de cancelamento e garantia de 30 dias.' },
-]
-
-export default function Page() {
+export default function FaqPage() {
+  const features = [
+    { icon: Search, title: 'Pesquisa Rápida', desc: 'Encontre a resposta à sua dúvida rapidamente com a pesquisa inteligente.' },
+    { icon: BookOpen, title: 'Categorias Organizadas', desc: 'Perguntas organizadas por tema: hospedagem, e-mail, domínios, pagamentos e mais.' },
+    { icon: Globe, title: 'Domínios', desc: 'Como registar, transferir e gerir domínios com a ViralizaHost.' },
+    { icon: Shield, title: 'Segurança e SSL', desc: 'Perguntas sobre certificados SSL, proteção DDoS e segurança do site.' },
+    { icon: Zap, title: 'Hospedagem', desc: 'Como funciona a hospedagem, limites de recursos e upgrade de planos.' },
+    { icon: RefreshCw, title: 'Migrações', desc: 'Como migrar o seu site de outro fornecedor para a ViralizaHost.' },
+    { icon: Lock, title: 'Pagamentos e Faturas', desc: 'Métodos de pagamento, faturação e gestão de subscrições.' },
+    { icon: Activity, title: 'Performance', desc: 'Como otimizar a velocidade do site e monitorizar o desempenho.' },
+    { icon: Headphones, title: 'Suporte', desc: 'Como contactar o suporte, horários e tempos de resposta garantidos.' },
+  ]
   return (
     <>
       <Header />
@@ -39,8 +38,8 @@ export default function Page() {
               As respostas para as dúvidas mais comuns sobre os nossos serviços.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/suporte/base-conhecimento" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
-                Ver Base de Conhecimento →
+              <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
+                Começar Agora →
               </Link>
               <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
                 Falar com Suporte
@@ -67,8 +66,8 @@ export default function Page() {
           <div className="container mx-auto px-4 lg:px-8 text-center max-w-2xl">
             <h2 className="text-3xl lg:text-4xl font-black text-white mb-4">Pronto para <span style={{ color: '#F5B700' }}>começar</span>?</h2>
             <p className="text-base mb-8" style={{ color: 'rgba(255,255,255,0.55)' }}>Junte-se a milhares de empresas que confiam na ViralizaHost.</p>
-            <Link href="/suporte/base-conhecimento" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
-              Ver Base de Conhecimento →
+            <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
+              Começar Agora →
             </Link>
           </div>
         </section>

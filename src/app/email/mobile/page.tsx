@@ -2,26 +2,25 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { Smartphone, Mail, RefreshCw, Globe, Shield, Zap, Lock, Gauge, Activity } from 'lucide-react'
+import { Smartphone, Mail, RefreshCw, Globe, Shield, Zap, Lock, Calendar, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'E-mail no Mobile | ViralizaHost',
+  title: 'E-mail no Mobile — ViralizaHost',
   description: 'Sincronize o seu e-mail em iOS e Android com IMAP e ActiveSync.',
 }
 
-const features = [
-  { icon: Smartphone, title: 'iOS e Android', desc: 'Suporte nativo para todos os dispositivos móveis.' },
-  { icon: Mail, title: 'IMAP Completo', desc: 'Sincronização bidirecional de e-mails e pastas.' },
-  { icon: RefreshCw, title: 'ActiveSync', desc: 'Sincronização de e-mail, calendário e contactos.' },
-  { icon: Globe, title: 'Push Notifications', desc: 'Notificações imediatas de novos e-mails.' },
-  { icon: Shield, title: 'Segurança Mobile', desc: 'Autenticação segura nos dispositivos móveis.' },
-  { icon: Zap, title: 'Configuração Simples', desc: 'Configure em minutos com guia passo-a-passo.' },
-  { icon: Lock, title: 'Encriptação', desc: 'Comunicação encriptada em todos os dispositivos.' },
-  { icon: Gauge, title: 'Gestão Remota', desc: 'Apague dispositivos remotamente se necessário.' },
-  { icon: Activity, title: 'Sincronização Total', desc: 'E-mails, contactos, calendário e notas.' },
-]
-
-export default function Page() {
+export default function EmailMobilePage() {
+  const features = [
+    { icon: Smartphone, title: 'iOS e Android', desc: 'Configuração nativa em iPhone, iPad e dispositivos Android com poucos passos.' },
+    { icon: Mail, title: 'IMAP e ActiveSync', desc: 'Suporte completo a IMAP e ActiveSync para sincronização bidirecional de e-mails.' },
+    { icon: RefreshCw, title: 'Sincronização em Tempo Real', desc: 'E-mails, pastas e estados de leitura sincronizados instantaneamente em todos os dispositivos.' },
+    { icon: Globe, title: 'Qualquer App de E-mail', desc: 'Compatível com Gmail, Apple Mail, Outlook Mobile e qualquer app de e-mail.' },
+    { icon: Shield, title: 'Notificações Push', desc: 'Receba notificações push em tempo real quando chegar um novo e-mail importante.' },
+    { icon: Zap, title: 'Configuração Guiada', desc: 'Guias passo-a-passo e suporte técnico para configurar o e-mail no seu dispositivo.' },
+    { icon: Lock, title: 'Conexão Segura', desc: 'Todas as sincronizações via SSL/TLS para proteger os seus e-mails em trânsito.' },
+    { icon: Calendar, title: 'Calendário Sincronizado', desc: 'Calendário e contactos também sincronizados para ter tudo disponível no mobile.' },
+    { icon: Activity, title: 'Acesso Offline', desc: 'Leia e escreva e-mails mesmo sem ligação à internet com sincronização automática.' },
+  ]
   return (
     <>
       <Header />
@@ -30,7 +29,7 @@ export default function Page() {
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(245,183,0,0.18) 0%, transparent 70%)' }} />
           <div className="container mx-auto px-4 lg:px-8 relative z-10 text-center max-w-4xl">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.30)', color: '#F5B700' }}>
-              Mobile Sync
+              MOBILE SYNC
             </div>
             <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">
               E-mail no <span style={{ color: '#F5B700' }}>Mobile</span>
@@ -39,8 +38,8 @@ export default function Page() {
               Sincronize o seu e-mail em iOS e Android com IMAP e ActiveSync.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/suporte/base-conhecimento" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
-                Configurar Mobile →
+              <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
+                Começar Agora →
               </Link>
               <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
                 Falar com Suporte
@@ -67,8 +66,8 @@ export default function Page() {
           <div className="container mx-auto px-4 lg:px-8 text-center max-w-2xl">
             <h2 className="text-3xl lg:text-4xl font-black text-white mb-4">Pronto para <span style={{ color: '#F5B700' }}>começar</span>?</h2>
             <p className="text-base mb-8" style={{ color: 'rgba(255,255,255,0.55)' }}>Junte-se a milhares de empresas que confiam na ViralizaHost.</p>
-            <Link href="/suporte/base-conhecimento" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
-              Configurar Mobile →
+            <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
+              Começar Agora →
             </Link>
           </div>
         </section>

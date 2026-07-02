@@ -2,26 +2,25 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { Shield, Lock, Globe, Zap, RefreshCw, Database, Gauge, Mail, Activity } from 'lucide-react'
+import { BookOpen, Search, Globe, Shield, Zap, Server, Lock, RefreshCw, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Base de Conhecimento | ViralizaHost',
+  title: 'Base de Conhecimento — ViralizaHost',
   description: 'Tutoriais passo-a-passo, guias técnicos e FAQs organizados por categoria.',
 }
 
-const features = [
-  { icon: Shield, title: 'Hospedagem', desc: 'Tutoriais de cPanel, WordPress e configurações gerais.' },
-  { icon: Mail, title: 'E-mail', desc: 'Guias de configuração, migração e antispam.' },
-  { icon: Globe, title: 'Domínios', desc: 'Registo, transferência, DNS e nameservers.' },
-  { icon: Zap, title: 'Servidores VPS', desc: 'Configuração, segurança e optimização de VPS.' },
-  { icon: RefreshCw, title: 'SSL e Segurança', desc: 'Instalar certificados e configurar HTTPS.' },
-  { icon: Lock, title: 'Facturação', desc: 'Faturas, pagamentos, cancelamentos e upgrades.' },
-  { icon: Database, title: 'Bases de Dados', desc: 'MySQL, PostgreSQL e gestão de dados.' },
-  { icon: Gauge, title: 'Performance', desc: 'Optimizar velocidade e uptime do seu site.' },
-  { icon: Activity, title: 'Migrações', desc: 'Como migrar sites e e-mails para a ViralizaHost.' },
-]
-
-export default function Page() {
+export default function SuporteBaseConhecimentoPage() {
+  const features = [
+    { icon: BookOpen, title: 'Tutoriais Passo-a-Passo', desc: 'Guias detalhados para configurar e gerir todos os serviços ViralizaHost.' },
+    { icon: Search, title: 'Pesquisa Inteligente', desc: 'Encontre qualquer artigo rapidamente com sugestões automáticas.' },
+    { icon: Globe, title: 'Domínios e DNS', desc: 'Configuração de domínios, registos DNS, propagação e WHOIS.' },
+    { icon: Shield, title: 'Segurança', desc: 'SSL, firewall, proteção DDoS e melhores práticas de segurança.' },
+    { icon: Zap, title: 'Performance', desc: 'Otimização de velocidade, cache, CDN e Core Web Vitals.' },
+    { icon: Server, title: 'Servidores', desc: 'Gestão de VPS, cPanel, WHM, SSH e configurações avançadas.' },
+    { icon: Lock, title: 'E-mail', desc: 'Configuração de e-mail corporativo, SPF, DKIM e clientes de e-mail.' },
+    { icon: RefreshCw, title: 'Backup e Restauro', desc: 'Como criar, agendar e restaurar backups de sites e bases de dados.' },
+    { icon: Activity, title: 'Resolução de Problemas', desc: 'Guias de troubleshooting para os erros e problemas mais frequentes.' },
+  ]
   return (
     <>
       <Header />
@@ -30,7 +29,7 @@ export default function Page() {
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(245,183,0,0.18) 0%, transparent 70%)' }} />
           <div className="container mx-auto px-4 lg:px-8 relative z-10 text-center max-w-4xl">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.30)', color: '#F5B700' }}>
-              Base de Conhecimento
+              BASE DE CONHECIMENTO
             </div>
             <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">
               Base de <span style={{ color: '#F5B700' }}>Conhecimento</span>
@@ -39,8 +38,8 @@ export default function Page() {
               Tutoriais passo-a-passo, guias técnicos e FAQs organizados por categoria.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/suporte/central-ajuda" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
-                Explorar Artigos →
+              <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
+                Começar Agora →
               </Link>
               <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
                 Falar com Suporte
@@ -67,8 +66,8 @@ export default function Page() {
           <div className="container mx-auto px-4 lg:px-8 text-center max-w-2xl">
             <h2 className="text-3xl lg:text-4xl font-black text-white mb-4">Pronto para <span style={{ color: '#F5B700' }}>começar</span>?</h2>
             <p className="text-base mb-8" style={{ color: 'rgba(255,255,255,0.55)' }}>Junte-se a milhares de empresas que confiam na ViralizaHost.</p>
-            <Link href="/suporte/central-ajuda" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
-              Explorar Artigos →
+            <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
+              Começar Agora →
             </Link>
           </div>
         </section>

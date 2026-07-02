@@ -5,23 +5,22 @@ import { Footer } from '@/components/layout/Footer'
 import { Activity, Server, Globe, Shield, Zap, Gauge, Database, Lock, RefreshCw } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Status do Sistema | ViralizaHost',
+  title: 'Status do Sistema — ViralizaHost',
   description: 'Monitorize em tempo real o estado de todos os nossos serviços e infraestrutura.',
 }
 
-const features = [
-  { icon: Activity, title: 'Estado em Tempo Real', desc: 'Monitorização contínua de todos os serviços.' },
-  { icon: Server, title: 'Servidores', desc: 'Estado de todos os servidores de hosting e VPS.' },
-  { icon: Globe, title: 'Rede Global', desc: 'Status da rede e pontos de presença globais.' },
-  { icon: Shield, title: 'Segurança', desc: 'Estado dos sistemas de protecção DDoS e firewall.' },
-  { icon: Zap, title: 'CDN', desc: 'Performance e disponibilidade da rede de distribuição.' },
-  { icon: Gauge, title: 'Uptime Histórico', desc: 'Histórico de uptime dos últimos 90 dias.' },
-  { icon: Database, title: 'Bases de Dados', desc: 'Estado dos servidores de base de dados.' },
-  { icon: Lock, title: 'SSL', desc: 'Estado dos certificados SSL em todos os domínios.' },
-  { icon: RefreshCw, title: 'Manutenções', desc: 'Avisos de manutenções programadas.' },
-]
-
-export default function Page() {
+export default function StatusPage() {
+  const features = [
+    { icon: Activity, title: 'Status em Tempo Real', desc: 'Visualize o estado atual de todos os serviços ViralizaHost atualizado ao segundo.' },
+    { icon: Server, title: 'Infraestrutura', desc: 'Monitorização de servidores web, de base de dados e de e-mail em tempo real.' },
+    { icon: Globe, title: 'Rede e CDN', desc: 'Estado da rede de distribuição global e conectividade dos datacenters.' },
+    { icon: Shield, title: 'Segurança', desc: 'Status dos sistemas de proteção DDoS, firewall e certificados SSL.' },
+    { icon: Zap, title: 'Performance', desc: 'Métricas de latência e tempo de resposta dos servidores em tempo real.' },
+    { icon: Gauge, title: 'Uptime Histórico', desc: 'Histórico de disponibilidade dos últimos 90 dias por serviço.' },
+    { icon: Database, title: 'Bases de Dados', desc: 'Estado dos clusters de base de dados MySQL e PostgreSQL.' },
+    { icon: Lock, title: 'Painel de Controlo', desc: 'Disponibilidade do painel de cliente e APIs de gestão.' },
+    { icon: RefreshCw, title: 'Notificações de Incidentes', desc: 'Subscreva para receber alertas imediatos em caso de incidente.' },
+  ]
   return (
     <>
       <Header />
@@ -30,17 +29,17 @@ export default function Page() {
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(245,183,0,0.18) 0%, transparent 70%)' }} />
           <div className="container mx-auto px-4 lg:px-8 relative z-10 text-center max-w-4xl">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.30)', color: '#F5B700' }}>
-              Status do Sistema
+              STATUS DO SISTEMA
             </div>
             <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">
-              Status do <span style={{ color: '#F5B700' }}>Sistema</span>
+              Status <span style={{ color: '#F5B700' }}>do Sistema</span>
             </h1>
             <p className="text-lg lg:text-xl leading-relaxed mb-10 max-w-2xl mx-auto" style={{ color: 'rgba(255,255,255,0.60)' }}>
               Monitorize em tempo real o estado de todos os nossos serviços e infraestrutura.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/suporte/status" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
-                Ver Status →
+              <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
+                Começar Agora →
               </Link>
               <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
                 Falar com Suporte
@@ -67,8 +66,8 @@ export default function Page() {
           <div className="container mx-auto px-4 lg:px-8 text-center max-w-2xl">
             <h2 className="text-3xl lg:text-4xl font-black text-white mb-4">Pronto para <span style={{ color: '#F5B700' }}>começar</span>?</h2>
             <p className="text-base mb-8" style={{ color: 'rgba(255,255,255,0.55)' }}>Junte-se a milhares de empresas que confiam na ViralizaHost.</p>
-            <Link href="/suporte/status" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
-              Ver Status →
+            <Link href="/register" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
+              Começar Agora →
             </Link>
           </div>
         </section>
