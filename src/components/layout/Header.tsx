@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect, useRef } from 'react'
 import {
   Menu, X, ChevronDown, ChevronRight, Server, Globe, Users, Bot, Code, Cpu,
@@ -292,38 +293,49 @@ export function Header() {
             <div className="flex flex-col gap-4 pl-2">
               {/* Infra card */}
               <div
-                className="flex-1 rounded-2xl p-5 flex flex-col justify-between"
+                className="flex-1 rounded-2xl overflow-hidden flex flex-col"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(245,183,0,0.12) 0%, rgba(245,183,0,0.04) 100%)',
-                  border: '1px solid rgba(245,183,0,0.25)',
-                  boxShadow: 'inset 0 1px 0 rgba(245,183,0,0.10)',
+                  background: '#0B0B0B',
+                  border: '1px solid rgba(245,183,0,0.35)',
+                  boxShadow: '0 0 24px rgba(245,183,0,0.10), inset 0 1px 0 rgba(245,183,0,0.12)',
                 }}
               >
-                <div>
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
-                    style={{ background: 'rgba(245,183,0,0.15)' }}
-                  >
-                    <Server size={18} style={{ color: '#F5B700' }} />
-                  </div>
-                  <h4 className="text-white font-black text-sm leading-snug mb-2">
-                    Infraestrutura de Classe Mundial
-                  </h4>
-                  <p className="text-[12px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                    Servidores de última geração com desempenho máximo e 99.9% uptime garantido.
-                  </p>
-                </div>
-                <Link
-                  href="/servidor-dedicado"
-                  onClick={() => setMegaOpen(null)}
-                  className="mt-4 inline-flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl transition-all duration-150"
-                  style={{ background: '#F5B700', color: '#0B0B0B' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FFD54F' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#F5B700' }}
+                {/* Image */}
+                <div
+                  className="w-full flex items-center justify-center"
+                  style={{ height: 170, background: '#060606', borderBottom: '1px solid rgba(245,183,0,0.15)' }}
                 >
-                  Ver Infraestrutura
-                  <ExternalLink size={11} />
-                </Link>
+                  <Image
+                    src="/infrastructure-world-class.png"
+                    alt="Infraestrutura de Classe Mundial"
+                    width={260}
+                    height={155}
+                    style={{ objectFit: 'contain', maxHeight: 155, width: '100%', borderRadius: 10 }}
+                    priority={false}
+                  />
+                </div>
+                {/* Content */}
+                <div className="p-5 flex flex-col flex-1 justify-between">
+                  <div>
+                    <h4 className="text-white font-black text-sm leading-snug mb-2">
+                      Infraestrutura de Classe Mundial
+                    </h4>
+                    <p className="text-[12px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                      Servidores de última geração com desempenho máximo e 99.9% uptime garantido.
+                    </p>
+                  </div>
+                  <Link
+                    href="/servidor-dedicado"
+                    onClick={() => setMegaOpen(null)}
+                    className="mt-4 inline-flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl transition-all duration-150"
+                    style={{ background: '#F5B700', color: '#0B0B0B' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FFD54F' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#F5B700' }}
+                  >
+                    Ver Infraestrutura →
+                    <ExternalLink size={11} />
+                  </Link>
+                </div>
               </div>
 
               {/* Support card */}
