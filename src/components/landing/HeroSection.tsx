@@ -195,43 +195,44 @@ export function HeroSection() {
             {/* ── Split layout (slides 2 & 3) ──────────────── */}
             {s.splitLayout ? (
               /*
-               * Desktop/tablet: left 50% black + right 50% image (object-fit: contain)
-               * Mobile: left panel collapsed, image takes full height below
+               * Full-width grid 1fr 1fr.
+               * Left col: solid black bg (no max-width, no container).
+               * Right col: image absolute-fills its col — object-fit:cover edge-to-edge.
+               * Mobile: single column, image fills full width below.
                */
-              <div className="absolute inset-0 flex flex-col md:flex-row">
-                {/* Left panel — dark background (content area) */}
-                <div
-                  className="hidden md:block md:w-1/2 h-full"
-                  style={{
-                    background: 'linear-gradient(to right, #000000 60%, rgba(0,0,0,0.80) 85%, transparent 100%)',
-                  }}
-                />
+              <div
+                className="absolute inset-0"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                }}
+              >
+                {/* Left — black background, blends into right */}
+                <div style={{
+                  background: 'linear-gradient(to right, #000000 70%, rgba(0,0,0,0.70) 90%, transparent 100%)',
+                }} />
 
-                {/* Right panel — image, full proportional */}
-                <div className="relative w-full md:w-1/2 flex-1 flex items-center justify-center overflow-hidden">
-                  {/* subtle vignette on the image panel */}
-                  <div className="absolute inset-0 pointer-events-none z-10"
-                    style={{
-                      background: 'linear-gradient(to left, rgba(0,0,0,0.12) 0%, transparent 40%), linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, transparent 30%, rgba(0,0,0,0.30) 100%)',
-                    }} />
+                {/* Right — image, edge-to-edge, no padding/container */}
+                <div className="relative overflow-hidden">
                   <img
                     src={s.bgImage}
                     alt=""
                     draggable={false}
-                    className="select-none"
+                    className="absolute inset-0 select-none"
                     style={{
                       width: '100%',
                       height: '100%',
-                      objectFit: 'contain',
+                      objectFit: 'cover',
                       objectPosition: 'center',
                       display: 'block',
                     }}
                   />
+                  {/* edge vignette — left blend + top/bottom fade */}
+                  <div className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: 'linear-gradient(to right, rgba(0,0,0,0.35) 0%, transparent 25%), linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, transparent 35%, rgba(0,0,0,0.30) 100%)',
+                    }} />
                 </div>
-
-                {/* Mobile: thin left-edge gradient so image bleeds to left */}
-                <div className="absolute inset-y-0 left-0 w-8 md:hidden pointer-events-none"
-                  style={{ background: 'linear-gradient(to right, #000, transparent)' }} />
               </div>
             ) : s.imageOnly ? (
               /* Legacy full-bg mode (unused but kept for safety) */
