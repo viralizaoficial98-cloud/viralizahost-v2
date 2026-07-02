@@ -355,6 +355,10 @@ export function GlobalPresenceSection() {
             {nodes.map(node=>{
               const isActive = active===node.id
               const delay = ((node.x*3+node.y*7)%2800)/2800*2.8
+              /* Flag pill dimensions (SVG units) */
+              const pillW = 28, pillH = 17, pillR = 4
+              const pillX = node.x - pillW/2
+              const pillY = node.y - pillH - 8
               return (
                 <g key={node.id}
                   style={{cursor:'pointer'}}
@@ -363,14 +367,8 @@ export function GlobalPresenceSection() {
                 >
                   {/* animated outer ring */}
                   <circle cx={node.x} cy={node.y} r="8"
-                    fill="none"
-                    stroke="#F5B700"
-                    strokeWidth="1.5"
-                    opacity="0"
-                    style={{
-                      animation:`gp-ring 2.8s ease-out infinite`,
-                      animationDelay:`${delay}s`,
-                    }}
+                    fill="none" stroke="#F5B700" strokeWidth="1.5" opacity="0"
+                    style={{animation:`gp-ring 2.8s ease-out infinite`,animationDelay:`${delay}s`}}
                   />
                   {/* glow halo */}
                   <circle cx={node.x} cy={node.y}
@@ -382,23 +380,37 @@ export function GlobalPresenceSection() {
                   {/* core dot */}
                   <circle cx={node.x} cy={node.y}
                     r={isActive?5:3.8}
-                    fill="#F5B700"
-                    stroke="white"
-                    strokeWidth="1.4"
+                    fill="#F5B700" stroke="white" strokeWidth="1.4"
                     className="gp-dot"
                     style={{animationDelay:`${delay}s`,transition:'r 0.2s'}}
                     filter={isActive?'url(#gp-glow)':undefined}
                   />
-                  {/* Flag always visible above dot */}
+                  {/*
+                    Flag badge: white pill + emoji text.
+                    Font-size 14 (SVG units) — large enough to render on Chromium
+                    desktop without anti-aliasing / emoji rasterisation issues.
+                    A white background rect ensures legibility on any continent fill.
+                  */}
+                  <rect
+                    x={pillX} y={pillY}
+                    width={pillW} height={pillH}
+                    rx={pillR}
+                    fill="white"
+                    stroke={isActive?'#F5B700':'#DDE6F0'}
+                    strokeWidth={isActive?'1.5':'0.8'}
+                    opacity="0.92"
+                    filter="url(#gp-drop)"
+                    style={{transition:'stroke 0.2s'}}
+                  />
                   <text
                     x={node.x}
-                    y={node.y-12}
+                    y={pillY + pillH - 3}
                     textAnchor="middle"
-                    fontSize={isActive?'13':'10'}
+                    fontSize="12"
+                    dominantBaseline="auto"
                     style={{
                       userSelect:'none',
-                      filter:'drop-shadow(0 1px 2px rgba(0,0,0,0.2))',
-                      transition:'font-size 0.2s',
+                      fontFamily:'"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif',
                     }}
                   >
                     {node.flag}
@@ -407,11 +419,11 @@ export function GlobalPresenceSection() {
                   {isActive&&(
                     <g>
                       <rect
-                        x={node.x-38} y={node.y+6}
-                        width="76" height="18"
+                        x={node.x-42} y={node.y+6}
+                        width="84" height="18"
                         rx="4" fill="white"
                         stroke="#DDE6F0" strokeWidth="1"
-                        filter="drop-shadow(0 2px 4px rgba(0,0,0,0.12))"
+                        filter="url(#gp-drop)"
                       />
                       <text x={node.x} y={node.y+18}
                         textAnchor="middle"
