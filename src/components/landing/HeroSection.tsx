@@ -1,16 +1,23 @@
 'use client'
 import Link from 'next/link'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Bot, Mail, ArrowRight, Shield, Zap, Star } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Bot, ArrowRight, Shield, Zap, Star } from 'lucide-react'
 
 type Slide = {
   id: number
   bgImage: string
   bgColor: string
-  bgPosition?: string
+  /** Desktop background-position */
+  desktopPosition?: string
+  /** Tablet background-position (≥768px <1024px) */
+  tabletPosition?: string
+  /** Mobile background-position (<768px) */
+  mobilePosition?: string
   bgSize?: string
   overlayColor?: string
   overlayGradient?: string
+  /** Mobile-specific overlay gradient (lighter so image shows) */
+  mobileOverlayGradient?: string
   glowGradient?: string
   accentColor: string
   imageOnly?: boolean
@@ -37,10 +44,13 @@ const slides: Slide[] = [
     ctaSecondaryHref: '#servicos',
     icon: Bot,
     bgImage: '/viraliza-ai-banner.png',
-    bgPosition: 'right center',
+    desktopPosition: 'center center',
+    tabletPosition: '60% center',
+    mobilePosition: '72% center',
     bgColor: '#000000',
     overlayColor: 'transparent',
     overlayGradient: 'linear-gradient(to right, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.82) 32%, rgba(0,0,0,0.52) 58%, rgba(0,0,0,0.12) 100%)',
+    mobileOverlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.20) 100%)',
     glowGradient: 'radial-gradient(ellipse 55% 70% at 82% 50%, rgba(245,183,0,0.08), transparent)',
     accentColor: '#F5B700',
     features: ['Chatbots Inteligentes', 'Automação de Processos', 'Agentes IA'],
@@ -49,8 +59,10 @@ const slides: Slide[] = [
     id: 1,
     imageOnly: true,
     bgImage: '/servidores_banner.png',
-    bgPosition: 'right center',
-    bgSize: 'contain',
+    desktopPosition: 'center center',
+    tabletPosition: '60% center',
+    mobilePosition: '70% center',
+    bgSize: 'cover',
     bgColor: '#000000',
     overlayColor: 'rgba(0,0,0,0.08)',
     accentColor: '#F5B700',
@@ -59,8 +71,10 @@ const slides: Slide[] = [
     id: 2,
     imageOnly: true,
     bgImage: '/viraliza-email-banner.png',
-    bgPosition: 'center center',
-    bgSize: 'contain',
+    desktopPosition: 'center center',
+    tabletPosition: '65% center',
+    mobilePosition: '75% center',
+    bgSize: 'cover',
     bgColor: '#000000',
     overlayColor: 'transparent',
     accentColor: '#34D399',
@@ -69,12 +83,33 @@ const slides: Slide[] = [
 
 const SLIDE_DURATION = 7000
 
+function useBreakpoint() {
+  const [bp, setBp] = useState<'mobile' | 'tablet' | 'desktop'>('desktop')
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth
+      setBp(w < 768 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop')
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+  return bp
+}
+
+function getBgPosition(s: Slide, bp: 'mobile' | 'tablet' | 'desktop') {
+  if (bp === 'mobile') return s.mobilePosition ?? s.desktopPosition ?? 'center center'
+  if (bp === 'tablet') return s.tabletPosition ?? s.desktopPosition ?? 'center center'
+  return s.desktopPosition ?? 'center center'
+}
+
 export function HeroSection() {
   const [current, setCurrent] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [scrollY, setScrollY] = useState(0)
   const sectionRef = useRef<HTMLElement>(null)
+  const bp = useBreakpoint()
 
   useEffect(() => {
     const onScroll = () => {
@@ -133,7 +168,8 @@ export function HeroSection() {
   return (
     <section
       ref={sectionRef}
-      className="relative min-h-screen flex flex-col overflow-hidden"
+      className="relative flex flex-col overflow-hidden"
+      style={{ minHeight: bp === 'mobile' ? '760px' : bp === 'tablet' ? '680px' : '760px' }}
       aria-label="Hero Slideshow"
     >
       {/* Background slides */}
@@ -146,25 +182,25 @@ export function HeroSection() {
         >
           <div className="absolute inset-0" style={{ background: s.bgColor }} />
 
-          {(s.bgSize === 'contain' || s.imageOnly) ? (
-            /* imageOnly ou contain: sem parallax, imagem fullscreen estática */
+          {s.imageOnly ? (
+            /* imageOnly: cover responsivo com posição por breakpoint */
             <div
-              className={s.bgSize === 'contain' ? 'absolute inset-0 hero-bg-contain' : 'absolute inset-0'}
+              className="absolute inset-0"
               style={{
                 backgroundImage: `url(${s.bgImage})`,
-                backgroundSize: s.bgSize === 'contain' ? 'contain' : 'cover',
-                backgroundPosition: s.bgPosition ?? (s.bgSize === 'contain' ? 'right center' : 'center'),
+                backgroundSize: 'cover',
+                backgroundPosition: getBgPosition(s, bp),
                 backgroundRepeat: 'no-repeat',
               }}
             />
           ) : (
-            /* cover com parallax + zoom padrão */
+            /* Slide com conteúdo: cover com parallax + posição por breakpoint */
             <div
               className="absolute inset-[-10%]"
               style={{
                 backgroundImage: `url(${s.bgImage})`,
                 backgroundSize: 'cover',
-                backgroundPosition: s.bgPosition ?? 'center',
+                backgroundPosition: getBgPosition(s, bp),
                 backgroundRepeat: 'no-repeat',
                 transform: `translateY(${i === current ? scrollY : 0}px) scale(${isTransitioning && i === current ? 1.02 : 1.05})`,
                 transition: isTransitioning ? 'transform 0.7s ease, opacity 0.5s ease' : 'transform 0.1s linear',
@@ -176,8 +212,13 @@ export function HeroSection() {
             <div className="absolute inset-0" style={{ background: s.overlayColor }} />
           )}
 
+          {/* Overlay gradient: versão mobile mais suave para não tapar a imagem */}
           {s.overlayGradient && (
-            <div className="absolute inset-0" style={{ background: s.overlayGradient }} />
+            <div className="absolute inset-0" style={{
+              background: bp === 'mobile' && s.mobileOverlayGradient
+                ? s.mobileOverlayGradient
+                : s.overlayGradient
+            }} />
           )}
 
           {s.glowGradient && (
@@ -210,12 +251,12 @@ export function HeroSection() {
       />
 
       {/* Content — hidden for imageOnly slides */}
-      <div className="relative z-10 flex-1 flex flex-col justify-center pt-28 pb-16">
+      <div className={`relative z-10 flex-1 flex flex-col justify-center ${bp === 'mobile' ? 'pt-20 pb-8' : 'pt-28 pb-16'}`}>
         {!slide.imageOnly && (
           <div className="container mx-auto px-4 lg:px-8">
-            <div className="max-w-4xl">
+            <div className={bp === 'mobile' ? 'max-w-[85%]' : 'max-w-4xl'}>
 
-              <div key={`tag-${current}`} className="animate-fade-in-up mb-7">
+              <div key={`tag-${current}`} className={`animate-fade-in-up ${bp === 'mobile' ? 'mb-4' : 'mb-7'}`}>
                 <span className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/15 text-white/90 text-xs font-bold tracking-widest uppercase px-4 py-2 rounded-full">
                   {Icon && <Icon size={12} style={{ color: slide.accentColor }} />}
                   {slide.tag}
@@ -225,7 +266,7 @@ export function HeroSection() {
 
               <h1
                 key={`title-${current}`}
-                className={`text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black text-white leading-[1.05] mb-6 animate-fade-in-up delay-100 transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
+                className={`font-black text-white leading-[1.05] animate-fade-in-up delay-100 transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'} ${bp === 'mobile' ? 'text-3xl mb-3' : 'text-4xl sm:text-5xl lg:text-6xl xl:text-7xl mb-6'}`}
               >
                 {slide.title!.split('\n').map((line, i) => (
                   <span key={i}>
@@ -239,43 +280,43 @@ export function HeroSection() {
 
               <p
                 key={`sub-${current}`}
-                className={`text-lg md:text-xl text-white/65 mb-10 max-w-2xl leading-relaxed animate-fade-in-up delay-200 transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
+                className={`text-white/65 leading-relaxed animate-fade-in-up delay-200 transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'} ${bp === 'mobile' ? 'text-sm mb-5 max-w-xs' : 'text-lg md:text-xl mb-10 max-w-2xl'}`}
               >
                 {slide.subtitle}
               </p>
 
-              <div key={`feat-${current}`} className="flex flex-wrap gap-2.5 mb-10 animate-fade-in-up delay-300">
+              <div key={`feat-${current}`} className={`flex flex-wrap gap-2 animate-fade-in-up delay-300 ${bp === 'mobile' ? 'mb-5' : 'mb-10'}`}>
                 {slide.features!.map((f) => (
                   <span key={f}
-                    className="inline-flex items-center gap-2 bg-white/8 backdrop-blur-sm border border-white/12 text-white/80 text-xs font-medium px-4 py-2 rounded-full">
-                    <Zap size={11} style={{ color: slide.accentColor }} />
+                    className="inline-flex items-center gap-2 bg-white/8 backdrop-blur-sm border border-white/12 text-white/80 text-xs font-medium px-3 py-1.5 rounded-full">
+                    <Zap size={10} style={{ color: slide.accentColor }} />
                     {f}
                   </span>
                 ))}
               </div>
 
-              <div key={`cta-${current}`} className="flex flex-col sm:flex-row gap-4 animate-fade-in-up delay-400">
+              <div key={`cta-${current}`} className={`flex flex-col sm:flex-row gap-3 animate-fade-in-up delay-400`}>
                 <Link
                   href={slide.ctaHref!}
-                  className="btn-shimmer btn-primary inline-flex items-center justify-center gap-2 px-9 py-4 rounded-2xl text-base font-bold shadow-[0_8px_30px_rgba(245,183,0,0.40)] hover:shadow-[0_12px_40px_rgba(245,183,0,0.55)] hover:scale-105 transition-all"
+                  className={`btn-shimmer btn-primary inline-flex items-center justify-center gap-2 rounded-2xl font-bold shadow-[0_8px_30px_rgba(245,183,0,0.40)] hover:shadow-[0_12px_40px_rgba(245,183,0,0.55)] hover:scale-105 transition-all ${bp === 'mobile' ? 'px-6 py-3 text-sm' : 'px-9 py-4 text-base'}`}
                 >
                   {slide.cta}
-                  <ArrowRight size={17} />
+                  <ArrowRight size={bp === 'mobile' ? 14 : 17} />
                 </Link>
                 <Link
                   href={slide.ctaSecondaryHref!}
-                  className="inline-flex items-center justify-center gap-2 border-2 border-white/22 hover:border-white/45 text-white/90 hover:text-white hover:bg-white/8 backdrop-blur-sm px-9 py-4 rounded-2xl text-base font-bold transition-all"
+                  className={`inline-flex items-center justify-center gap-2 border-2 border-white/22 hover:border-white/45 text-white/90 hover:text-white hover:bg-white/8 backdrop-blur-sm rounded-2xl font-bold transition-all ${bp === 'mobile' ? 'px-6 py-3 text-sm' : 'px-9 py-4 text-base'}`}
                 >
                   {slide.ctaSecondary}
                 </Link>
               </div>
 
-              <div className="flex items-center flex-wrap gap-5 mt-12 animate-fade-in-up delay-500">
+              <div className={`flex items-center flex-wrap gap-4 animate-fade-in-up delay-500 ${bp === 'mobile' ? 'mt-6' : 'mt-12'}`}>
                 <div className="flex items-center gap-3">
                   <div className="flex -space-x-2">
                     {['A','B','C','D','E'].map((l, i) => (
                       <div key={i}
-                        className="w-8 h-8 rounded-full border-2 border-black/30 flex items-center justify-center text-black text-xs font-black"
+                        className="w-7 h-7 rounded-full border-2 border-black/30 flex items-center justify-center text-black text-xs font-black"
                         style={{ background: 'linear-gradient(135deg, #F5B700, #D9A300)' }}>
                         {l}
                       </div>
@@ -283,13 +324,13 @@ export function HeroSection() {
                   </div>
                   <div>
                     <div className="flex items-center gap-0.5 mb-0.5">
-                      {[...Array(5)].map((_, i) => <Star key={i} size={12} className="text-[#F5B700] fill-[#F5B700]" />)}
+                      {[...Array(5)].map((_, i) => <Star key={i} size={11} className="text-[#F5B700] fill-[#F5B700]" />)}
                     </div>
                     <p className="text-white/55 text-xs"><strong className="text-white">+5.000</strong> clientes satisfeitos</p>
                   </div>
                 </div>
 
-                <div className="h-8 w-px bg-white/10 hidden sm:block" />
+                <div className="h-7 w-px bg-white/10 hidden sm:block" />
 
                 <div className="hidden sm:flex items-center gap-4">
                   <div className="flex items-center gap-1.5 text-white/55 text-xs">
