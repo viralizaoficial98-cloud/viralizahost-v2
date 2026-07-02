@@ -44,13 +44,14 @@ const slides: Slide[] = [
     ctaSecondaryHref: '#servicos',
     icon: Bot,
     bgImage: '/viraliza-ai-banner.png',
-    desktopPosition: 'center center',
-    tabletPosition: '60% center',
-    mobilePosition: '72% center',
+    /* IA slide: sujeito à direita — desktop usa right center para mostrar a face */
+    desktopPosition: 'right center',
+    tabletPosition: 'right center',
+    mobilePosition: 'center center',
     bgColor: '#000000',
     overlayColor: 'transparent',
-    overlayGradient: 'linear-gradient(to right, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.82) 32%, rgba(0,0,0,0.52) 58%, rgba(0,0,0,0.12) 100%)',
-    mobileOverlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.20) 100%)',
+    overlayGradient: 'linear-gradient(to right, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.82) 32%, rgba(0,0,0,0.50) 60%, rgba(0,0,0,0.10) 100%)',
+    mobileOverlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.80) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.25) 100%)',
     glowGradient: 'radial-gradient(ellipse 55% 70% at 82% 50%, rgba(245,183,0,0.08), transparent)',
     accentColor: '#F5B700',
     features: ['Chatbots Inteligentes', 'Automação de Processos', 'Agentes IA'],
@@ -59,24 +60,28 @@ const slides: Slide[] = [
     id: 1,
     imageOnly: true,
     bgImage: '/servidores_banner.png',
+    /* Servidores: banner centrado em todos os breakpoints */
     desktopPosition: 'center center',
-    tabletPosition: '60% center',
-    mobilePosition: '70% center',
-    bgSize: 'cover',
+    tabletPosition: 'center center',
+    mobilePosition: 'center center',
     bgColor: '#000000',
-    overlayColor: 'rgba(0,0,0,0.08)',
+    /* overlay leve para contraste premium sem esconder a imagem */
+    overlayColor: 'transparent',
+    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.35) 100%)',
     accentColor: '#F5B700',
   },
   {
     id: 2,
     imageOnly: true,
     bgImage: '/viraliza-email-banner.png',
+    /* Email: banner centrado em todos os breakpoints */
     desktopPosition: 'center center',
-    tabletPosition: '65% center',
-    mobilePosition: '75% center',
-    bgSize: 'cover',
+    tabletPosition: 'center center',
+    mobilePosition: 'center center',
     bgColor: '#000000',
+    /* overlay leve para contraste premium sem esconder a imagem */
     overlayColor: 'transparent',
+    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.30) 100%)',
     accentColor: '#34D399',
   },
 ]
@@ -169,77 +174,92 @@ export function HeroSection() {
     <section
       ref={sectionRef}
       className="relative flex flex-col overflow-hidden"
-      style={{ minHeight: bp === 'mobile' ? '760px' : bp === 'tablet' ? '680px' : '760px' }}
+      style={{
+        minHeight: bp === 'mobile' ? '800px' : bp === 'tablet' ? '720px' : 'min(100vh, 860px)',
+      }}
       aria-label="Hero Slideshow"
     >
       {/* Background slides */}
-      {slides.map((s, i) => (
-        <div
-          key={s.id}
-          className="absolute inset-0 transition-opacity duration-700"
-          style={{ opacity: i === current ? 1 : 0 }}
-          aria-hidden={i !== current}
-        >
-          <div className="absolute inset-0" style={{ background: s.bgColor }} />
+      {slides.map((s, i) => {
+        const pos = getBgPosition(s, bp)
+        return (
+          <div
+            key={s.id}
+            className="absolute inset-0 transition-opacity duration-700"
+            style={{ opacity: i === current ? 1 : 0 }}
+            aria-hidden={i !== current}
+          >
+            {/* Base color */}
+            <div className="absolute inset-0" style={{ background: s.bgColor }} />
 
-          {s.imageOnly ? (
-            /* imageOnly: cover responsivo com posição por breakpoint */
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `url(${s.bgImage})`,
-                backgroundSize: 'cover',
-                backgroundPosition: getBgPosition(s, bp),
-                backgroundRepeat: 'no-repeat',
-              }}
-            />
-          ) : (
-            /* Slide com conteúdo: cover com parallax + posição por breakpoint */
-            <div
-              className="absolute inset-[-10%]"
-              style={{
-                backgroundImage: `url(${s.bgImage})`,
-                backgroundSize: 'cover',
-                backgroundPosition: getBgPosition(s, bp),
-                backgroundRepeat: 'no-repeat',
-                transform: `translateY(${i === current ? scrollY : 0}px) scale(${isTransitioning && i === current ? 1.02 : 1.05})`,
-                transition: isTransitioning ? 'transform 0.7s ease, opacity 0.5s ease' : 'transform 0.1s linear',
-              }}
-            />
-          )}
-
-          {s.overlayColor && s.overlayColor !== 'transparent' && (
-            <div className="absolute inset-0" style={{ background: s.overlayColor }} />
-          )}
-
-          {/* Overlay gradient: versão mobile mais suave para não tapar a imagem */}
-          {s.overlayGradient && (
-            <div className="absolute inset-0" style={{
-              background: bp === 'mobile' && s.mobileOverlayGradient
-                ? s.mobileOverlayGradient
-                : s.overlayGradient
-            }} />
-          )}
-
-          {s.glowGradient && (
-            <div className="absolute inset-0" style={{ background: s.glowGradient }} />
-          )}
-
-          {/* Vignette + bottom fade only for content slides */}
-          {!s.imageOnly && (
-            <>
+            {s.imageOnly ? (
+              /*
+               * imageOnly: div preenche exactamente o contêiner.
+               * background-size: cover mantém proporção e preenche sem distorção.
+               * Sem parallax, sem inset negativo — a imagem cobre o painel limpo.
+               */
               <div
                 className="absolute inset-0"
-                style={{ background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.5) 100%)' }}
+                style={{
+                  backgroundImage: `url(${s.bgImage})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: pos,
+                  backgroundRepeat: 'no-repeat',
+                }}
               />
+            ) : (
+              /*
+               * Slide com conteúdo (slide 0 — IA):
+               * inset-[-8%] deixa margem para o parallax/scale sem bordas visíveis.
+               * Mantém cover sem distorção — o scale via transform não altera proporção.
+               */
               <div
-                className="absolute bottom-0 left-0 right-0 h-1/3"
-                style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)' }}
+                className="absolute"
+                style={{
+                  inset: '-8%',
+                  backgroundImage: `url(${s.bgImage})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: pos,
+                  backgroundRepeat: 'no-repeat',
+                  transform: `translateY(${i === current ? scrollY * 0.4 : 0}px) scale(${isTransitioning && i === current ? 1.01 : 1.04})`,
+                  transition: isTransitioning
+                    ? 'transform 0.7s ease'
+                    : 'transform 0.12s linear',
+                }}
               />
-            </>
-          )}
-        </div>
-      ))}
+            )}
+
+            {/* Overlay sólido (quando não transparente) */}
+            {s.overlayColor && s.overlayColor !== 'transparent' && (
+              <div className="absolute inset-0" style={{ background: s.overlayColor }} />
+            )}
+
+            {/* Overlay gradiente — versão mobile adaptada para slide IA */}
+            {s.overlayGradient && (
+              <div className="absolute inset-0" style={{
+                background: bp === 'mobile' && s.mobileOverlayGradient
+                  ? s.mobileOverlayGradient
+                  : s.overlayGradient,
+              }} />
+            )}
+
+            {/* Glow opcional */}
+            {s.glowGradient && (
+              <div className="absolute inset-0" style={{ background: s.glowGradient }} />
+            )}
+
+            {/* Vignette lateral + fade inferior apenas no slide com conteúdo */}
+            {!s.imageOnly && (
+              <>
+                <div className="absolute inset-0"
+                  style={{ background: 'radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.45) 100%)' }} />
+                <div className="absolute bottom-0 left-0 right-0 h-1/4"
+                  style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.60), transparent)' }} />
+              </>
+            )}
+          </div>
+        )
+      })}
 
       {/* Grid overlay */}
       <div
