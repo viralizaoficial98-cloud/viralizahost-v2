@@ -74,14 +74,14 @@ const slides: Slide[] = [
     id: 2,
     imageOnly: true,
     bgImage: '/viraliza-email-banner.png',
-    /* Email: contain para não cortar nenhum elemento da imagem */
+    /* Email: cover para preencher sem distorcer, centrado em todos os breakpoints */
     desktopPosition: 'center center',
     tabletPosition: 'center center',
     mobilePosition: 'center center',
-    bgSize: 'contain',          // <<< imagem inteira, proporcional, sem corte
     bgColor: '#000000',
     overlayColor: 'transparent',
-    overlayGradient: undefined,
+    /* overlay escuro suave para legibilidade sem esconder a imagem */
+    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.10) 50%, rgba(0,0,0,0.45) 100%)',
     accentColor: '#34D399',
   },
 ]
@@ -175,7 +175,7 @@ export function HeroSection() {
       ref={sectionRef}
       className="relative flex flex-col overflow-hidden"
       style={{
-        minHeight: bp === 'mobile' ? '800px' : bp === 'tablet' ? '720px' : 'min(100vh, 860px)',
+        minHeight: bp === 'mobile' ? '760px' : bp === 'tablet' ? '720px' : 'calc(100vh - 80px)',
       }}
       aria-label="Hero Slideshow"
     >
