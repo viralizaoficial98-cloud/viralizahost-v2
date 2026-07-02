@@ -19,11 +19,6 @@ type Slide = {
   accentColor: string
   /** Full-width background image slide (no text) — legacy mode */
   imageOnly?: boolean
-  /**
-   * Split layout: left half = black bg, right half = <img> object-fit:contain
-   * Desktop/tablet: side by side (1fr 1fr). Mobile: image full-width below.
-   */
-  splitLayout?: boolean
   tag?: string
   title?: string
   subtitle?: string
@@ -61,25 +56,30 @@ const slides: Slide[] = [
     features: ['Chatbots Inteligentes', 'Automação de Processos', 'Agentes IA'],
   },
 
-  /* ── SLIDE 2 — Servidores Premium (SPLIT LAYOUT) ─────────── */
+  /* ── SLIDE 2 — Servidores Premium ────────────────────────── */
   {
     id: 1,
-    splitLayout: true,
+    imageOnly: true,
     bgImage: '/servidores_banner.png',
     bgColor: '#000000',
+    bgSize: 'contain',
+    desktopPosition: 'center center',
+    tabletPosition: 'center center',
+    mobilePosition: 'center center',
     accentColor: '#F5B700',
-    /* overlayGradient applied only over the right image panel */
-    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.04) 50%, rgba(0,0,0,0.28) 100%)',
   },
 
-  /* ── SLIDE 3 — E-mail Corporativo (SPLIT LAYOUT) ─────────── */
+  /* ── SLIDE 3 — E-mail Corporativo ────────────────────────── */
   {
     id: 2,
-    splitLayout: true,
+    imageOnly: true,
     bgImage: '/viraliza-email-banner.png',
     bgColor: '#000000',
+    bgSize: 'contain',
+    desktopPosition: 'center center',
+    tabletPosition: 'center center',
+    mobilePosition: 'center center',
     accentColor: '#34D399',
-    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.04) 50%, rgba(0,0,0,0.28) 100%)',
   },
 ]
 
@@ -192,49 +192,8 @@ export function HeroSection() {
             {/* Base colour fill */}
             <div className="absolute inset-0" style={{ background: s.bgColor }} />
 
-            {/* ── Split layout (slides 2 & 3) ──────────────── */}
-            {s.splitLayout ? (
-              /*
-               * Full-width grid 1fr 1fr.
-               * Left col: solid black bg (no max-width, no container).
-               * Right col: image absolute-fills its col — object-fit:cover edge-to-edge.
-               * Mobile: single column, image fills full width below.
-               */
-              <div
-                className="absolute inset-0"
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                }}
-              >
-                {/* Left — black background, blends into right */}
-                <div style={{
-                  background: 'linear-gradient(to right, #000000 70%, rgba(0,0,0,0.70) 90%, transparent 100%)',
-                }} />
-
-                {/* Right — image, edge-to-edge, no padding/container */}
-                <div className="relative overflow-hidden">
-                  <img
-                    src={s.bgImage}
-                    alt=""
-                    draggable={false}
-                    className="absolute inset-0 select-none"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      objectPosition: 'center',
-                      display: 'block',
-                    }}
-                  />
-                  {/* edge vignette — left blend + top/bottom fade */}
-                  <div className="absolute inset-0 pointer-events-none"
-                    style={{
-                      background: 'linear-gradient(to right, rgba(0,0,0,0.35) 0%, transparent 25%), linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, transparent 35%, rgba(0,0,0,0.30) 100%)',
-                    }} />
-                </div>
-              </div>
-            ) : s.imageOnly ? (
+            {/* ── imageOnly (slides 2 & 3): background-size:contain, sem corte ── */}
+            {s.imageOnly ? (
               /* Legacy full-bg mode (unused but kept for safety) */
               <div
                 className="absolute inset-0"
@@ -265,7 +224,7 @@ export function HeroSection() {
             {s.overlayColor && s.overlayColor !== 'transparent' && (
               <div className="absolute inset-0" style={{ background: s.overlayColor }} />
             )}
-            {s.overlayGradient && !s.splitLayout && (
+            {s.overlayGradient && (
               <div className="absolute inset-0" style={{
                 background: bp === 'mobile' && s.mobileOverlayGradient
                   ? s.mobileOverlayGradient
@@ -277,7 +236,7 @@ export function HeroSection() {
             )}
 
             {/* Slide 0 vignette */}
-            {!s.imageOnly && !s.splitLayout && (
+            {!s.imageOnly && (
               <>
                 <div className="absolute inset-0"
                   style={{ background: 'radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.45) 100%)' }} />
@@ -300,7 +259,7 @@ export function HeroSection() {
 
       {/* ── Slide content (slide 0 only) ─────────────────────── */}
       <div className={`relative z-10 flex-1 flex flex-col justify-center ${bp === 'mobile' ? 'pt-20 pb-8' : 'pt-28 pb-16'}`}>
-        {!slide.imageOnly && !slide.splitLayout && (
+        {!slide.imageOnly && (
           <div className="container mx-auto px-4 lg:px-8">
             <div className={bp === 'mobile' ? 'max-w-[85%]' : 'max-w-4xl'}>
 
