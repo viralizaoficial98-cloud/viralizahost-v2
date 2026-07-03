@@ -1,10 +1,28 @@
 'use client'
 
-import { Metadata } from 'next'
 import { useState, useEffect } from 'react'
-import { User, Lock, Bell, Globe, Save, Eye, EyeOff } from 'lucide-react'
+import { User, Lock, Save, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+
+const inputStyle = {
+  width: '100%',
+  padding: '10px 14px',
+  borderRadius: 12,
+  border: '1px solid #E2E8F0',
+  background: '#F8FAFC',
+  color: '#0B0B0D',
+  fontSize: 14,
+  outline: 'none',
+}
+
+const sectionCard = {
+  background: '#FFFFFF',
+  border: '1px solid #E5E7EB',
+  borderRadius: 18,
+  boxShadow: '0 10px 30px rgba(15,23,42,0.06)',
+  padding: 24,
+}
 
 export default function SettingsPage() {
   const supabase = createClient()
@@ -14,16 +32,16 @@ export default function SettingsPage() {
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [showPwd, setShowPwd] = useState(false)
   const [newPwd, setNewPwd] = useState('')
-  const [form, setForm] = useState({ full_name: '', phone: '', country: '', currency: 'USD' })
+  const [form, setForm] = useState({ full_name: '', phone: '', country: 'AO', currency: 'USD' })
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { router.push('/login'); return }
-      supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data: rawData }) => {
-        const data = rawData as any
-        if (data) {
-          setProfile(data)
-          setForm({ full_name: data.full_name ?? '', phone: data.phone ?? '', country: data.country ?? 'AO', currency: data.currency ?? 'USD' })
+      supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
+        const d = data as any
+        if (d) {
+          setProfile(d)
+          setForm({ full_name: d.full_name ?? '', phone: d.phone ?? '', country: d.country ?? 'AO', currency: d.currency ?? 'USD' })
         }
       })
     })
@@ -45,82 +63,122 @@ export default function SettingsPage() {
     setNewPwd(''); setSaving(false)
   }
 
+  const field = (label: string, node: React.ReactNode) => (
+    <div>
+      <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>{label}</label>
+      {node}
+    </div>
+  )
+
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-7 max-w-2xl">
+
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-black text-white">Definições</h1>
-        <p className="text-gray-500 text-sm mt-1">Gerencie o seu perfil e preferências</p>
+        <h1 className="text-2xl font-black" style={{ color: '#0B0B0D' }}>Definições</h1>
+        <p className="text-sm mt-1" style={{ color: '#64748B' }}>Gerencie o seu perfil e preferências</p>
       </div>
 
+      {/* Feedback */}
       {msg && (
-        <div className={`px-4 py-3 rounded-xl text-sm font-medium ${msg.type === 'ok' ? 'bg-green-400/10 text-green-400 border border-green-400/20' : 'bg-red-400/10 text-red-400 border border-red-400/20'}`}>
+        <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium"
+          style={msg.type === 'ok'
+            ? { background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.20)' }
+            : { background: 'rgba(239,68,68,0.08)', color: '#DC2626', border: '1px solid rgba(239,68,68,0.20)' }}>
+          {msg.type === 'ok' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
           {msg.text}
         </div>
       )}
 
-      <div className="glass-dark rounded-2xl border border-[#222] p-6 space-y-5">
-        <div className="flex items-center gap-2 mb-2">
-          <User size={16} className="text-yellow-400" />
-          <h2 className="font-bold text-white">Perfil</h2>
+      {/* Profile card */}
+      <div style={sectionCard}>
+        <div className="flex items-center gap-2.5 mb-6">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.20)' }}>
+            <User size={17} style={{ color: '#D9A300' }} />
+          </div>
+          <div>
+            <h2 className="font-bold text-sm" style={{ color: '#0B0B0D' }}>Perfil</h2>
+            <p className="text-xs" style={{ color: '#94A3B8' }}>Informações pessoais da sua conta</p>
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs text-gray-600 mb-1.5 block">Nome completo</label>
-            <input className="input-brand w-full" value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} placeholder="Seu nome" />
-          </div>
-          <div>
-            <label className="text-xs text-gray-600 mb-1.5 block">Telefone</label>
-            <input className="input-brand w-full" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+244 900 000 000" />
-          </div>
-          <div>
-            <label className="text-xs text-gray-600 mb-1.5 block">País</label>
-            <select className="input-brand w-full" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}>
-              <option value="AO">Angola</option>
-              <option value="BR">Brasil</option>
-              <option value="PT">Portugal</option>
-              <option value="US">Estados Unidos</option>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          {field('Nome completo',
+            <input style={inputStyle} value={form.full_name}
+              onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
+              placeholder="Seu nome completo" />
+          )}
+          {field('Telefone',
+            <input style={inputStyle} value={form.phone}
+              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+              placeholder="+244 900 000 000" />
+          )}
+          {field('País',
+            <select style={inputStyle} value={form.country}
+              onChange={e => setForm(f => ({ ...f, country: e.target.value }))}>
+              <option value="AO">🇦🇴 Angola</option>
+              <option value="BR">🇧🇷 Brasil</option>
+              <option value="PT">🇵🇹 Portugal</option>
+              <option value="US">🇺🇸 Estados Unidos</option>
             </select>
-          </div>
-          <div>
-            <label className="text-xs text-gray-600 mb-1.5 block">Moeda preferida</label>
-            <select className="input-brand w-full" value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}>
-              <option value="USD">USD — Dólar</option>
-              <option value="BRL">BRL — Real</option>
-              <option value="AKZ">AKZ — Kwanza</option>
+          )}
+          {field('Moeda preferida',
+            <select style={inputStyle} value={form.currency}
+              onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}>
+              <option value="USD">USD — Dólar Americano</option>
+              <option value="BRL">BRL — Real Brasileiro</option>
+              <option value="AKZ">AKZ — Kwanza Angolano</option>
             </select>
-          </div>
+          )}
         </div>
-        <div className="pt-2">
-          <label className="text-xs text-gray-600 mb-1.5 block">Email</label>
-          <input className="input-brand w-full opacity-60 cursor-not-allowed" value={profile?.email ?? ''} disabled />
-          <p className="text-xs text-gray-700 mt-1">O email não pode ser alterado aqui.</p>
-        </div>
-        <button onClick={saveProfile} disabled={saving} className="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold disabled:opacity-60">
+
+        {field('Email (não editável)',
+          <input style={{ ...inputStyle, opacity: 0.55, cursor: 'not-allowed' }}
+            value={profile?.email ?? ''} disabled />
+        )}
+        <p className="text-xs mt-1 mb-5" style={{ color: '#94A3B8' }}>O email não pode ser alterado por aqui.</p>
+
+        <button onClick={saveProfile} disabled={saving}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-black disabled:opacity-60 transition-all"
+          style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.30)' }}>
           <Save size={14} /> {saving ? 'A guardar...' : 'Guardar Perfil'}
         </button>
       </div>
 
-      <div className="glass-dark rounded-2xl border border-[#222] p-6 space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Lock size={16} className="text-yellow-400" />
-          <h2 className="font-bold text-white">Segurança</h2>
+      {/* Security card */}
+      <div style={sectionCard}>
+        <div className="flex items-center gap-2.5 mb-6">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}>
+            <Lock size={17} style={{ color: '#DC2626' }} />
+          </div>
+          <div>
+            <h2 className="font-bold text-sm" style={{ color: '#0B0B0D' }}>Segurança</h2>
+            <p className="text-xs" style={{ color: '#94A3B8' }}>Altere a sua senha de acesso</p>
+          </div>
         </div>
-        <div>
-          <label className="text-xs text-gray-600 mb-1.5 block">Nova senha</label>
+
+        {field('Nova senha',
           <div className="relative">
             <input
               type={showPwd ? 'text' : 'password'}
-              className="input-brand w-full pr-10"
+              style={{ ...inputStyle, paddingRight: 40 }}
               value={newPwd}
               onChange={e => setNewPwd(e.target.value)}
               placeholder="Mínimo 8 caracteres"
             />
-            <button type="button" onClick={() => setShowPwd(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400">
+            <button type="button" onClick={() => setShowPwd(p => !p)}
+              className="absolute right-3 top-1/2 -translate-y-1/2"
+              style={{ color: '#94A3B8' }}>
               {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-        </div>
-        <button onClick={changePassword} disabled={saving || !newPwd} className="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold disabled:opacity-60">
+        )}
+
+        <button onClick={changePassword} disabled={saving || !newPwd}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-black disabled:opacity-60 transition-all mt-5"
+          style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.30)' }}>
           <Lock size={14} /> Alterar Senha
         </button>
       </div>

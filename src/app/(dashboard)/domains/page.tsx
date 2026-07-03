@@ -5,12 +5,25 @@ import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = { title: 'Domínios — ViralizaHost' }
 
-const statusConfig: Record<string, { label: string; class: string }> = {
-  active: { label: 'Ativo', class: 'bg-green-400/10 text-green-400 border border-green-400/20' },
-  expired: { label: 'Expirado', class: 'bg-red-400/10 text-red-400 border border-red-400/20' },
-  pending: { label: 'Pendente', class: 'bg-yellow-400/10 text-yellow-400 border border-yellow-400/20' },
-  transferred: { label: 'Transferido', class: 'bg-blue-400/10 text-blue-400 border border-blue-400/20' },
-  locked: { label: 'Bloqueado', class: 'bg-gray-400/10 text-gray-500 border border-gray-400/20' },
+const card = {
+  background: '#FFFFFF',
+  border: '1px solid #E5E7EB',
+  borderRadius: 18,
+  boxShadow: '0 10px 30px rgba(15,23,42,0.06)',
+}
+
+const statusMap: Record<string, { label: string; bg: string; color: string; border: string }> = {
+  active:      { label: 'Ativo',        bg: 'rgba(16,185,129,0.08)',  color: '#059669', border: 'rgba(16,185,129,0.20)' },
+  expired:     { label: 'Expirado',     bg: 'rgba(239,68,68,0.08)',   color: '#DC2626', border: 'rgba(239,68,68,0.20)' },
+  pending:     { label: 'Pendente',     bg: 'rgba(245,183,0,0.10)',   color: '#D9A300', border: 'rgba(245,183,0,0.25)' },
+  transferred: { label: 'Transferido',  bg: 'rgba(59,130,246,0.08)',  color: '#2563EB', border: 'rgba(59,130,246,0.20)' },
+  locked:      { label: 'Bloqueado',    bg: 'rgba(107,114,128,0.08)', color: '#6B7280', border: 'rgba(107,114,128,0.20)' },
+}
+
+async function fetchDomains(userId: string) {
+  const supabase = await createClient()
+  const result = await supabase.from('domains').select('*').eq('profile_id', userId).order('created_at', { ascending: false })
+  return (result.data ?? []) as any[]
 }
 
 export default async function DomainsPage() {
@@ -18,81 +31,109 @@ export default async function DomainsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: domainsRaw } = await supabase
-    .from('domains')
-    .select('*')
-    .eq('profile_id', user.id)
-    .order('created_at', { ascending: false })
-  const domains = domainsRaw as any[]
+  const domains = await fetchDomains(user.id)
+  const activeCount   = domains.filter(d => d.status === 'active').length
+  const expiredCount  = domains.filter(d => d.status === 'expired').length
+  const pendingCount  = domains.filter(d => d.status === 'pending').length
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
+
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-white">Domínios</h1>
-          <p className="text-gray-500 text-sm mt-1">Gerencie todos os seus domínios</p>
+          <h1 className="text-2xl font-black" style={{ color: '#0B0B0D' }}>Domínios</h1>
+          <p className="text-sm mt-1" style={{ color: '#64748B' }}>Gerencie todos os seus domínios registados</p>
         </div>
-        <button className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold">
+        <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-black transition-all"
+          style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.35)' }}>
           <Plus size={16} /> Registar Domínio
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {(['active', 'expired', 'pending'] as const).map(s => {
-          const count = domains?.filter(d => d.status === s).length ?? 0
-          const borderColor = s === 'active' ? 'border-green-400/20' : s === 'expired' ? 'border-red-400/20' : 'border-yellow-400/20'
-          return (
-            <div key={s} className={`glass-dark rounded-xl border p-4 ${borderColor}`}>
-              <div className="text-xs text-gray-600 mb-1">{statusConfig[s].label}</div>
-              <div className="text-2xl font-black text-white">{count}</div>
-            </div>
-          )
-        })}
+      {/* Stats mini */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: 'Ativos',    value: activeCount,  accent: '#059669', bg: 'rgba(16,185,129,0.06)',  border: 'rgba(16,185,129,0.15)' },
+          { label: 'Expirados', value: expiredCount, accent: '#DC2626', bg: 'rgba(239,68,68,0.06)',   border: 'rgba(239,68,68,0.15)' },
+          { label: 'Pendentes', value: pendingCount, accent: '#D9A300', bg: 'rgba(245,183,0,0.08)',   border: 'rgba(245,183,0,0.20)' },
+        ].map(s => (
+          <div key={s.label} className="rounded-2xl p-5" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
+            <div className="text-xs font-semibold mb-1" style={{ color: s.accent }}>{s.label}</div>
+            <div className="text-3xl font-black" style={{ color: '#0B0B0D' }}>{s.value}</div>
+          </div>
+        ))}
       </div>
 
-      <div className="glass-dark rounded-2xl border border-[#222] overflow-hidden">
-        <div className="p-5 border-b border-[#1A1A1A] flex items-center gap-2">
-          <Globe size={16} className="text-yellow-400" />
-          <h2 className="font-bold text-white">Meus Domínios</h2>
-          <span className="ml-auto text-xs text-gray-600 bg-[#1A1A1A] px-2.5 py-1 rounded-full">{domains?.length ?? 0} domínios</span>
+      {/* Table card */}
+      <div style={card}>
+        <div className="px-6 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid #F1F5F9' }}>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.20)' }}>
+            <Globe size={15} style={{ color: '#D9A300' }} />
+          </div>
+          <h2 className="font-bold text-sm" style={{ color: '#0B0B0D' }}>Meus Domínios</h2>
+          <span className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full"
+            style={{ background: '#F1F5F9', color: '#64748B' }}>
+            {domains.length} domínio{domains.length !== 1 ? 's' : ''}
+          </span>
         </div>
-        <div className="divide-y divide-[#1A1A1A]">
-          {domains && domains.length > 0 ? domains.map((domain) => {
-            const cfg = statusConfig[domain.status] ?? statusConfig.pending
-            const expires = domain.expires_at ? new Date(domain.expires_at).toLocaleDateString('pt-BR') : '—'
-            return (
-              <div key={domain.id} className="p-5 flex items-center gap-4 hover:bg-[#111] transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-[#1A1A1A] flex items-center justify-center flex-shrink-0">
-                  <Globe size={18} className="text-yellow-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white">{domain.full_domain ?? (domain.name + domain.extension)}</span>
-                    {domain.is_locked && <Lock size={12} className="text-gray-600" />}
+
+        {domains.length > 0 ? (
+          <div>
+            {domains.map((domain: any, i: number) => {
+              const s = statusMap[domain.status] ?? statusMap.pending
+              const expires = domain.expires_at ? new Date(domain.expires_at).toLocaleDateString('pt-BR') : '—'
+              const name = domain.full_domain ?? ((domain.name ?? '') + (domain.extension ?? ''))
+              return (
+                <div key={domain.id}
+                  className="px-6 py-4 flex items-center gap-4"
+                  style={{ borderBottom: i < domains.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: 'rgba(245,183,0,0.08)', border: '1px solid rgba(245,183,0,0.15)' }}>
+                    <Globe size={17} style={{ color: '#D9A300' }} />
                   </div>
-                  <div className="text-xs text-gray-600 mt-0.5">Expira: {expires} · {domain.registrar}</div>
-                </div>
-                <div className="hidden sm:flex items-center gap-3">
-                  {domain.auto_renew && (
-                    <div className="flex items-center gap-1 text-xs text-green-400">
-                      <RefreshCw size={11} /> Auto-renovar
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm" style={{ color: '#0B0B0D' }}>{name}</span>
+                      {domain.is_locked && <Lock size={11} style={{ color: '#94A3B8' }} />}
                     </div>
-                  )}
-                  <div className="flex items-center gap-1 text-xs text-blue-400">
-                    <Shield size={11} /> SSL
+                    <div className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
+                      Expira: {expires}{domain.registrar ? ` · ${domain.registrar}` : ''}
+                    </div>
                   </div>
+                  <div className="hidden sm:flex items-center gap-3">
+                    {domain.auto_renew && (
+                      <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#059669' }}>
+                        <RefreshCw size={11} /> Auto-renovar
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#2563EB' }}>
+                      <Shield size={11} /> SSL
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full shrink-0"
+                    style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
+                    {s.label}
+                  </span>
                 </div>
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${cfg.class}`}>{cfg.label}</span>
-              </div>
-            )
-          }) : (
-            <div className="p-12 text-center">
-              <Globe size={32} className="text-gray-700 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">Nenhum domínio registado</p>
-              <button className="mt-4 btn-primary text-xs px-4 py-2 rounded-xl font-bold">Registar primeiro domínio</button>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="py-16 text-center">
+            <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+              style={{ background: 'rgba(245,183,0,0.08)', border: '1px solid rgba(245,183,0,0.15)' }}>
+              <Globe size={28} style={{ color: '#D9A300' }} />
             </div>
-          )}
-        </div>
+            <p className="font-semibold text-sm mb-1" style={{ color: '#0B0B0D' }}>Nenhum domínio registado</p>
+            <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>Registe o seu primeiro domínio e comece a construir a sua presença online</p>
+            <button className="px-5 py-2.5 rounded-xl text-sm font-bold text-black"
+              style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.30)' }}>
+              Registar primeiro domínio
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

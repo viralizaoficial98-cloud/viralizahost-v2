@@ -3,7 +3,7 @@ import { DashboardHeader } from '@/components/layout/DashboardHeader'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen bg-[#F4F6F9] overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: '#F7F8FA' }}>
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <DashboardHeader />
