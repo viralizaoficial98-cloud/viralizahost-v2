@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Base client — schema set per-query via .schema() for reliability
-const supabaseBase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-const db = (supabaseBase as any).schema('viralizahost')
+function getDb() {
+  const client = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { db: { schema: 'viralizahost' } }
+  )
+  return client
+}
 
 const seedBanners = [
   {
@@ -109,10 +110,10 @@ const seedTeam = [
 ]
 
 async function seedTable(
+  db: ReturnType<typeof getDb>,
   table: string,
   data: object[]
 ): Promise<{ seeded: boolean; count: number; error?: string }> {
-  // Check existing row count
   const { count, error: countErr } = await db.from(table).select('*', { count: 'exact', head: true })
   if (countErr) {
     console.error(`[seed-site] count error on ${table}:`, countErr)
@@ -123,7 +124,6 @@ async function seedTable(
     return { seeded: false, count: count ?? 0 }
   }
 
-  // Insert seed data
   const { error: insertErr } = await db.from(table).insert(data as any)
   if (insertErr) {
     console.error(`[seed-site] insert error on ${table}:`, insertErr)
@@ -135,11 +135,12 @@ async function seedTable(
 }
 
 export async function POST() {
+  const db = getDb()
   const tables = ['site_banners', 'site_domains', 'site_email_plans', 'site_hosting_plans', 'site_team']
   const datasets = [seedBanners, seedDomains, seedEmailPlans, seedHostingPlans, seedTeam]
 
   const summary = await Promise.all(
-    tables.map((t, i) => seedTable(t, datasets[i]).then(r => ({ table: t, ...r })))
+    tables.map((t, i) => seedTable(db, t, datasets[i]).then(r => ({ table: t, ...r })))
   )
 
   const seededCount  = summary.filter(s => s.seeded).length
@@ -152,6 +153,7 @@ export async function POST() {
 }
 
 export async function GET() {
+  const db = getDb()
   const tables = ['site_banners', 'site_domains', 'site_email_plans', 'site_hosting_plans', 'site_team']
   const results = await Promise.all(
     tables.map(t => db.from(t).select('*', { count: 'exact', head: true }))
