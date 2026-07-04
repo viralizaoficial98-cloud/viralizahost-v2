@@ -6,15 +6,15 @@ import { LayoutDashboard, Users, CreditCard, MessageSquare, Settings, Server, Gl
 import { createClient } from '@/lib/supabase/client'
 
 const adminNav = [
-  { href: '/admin',              icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/admin/clients',      icon: Users,           label: 'Clientes' },
-  { href: '/admin/financial',    icon: CreditCard,      label: 'Financeiro' },
-  { href: '/admin/tickets',      icon: MessageSquare,   label: 'Tickets' },
-  { href: '/admin/servers',      icon: Server,          label: 'Servidores' },
-  { href: '/admin/domains',      icon: Globe,           label: 'Domínios' },
-  { href: '/admin/activity',     icon: Activity,        label: 'Atividade' },
-  { href: '/admin/site',         icon: Monitor,         label: 'Gestão do Site' },
-  { href: '/admin/settings',     icon: Settings,        label: 'Configurações' },
+  { href: '/admin',              icon: LayoutDashboard, label: 'Dashboard',       exact: true },
+  { href: '/admin/clients',      icon: Users,           label: 'Clientes',        exact: false },
+  { href: '/admin/financial',    icon: CreditCard,      label: 'Financeiro',      exact: false },
+  { href: '/admin/tickets',      icon: MessageSquare,   label: 'Tickets',         exact: false },
+  { href: '/admin/servers',      icon: Server,          label: 'Servidores',      exact: false },
+  { href: '/admin/domains',      icon: Globe,           label: 'Domínios',        exact: false },
+  { href: '/admin/activity',     icon: Activity,        label: 'Atividade',       exact: false },
+  { href: '/admin/site',         icon: Monitor,         label: 'Gestão do Site',  exact: false },
+  { href: '/admin/settings',     icon: Settings,        label: 'Configurações',   exact: false },
 ]
 
 function AdminSidebar() {
@@ -57,9 +57,8 @@ function AdminSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 pb-4 space-y-0.5 overflow-y-auto">
-        {adminNav.map(({ href, icon: Icon, label }) => {
-          const active = pathname === href || (href !== '/admin' && pathname.startsWith(href + '/'))
-            || (href === '/admin' && pathname === '/admin')
+        {adminNav.map(({ href, icon: Icon, label, exact }) => {
+          const active = exact ? pathname === href : (pathname === href || pathname.startsWith(href + '/'))
           return (
             <Link key={href} href={href}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 relative"
