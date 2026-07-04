@@ -105,7 +105,7 @@ export function ServicePricingCards({
 
               <div className="px-7 pb-7">
                 <Link
-                  href={plan.href ?? `/register?plan=${plan.id}`}
+                  href={plan.href ?? `/checkout?plan=${plan.id}`}
                   className={`block w-full text-center py-3 rounded-xl text-sm font-bold transition-all ${
                     plan.popular
                       ? 'btn-primary btn-shimmer shadow-[0_4px_16px_rgba(245,183,0,0.30)]'

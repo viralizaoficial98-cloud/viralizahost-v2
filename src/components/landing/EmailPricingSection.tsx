@@ -176,7 +176,7 @@ export function EmailPricingSection() {
                         </li>
                       ))}
                     </ul>
-                    <Link href="#contacto" className={`block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 ${
+                    <Link href={`/checkout?plan=${plan.id}`} className={`block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 ${
                       isPopular
                         ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300]'
                         : 'border border-[#E8E8E8] text-[#0A0A0A] hover:border-[#F5B700] hover:bg-[#F5B700]/5'
@@ -290,7 +290,7 @@ export function EmailPricingSection() {
 
                   {/* CTA */}
                   {plan.priceAKZ ? (
-                    <Link href={`/register?plan=${plan.id}`}
+                    <Link href={`/checkout?plan=${plan.id}`}
                       className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
                         plan.is_popular
                           ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'

@@ -1,7 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Search, Shield, Zap, Headphones, Lock, Globe, RefreshCw, Server } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useCheckoutStore } from '@/store/checkoutStore'
 
 type ExtItem = { tld: string; label: string; price: string; popular: boolean }
 
@@ -33,6 +35,8 @@ const trustItems = [
 export function DomainSearchBar() {
   const [query, setQuery] = useState('')
   const [extensions, setExtensions] = useState<ExtItem[]>(defaultExtensions)
+  const router = useRouter()
+  const { setItems, setDomainName, setDomainAction, setStep } = useCheckoutStore()
 
   useEffect(() => {
     const supabase = createClient()
@@ -50,7 +54,21 @@ export function DomainSearchBar() {
   }, [])
 
   const handleSearch = () => {
-    if (query.trim()) alert(`A pesquisar: ${query}`)
+    if (!query.trim()) return
+    setItems([{ id: 'domain-search', name: `Domínio ${query.trim()}`, type: 'domain', price: 4500, currency: 'AOA', quantity: 1 }])
+    setDomainName(query.trim())
+    setDomainAction('register')
+    setStep(1)
+    router.push(`/checkout?plan=domain-search`)
+  }
+
+  const handleRegisterTld = (tld: string, price: string) => {
+    const name = query.trim() ? `${query.trim()}${tld}` : tld
+    setItems([{ id: `domain${tld}`, name: `Domínio ${name}`, type: 'domain', price: 4500, currency: 'AOA', quantity: 1 }])
+    setDomainAction('register')
+    if (query.trim()) setDomainName(name)
+    setStep(1)
+    router.push(`/checkout?plan=domain${tld}`)
   }
 
   return (
@@ -267,6 +285,7 @@ export function DomainSearchBar() {
                 <div className="text-[11px] text-[#999] mb-3 leading-tight">{label}</div>
                 <div className="text-[13px] font-bold text-[#0A0A0A] mb-4">{price}</div>
                 <button
+                  onClick={() => handleRegisterTld(tld, price)}
                   className="w-full py-2 rounded-xl text-xs font-bold transition-all duration-200 border"
                   style={{
                     background: popular ? '#F5B700' : 'transparent',
@@ -295,7 +314,7 @@ export function DomainSearchBar() {
           {/* CTA link */}
           <div className="text-center mb-16">
             <a
-              href="#"
+              href="/dominios"
               className="inline-flex items-center gap-2 text-[#F5B700] font-bold text-sm hover:gap-3 transition-all duration-200"
             >
               Ver todos os domínios disponíveis

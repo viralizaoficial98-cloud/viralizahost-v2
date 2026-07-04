@@ -177,7 +177,7 @@ export function PricingSection() {
                       </li>
                     ))}
                   </ul>
-                  <Link href="/register" className="block text-center py-3 rounded-2xl font-bold text-sm transition-all"
+                  <Link href={`/checkout?plan=${plan.id}`} className="block text-center py-3 rounded-2xl font-bold text-sm transition-all"
                     style={plan.featured ? { background: accent, color: '#000', boxShadow: `0 8px 25px ${accent}40` } : { background: '#F3F4F6', color: '#0A0A0A' }}>
                     Começar agora
                   </Link>
@@ -300,7 +300,7 @@ export function PricingSection() {
                   </div>
 
                   {/* CTA */}
-                  <Link href={`/register?plan=${plan.id}`}
+                  <Link href={`/checkout?plan=${plan.id}`}
                     className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
                       plan.is_popular
                         ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'

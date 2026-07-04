@@ -41,7 +41,7 @@ export function CTASection() {
 
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-14">
-          <Link href="/register"
+          <Link href="/checkout"
             className="btn-shimmer inline-flex items-center justify-center gap-2 bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] px-10 py-5 rounded-2xl font-black text-lg transition-all hover:scale-105 shadow-[0_8px_40px_rgba(245,183,0,0.35)]">
             Começar Agora — Grátis
             <ArrowRight size={22} />
