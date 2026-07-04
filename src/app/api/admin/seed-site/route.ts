@@ -1,14 +1,7 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/server'
 
-function getDb() {
-  const client = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { db: { schema: 'viralizahost' } }
-  )
-  return client
-}
+// Seed data ---------------------------------------------------------------
 
 const seedBanners = [
   {
@@ -76,7 +69,7 @@ const seedHostingPlans = [
   },
   {
     position: 1, active: true, featured: true, badge: 'MAIS POPULAR',
-    name: 'Business Cloud', description: 'Para pequenas e médias empresas crescerem',
+    name: 'Business Cloud', description: 'Para pequenas e m��dias empresas crescerem',
     price_monthly: 9500, price_annual: null, discount_annual: 20,
     features: ['5 Sites', '50 GB NVMe SSD', 'Bandwidth Ilimitado', '20 Contas de Email', 'SSL Grátis', 'cPanel Premium', '10 Bases de Dados MySQL', 'Backup Diário', 'Softaculous (400+ apps)'],
   },
@@ -109,38 +102,55 @@ const seedTeam = [
   },
 ]
 
+// Helpers -----------------------------------------------------------------
+
+const TABLES = ['site_banners', 'site_domains', 'site_email_plans', 'site_hosting_plans', 'site_team'] as const
+const DATASETS = [seedBanners, seedDomains, seedEmailPlans, seedHostingPlans, seedTeam]
+
 async function seedTable(
-  db: ReturnType<typeof getDb>,
+  db: Awaited<ReturnType<typeof createAdminClient>>,
   table: string,
   data: object[]
 ): Promise<{ seeded: boolean; count: number; error?: string }> {
-  const { count, error: countErr } = await db.from(table).select('*', { count: 'exact', head: true })
+  console.log(`[seed-site] checking ${table}...`)
+
+  const { count, error: countErr } = await (db as any)
+    .from(table)
+    .select('*', { count: 'exact', head: true })
+
   if (countErr) {
-    console.error(`[seed-site] count error on ${table}:`, countErr)
-    return { seeded: false, count: 0, error: `count failed: ${countErr.message}` }
+    console.error(`[seed-site] ❌ count error on ${table}:`, JSON.stringify(countErr))
+    return { seeded: false, count: 0, error: `count failed: ${countErr.message} (code: ${countErr.code})` }
   }
+
+  console.log(`[seed-site] ${table} has ${count} rows`)
+
   if ((count ?? 0) > 0) {
-    console.log(`[seed-site] ${table} already has ${count} rows — skipping`)
     return { seeded: false, count: count ?? 0 }
   }
 
-  const { error: insertErr } = await db.from(table).insert(data as any)
+  const { error: insertErr } = await (db as any).from(table).insert(data)
+
   if (insertErr) {
-    console.error(`[seed-site] insert error on ${table}:`, insertErr)
-    return { seeded: false, count: 0, error: `insert failed: ${insertErr.message}` }
+    console.error(`[seed-site] ❌ insert error on ${table}:`, JSON.stringify(insertErr))
+    return { seeded: false, count: 0, error: `insert failed: ${insertErr.message} (code: ${insertErr.code})` }
   }
 
-  console.log(`[seed-site] seeded ${data.length} rows into ${table}`)
+  console.log(`[seed-site] ✅ seeded ${data.length} rows into ${table}`)
   return { seeded: true, count: data.length }
 }
 
+// Handlers ----------------------------------------------------------------
+
 export async function POST() {
-  const db = getDb()
-  const tables = ['site_banners', 'site_domains', 'site_email_plans', 'site_hosting_plans', 'site_team']
-  const datasets = [seedBanners, seedDomains, seedEmailPlans, seedHostingPlans, seedTeam]
+  console.log('[seed-site] POST called — creating admin client...')
+
+  const db = await createAdminClient()
+
+  console.log('[seed-site] admin client ready — starting seed...')
 
   const summary = await Promise.all(
-    tables.map((t, i) => seedTable(db, t, datasets[i]).then(r => ({ table: t, ...r })))
+    TABLES.map((t, i) => seedTable(db, t, DATASETS[i]).then(r => ({ table: t, ...r })))
   )
 
   const seededCount  = summary.filter(s => s.seeded).length
@@ -148,21 +158,31 @@ export async function POST() {
   const errorCount   = summary.filter(s => s.error).length
 
   console.log(`[seed-site] done — seeded: ${seededCount}, skipped: ${skippedCount}, errors: ${errorCount}`)
+  console.log('[seed-site] summary:', JSON.stringify(summary))
 
   return NextResponse.json({ ok: errorCount === 0, summary, seededCount, skippedCount, errorCount })
 }
 
 export async function GET() {
-  const db = getDb()
-  const tables = ['site_banners', 'site_domains', 'site_email_plans', 'site_hosting_plans', 'site_team']
+  console.log('[seed-site] GET called — reading counts...')
+
+  const db = await createAdminClient()
+
   const results = await Promise.all(
-    tables.map(t => db.from(t).select('*', { count: 'exact', head: true }))
+    TABLES.map(t => (db as any).from(t).select('*', { count: 'exact', head: true }))
   )
-  const counts = tables.reduce((acc, t, i) => {
+
+  const counts = TABLES.reduce((acc, t, i) => {
     const r = results[i]
-    if (r.error) console.error(`[seed-site] GET count error on ${t}:`, r.error)
-    acc[t] = r.count ?? 0
+    if (r.error) {
+      console.error(`[seed-site] GET count error on ${t}:`, JSON.stringify(r.error))
+      acc[t] = 0
+    } else {
+      acc[t] = r.count ?? 0
+    }
     return acc
   }, {} as Record<string, number>)
+
+  console.log('[seed-site] counts:', JSON.stringify(counts))
   return NextResponse.json(counts)
 }
