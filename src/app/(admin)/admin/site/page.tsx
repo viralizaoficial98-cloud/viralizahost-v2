@@ -2,7 +2,6 @@
 import Link from 'next/link'
 import { Monitor, Image, Globe, Mail, Users, Server, RefreshCw, Sparkles } from 'lucide-react'
 import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
 
 const modules = [
   { href: '/admin/site/banners',       icon: Image,  label: 'Banners / Hero',       desc: 'Slides do carrossel principal', color: '#F5B700', table: 'site_banners' },
@@ -13,7 +12,6 @@ const modules = [
 ]
 
 export default function SitePage() {
-  const supabase = createClient() as any
   const [counts, setCounts] = useState<number[]>(modules.map(() => 0))
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
@@ -21,10 +19,13 @@ export default function SitePage() {
 
   const loadCounts = useCallback(async () => {
     setLoading(true)
-    const results = await Promise.allSettled(
-      modules.map(m => supabase.from(m.table).select('*', { count: 'exact', head: true }))
-    )
-    setCounts(results.map(r => r.status === 'fulfilled' ? ((r.value as any).count ?? 0) : 0))
+    try {
+      const res = await fetch('/api/admin/seed-site')
+      const data = await res.json()
+      setCounts(modules.map(m => data[m.table] ?? 0))
+    } catch {
+      setCounts(modules.map(() => 0))
+    }
     setLoading(false)
   }, [])
 
@@ -39,9 +40,15 @@ export default function SitePage() {
     try {
       const res  = await fetch('/api/admin/seed-site', { method: 'POST' })
       const data = await res.json()
-      const seeded  = data.summary?.filter((s: any) => s.seeded).length ?? 0
-      const skipped = data.summary?.filter((s: any) => !s.seeded && !s.error).length ?? 0
-      setSeedMsg({ ok: true, text: `${seeded} tabela(s) populadas, ${skipped} já tinham dados.` })
+      const seeded  = data.seededCount  ?? data.summary?.filter((s: any) => s.seeded).length ?? 0
+      const skipped = data.skippedCount ?? data.summary?.filter((s: any) => !s.seeded && !s.error).length ?? 0
+      const errors  = data.errorCount   ?? data.summary?.filter((s: any) => s.error).length ?? 0
+      const errDetails = data.summary?.filter((s: any) => s.error).map((s: any) => `${s.table}: ${s.error}`).join(' | ') ?? ''
+      if (errors > 0) {
+        setSeedMsg({ ok: false, text: `${errors} erro(s): ${errDetails}` })
+      } else {
+        setSeedMsg({ ok: true, text: `${seeded} tabela(s) populadas, ${skipped} já tinham dados.` })
+      }
       loadCounts()
     } catch {
       setSeedMsg({ ok: false, text: 'Erro ao fazer seed. Verifique os logs.' })

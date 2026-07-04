@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
+// Base client — schema set per-query via .schema() for reliability
+const supabaseBase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { db: { schema: 'viralizahost' } }
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+const db = (supabaseBase as any).schema('viralizahost')
 
 const seedBanners = [
   {
@@ -106,48 +108,59 @@ const seedTeam = [
   },
 ]
 
-async function seedTable(table: string, data: object[], countCheck: boolean = true): Promise<{ seeded: boolean; count: number }> {
-  if (countCheck) {
-    const { count } = await supabase.from(table).select('*', { count: 'exact', head: true })
-    if ((count ?? 0) > 0) return { seeded: false, count: count ?? 0 }
+async function seedTable(
+  table: string,
+  data: object[]
+): Promise<{ seeded: boolean; count: number; error?: string }> {
+  // Check existing row count
+  const { count, error: countErr } = await db.from(table).select('*', { count: 'exact', head: true })
+  if (countErr) {
+    console.error(`[seed-site] count error on ${table}:`, countErr)
+    return { seeded: false, count: 0, error: `count failed: ${countErr.message}` }
   }
-  const { error } = await supabase.from(table).insert(data as any)
-  if (error) throw new Error(`${table}: ${error.message}`)
+  if ((count ?? 0) > 0) {
+    console.log(`[seed-site] ${table} already has ${count} rows — skipping`)
+    return { seeded: false, count: count ?? 0 }
+  }
+
+  // Insert seed data
+  const { error: insertErr } = await db.from(table).insert(data as any)
+  if (insertErr) {
+    console.error(`[seed-site] insert error on ${table}:`, insertErr)
+    return { seeded: false, count: 0, error: `insert failed: ${insertErr.message}` }
+  }
+
+  console.log(`[seed-site] seeded ${data.length} rows into ${table}`)
   return { seeded: true, count: data.length }
 }
 
 export async function POST() {
-  try {
-    const results = await Promise.allSettled([
-      seedTable('site_banners',       seedBanners),
-      seedTable('site_domains',       seedDomains),
-      seedTable('site_email_plans',   seedEmailPlans),
-      seedTable('site_hosting_plans', seedHostingPlans),
-      seedTable('site_team',          seedTeam),
-    ])
+  const tables = ['site_banners', 'site_domains', 'site_email_plans', 'site_hosting_plans', 'site_team']
+  const datasets = [seedBanners, seedDomains, seedEmailPlans, seedHostingPlans, seedTeam]
 
-    const tables = ['site_banners', 'site_domains', 'site_email_plans', 'site_hosting_plans', 'site_team']
-    const summary = results.map((r, i) => ({
-      table: tables[i],
-      ...(r.status === 'fulfilled' ? r.value : { seeded: false, error: (r.reason as Error).message }),
-    }))
+  const summary = await Promise.all(
+    tables.map((t, i) => seedTable(t, datasets[i]).then(r => ({ table: t, ...r })))
+  )
 
-    return NextResponse.json({ ok: true, summary })
-  } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 })
-  }
+  const seededCount  = summary.filter(s => s.seeded).length
+  const skippedCount = summary.filter(s => !s.seeded && !s.error).length
+  const errorCount   = summary.filter(s => s.error).length
+
+  console.log(`[seed-site] done — seeded: ${seededCount}, skipped: ${skippedCount}, errors: ${errorCount}`)
+
+  return NextResponse.json({ ok: errorCount === 0, summary, seededCount, skippedCount, errorCount })
 }
 
 export async function GET() {
-  // Return current counts
   const tables = ['site_banners', 'site_domains', 'site_email_plans', 'site_hosting_plans', 'site_team']
-  const counts = await Promise.allSettled(
-    tables.map(t => supabase.from(t).select('*', { count: 'exact', head: true }))
+  const results = await Promise.all(
+    tables.map(t => db.from(t).select('*', { count: 'exact', head: true }))
   )
-  const result = tables.reduce((acc, t, i) => {
-    const r = counts[i]
-    acc[t] = r.status === 'fulfilled' ? ((r.value as any).count ?? 0) : 0
+  const counts = tables.reduce((acc, t, i) => {
+    const r = results[i]
+    if (r.error) console.error(`[seed-site] GET count error on ${t}:`, r.error)
+    acc[t] = r.count ?? 0
     return acc
   }, {} as Record<string, number>)
-  return NextResponse.json(result)
+  return NextResponse.json(counts)
 }
