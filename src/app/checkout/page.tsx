@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Check, ChevronRight, ChevronLeft, Trash2, Plus, Minus,
@@ -673,7 +673,7 @@ function StepConfirmation({ orderId }: { orderId: string }) {
 
 // ─── Main page ──────────────────────────────────────────────────────────────
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const searchParams = useSearchParams()
   const {
     step, setStep, items, setItems, billingCycle,
@@ -756,5 +756,13 @@ export default function CheckoutPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[60vh] text-[#888]">Carregando checkout...</div>}>
+      <CheckoutContent />
+    </Suspense>
   )
 }
