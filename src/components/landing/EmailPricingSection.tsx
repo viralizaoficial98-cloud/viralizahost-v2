@@ -1,6 +1,10 @@
 'use client'
 import Link from 'next/link'
+import { useState, useEffect } from 'react'
 import { Check, Mail, Shield, Database, Globe, Lock, Star, Phone } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+
+type DbEmailPlan = { id: string; name: string; price_monthly: number | null; storage_gb: number; accounts: number; features: string[] | null; active: boolean; popular: boolean; color: string; position: number }
 
 const emailPlans = [
   {
@@ -93,7 +97,102 @@ const emailPlans = [
   },
 ]
 
+const PLAN_ICONS = [Mail, Shield, Lock, Star, Database]
+const PLAN_ACCENTS = ['#3B82F6', '#F5B700', '#8B5CF6', '#0A0A0A', '#10B981']
+
 export function EmailPricingSection() {
+  const [dbPlans, setDbPlans] = useState<DbEmailPlan[] | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('site_email_plans').select('*').eq('active', true).order('position')
+      .then(({ data }) => { if (data && data.length > 0) setDbPlans(data as DbEmailPlan[]) })
+  }, [])
+
+  if (dbPlans) {
+    return (
+      <section id="email-plans" className="py-24 bg-white relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#E8E8E8] to-transparent" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#F5B700]/4 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#F5B700]/3 rounded-full blur-3xl pointer-events-none" />
+        <div className="container mx-auto px-4 relative">
+          <div className="text-center mb-16">
+            <span className="section-tag mb-5 inline-flex"><Mail size={13} />E-mail Corporativo</span>
+            <h2 className="text-4xl lg:text-5xl font-black text-[#0A0A0A] mb-5">
+              Planos de <span className="gradient-text">E-mail Corporativo</span>
+            </h2>
+            <p className="text-gray-500 text-xl max-w-2xl mx-auto">
+              Comunicação profissional, segura e escalável para a sua empresa.
+            </p>
+          </div>
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${dbPlans.length >= 3 ? 'xl:grid-cols-3' : ''}`}>
+            {dbPlans.map((plan, idx) => {
+              const Icon = PLAN_ICONS[idx % PLAN_ICONS.length]
+              const accent = plan.color || PLAN_ACCENTS[idx % PLAN_ACCENTS.length]
+              const isPopular = plan.popular
+              const price = plan.price_monthly
+              const features: string[] = plan.features ?? []
+              return (
+                <div key={plan.id} className={`relative rounded-3xl overflow-hidden transition-all duration-300 hover-lift ${
+                  isPopular
+                    ? 'bg-[#0A0A0A] border-2 border-[#F5B700] shadow-[0_20px_60px_rgba(0,0,0,0.15)]'
+                    : 'bg-white border border-[#E8E8E8] shadow-sm hover:border-[#F5B700]/40'
+                }`}>
+                  {isPopular && (
+                    <div className="text-center py-2.5 text-xs font-black tracking-widest" style={{ background: '#F5B700', color: '#0A0A0A' }}>
+                      MAIS POPULAR
+                    </div>
+                  )}
+                  <div className="p-8">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `${accent}20` }}>
+                        <Icon size={24} style={{ color: accent }} />
+                      </div>
+                    </div>
+                    <h3 className={`text-2xl font-black mb-2 ${isPopular ? 'text-white' : 'text-[#0A0A0A]'}`}>{plan.name}</h3>
+                    <p className={`text-sm mb-6 ${isPopular ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {plan.accounts} caixas · {plan.storage_gb} GB por caixa
+                    </p>
+                    <div className="mb-8">
+                      {price ? (
+                        <div className="flex items-baseline gap-1">
+                          <span className={`text-sm font-bold ${isPopular ? 'text-gray-400' : 'text-gray-500'}`}>Kz</span>
+                          <span className={`text-4xl font-black ${isPopular ? 'text-white' : 'text-[#0A0A0A]'}`}>
+                            {price.toLocaleString('pt-AO')}
+                          </span>
+                          <span className={`text-sm ${isPopular ? 'text-gray-400' : 'text-gray-500'}`}>/mês</span>
+                        </div>
+                      ) : (
+                        <div className={`text-2xl font-black ${isPopular ? 'text-white' : 'text-[#0A0A0A]'}`}>Consultar</div>
+                      )}
+                    </div>
+                    <ul className="space-y-3 mb-8">
+                      {features.map((feat, fi) => (
+                        <li key={fi} className="flex items-center gap-3">
+                          <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${accent}20` }}>
+                            <Check size={11} style={{ color: accent }} />
+                          </div>
+                          <span className={`text-sm ${isPopular ? 'text-gray-300' : 'text-gray-600'}`}>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Link href="#contacto" className={`block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 ${
+                      isPopular
+                        ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300]'
+                        : 'border border-[#E8E8E8] text-[#0A0A0A] hover:border-[#F5B700] hover:bg-[#F5B700]/5'
+                    }`}>
+                      Começar Agora
+                    </Link>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section id="email-plans" className="py-24 bg-white relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#E8E8E8] to-transparent" />

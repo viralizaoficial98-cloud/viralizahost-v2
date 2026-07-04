@@ -1,9 +1,10 @@
 'use client'
 import Link from 'next/link'
-import { Check, X, Zap, Crown, Rocket, Users } from 'lucide-react'
-import { useState } from 'react'
+import { Check, X, Zap, Crown, Rocket, Users, Server } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { Currency } from '@/types'
+import { createClient } from '@/lib/supabase/client'
 
 const plans = [
   {
@@ -108,13 +109,85 @@ const plans = [
   },
 ]
 
+type DbPlan = { id: string; name: string; description: string | null; badge: string | null; price_monthly: number | null; price_annual: number | null; discount_annual: number; features: string[] | null; active: boolean; featured: boolean; position: number }
+
+const PLAN_ICONS = [Zap, Rocket, Crown, Users, Server]
+const PLAN_ACCENTS = ['#3B82F6', '#F5B700', '#8B5CF6', '#EF4444', '#10B981']
+
 export function PricingSection() {
   const { format, currency } = useCurrency()
   const [billing, setBilling] = useState<'monthly' | 'annual'>('annual')
+  const [dbPlans, setDbPlans] = useState<DbPlan[] | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('site_hosting_plans').select('*').eq('active', true).order('position')
+      .then(({ data }) => { if (data && data.length > 0) setDbPlans(data as DbPlan[]) })
+  }, [])
 
   const getPrice = (price: Record<Currency, number>) => {
     const p = price[currency]
     return billing === 'annual' ? p : p * 1.4
+  }
+
+  // If DB has plans, render them instead of hardcoded
+  if (dbPlans) {
+    return (
+      <section id="planos" className="py-24 bg-[#F8F8F8] relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#E8E8E8] to-transparent" />
+        <div className="container mx-auto px-4 relative">
+          <div className="text-center mb-16">
+            <span className="section-tag mb-5 inline-flex">Hospedagem Premium</span>
+            <h2 className="text-4xl lg:text-5xl font-black text-[#0A0A0A] mb-5">
+              Planos de <span className="gradient-text">Hospedagem</span>
+            </h2>
+            <p className="text-gray-500 max-w-2xl mx-auto">Escolha o plano ideal para o seu projecto com hardware NVMe de última geração.</p>
+          </div>
+          <div className={`grid gap-6 ${dbPlans.length <= 3 ? 'grid-cols-1 md:grid-cols-' + dbPlans.length : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} max-w-6xl mx-auto`}>
+            {dbPlans.map((plan, i) => {
+              const Icon    = PLAN_ICONS[i % PLAN_ICONS.length]
+              const accent  = PLAN_ACCENTS[i % PLAN_ACCENTS.length]
+              const price   = billing === 'annual' && plan.price_annual ? plan.price_annual : plan.price_monthly
+              const features = plan.features ?? []
+              return (
+                <div key={plan.id} className="relative rounded-3xl p-7 flex flex-col"
+                  style={{ background: plan.featured ? '#0A0A0A' : '#FFFFFF', border: plan.featured ? `2px solid ${accent}` : '1px solid #E8E8E8', boxShadow: plan.featured ? `0 20px 60px ${accent}25` : '0 4px 20px rgba(0,0,0,0.06)' }}>
+                  {plan.badge && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="text-xs font-black px-3 py-1 rounded-full" style={{ background: accent, color: plan.featured ? '#000' : '#fff' }}>{plan.badge}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${accent}20` }}>
+                      <Icon size={18} style={{ color: accent }} />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-base" style={{ color: plan.featured ? '#fff' : '#0A0A0A' }}>{plan.name}</h3>
+                      {plan.description && <p className="text-xs" style={{ color: plan.featured ? 'rgba(255,255,255,0.5)' : '#94A3B8' }}>{plan.description}</p>}
+                    </div>
+                  </div>
+                  <div className="mb-5">
+                    <span className="text-3xl font-black" style={{ color: accent }}>Kz {price?.toLocaleString() ?? '—'}</span>
+                    <span className="text-sm ml-1" style={{ color: plan.featured ? 'rgba(255,255,255,0.4)' : '#94A3B8' }}>/mês</span>
+                  </div>
+                  <ul className="space-y-2 flex-1 mb-6">
+                    {features.map((f, fi) => (
+                      <li key={fi} className="flex items-center gap-2 text-sm" style={{ color: plan.featured ? 'rgba(255,255,255,0.8)' : '#374151' }}>
+                        <Check size={14} style={{ color: accent, flexShrink: 0 }} /> {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/register" className="block text-center py-3 rounded-2xl font-bold text-sm transition-all"
+                    style={plan.featured ? { background: accent, color: '#000', boxShadow: `0 8px 25px ${accent}40` } : { background: '#F3F4F6', color: '#0A0A0A' }}>
+                    Começar agora
+                  </Link>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+    )
   }
 
   return (
