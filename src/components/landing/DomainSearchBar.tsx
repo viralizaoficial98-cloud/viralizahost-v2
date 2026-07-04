@@ -1,15 +1,20 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Search, Shield, Zap, Headphones, Lock, Globe, RefreshCw, Server } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
-const extensions = [
-  { tld: '.com', label: 'O mais popular', price: 'Kz 4.500/ano', popular: true },
-  { tld: '.net', label: 'Tecnologia & redes', price: 'Kz 5.200/ano' },
-  { tld: '.org', label: 'Organizações', price: 'Kz 4.800/ano' },
-  { tld: '.ao', label: 'Angola oficial', price: 'Kz 8.000/ano' },
-  { tld: '.com.br', label: 'Brasil', price: 'R$ 49/ano' },
-  { tld: '.io', label: 'Startups & tech', price: 'Kz 18.000/ano' },
+type ExtItem = { tld: string; label: string; price: string; popular: boolean }
+
+const defaultExtensions: ExtItem[] = [
+  { tld: '.com',    label: 'O mais popular',     price: 'Kz 4.500/ano',  popular: true  },
+  { tld: '.net',    label: 'Tecnologia & redes', price: 'Kz 5.200/ano',  popular: false },
+  { tld: '.org',    label: 'Organizações',       price: 'Kz 4.800/ano',  popular: false },
+  { tld: '.ao',     label: 'Angola oficial',     price: 'Kz 8.000/ano',  popular: true  },
+  { tld: '.com.br', label: 'Brasil',             price: 'R$ 49/ano',     popular: false },
+  { tld: '.io',     label: 'Startups & tech',    price: 'Kz 18.000/ano', popular: false },
 ]
+
+const currencySymbol: Record<string, string> = { AOA: 'Kz', USD: '$', BRL: 'R$', EUR: '€' }
 
 const benefits = [
   { icon: Lock, title: 'Protecção de Privacidade', desc: 'WHOIS protegido e dados ocultos' },
@@ -27,6 +32,22 @@ const trustItems = [
 
 export function DomainSearchBar() {
   const [query, setQuery] = useState('')
+  const [extensions, setExtensions] = useState<ExtItem[]>(defaultExtensions)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('site_domains').select('*').eq('active', true).order('position')
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setExtensions(data.map((d: any) => ({
+            tld: d.extension,
+            label: d.popular ? 'Angola oficial' : d.extension,
+            price: `${currencySymbol[d.currency] ?? d.currency} ${(d.price_annual ?? d.price_monthly ?? 0).toLocaleString('pt-AO')}/ano`,
+            popular: d.popular ?? false,
+          })))
+        }
+      })
+  }, [])
 
   const handleSearch = () => {
     if (query.trim()) alert(`A pesquisar: ${query}`)
