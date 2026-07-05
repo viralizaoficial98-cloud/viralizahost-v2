@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Shield, Zap, Headphones, Lock, Globe, RefreshCw, Check, X, Loader2 } from 'lucide-react'
+import { Search, Shield, Zap, Headphones, Lock, Globe, RefreshCw, Check, X, Loader2, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type ExtItem = { tld: string; label: string; price: string; priceNum: number; currency: string; popular: boolean }
@@ -51,6 +51,7 @@ export function DomainSearchBar() {
   const [extensions, setExtensions] = useState<ExtItem[]>(defaultExtensions)
   const [results, setResults] = useState<CheckResult[]>([])
   const [searching, setSearching] = useState(false)
+  const [revealed, setRevealed] = useState<boolean[]>([])
   const abortRef = useRef<AbortController | null>(null)
   const router = useRouter()
 
@@ -107,7 +108,7 @@ export function DomainSearchBar() {
       tlds = SUGGEST_TLDS
     }
 
-    // Seed loading state
+    // Seed skeleton state — all loading
     const initial: CheckResult[] = tlds.map(tld => ({
       tld,
       domain: `${baseName}${tld}`,
@@ -115,7 +116,15 @@ export function DomainSearchBar() {
       loading: true,
     }))
     setResults(initial)
+    setRevealed(tlds.map(() => false))
     setSearching(false)
+
+    // Stagger reveal: each row slides in 120ms apart after a 200ms initial delay
+    tlds.forEach((_, idx) => {
+      setTimeout(() => {
+        setRevealed(prev => { const next = [...prev]; next[idx] = true; return next })
+      }, 200 + idx * 120)
+    })
 
     // Fire checks in parallel
     await Promise.allSettled(tlds.map(async (tld, idx) => {
@@ -127,7 +136,6 @@ export function DomainSearchBar() {
         const json = await res.json()
         setResults(prev => prev.map((r, i) => i === idx ? { ...r, available: json.available, loading: false } : r))
       } catch {
-        // aborted or network error
         setResults(prev => prev.map((r, i) => i === idx ? { ...r, available: true, loading: false } : r))
       }
     }))
@@ -171,6 +179,29 @@ export function DomainSearchBar() {
 
       {/* Domain Section */}
       <section className="bg-white pt-0 pb-20">
+        <style>{`
+          @keyframes domain-slide-up {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes check-pop {
+            0%   { transform: scale(0); opacity: 0; }
+            70%  { transform: scale(1.25); }
+            100% { transform: scale(1); opacity: 1; }
+          }
+          @keyframes skeleton-shimmer {
+            0%   { background-position: -400px 0; }
+            100% { background-position: 400px 0; }
+          }
+          .domain-row-enter { animation: domain-slide-up 0.28s cubic-bezier(0.22,1,0.36,1) both; }
+          .check-pop { animation: check-pop 0.35s cubic-bezier(0.34,1.56,0.64,1) both; }
+          .skeleton-bar {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 800px 100%;
+            animation: skeleton-shimmer 1.4s ease-in-out infinite;
+            border-radius: 6px;
+          }
+        `}</style>
         <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
 
           {/* Heading */}
@@ -191,16 +222,22 @@ export function DomainSearchBar() {
           {/* Search bar */}
           <div className="max-w-3xl mx-auto mb-5">
             <div
-              className="flex items-center bg-white rounded-[20px] border border-[#E8E8E8] overflow-hidden transition-all duration-200"
-              style={{ height: 72, boxShadow: '0 8px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(245,183,0,0.08)' }}
+              className="flex items-center bg-white rounded-[20px] border transition-all duration-300"
+              style={{
+                height: 72,
+                borderColor: results.length > 0 ? '#F5B700' : '#E8E8E8',
+                boxShadow: results.length > 0
+                  ? '0 8px 40px rgba(245,183,0,0.18), 0 2px 8px rgba(245,183,0,0.10)'
+                  : '0 8px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(245,183,0,0.08)',
+              }}
             >
               <div className="flex items-center pl-5 pr-3 shrink-0">
-                <Search size={22} className="text-[#BBB]" />
+                <Search size={22} className={`transition-colors duration-200 ${searching ? 'text-[#F5B700]' : 'text-[#BBB]'}`} />
               </div>
               <input
                 type="text"
                 value={query}
-                onChange={e => { setQuery(e.target.value); setResults([]) }}
+                onChange={e => { setQuery(e.target.value); setResults([]); setRevealed([]) }}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 placeholder="Digite o nome do domínio desejado"
                 className="flex-1 text-[#0A0A0A] text-base md:text-lg outline-none bg-transparent placeholder:text-[#C0C0C0] pr-3"
@@ -209,54 +246,105 @@ export function DomainSearchBar() {
                 <button
                   onClick={handleSearch}
                   disabled={searching}
-                  className="h-[54px] px-7 rounded-[14px] font-bold text-sm md:text-base text-[#0A0A0A] transition-all duration-200 flex items-center gap-2 shrink-0 disabled:opacity-70"
-                  style={{ background: '#F5B700', boxShadow: '0 4px 20px rgba(245,183,0,0.35)' }}
-                  onMouseEnter={e => { const el = e.currentTarget; el.style.background = '#0A0A0A'; el.style.color = '#F5B700' }}
-                  onMouseLeave={e => { const el = e.currentTarget; el.style.background = '#F5B700'; el.style.color = '#0A0A0A' }}
+                  className="h-[54px] px-7 rounded-[14px] font-bold text-sm md:text-base transition-all duration-200 flex items-center gap-2 shrink-0"
+                  style={{
+                    background: searching ? '#0A0A0A' : '#F5B700',
+                    color: searching ? '#F5B700' : '#0A0A0A',
+                    boxShadow: '0 4px 20px rgba(245,183,0,0.35)',
+                    minWidth: 180,
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={e => { if (!searching) { e.currentTarget.style.background = '#0A0A0A'; e.currentTarget.style.color = '#F5B700' } }}
+                  onMouseLeave={e => { if (!searching) { e.currentTarget.style.background = '#F5B700'; e.currentTarget.style.color = '#0A0A0A' } }}
                 >
-                  {searching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-                  Pesquisar Domínio
+                  {searching
+                    ? <><Loader2 size={16} className="animate-spin" /> A pesquisar...</>
+                    : <><Search size={16} /> Pesquisar Domínio</>
+                  }
                 </button>
               </div>
             </div>
 
-            {/* Search results */}
+            {/* Results panel */}
             {results.length > 0 && (
-              <div className="mt-3 bg-white border border-[#E8E8E8] rounded-2xl overflow-hidden shadow-lg">
+              <div
+                className="mt-2 bg-white rounded-2xl overflow-hidden"
+                style={{ border: '1.5px solid #F5B700', boxShadow: '0 12px 48px rgba(245,183,0,0.12), 0 2px 12px rgba(0,0,0,0.06)' }}
+              >
                 {results.map((r, idx) => {
                   const ext = getExtByTld(r.tld)
+                  const isVisible = revealed[idx]
+                  const isLoading = r.loading
+                  const isAvailable = !isLoading && r.available === true
+                  const isOccupied = !isLoading && r.available === false
+
                   return (
-                    <div key={r.tld} className={`flex items-center justify-between px-5 py-4 ${idx < results.length - 1 ? 'border-b border-[#F0F0F0]' : ''}`}>
-                      <div className="flex items-center gap-3">
-                        <span className="font-black text-[#0A0A0A] text-sm md:text-base">{r.domain}</span>
-                        <span className="text-[#999] text-xs">{ext.price}</span>
+                    <div
+                      key={r.tld}
+                      className={`domain-row-enter flex items-center justify-between px-5 py-4 transition-colors duration-150 ${
+                        isAvailable ? 'hover:bg-[#FFFDF0]' : isOccupied ? 'hover:bg-[#FFF5F5]' : 'hover:bg-[#FAFAFA]'
+                      } ${idx < results.length - 1 ? 'border-b border-[#F5F5F5]' : ''}`}
+                      style={{ animationDelay: `${idx * 0.12}s`, opacity: isVisible ? undefined : 0 }}
+                    >
+                      {/* Left: domain + price */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          isLoading ? 'bg-[#DDD]' : isAvailable ? 'bg-green-400' : 'bg-red-400'
+                        }`} />
+                        <span className="font-black text-[#0A0A0A] text-sm md:text-base truncate">{r.domain}</span>
+                        {isLoading
+                          ? <span className="skeleton-bar h-4 w-20 inline-block" />
+                          : <span className="text-[#AAA] text-xs font-medium hidden sm:inline">{ext.price}</span>
+                        }
                       </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        {r.loading ? (
-                          <span className="flex items-center gap-1.5 text-[#AAA] text-xs">
-                            <Loader2 size={13} className="animate-spin" /> A verificar...
+
+                      {/* Right: status + CTA */}
+                      <div className="flex items-center gap-3 shrink-0 ml-3">
+                        {isLoading && (
+                          <span className="flex items-center gap-1.5 text-[#BBB] text-xs">
+                            <Loader2 size={12} className="animate-spin" />
+                            <span className="hidden sm:inline">A verificar...</span>
                           </span>
-                        ) : r.available ? (
+                        )}
+
+                        {isAvailable && (
                           <>
-                            <span className="flex items-center gap-1 text-green-600 text-xs font-bold">
-                              <Check size={13} /> Disponível
+                            <span className="flex items-center gap-1.5 text-green-600 text-xs font-bold">
+                              <span className="check-pop inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-100">
+                                <Check size={10} className="text-green-600" />
+                              </span>
+                              <span className="hidden sm:inline">Disponível</span>
                             </span>
                             <button
                               onClick={() => goToCheckout(r.domain, r.tld)}
-                              className="px-4 py-1.5 rounded-xl bg-[#F5B700] text-[#0A0A0A] text-xs font-black hover:bg-[#D9A300] transition-colors"
+                              className="group flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all duration-200 hover:gap-2.5 hover:scale-105"
+                              style={{ background: '#F5B700', color: '#0A0A0A', boxShadow: '0 2px 12px rgba(245,183,0,0.35)' }}
+                              onMouseEnter={e => { e.currentTarget.style.background = '#0A0A0A'; e.currentTarget.style.color = '#F5B700' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = '#F5B700'; e.currentTarget.style.color = '#0A0A0A' }}
                             >
-                              Registar agora
+                              Registar agora <ArrowRight size={11} />
                             </button>
                           </>
-                        ) : (
-                          <span className="flex items-center gap-1 text-red-500 text-xs font-bold">
-                            <X size={13} /> Ocupado
+                        )}
+
+                        {isOccupied && (
+                          <span className="flex items-center gap-1.5 text-red-500 text-xs font-bold">
+                            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-100">
+                              <X size={10} className="text-red-500" />
+                            </span>
+                            Ocupado
                           </span>
                         )}
                       </div>
                     </div>
                   )
                 })}
+
+                {/* Footer hint */}
+                <div className="px-5 py-3 bg-[#FAFAFA] border-t border-[#F0F0F0] flex items-center gap-2">
+                  <Shield size={11} className="text-[#F5B700]" />
+                  <span className="text-[#AAA] text-[11px]">Resultados em tempo real · Activação em minutos · SSL incluído</span>
+                </div>
               </div>
             )}
           </div>
