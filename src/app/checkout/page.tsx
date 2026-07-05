@@ -28,9 +28,11 @@ const PLAN_CATALOG: Record<string, CheckoutItem> = {
   business:  { id: 'business',  name: 'Business Cloud', type: 'hosting',  price: 9500,  currency: 'AOA', quantity: 1 },
   pro:       { id: 'pro',       name: 'Cloud Pro',      type: 'hosting',  price: 19500, currency: 'AOA', quantity: 1 },
   reseller:  { id: 'reseller',  name: 'Revenda WHM',    type: 'reseller', price: 35000, currency: 'AOA', quantity: 1 },
-  'starter-mail':   { id: 'starter-mail',   name: 'Starter Mail',   type: 'email', price: 25000, currency: 'AOA', quantity: 1 },
-  'business-mail':  { id: 'business-mail',  name: 'Business Mail',  type: 'email', price: 45000, currency: 'AOA', quantity: 1 },
-  'enterprise-mail':{ id: 'enterprise-mail',name: 'Enterprise Mail',type: 'email', price: 95000, currency: 'AOA', quantity: 1 },
+  'starter-mail':    { id: 'starter-mail',    name: 'Webmail Start',          type: 'email', price: 25000, currency: 'AOA', quantity: 1 },
+  'business-mail':   { id: 'business-mail',   name: 'Webmail Business',       type: 'email', price: 45000, currency: 'AOA', quantity: 1 },
+  'enterprise-mail': { id: 'enterprise-mail', name: 'Webmail Enterprise',     type: 'email', price: 95000, currency: 'AOA', quantity: 1 },
+  'corporate-pro':   { id: 'corporate-pro',   name: 'Corporate Pro',          type: 'email', price: 150000, currency: 'AOA', quantity: 1 },
+  'microsoft365':    { id: 'microsoft365',    name: 'Microsoft 365 Outlook',  type: 'email', price: 65000, currency: 'AOA', quantity: 1 },
 }
 
 // ─── helpers ───────────────────────────────────────────────────────────────
@@ -130,8 +132,11 @@ function OrderSummary({ items, cycle }: { items: CheckoutItem[]; cycle: BillingC
 // ─── Step 1: Billing cycle ──────────────────────────────────────────────────
 
 function Step1Cycle({ onNext }: { onNext: () => void }) {
-  const { billingCycle, setBillingCycle } = useCheckoutStore()
-  const cycles: BillingCycle[] = ['monthly', '6months', '1year', '2years', '3years']
+  const { billingCycle, setBillingCycle, items } = useCheckoutStore()
+  const isDomainOnly = items.length > 0 && items.every(i => i.type === 'domain')
+  const cycles: BillingCycle[] = isDomainOnly
+    ? ['1year', '2years', '3years']
+    : ['monthly', '6months', '1year', '2years', '3years']
 
   return (
     <div>
