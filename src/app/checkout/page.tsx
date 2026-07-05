@@ -695,17 +695,21 @@ function CheckoutContent() {
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
 
-  // Pre-populate cart from URL param on first load
+  // Always load plan from URL — clears stale persisted state
   useEffect(() => {
     const planId = searchParams.get('plan')
-    if (planId && items.length === 0) {
+    if (planId) {
       const plan = PLAN_CATALOG[planId]
+      clear()
       if (plan) setItems([{ ...plan, quantity: 1 }])
       else setItems([{ id: planId, name: planId, type: 'other', price: 0, currency: 'AOA', quantity: 1 }])
+    } else {
+      // /checkout with no plan param — start fresh
+      clear()
     }
     setStep(1)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [searchParams.get('plan')])
 
   async function handleSubmit() {
     const state = useCheckoutStore.getState()
