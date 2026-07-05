@@ -558,7 +558,7 @@ function Step4Ident({ onNext, onBack }: { onNext: () => void; onBack: () => void
 
 // ─── Step 5: Payment ────────────────────────────────────────────────────────
 
-function Step5Payment({ onSubmit, onBack, submitting }: { onSubmit: () => void; onBack: () => void; submitting: boolean }) {
+function Step5Payment({ onSubmit, onBack, submitting, error }: { onSubmit: () => void; onBack: () => void; submitting: boolean; error?: string }) {
   const { paymentMethod, setPaymentMethod, transferRef, setTransferRef, setProofFileUrl } = useCheckoutStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState('')
@@ -672,6 +672,13 @@ function Step5Payment({ onSubmit, onBack, submitting }: { onSubmit: () => void; 
         </div>
       )}
 
+      {error && (
+        <div className="flex items-start gap-2 text-red-600 text-sm bg-red-50 border border-red-200 px-4 py-3 rounded-xl mb-4">
+          <AlertCircle size={15} className="shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
+
       <div className="flex gap-3">
         <button onClick={onBack} disabled={submitting} className="flex-1 py-4 border-2 border-[#E8E8E8] text-[#666] font-bold rounded-xl flex items-center justify-center gap-2 hover:border-[#CCC] transition-colors disabled:opacity-40">
           <ChevronLeft size={18} /> Voltar
@@ -780,6 +787,7 @@ function CheckoutContent() {
   const [orderId, setOrderId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const isDomainCheckout = items.length > 0 && items.every(i => i.type === 'domain')
 
@@ -810,27 +818,32 @@ function CheckoutContent() {
   async function handleSubmit() {
     const state = useCheckoutStore.getState()
     setSubmitting(true)
+    setSubmitError('')
     try {
       const res = await fetch('/api/checkout/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items:          state.items,
-          billingCycle:   state.billingCycle,
-          domainName:     state.domainName,
-          domainAction:   state.domainAction,
-          paymentMethod:  state.paymentMethod,
-          proofFileUrl:   state.proofFileUrl,
-          transferRef:    state.transferRef,
-          userData:       state.userData,
-          amount:         state.getTotal(),
+          items:         state.items,
+          billingCycle:  state.billingCycle,
+          domainName:    state.domainName,
+          domainAction:  state.domainAction,
+          paymentMethod: state.paymentMethod,
+          proofFileUrl:  state.proofFileUrl,
+          transferRef:   state.transferRef,
+          userData:      state.userData,
+          amount:        state.getTotal(),
         }),
       })
       const data = await res.json()
+      if (!res.ok || data.error) {
+        setSubmitError(data.error ?? 'Erro ao processar pedido. Tente novamente.')
+        return
+      }
       if (data.id) setOrderId(data.id)
       setDone(true)
-    } catch {
-      alert('Erro ao processar pedido. Tente novamente.')
+    } catch (err: any) {
+      setSubmitError(err?.message ?? 'Erro de rede. Verifique a sua ligação e tente novamente.')
     } finally {
       setSubmitting(false)
     }
@@ -851,7 +864,7 @@ function CheckoutContent() {
               {step === 2 && <Step2Cart onNext={() => setStep(isDomainCheckout ? 4 : 3)} onBack={() => setStep(1)} />}
               {step === 3 && <Step3Domain onNext={() => setStep(4)} onBack={() => setStep(2)} />}
               {step === 4 && <Step4Ident onNext={() => setStep(5)} onBack={() => setStep(isDomainCheckout ? 2 : 3)} />}
-              {step === 5 && <Step5Payment onSubmit={handleSubmit} onBack={() => setStep(4)} submitting={submitting} />}
+              {step === 5 && <Step5Payment onSubmit={handleSubmit} onBack={() => setStep(4)} submitting={submitting} error={submitError} />}
             </>
           )}
         </div>
