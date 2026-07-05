@@ -76,12 +76,18 @@ export async function POST(req: NextRequest) {
     const status    = paymentMethod === 'bic_transfer' ? 'aguardando_confirmacao' : 'pending'
 
     // ── 4. Build items payload ─────────────────────────────────────────────
-    const rpcItems = (items ?? []).map((item: any) => ({
-      service_name: item.name,
-      service_type: item.type,
-      price:        Math.round(item.price),
-      quantity:     item.quantity ?? 1,
-    }))
+    // Map checkout plan IDs to DB plan slugs (plans table uses different slugs)
+    const PLAN_SLUG_MAP: Record<string, string> = { pro: 'premium' }
+    const rpcItems = (items ?? []).map((item: any) => {
+      const slug = item.id as string
+      return {
+        service_name: item.name,
+        service_type: item.type,
+        price:        Math.round(item.price),
+        quantity:     item.quantity ?? 1,
+        plan_slug:    PLAN_SLUG_MAP[slug] ?? slug,
+      }
+    })
 
     console.log('[checkout/orders] CALLING RPC create_order — userId:', userId, 'items:', rpcItems.length)
 

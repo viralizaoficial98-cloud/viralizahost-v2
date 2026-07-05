@@ -24,7 +24,7 @@ CREATE OR REPLACE FUNCTION public.create_order(
   p_proof_file     text,
   p_transfer_ref   text,
   p_status         text,
-  p_items          jsonb   -- [{service_name, service_type, price, quantity}]
+  p_items          jsonb   -- [{service_name, service_type, price, quantity, plan_slug}]
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -34,6 +34,7 @@ AS $$
 DECLARE
   v_order_id uuid;
   v_item     jsonb;
+  v_plan_id  uuid;
 BEGIN
   -- 1. Insert order
   INSERT INTO orders (
@@ -52,7 +53,7 @@ BEGIN
   )
   RETURNING id INTO v_order_id;
 
-  -- 2. Insert order_items + one pending service row per item
+  -- 2. Insert order_items + one pending service row per item (only when plan exists)
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
     INSERT INTO order_items (order_id, service_name, service_type, price, quantity)
     VALUES (
@@ -63,14 +64,21 @@ BEGIN
       (v_item->>'quantity')::int
     );
 
-    INSERT INTO services (profile_id, service_type, service_name, status, order_id)
-    VALUES (
-      p_user_id,
-      v_item->>'service_type',
-      v_item->>'service_name',
-      'pending',
-      v_order_id
-    );
+    -- Look up plan by slug (domain/email items without a matching plan are skipped)
+    v_plan_id := NULL;
+    SELECT id INTO v_plan_id FROM plans WHERE slug = v_item->>'plan_slug' LIMIT 1;
+
+    IF v_plan_id IS NOT NULL THEN
+      INSERT INTO services (profile_id, plan_id, service_type, service_name, status, order_id)
+      VALUES (
+        p_user_id,
+        v_plan_id,
+        v_item->>'service_type',
+        v_item->>'service_name',
+        'pending',
+        v_order_id
+      );
+    END IF;
   END LOOP;
 
   -- 3. Create pending domain row
