@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Users, CreditCard, MessageSquare, Settings, Server, Globe, Activity, LogOut, ChevronRight, Monitor } from 'lucide-react'
+import { LayoutDashboard, Users, CreditCard, MessageSquare, Settings, Server, Globe, Activity, LogOut, ChevronRight, Monitor, ShoppingBag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const adminNav = [
@@ -13,6 +13,7 @@ const adminNav = [
   { href: '/admin/servers',      icon: Server,          label: 'Servidores',      exact: false },
   { href: '/admin/domains',      icon: Globe,           label: 'Domínios',        exact: false },
   { href: '/admin/activity',     icon: Activity,        label: 'Atividade',       exact: false },
+  { href: '/admin/orders',        icon: ShoppingBag,     label: 'Pedidos',         exact: false },
   { href: '/admin/site',         icon: Monitor,         label: 'Gestão do Site',  exact: false },
   { href: '/admin/settings',     icon: Settings,        label: 'Configurações',   exact: false },
 ]

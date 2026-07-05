@@ -428,14 +428,17 @@ function Step3Domain({ onNext, onBack }: { onNext: () => void; onBack: () => voi
 
 function Step4Ident({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   const { userData, setUserData } = useCheckoutStore()
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null)
+  const [authState, setAuthState] = useState<'loading' | 'logged-in' | 'login-form' | 'register-form'>('loading')
   const [profile, setProfile] = useState<{ full_name: string; email: string; phone: string | null } | null>(null)
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [loggingIn, setLoggingIn] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        setLoggedIn(true)
         supabase.from('profiles').select('full_name,email,phone').eq('id', user.id).single()
           .then(({ data }) => {
             if (data) {
@@ -443,54 +446,107 @@ function Step4Ident({ onNext, onBack }: { onNext: () => void; onBack: () => void
               setUserData({ name: (data as any).full_name, email: (data as any).email, phone: (data as any).phone ?? '' })
             }
           })
+        setAuthState('logged-in')
       } else {
-        setLoggedIn(false)
+        setAuthState('login-form')
       }
     })
   }, [])
 
-  function isValid() {
-    if (loggedIn) return true
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    setLoginError(''); setLoggingIn(true)
+    const supabase = createClient()
+    const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword })
+    if (error) { setLoginError('E-mail ou senha incorretos.'); setLoggingIn(false); return }
+    const user = data.user
+    if (user) {
+      const { data: prof } = await supabase.from('profiles').select('full_name,email,phone').eq('id', user.id).single()
+      if (prof) {
+        setProfile(prof as any)
+        setUserData({ name: (prof as any).full_name, email: (prof as any).email, phone: (prof as any).phone ?? '' })
+      }
+    }
+    setAuthState('logged-in')
+    setLoggingIn(false)
+  }
+
+  function isRegisterValid() {
     return userData.name.trim().length > 1 && /\S+@\S+\.\S+/.test(userData.email) && userData.phone.trim().length > 5 && userData.password.length >= 6
   }
 
   const inputCls = 'w-full border border-[#E8E8E8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#F5B700] transition-colors'
+  const canProceed = authState === 'logged-in' || (authState === 'register-form' && isRegisterValid())
 
   return (
     <div>
       <h2 className="text-2xl font-black text-[#0A0A0A] mb-2">Identificação</h2>
-      <p className="text-[#888] text-sm mb-6">Os seus dados para activar o serviço.</p>
+      <p className="text-[#888] text-sm mb-6">Inicie sessão ou crie uma conta para continuar.</p>
 
-      {loggedIn === null && (
+      {authState === 'loading' && (
         <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-[#F5B700]" /></div>
       )}
 
-      {loggedIn === true && profile && (
+      {/* Logged in */}
+      {authState === 'logged-in' && profile && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
           <div className="flex items-center gap-2 text-green-700 font-bold mb-1"><Check size={16} /> Sessão iniciada</div>
           <p className="text-sm text-green-800">{profile.full_name} · {profile.email}</p>
+          <button onClick={() => { setAuthState('login-form'); setProfile(null) }}
+            className="text-xs text-[#888] hover:text-[#555] mt-2 underline">
+            Usar outra conta
+          </button>
         </div>
       )}
 
-      {loggedIn === false && (
-        <div className="space-y-3 mb-6">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800 mb-4">
-            Não tem conta? Preencha abaixo para criar automaticamente.
+      {/* Login form */}
+      {authState === 'login-form' && (
+        <form onSubmit={handleLogin} className="space-y-3 mb-4">
+          <input type="email" placeholder="E-mail" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required className={inputCls} />
+          <input type="password" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required className={inputCls} />
+          {loginError && (
+            <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">
+              <AlertCircle size={14} />{loginError}
+            </div>
+          )}
+          <button type="submit" disabled={loggingIn}
+            className="w-full py-3 bg-[#0A0A0A] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-[#222] transition-colors disabled:opacity-50">
+            {loggingIn ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />}
+            Entrar
+          </button>
+          <div className="text-center pt-1">
+            <button type="button" onClick={() => setAuthState('register-form')}
+              className="text-sm text-[#F5B700] font-bold hover:underline">
+              Não tenho conta — Criar agora
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Register form */}
+      {authState === 'register-form' && (
+        <div className="space-y-3 mb-4">
+          <div className="bg-[#FFF8E1] border border-[#F5B700]/30 rounded-xl p-3 text-sm text-[#888]">
+            Preencha os dados abaixo. A sua conta será criada ao finalizar a encomenda.
           </div>
           <input type="text" placeholder="Nome completo" value={userData.name} onChange={e => setUserData({ name: e.target.value })} className={inputCls} />
           <input type="email" placeholder="E-mail" value={userData.email} onChange={e => setUserData({ email: e.target.value })} className={inputCls} />
           <input type="tel" placeholder="Telefone" value={userData.phone} onChange={e => setUserData({ phone: e.target.value })} className={inputCls} />
           <input type="password" placeholder="Senha (mín. 6 caracteres)" value={userData.password} onChange={e => setUserData({ password: e.target.value })} className={inputCls} />
+          <button type="button" onClick={() => setAuthState('login-form')}
+            className="text-sm text-[#888] hover:text-[#555] underline">
+            ← Já tenho conta
+          </button>
         </div>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 mt-2">
         <button onClick={onBack} className="flex-1 py-4 border-2 border-[#E8E8E8] text-[#666] font-bold rounded-xl flex items-center justify-center gap-2 hover:border-[#CCC] transition-colors">
           <ChevronLeft size={18} /> Voltar
         </button>
         <button
           onClick={onNext}
-          disabled={!isValid()}
+          disabled={!canProceed}
           className="flex-[2] py-4 bg-[#F5B700] text-[#0A0A0A] font-black rounded-xl flex items-center justify-center gap-2 hover:bg-[#D9A300] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Continuar <ChevronRight size={18} />
@@ -526,10 +582,10 @@ function Step5Payment({ onSubmit, onBack, submitting }: { onSubmit: () => void; 
   }
 
   const methods = [
-    { id: 'pix',          icon: Smartphone,   label: 'PIX',                    desc: 'Pagamento instantâneo (Brasil)' },
-    { id: 'card',         icon: CreditCard,   label: 'Cartão de Crédito',      desc: 'Visa, Mastercard, Amex' },
-    { id: 'paypal',       icon: Globe,        label: 'PayPal',                 desc: 'Pagamento internacional' },
-    { id: 'bic_transfer', icon: Building2,    label: 'Transferência BIC',      desc: 'Banco BIC Angola' },
+    { id: 'pix',          icon: Smartphone, label: 'PIX',               desc: 'Pagamento instantâneo',   color: '#00B14F', bg: '#E6F9EE' },
+    { id: 'card',         icon: CreditCard, label: 'Cartão',            desc: 'Visa, Mastercard, Amex',  color: '#2563EB', bg: '#EFF6FF' },
+    { id: 'paypal',       icon: Globe,      label: 'PayPal',            desc: 'Pagamento internacional', color: '#003087', bg: '#EEF2FF' },
+    { id: 'bic_transfer', icon: Building2,  label: 'Banco BIC',         desc: 'Transferência bancária',  color: '#E85D04', bg: '#FFF0E6' },
   ] as const
 
   return (
@@ -549,7 +605,9 @@ function Step5Payment({ onSubmit, onBack, submitting }: { onSubmit: () => void; 
                 active ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#E8E8E8] bg-white hover:border-[#F5B700]/40'
               }`}
             >
-              <Icon size={20} className={`mb-2 ${active ? 'text-[#F5B700]' : 'text-[#888]'}`} />
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ background: m.bg }}>
+                <Icon size={18} style={{ color: m.color }} />
+              </div>
               <p className="text-sm font-bold text-[#0A0A0A]">{m.label}</p>
               <p className="text-xs text-[#888] mt-0.5">{m.desc}</p>
             </button>
@@ -637,6 +695,12 @@ function StepConfirmation({ orderId }: { orderId: string }) {
   const router = useRouter()
   const isPending = paymentMethod === 'bic_transfer'
 
+  useEffect(() => {
+    const t = setTimeout(() => { clear(); router.push('/dashboard') }, 4000)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function finish() {
     clear()
     router.push('/dashboard')
@@ -694,11 +758,12 @@ function StepConfirmation({ orderId }: { orderId: string }) {
         </div>
       )}
 
+      <p className="text-xs text-[#AAA] mb-4">A redirecionar para o seu perfil em 4 segundos...</p>
       <button
         onClick={finish}
         className="w-full py-4 bg-[#0A0A0A] text-white font-black rounded-xl hover:bg-[#222] transition-colors"
       >
-        Ir para o Dashboard
+        Ir para o Dashboard agora
       </button>
     </div>
   )
@@ -716,16 +781,24 @@ function CheckoutContent() {
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
 
+  const isDomainCheckout = items.length > 0 && items.every(i => i.type === 'domain')
+
   // Always load plan from URL — clears stale persisted state
   useEffect(() => {
     const planId = searchParams.get('plan')
-    const domainParam = searchParams.get('domain') // custom domain name e.g. "meusite.com"
+    const domainParam = searchParams.get('domain')
     clear()
     if (planId) {
       const plan = PLAN_CATALOG[planId]
       if (plan) {
         const name = domainParam ? `Domínio ${domainParam}` : plan.name
+        const isDomain = plan.type === 'domain'
         setItems([{ ...plan, name, quantity: 1 }])
+        if (isDomain && domainParam) {
+          // Pre-fill domain info so Step 3 is skipped
+          useCheckoutStore.getState().setDomainName(domainParam)
+          useCheckoutStore.getState().setDomainAction('register')
+        }
       } else {
         setItems([{ id: planId, name: planId, type: 'other', price: 0, currency: 'AOA', quantity: 1 }])
       }
@@ -775,9 +848,9 @@ function CheckoutContent() {
           ) : (
             <>
               {step === 1 && <Step1Cycle onNext={() => setStep(2)} />}
-              {step === 2 && <Step2Cart onNext={() => setStep(3)} onBack={() => setStep(1)} />}
+              {step === 2 && <Step2Cart onNext={() => setStep(isDomainCheckout ? 4 : 3)} onBack={() => setStep(1)} />}
               {step === 3 && <Step3Domain onNext={() => setStep(4)} onBack={() => setStep(2)} />}
-              {step === 4 && <Step4Ident onNext={() => setStep(5)} onBack={() => setStep(3)} />}
+              {step === 4 && <Step4Ident onNext={() => setStep(5)} onBack={() => setStep(isDomainCheckout ? 2 : 3)} />}
               {step === 5 && <Step5Payment onSubmit={handleSubmit} onBack={() => setStep(4)} submitting={submitting} />}
             </>
           )}
