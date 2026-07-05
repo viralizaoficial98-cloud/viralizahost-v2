@@ -40,6 +40,15 @@ const PLAN_CATALOG: Record<string, CheckoutItem> = {
   'microsoft365':       { id: 'microsoft365',       name: 'Microsoft 365 Outlook',type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
   // individual email pages
   'microsoft-365-outlook': { id: 'microsoft-365-outlook', name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
+  // Domain TLDs — price = annual base price
+  'domain.com':    { id: 'domain.com',    name: 'Domínio .com',    type: 'domain', price: 4500,  currency: 'AOA', quantity: 1 },
+  'domain.net':    { id: 'domain.net',    name: 'Domínio .net',    type: 'domain', price: 5200,  currency: 'AOA', quantity: 1 },
+  'domain.org':    { id: 'domain.org',    name: 'Domínio .org',    type: 'domain', price: 4800,  currency: 'AOA', quantity: 1 },
+  'domain.ao':     { id: 'domain.ao',     name: 'Domínio .ao',     type: 'domain', price: 8000,  currency: 'AOA', quantity: 1 },
+  'domain.com.br': { id: 'domain.com.br', name: 'Domínio .com.br', type: 'domain', price: 4900,  currency: 'AOA', quantity: 1 },
+  'domain.io':     { id: 'domain.io',     name: 'Domínio .io',     type: 'domain', price: 18000, currency: 'AOA', quantity: 1 },
+  // domain-search fallback
+  'domain-search': { id: 'domain-search', name: 'Domínio',         type: 'domain', price: 4500,  currency: 'AOA', quantity: 1 },
 }
 
 // ─── helpers ───────────────────────────────────────────────────────────────
@@ -698,18 +707,20 @@ function CheckoutContent() {
   // Always load plan from URL — clears stale persisted state
   useEffect(() => {
     const planId = searchParams.get('plan')
+    const domainParam = searchParams.get('domain') // custom domain name e.g. "meusite.com"
+    clear()
     if (planId) {
       const plan = PLAN_CATALOG[planId]
-      clear()
-      if (plan) setItems([{ ...plan, quantity: 1 }])
-      else setItems([{ id: planId, name: planId, type: 'other', price: 0, currency: 'AOA', quantity: 1 }])
-    } else {
-      // /checkout with no plan param — start fresh
-      clear()
+      if (plan) {
+        const name = domainParam ? `Domínio ${domainParam}` : plan.name
+        setItems([{ ...plan, name, quantity: 1 }])
+      } else {
+        setItems([{ id: planId, name: planId, type: 'other', price: 0, currency: 'AOA', quantity: 1 }])
+      }
     }
     setStep(1)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams.get('plan')])
+  }, [searchParams.get('plan'), searchParams.get('domain')])
 
   async function handleSubmit() {
     const state = useCheckoutStore.getState()

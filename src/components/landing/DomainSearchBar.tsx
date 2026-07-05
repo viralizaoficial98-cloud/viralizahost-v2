@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Shield, Zap, Headphones, Lock, Globe, RefreshCw, Server } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useCheckoutStore } from '@/store/checkoutStore'
 
 type ExtItem = { tld: string; label: string; price: string; popular: boolean }
 
@@ -32,11 +31,20 @@ const trustItems = [
   { icon: Headphones, text: 'Suporte especializado' },
 ]
 
+// Maps TLD → plan ID used in PLAN_CATALOG
+const TLD_PLAN_ID: Record<string, string> = {
+  '.com':    'domain.com',
+  '.net':    'domain.net',
+  '.org':    'domain.org',
+  '.ao':     'domain.ao',
+  '.com.br': 'domain.com.br',
+  '.io':     'domain.io',
+}
+
 export function DomainSearchBar() {
   const [query, setQuery] = useState('')
   const [extensions, setExtensions] = useState<ExtItem[]>(defaultExtensions)
   const router = useRouter()
-  const { setItems, setDomainName, setDomainAction, setStep } = useCheckoutStore()
 
   useEffect(() => {
     const supabase = createClient()
@@ -54,21 +62,23 @@ export function DomainSearchBar() {
   }, [])
 
   const handleSearch = () => {
-    if (!query.trim()) return
-    setItems([{ id: 'domain-search', name: `Domínio ${query.trim()}`, type: 'domain', price: 4500, currency: 'AOA', quantity: 1 }])
-    setDomainName(query.trim())
-    setDomainAction('register')
-    setStep(1)
-    router.push(`/checkout?plan=domain-search`)
+    const q = query.trim()
+    if (!q) return
+    // Detect if query already contains a known TLD
+    const matchedTld = Object.keys(TLD_PLAN_ID).find(tld => q.toLowerCase().endsWith(tld))
+    if (matchedTld) {
+      const planId = TLD_PLAN_ID[matchedTld]
+      router.push(`/checkout?plan=${planId}&domain=${encodeURIComponent(q)}`)
+    } else {
+      // No recognized TLD — use domain-search fallback with .com price
+      router.push(`/checkout?plan=domain-search&domain=${encodeURIComponent(q)}`)
+    }
   }
 
-  const handleRegisterTld = (tld: string, price: string) => {
-    const name = query.trim() ? `${query.trim()}${tld}` : tld
-    setItems([{ id: `domain${tld}`, name: `Domínio ${name}`, type: 'domain', price: 4500, currency: 'AOA', quantity: 1 }])
-    setDomainAction('register')
-    if (query.trim()) setDomainName(name)
-    setStep(1)
-    router.push(`/checkout?plan=domain${tld}`)
+  const handleRegisterTld = (tld: string) => {
+    const planId = TLD_PLAN_ID[tld] ?? 'domain-search'
+    const domainName = query.trim() ? `${query.trim()}${tld}` : tld
+    router.push(`/checkout?plan=${planId}&domain=${encodeURIComponent(domainName)}`)
   }
 
   return (
@@ -285,7 +295,7 @@ export function DomainSearchBar() {
                 <div className="text-[11px] text-[#999] mb-3 leading-tight">{label}</div>
                 <div className="text-[13px] font-bold text-[#0A0A0A] mb-4">{price}</div>
                 <button
-                  onClick={() => handleRegisterTld(tld, price)}
+                  onClick={() => handleRegisterTld(tld)}
                   className="w-full py-2 rounded-xl text-xs font-bold transition-all duration-200 border"
                   style={{
                     background: popular ? '#F5B700' : 'transparent',
