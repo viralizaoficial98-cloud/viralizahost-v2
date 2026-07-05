@@ -48,9 +48,11 @@ SECURITY DEFINER
 SET search_path = viralizahost
 AS $$
 DECLARE
-  v_order_id uuid;
-  v_item     jsonb;
-  v_plan_id  uuid;
+  v_order_id   uuid;
+  v_item       jsonb;
+  v_plan_id    uuid;
+  v_base_name  text;  -- e.g. "empresa"  (tudo antes do primeiro ponto)
+  v_extension  text;  -- e.g. ".com.br"  (ponto + tudo após o primeiro ponto)
 BEGIN
   -- 1. Insert order
   INSERT INTO orders (
@@ -97,11 +99,18 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- 3. Create pending domain row (no "registered" column — use registered_at DEFAULT)
+  -- 3. Create pending domain row
+  --    Splits full domain into base name + extension:
+  --      "empresa.ao"     → name="empresa"  extension=".ao"
+  --      "empresa.com.br" → name="empresa"  extension=".com.br"
+  --      "empresa.co.ao"  → name="empresa"  extension=".co.ao"
   IF p_domain_name IS NOT NULL AND p_domain_name <> '' THEN
-    INSERT INTO domains (profile_id, name, status, order_id)
-    VALUES (p_user_id, p_domain_name, 'pending', v_order_id)
-    ON CONFLICT (name) DO UPDATE
+    v_base_name := split_part(p_domain_name, '.', 1);
+    v_extension := '.' || substring(p_domain_name FROM position('.' IN p_domain_name) + 1);
+
+    INSERT INTO domains (profile_id, name, extension, status, order_id)
+    VALUES (p_user_id, v_base_name, v_extension, 'pending', v_order_id)
+    ON CONFLICT (name, extension) DO UPDATE
       SET status     = 'pending',
           order_id   = EXCLUDED.order_id,
           profile_id = EXCLUDED.profile_id,
