@@ -28,11 +28,18 @@ const PLAN_CATALOG: Record<string, CheckoutItem> = {
   business:  { id: 'business',  name: 'Business Cloud', type: 'hosting',  price: 9500,  currency: 'AOA', quantity: 1 },
   pro:       { id: 'pro',       name: 'Cloud Pro',      type: 'hosting',  price: 19500, currency: 'AOA', quantity: 1 },
   reseller:  { id: 'reseller',  name: 'Revenda WHM',    type: 'reseller', price: 35000, currency: 'AOA', quantity: 1 },
-  'starter-mail':    { id: 'starter-mail',    name: 'Webmail Start',          type: 'email', price: 25000, currency: 'AOA', quantity: 1 },
-  'business-mail':   { id: 'business-mail',   name: 'Webmail Business',       type: 'email', price: 45000, currency: 'AOA', quantity: 1 },
-  'enterprise-mail': { id: 'enterprise-mail', name: 'Webmail Enterprise',     type: 'email', price: 95000, currency: 'AOA', quantity: 1 },
-  'corporate-pro':   { id: 'corporate-pro',   name: 'Corporate Pro',          type: 'email', price: 150000, currency: 'AOA', quantity: 1 },
-  'microsoft365':    { id: 'microsoft365',    name: 'Microsoft 365 Outlook',  type: 'email', price: 65000, currency: 'AOA', quantity: 1 },
+  // EmailPricingSection IDs
+  'starter-mail':    { id: 'starter-mail',    name: 'Webmail Start',         type: 'email', price: 6800,  currency: 'AOA', quantity: 1 },
+  'business-mail':   { id: 'business-mail',   name: 'Webmail Business',      type: 'email', price: 14800, currency: 'AOA', quantity: 1 },
+  'enterprise-mail': { id: 'enterprise-mail', name: 'Webmail Enterprise',    type: 'email', price: 28000, currency: 'AOA', quantity: 1 },
+  'corporate-pro':   { id: 'corporate-pro',   name: 'Corporate Pro',         type: 'email', price: 45000, currency: 'AOA', quantity: 1 },
+  // EmailCorpSection IDs
+  'webmail-start':      { id: 'webmail-start',      name: 'Webmail Start',        type: 'email', price: 6800,  currency: 'AOA', quantity: 1 },
+  'webmail-business':   { id: 'webmail-business',   name: 'Webmail Business',     type: 'email', price: 14800, currency: 'AOA', quantity: 1 },
+  'webmail-enterprise': { id: 'webmail-enterprise', name: 'Webmail Enterprise',   type: 'email', price: 28000, currency: 'AOA', quantity: 1 },
+  'microsoft365':       { id: 'microsoft365',       name: 'Microsoft 365 Outlook',type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
+  // individual email pages
+  'microsoft-365-outlook': { id: 'microsoft-365-outlook', name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
 }
 
 // ─── helpers ───────────────────────────────────────────────────────────────
