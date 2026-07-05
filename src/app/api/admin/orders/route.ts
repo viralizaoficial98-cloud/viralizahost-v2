@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
+
+// Plain admin client without db.schema override — needed for Storage
+function createStorageAdmin() {
+  return createSupabaseAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export async function GET() {
   const db = await createAdminClient()
@@ -21,7 +30,21 @@ export async function GET() {
     return NextResponse.json({ orders: [], error: error.message })
   }
 
-  return NextResponse.json({ orders: data ?? [] })
+  const orders = data ?? []
+
+  // Generate signed URLs for proof files (bucket is private)
+  const storage = createStorageAdmin()
+  const ordersWithUrls = await Promise.all(
+    orders.map(async (order: any) => {
+      if (!order.proof_file) return order
+      const { data: signed } = await storage.storage
+        .from('payment-proofs')
+        .createSignedUrl(order.proof_file, 3600) // 1 hour
+      return { ...order, proof_url: signed?.signedUrl ?? null }
+    })
+  )
+
+  return NextResponse.json({ orders: ordersWithUrls })
 }
 
 export async function POST(req: NextRequest) {

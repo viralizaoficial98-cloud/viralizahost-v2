@@ -11,6 +11,7 @@ type Order = {
   domain_name: string | null
   transfer_ref: string | null
   proof_file: string | null
+  proof_url: string | null   // signed URL generated server-side
   profiles: { full_name: string; email: string } | null
   order_items: { service_name: string; service_type: string; price: number; quantity: number }[]
 }
@@ -146,8 +147,8 @@ export default function AdminOrdersPage() {
                     <div className="flex flex-wrap gap-4 text-xs text-[#888] mt-1">
                       <span>Pagamento: <strong className="text-[#555]">{order.payment_method?.replace('_', ' ') ?? '—'}</strong></span>
                       {order.transfer_ref && <span>Ref: <strong className="text-[#555]">{order.transfer_ref}</strong></span>}
-                      {order.proof_file && (
-                        <a href={order.proof_file} target="_blank" rel="noreferrer"
+                      {(order.proof_url || order.proof_file) && (
+                        <a href={order.proof_url ?? order.proof_file ?? '#'} target="_blank" rel="noreferrer"
                           className="flex items-center gap-1 text-[#F5B700] hover:underline font-semibold">
                           <ExternalLink size={11} /> Ver comprovativo
                         </a>

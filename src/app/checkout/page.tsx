@@ -12,7 +12,7 @@ import {
   BILLING_LABEL, BILLING_DISCOUNT, BILLING_MONTHS,
   type BillingCycle, type CheckoutItem, type ServiceType,
 } from '@/store/checkoutStore'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, createStorageClient } from '@/lib/supabase/client'
 
 // ─── constants ─────────────────────────────────────────────────────────────
 
@@ -569,15 +569,24 @@ function Step5Payment({ onSubmit, onBack, submitting, error }: { onSubmit: () =>
     if (!file) return
     setFileName(file.name); setUploading(true)
     try {
-      const supabase = createClient()
-      const { data, error } = await (supabase as any).storage.from('payment-proofs').upload(
-        `${Date.now()}_${file.name}`, file, { upsert: true }
-      )
-      if (!error && data) {
-        const { data: { publicUrl } } = (supabase as any).storage.from('payment-proofs').getPublicUrl(data.path)
-        setProofFileUrl(publicUrl)
+      // Use storage client WITHOUT db.schema — Storage always uses the public schema
+      const storage = createStorageClient()
+      const now = new Date()
+      const folder = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`
+      const path = `${folder}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+
+      const { data, error } = await storage.storage.from('payment-proofs').upload(path, file, { upsert: true })
+      if (error) {
+        console.error('[upload] storage error:', error.message)
+        setFileName(`${file.name} (erro: ${error.message})`)
+      } else if (data) {
+        // Store the storage path (not the public URL) — admin can generate signed URL later
+        setProofFileUrl(data.path)
       }
-    } catch { /* ignore upload errors — proof optional */ }
+    } catch (err: any) {
+      console.error('[upload] unexpected error:', err)
+      setFileName(`${file.name} (falhou)`)
+    }
     setUploading(false)
   }
 
