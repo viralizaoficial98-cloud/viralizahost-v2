@@ -57,7 +57,19 @@ function fmtPrice(n: number) {
   return `Kz ${n.toLocaleString('pt-AO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
+const DOMAIN_YEARS: Record<BillingCycle, number> = {
+  monthly: 1, '6months': 1, '1year': 1, '2years': 2, '3years': 3,
+}
+const DOMAIN_DISCOUNT: Record<BillingCycle, number> = {
+  monthly: 0, '6months': 0, '1year': 0, '2years': 0.10, '3years': 0.15,
+}
+
 function calcItemTotal(item: CheckoutItem, cycle: BillingCycle) {
+  if (item.type === 'domain') {
+    const years = DOMAIN_YEARS[cycle]
+    const discount = DOMAIN_DISCOUNT[cycle]
+    return item.price * item.quantity * years * (1 - discount)
+  }
   return item.price * item.quantity * BILLING_MONTHS[cycle] * (1 - BILLING_DISCOUNT[cycle])
 }
 

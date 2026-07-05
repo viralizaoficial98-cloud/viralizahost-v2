@@ -124,11 +124,13 @@ export const useCheckoutStore = create<CheckoutState>()(
 
       getTotal: () => {
         const { items, billingCycle } = get()
-        const discount = BILLING_DISCOUNT[billingCycle]
-        const months = BILLING_MONTHS[billingCycle]
+        const domainYears: Record<BillingCycle, number> = { monthly: 1, '6months': 1, '1year': 1, '2years': 2, '3years': 3 }
+        const domainDiscount: Record<BillingCycle, number> = { monthly: 0, '6months': 0, '1year': 0, '2years': 0.10, '3years': 0.15 }
         return items.reduce((acc, item) => {
-          const subtotal = item.price * item.quantity * months
-          return acc + subtotal * (1 - discount)
+          if (item.type === 'domain') {
+            return acc + item.price * item.quantity * domainYears[billingCycle] * (1 - domainDiscount[billingCycle])
+          }
+          return acc + item.price * item.quantity * BILLING_MONTHS[billingCycle] * (1 - BILLING_DISCOUNT[billingCycle])
         }, 0)
       },
     }),
