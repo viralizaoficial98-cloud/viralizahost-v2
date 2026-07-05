@@ -1,21 +1,36 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Shield, Zap, Headphones, Lock, Globe, RefreshCw, Server } from 'lucide-react'
+import { Search, Shield, Zap, Headphones, Lock, Globe, RefreshCw, Check, X, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-type ExtItem = { tld: string; label: string; price: string; popular: boolean }
+type ExtItem = { tld: string; label: string; price: string; priceNum: number; currency: string; popular: boolean }
 
 const defaultExtensions: ExtItem[] = [
-  { tld: '.com',    label: 'O mais popular',     price: 'Kz 4.500/ano',  popular: true  },
-  { tld: '.net',    label: 'Tecnologia & redes', price: 'Kz 5.200/ano',  popular: false },
-  { tld: '.org',    label: 'Organizações',       price: 'Kz 4.800/ano',  popular: false },
-  { tld: '.ao',     label: 'Angola oficial',     price: 'Kz 8.000/ano',  popular: true  },
-  { tld: '.com.br', label: 'Brasil',             price: 'R$ 49/ano',     popular: false },
-  { tld: '.io',     label: 'Startups & tech',    price: 'Kz 18.000/ano', popular: false },
+  { tld: '.com',    label: 'O mais popular',     price: 'Kz 4.500/ano',  priceNum: 4500,  currency: 'AOA', popular: true  },
+  { tld: '.net',    label: 'Tecnologia & redes', price: 'Kz 5.200/ano',  priceNum: 5200,  currency: 'AOA', popular: false },
+  { tld: '.org',    label: 'Organizações',       price: 'Kz 4.800/ano',  priceNum: 4800,  currency: 'AOA', popular: false },
+  { tld: '.ao',     label: 'Angola oficial',     price: 'Kz 8.000/ano',  priceNum: 8000,  currency: 'AOA', popular: true  },
+  { tld: '.com.br', label: 'Brasil',             price: 'R$ 49/ano',     priceNum: 4900,  currency: 'BRL', popular: false },
+  { tld: '.io',     label: 'Startups & tech',    price: 'Kz 18.000/ano', priceNum: 18000, currency: 'AOA', popular: false },
 ]
 
 const currencySymbol: Record<string, string> = { AOA: 'Kz', USD: '$', BRL: 'R$', EUR: '€' }
+
+// TLD → PLAN_CATALOG id
+const TLD_PLAN_ID: Record<string, string> = {
+  '.com':    'domain.com',
+  '.net':    'domain.net',
+  '.org':    'domain.org',
+  '.ao':     'domain.ao',
+  '.com.br': 'domain.com.br',
+  '.io':     'domain.io',
+}
+
+// Suggested TLDs to show when user types without extension
+const SUGGEST_TLDS = ['.com', '.ao', '.net', '.org', '.io']
+
+type CheckResult = { tld: string; domain: string; available: boolean | null; loading: boolean }
 
 const benefits = [
   { icon: Lock, title: 'Protecção de Privacidade', desc: 'WHOIS protegido e dados ocultos' },
@@ -31,19 +46,12 @@ const trustItems = [
   { icon: Headphones, text: 'Suporte especializado' },
 ]
 
-// Maps TLD → plan ID used in PLAN_CATALOG
-const TLD_PLAN_ID: Record<string, string> = {
-  '.com':    'domain.com',
-  '.net':    'domain.net',
-  '.org':    'domain.org',
-  '.ao':     'domain.ao',
-  '.com.br': 'domain.com.br',
-  '.io':     'domain.io',
-}
-
 export function DomainSearchBar() {
   const [query, setQuery] = useState('')
   const [extensions, setExtensions] = useState<ExtItem[]>(defaultExtensions)
+  const [results, setResults] = useState<CheckResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -51,31 +59,86 @@ export function DomainSearchBar() {
     supabase.from('site_domains').select('*').eq('active', true).order('position')
       .then(({ data }) => {
         if (data && data.length > 0) {
-          setExtensions(data.map((d: any) => ({
-            tld: d.extension,
-            label: d.popular ? 'Angola oficial' : d.extension,
-            price: `${currencySymbol[d.currency] ?? d.currency} ${(d.price_annual ?? d.price_monthly ?? 0).toLocaleString('pt-AO')}/ano`,
-            popular: d.popular ?? false,
-          })))
+          setExtensions(data.map((d: any) => {
+            const priceNum = d.price_annual ?? d.price_monthly ?? 0
+            const sym = currencySymbol[d.currency] ?? d.currency
+            return {
+              tld: d.extension,
+              label: d.popular ? 'Angola oficial' : d.extension,
+              price: `${sym} ${priceNum.toLocaleString('pt-AO')}/ano`,
+              priceNum,
+              currency: d.currency,
+              popular: d.popular ?? false,
+            }
+          }))
         }
       })
   }, [])
 
-  const handleSearch = () => {
-    const q = query.trim()
-    if (!q) return
-    // Detect if query already contains a known TLD
-    const matchedTld = Object.keys(TLD_PLAN_ID).find(tld => q.toLowerCase().endsWith(tld))
-    if (matchedTld) {
-      const planId = TLD_PLAN_ID[matchedTld]
-      router.push(`/checkout?plan=${planId}&domain=${encodeURIComponent(q)}`)
-    } else {
-      // No recognized TLD — use domain-search fallback with .com price
-      router.push(`/checkout?plan=domain-search&domain=${encodeURIComponent(q)}`)
-    }
+  function getExtByTld(tld: string): ExtItem {
+    return extensions.find(e => e.tld === tld) ?? defaultExtensions.find(e => e.tld === tld) ?? defaultExtensions[0]
   }
 
-  const handleRegisterTld = (tld: string) => {
+  async function handleSearch() {
+    const q = query.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
+    if (!q) return
+
+    // Cancel previous search
+    if (abortRef.current) abortRef.current.abort()
+    const abort = new AbortController()
+    abortRef.current = abort
+
+    setSearching(true)
+    setResults([])
+
+    // Determine which TLDs to check
+    const matchedTld = Object.keys(TLD_PLAN_ID).find(tld => q.endsWith(tld))
+    let tlds: string[]
+    let baseName: string
+
+    if (matchedTld) {
+      // User typed full domain — check that TLD plus alternatives
+      baseName = q.slice(0, q.length - matchedTld.length)
+      const others = SUGGEST_TLDS.filter(t => t !== matchedTld).slice(0, 3)
+      tlds = [matchedTld, ...others]
+    } else {
+      // No extension — suggest defaults
+      baseName = q
+      tlds = SUGGEST_TLDS
+    }
+
+    // Seed loading state
+    const initial: CheckResult[] = tlds.map(tld => ({
+      tld,
+      domain: `${baseName}${tld}`,
+      available: null,
+      loading: true,
+    }))
+    setResults(initial)
+    setSearching(false)
+
+    // Fire checks in parallel
+    await Promise.allSettled(tlds.map(async (tld, idx) => {
+      const domain = `${baseName}${tld}`
+      try {
+        const res = await fetch(`/api/checkout/domain-check?domain=${encodeURIComponent(domain)}`, {
+          signal: abort.signal,
+        })
+        const json = await res.json()
+        setResults(prev => prev.map((r, i) => i === idx ? { ...r, available: json.available, loading: false } : r))
+      } catch {
+        // aborted or network error
+        setResults(prev => prev.map((r, i) => i === idx ? { ...r, available: true, loading: false } : r))
+      }
+    }))
+  }
+
+  function goToCheckout(domain: string, tld: string) {
+    const planId = TLD_PLAN_ID[tld] ?? 'domain-search'
+    router.push(`/checkout?plan=${planId}&domain=${encodeURIComponent(domain)}`)
+  }
+
+  function handleRegisterTld(tld: string) {
     const planId = TLD_PLAN_ID[tld] ?? 'domain-search'
     const domainName = query.trim() ? `${query.trim()}${tld}` : tld
     router.push(`/checkout?plan=${planId}&domain=${encodeURIComponent(domainName)}`)
@@ -86,97 +149,23 @@ export function DomainSearchBar() {
       {/* Premium LED wave separator */}
       <div className="relative w-full overflow-hidden" style={{ background: '#000000', marginBottom: '-1px' }}>
         <style>{`
-          @keyframes wave-pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.72; }
-          }
-          @keyframes wave-shift {
-            0%, 100% { transform: translateX(0px); }
-            50% { transform: translateX(6px); }
-          }
+          @keyframes wave-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
+          @keyframes wave-shift { 0%, 100% { transform: translateX(0px); } 50% { transform: translateX(6px); } }
           .led-wave-glow { animation: wave-pulse 3.5s ease-in-out infinite; }
           .led-wave-line { animation: wave-shift 6s ease-in-out infinite; }
         `}</style>
-        <svg
-          viewBox="0 0 1440 56"
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-          className="w-full block"
-          style={{ height: 56 }}
-        >
+        <svg viewBox="0 0 1440 56" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" className="w-full block" style={{ height: 56 }}>
           <defs>
-            {/* Outer bloom — widest, softest */}
-            <filter id="glow-bloom" x="-10%" y="-200%" width="120%" height="500%">
-              <feGaussianBlur stdDeviation="10" result="bloom" />
-            </filter>
-            {/* Mid glow */}
-            <filter id="glow-mid" x="-5%" y="-150%" width="110%" height="400%">
-              <feGaussianBlur stdDeviation="5" result="mid" />
-            </filter>
-            {/* Inner crisp glow */}
-            <filter id="glow-inner" x="-2%" y="-80%" width="104%" height="260%">
-              <feGaussianBlur stdDeviation="2" result="inner" />
-            </filter>
+            <filter id="glow-bloom" x="-10%" y="-200%" width="120%" height="500%"><feGaussianBlur stdDeviation="10" result="bloom" /></filter>
+            <filter id="glow-mid" x="-5%" y="-150%" width="110%" height="400%"><feGaussianBlur stdDeviation="5" result="mid" /></filter>
+            <filter id="glow-inner" x="-2%" y="-80%" width="104%" height="260%"><feGaussianBlur stdDeviation="2" result="inner" /></filter>
           </defs>
-
-          {/* White fill — domain section background */}
-          <path
-            d="M0,56 L0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22 L1440,56 Z"
-            fill="#ffffff"
-          />
-
-          {/* Layer 1 — outer bloom (widest, most diffuse, amber) */}
-          <path
-            className="led-wave-glow"
-            d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22"
-            fill="none"
-            stroke="#F5B700"
-            strokeWidth="12"
-            filter="url(#glow-bloom)"
-            opacity="0.25"
-          />
-
-          {/* Layer 2 — mid glow (yellow) */}
-          <path
-            className="led-wave-glow"
-            d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22"
-            fill="none"
-            stroke="#F5B700"
-            strokeWidth="6"
-            filter="url(#glow-mid)"
-            opacity="0.55"
-          />
-
-          {/* Layer 3 — inner glow (brighter yellow) */}
-          <path
-            className="led-wave-glow"
-            d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22"
-            fill="none"
-            stroke="#FFD54F"
-            strokeWidth="3"
-            filter="url(#glow-inner)"
-            opacity="0.85"
-          />
-
-          {/* Layer 4 — white core (LED hotspot) */}
-          <path
-            className="led-wave-line"
-            d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22"
-            fill="none"
-            stroke="#FFFFFF"
-            strokeWidth="1.2"
-            opacity="0.7"
-          />
-
-          {/* Layer 5 — solid yellow main line */}
-          <path
-            className="led-wave-line"
-            d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22"
-            fill="none"
-            stroke="#F5B700"
-            strokeWidth="2"
-            opacity="1"
-          />
+          <path d="M0,56 L0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22 L1440,56 Z" fill="#ffffff" />
+          <path className="led-wave-glow" d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22" fill="none" stroke="#F5B700" strokeWidth="12" filter="url(#glow-bloom)" opacity="0.25" />
+          <path className="led-wave-glow" d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22" fill="none" stroke="#F5B700" strokeWidth="6" filter="url(#glow-mid)" opacity="0.55" />
+          <path className="led-wave-glow" d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22" fill="none" stroke="#FFD54F" strokeWidth="3" filter="url(#glow-inner)" opacity="0.85" />
+          <path className="led-wave-line" d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22" fill="none" stroke="#FFFFFF" strokeWidth="1.2" opacity="0.7" />
+          <path className="led-wave-line" d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22" fill="none" stroke="#F5B700" strokeWidth="2" opacity="1" />
         </svg>
       </div>
 
@@ -192,9 +181,7 @@ export function DomainSearchBar() {
               <div className="h-px w-16 bg-gradient-to-l from-transparent to-[#F5B700]" />
             </div>
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-[#0A0A0A] leading-tight mb-4">
-              Encontre o{' '}
-              <span className="text-[#F5B700]">domínio ideal</span>
-              {' '}para<br className="hidden md:block" /> o seu negócio
+              Encontre o{' '}<span className="text-[#F5B700]">domínio ideal</span>{' '}para<br className="hidden md:block" /> o seu negócio
             </h2>
             <p className="text-[#666] text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
               Pesquise, registe e proteja o nome da sua marca com rapidez,<br className="hidden md:block" /> segurança e o melhor preço.
@@ -205,10 +192,7 @@ export function DomainSearchBar() {
           <div className="max-w-3xl mx-auto mb-5">
             <div
               className="flex items-center bg-white rounded-[20px] border border-[#E8E8E8] overflow-hidden transition-all duration-200"
-              style={{
-                height: 72,
-                boxShadow: '0 8px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(245,183,0,0.08)',
-              }}
+              style={{ height: 72, boxShadow: '0 8px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(245,183,0,0.08)' }}
             >
               <div className="flex items-center pl-5 pr-3 shrink-0">
                 <Search size={22} className="text-[#BBB]" />
@@ -216,7 +200,7 @@ export function DomainSearchBar() {
               <input
                 type="text"
                 value={query}
-                onChange={e => setQuery(e.target.value)}
+                onChange={e => { setQuery(e.target.value); setResults([]) }}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 placeholder="Digite o nome do domínio desejado"
                 className="flex-1 text-[#0A0A0A] text-base md:text-lg outline-none bg-transparent placeholder:text-[#C0C0C0] pr-3"
@@ -224,29 +208,57 @@ export function DomainSearchBar() {
               <div className="pr-2 shrink-0">
                 <button
                   onClick={handleSearch}
-                  className="h-[54px] px-7 rounded-[14px] font-bold text-sm md:text-base text-[#0A0A0A] transition-all duration-200 flex items-center gap-2 shrink-0"
-                  style={{
-                    background: '#F5B700',
-                    boxShadow: '0 4px 20px rgba(245,183,0,0.35)',
-                  }}
-                  onMouseEnter={e => {
-                    const el = e.currentTarget
-                    el.style.background = '#0A0A0A'
-                    el.style.color = '#F5B700'
-                    el.style.boxShadow = '0 4px 20px rgba(0,0,0,0.25)'
-                  }}
-                  onMouseLeave={e => {
-                    const el = e.currentTarget
-                    el.style.background = '#F5B700'
-                    el.style.color = '#0A0A0A'
-                    el.style.boxShadow = '0 4px 20px rgba(245,183,0,0.35)'
-                  }}
+                  disabled={searching}
+                  className="h-[54px] px-7 rounded-[14px] font-bold text-sm md:text-base text-[#0A0A0A] transition-all duration-200 flex items-center gap-2 shrink-0 disabled:opacity-70"
+                  style={{ background: '#F5B700', boxShadow: '0 4px 20px rgba(245,183,0,0.35)' }}
+                  onMouseEnter={e => { const el = e.currentTarget; el.style.background = '#0A0A0A'; el.style.color = '#F5B700' }}
+                  onMouseLeave={e => { const el = e.currentTarget; el.style.background = '#F5B700'; el.style.color = '#0A0A0A' }}
                 >
-                  <Search size={16} />
+                  {searching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                   Pesquisar Domínio
                 </button>
               </div>
             </div>
+
+            {/* Search results */}
+            {results.length > 0 && (
+              <div className="mt-3 bg-white border border-[#E8E8E8] rounded-2xl overflow-hidden shadow-lg">
+                {results.map((r, idx) => {
+                  const ext = getExtByTld(r.tld)
+                  return (
+                    <div key={r.tld} className={`flex items-center justify-between px-5 py-4 ${idx < results.length - 1 ? 'border-b border-[#F0F0F0]' : ''}`}>
+                      <div className="flex items-center gap-3">
+                        <span className="font-black text-[#0A0A0A] text-sm md:text-base">{r.domain}</span>
+                        <span className="text-[#999] text-xs">{ext.price}</span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        {r.loading ? (
+                          <span className="flex items-center gap-1.5 text-[#AAA] text-xs">
+                            <Loader2 size={13} className="animate-spin" /> A verificar...
+                          </span>
+                        ) : r.available ? (
+                          <>
+                            <span className="flex items-center gap-1 text-green-600 text-xs font-bold">
+                              <Check size={13} /> Disponível
+                            </span>
+                            <button
+                              onClick={() => goToCheckout(r.domain, r.tld)}
+                              className="px-4 py-1.5 rounded-xl bg-[#F5B700] text-[#0A0A0A] text-xs font-black hover:bg-[#D9A300] transition-colors"
+                            >
+                              Registar agora
+                            </button>
+                          </>
+                        ) : (
+                          <span className="flex items-center gap-1 text-red-500 text-xs font-bold">
+                            <X size={13} /> Ocupado
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Trust bar */}
@@ -267,24 +279,10 @@ export function DomainSearchBar() {
                 className="group relative flex flex-col items-center text-center bg-white border rounded-2xl p-5 cursor-pointer transition-all duration-200"
                 style={{
                   borderColor: popular ? '#F5B700' : '#EBEBEB',
-                  boxShadow: popular
-                    ? '0 4px 24px rgba(245,183,0,0.18)'
-                    : '0 2px 12px rgba(0,0,0,0.05)',
+                  boxShadow: popular ? '0 4px 24px rgba(245,183,0,0.18)' : '0 2px 12px rgba(0,0,0,0.05)',
                 }}
-                onMouseEnter={e => {
-                  const el = e.currentTarget
-                  el.style.borderColor = '#F5B700'
-                  el.style.boxShadow = '0 8px 32px rgba(245,183,0,0.22)'
-                  el.style.transform = 'translateY(-3px)'
-                }}
-                onMouseLeave={e => {
-                  const el = e.currentTarget
-                  el.style.borderColor = popular ? '#F5B700' : '#EBEBEB'
-                  el.style.boxShadow = popular
-                    ? '0 4px 24px rgba(245,183,0,0.18)'
-                    : '0 2px 12px rgba(0,0,0,0.05)'
-                  el.style.transform = 'translateY(0)'
-                }}
+                onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = '#F5B700'; el.style.boxShadow = '0 8px 32px rgba(245,183,0,0.22)'; el.style.transform = 'translateY(-3px)' }}
+                onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = popular ? '#F5B700' : '#EBEBEB'; el.style.boxShadow = popular ? '0 4px 24px rgba(245,183,0,0.18)' : '0 2px 12px rgba(0,0,0,0.05)'; el.style.transform = 'translateY(0)' }}
               >
                 {popular && (
                   <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#F5B700] text-[#0A0A0A] text-[10px] font-black px-3 py-0.5 rounded-full tracking-wide uppercase">
@@ -297,23 +295,9 @@ export function DomainSearchBar() {
                 <button
                   onClick={() => handleRegisterTld(tld)}
                   className="w-full py-2 rounded-xl text-xs font-bold transition-all duration-200 border"
-                  style={{
-                    background: popular ? '#F5B700' : 'transparent',
-                    borderColor: popular ? '#F5B700' : '#D0D0D0',
-                    color: popular ? '#0A0A0A' : '#444',
-                  }}
-                  onMouseEnter={e => {
-                    const el = e.currentTarget
-                    el.style.background = '#F5B700'
-                    el.style.borderColor = '#F5B700'
-                    el.style.color = '#0A0A0A'
-                  }}
-                  onMouseLeave={e => {
-                    const el = e.currentTarget
-                    el.style.background = popular ? '#F5B700' : 'transparent'
-                    el.style.borderColor = popular ? '#F5B700' : '#D0D0D0'
-                    el.style.color = popular ? '#0A0A0A' : '#444'
-                  }}
+                  style={{ background: popular ? '#F5B700' : 'transparent', borderColor: popular ? '#F5B700' : '#D0D0D0', color: popular ? '#0A0A0A' : '#444' }}
+                  onMouseEnter={e => { const el = e.currentTarget; el.style.background = '#F5B700'; el.style.borderColor = '#F5B700'; el.style.color = '#0A0A0A' }}
+                  onMouseLeave={e => { const el = e.currentTarget; el.style.background = popular ? '#F5B700' : 'transparent'; el.style.borderColor = popular ? '#F5B700' : '#D0D0D0'; el.style.color = popular ? '#0A0A0A' : '#444' }}
                 >
                   Registar
                 </button>
@@ -323,12 +307,8 @@ export function DomainSearchBar() {
 
           {/* CTA link */}
           <div className="text-center mb-16">
-            <a
-              href="/dominios"
-              className="inline-flex items-center gap-2 text-[#F5B700] font-bold text-sm hover:gap-3 transition-all duration-200"
-            >
-              Ver todos os domínios disponíveis
-              <span>→</span>
+            <a href="/dominios" className="inline-flex items-center gap-2 text-[#F5B700] font-bold text-sm hover:gap-3 transition-all duration-200">
+              Ver todos os domínios disponíveis <span>→</span>
             </a>
           </div>
 
@@ -338,14 +318,8 @@ export function DomainSearchBar() {
             style={{ boxShadow: '0 2px 20px rgba(0,0,0,0.06)' }}
           >
             {benefits.map(({ icon: Icon, title, desc }) => (
-              <div
-                key={title}
-                className="bg-white px-6 py-6 flex flex-col items-center text-center gap-3 group hover:bg-[#FAFAFA] transition-colors duration-200"
-              >
-                <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center transition-colors duration-200"
-                  style={{ background: '#FFF8E1' }}
-                >
+              <div key={title} className="bg-white px-6 py-6 flex flex-col items-center text-center gap-3 group hover:bg-[#FAFAFA] transition-colors duration-200">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center transition-colors duration-200" style={{ background: '#FFF8E1' }}>
                   <Icon size={20} className="text-[#F5B700]" />
                 </div>
                 <div>
