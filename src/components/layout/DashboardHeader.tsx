@@ -1,7 +1,7 @@
 'use client'
 import { Bell, Search, User } from 'lucide-react'
 import { CurrencySelector } from '@/components/shared/CurrencySelector'
-import { createClient } from '@/lib/supabase/client'
+import { createAuthClient } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 
 export function DashboardHeader() {
@@ -9,7 +9,7 @@ export function DashboardHeader() {
   const [userEmail, setUserEmail] = useState('')
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = createAuthClient()
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
         setUserEmail(data.user.email ?? '')

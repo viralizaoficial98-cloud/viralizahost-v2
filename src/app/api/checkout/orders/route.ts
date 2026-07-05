@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAuthClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { createRpcClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,17 +12,22 @@ export async function POST(req: NextRequest) {
       userData, amount,
     } = body
 
-    // ── 1. Resolve authenticated user ──────────────────────────────────────
-    // Use anon-key client (reads session cookies) to get the real user.
-    // createAdminClient uses service_role key and cannot resolve user from cookies.
-    const authClient = await createClient()
-    const { data: { user: sessionUser } } = await authClient.auth.getUser()
+    console.log('[checkout/orders] START — paymentMethod:', paymentMethod, 'amount:', amount)
 
-    const db = await createAdminClient()
+    // ── 1. Resolve authenticated user ──────────────────────────────────────
+    // createAuthClient has NO db.schema — auth.getUser() must never send
+    // a Content-Profile header; that belongs only to PostgREST table queries.
+    const authClient = await createAuthClient()
+    const { data: { user: sessionUser }, error: authErr } = await authClient.auth.getUser()
+
+    console.log('[checkout/orders] auth.getUser —', sessionUser?.id ?? 'no session', authErr?.message ?? 'ok')
+
+    const db = await createAdminClient() // for profile upsert (table query, viralizahost schema)
     let userId: string | null = sessionUser?.id ?? null
 
     // ── 2. Create account if user arrived as guest ─────────────────────────
     if (!userId && userData?.email && userData?.password) {
+      console.log('[checkout/orders] creating guest account for', userData.email)
       const { data: newUser, error: signUpErr } = await db.auth.admin.createUser({
         email:         userData.email,
         password:      userData.password,
@@ -52,6 +58,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!userId) {
+      console.error('[checkout/orders] no userId — aborting')
       return NextResponse.json(
         { error: 'Sessão inválida. Faça login e tente novamente.' },
         { status: 401 }
@@ -66,13 +73,9 @@ export async function POST(req: NextRequest) {
       bic_transfer: 'bank_transfer',
     }
     const dbPayment = paymentMap[paymentMethod] ?? 'bank_transfer'
+    const status    = paymentMethod === 'bic_transfer' ? 'aguardando_confirmacao' : 'pending'
 
-    // ── 4. Order status ────────────────────────────────────────────────────
-    // BIC transfer → aguardando_confirmacao (manual review)
-    // All others   → pending (awaiting automated payment gateway)
-    const status = paymentMethod === 'bic_transfer' ? 'aguardando_confirmacao' : 'pending'
-
-    // ── 5. Build items payload for RPC ─────────────────────────────────────
+    // ── 4. Build items payload ─────────────────────────────────────────────
     const rpcItems = (items ?? []).map((item: any) => ({
       service_name: item.name,
       service_type: item.type,
@@ -80,32 +83,37 @@ export async function POST(req: NextRequest) {
       quantity:     item.quantity ?? 1,
     }))
 
-    // ── 6. Call transaction RPC — all-or-nothing ───────────────────────────
-    const { data, error: rpcErr } = await (db as any).rpc('create_order', {
+    console.log('[checkout/orders] CALLING RPC create_order — userId:', userId, 'items:', rpcItems.length)
+
+    // ── 5. Call RPC via rpcClient (NO db.schema) ───────────────────────────
+    // public.create_order uses SECURITY DEFINER + SET search_path = viralizahost
+    // so it operates on viralizahost tables without PostgREST needing the schema exposed.
+    const rpcClient = createRpcClient()
+    const { data, error: rpcErr } = await rpcClient.rpc('create_order', {
       p_user_id:        userId,
-      p_billing_cycle:  billingCycle ?? 'monthly',
-      p_domain_name:    domainName   ?? '',
-      p_domain_action:  domainAction ?? '',
+      p_billing_cycle:  billingCycle  ?? 'monthly',
+      p_domain_name:    domainName    ?? '',
+      p_domain_action:  domainAction  ?? '',
       p_payment_method: dbPayment,
       p_amount:         Math.round(amount ?? 0),
-      p_proof_file:     proofFileUrl ?? '',
-      p_transfer_ref:   transferRef  ?? '',
+      p_proof_file:     proofFileUrl  ?? '',
+      p_transfer_ref:   transferRef   ?? '',
       p_status:         status,
       p_items:          rpcItems,
     })
 
     if (rpcErr) {
-      console.error('[checkout/orders] RPC error:', rpcErr)
+      console.error('[checkout/orders] RPC error:', rpcErr.message, rpcErr)
       return NextResponse.json({ error: rpcErr.message }, { status: 500 })
     }
 
-    const orderId = data?.id
-    console.log(`[checkout/orders] created order ${orderId} for user ${userId} — ${status}`)
+    const orderId = (data as any)?.id
+    console.log('[checkout/orders] ORDER CREATED — id:', orderId, 'status:', status)
 
     return NextResponse.json({ id: orderId, status })
 
   } catch (err: any) {
-    console.error('[checkout/orders] unexpected error:', err)
+    console.error('[checkout/orders] UNEXPECTED ERROR:', err)
     return NextResponse.json({ error: err.message ?? 'Erro interno' }, { status: 500 })
   }
 }

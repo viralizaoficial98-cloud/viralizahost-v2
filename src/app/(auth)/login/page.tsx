@@ -3,7 +3,7 @@ import { Metadata } from 'next'
 import Link from 'next/link'
 import { useState } from 'react'
 import { Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { createAuthClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -19,7 +19,7 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     try {
-      const supabase = createClient()
+      const supabase = createAuthClient()
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
       if (authError) {
         setError(authError.message === 'Invalid login credentials'

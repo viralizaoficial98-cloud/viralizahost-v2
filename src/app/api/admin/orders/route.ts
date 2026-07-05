@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
+import { createAdminClient, createRpcClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseJs } from '@supabase/supabase-js'
 
-// Plain admin client without db.schema override — needed for Storage
+// Storage client — no db.schema, needed for signed URLs
 function createStorageAdmin() {
-  return createSupabaseAdmin(
+  return createSupabaseJs(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
@@ -55,19 +55,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
   }
 
-  const db = await createAdminClient()
+  // Use rpcClient (no db.schema) — public.approve_order and public.reject_order
+  // are in the public schema and never need Content-Profile header
+  const rpcClient = createRpcClient()
 
   if (action === 'approve') {
-    const { data, error } = await (db as any).rpc('approve_order', { p_order_id: orderId })
+    console.log('[admin/orders] APPROVING order', orderId)
+    const { data, error } = await rpcClient.rpc('approve_order', { p_order_id: orderId })
     if (error) {
       console.error('[admin/orders approve]', error.message)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+    console.log('[admin/orders] APPROVED', orderId)
     return NextResponse.json(data)
   }
 
   // reject
-  const { data, error } = await (db as any).rpc('reject_order', {
+  console.log('[admin/orders] REJECTING order', orderId, 'notes:', notes)
+  const { data, error } = await rpcClient.rpc('reject_order', {
     p_order_id: orderId,
     p_notes:    notes ?? null,
   })
@@ -75,5 +80,6 @@ export async function POST(req: NextRequest) {
     console.error('[admin/orders reject]', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+  console.log('[admin/orders] REJECTED', orderId)
   return NextResponse.json(data)
 }

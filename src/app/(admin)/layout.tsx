@@ -3,7 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, Users, CreditCard, MessageSquare, Settings, Server, Globe, Activity, LogOut, ChevronRight, Monitor, ShoppingBag } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { createAuthClient } from '@/lib/supabase/client'
 
 const adminNav = [
   { href: '/admin',              icon: LayoutDashboard, label: 'Dashboard',       exact: true },
@@ -23,7 +23,7 @@ function AdminSidebar() {
   const router   = useRouter()
 
   const handleLogout = async () => {
-    const supabase = createClient()
+    const supabase = createAuthClient()
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()

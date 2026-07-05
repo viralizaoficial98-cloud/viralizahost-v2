@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Lock, Loader2, Eye, EyeOff, CheckCircle2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { createAuthClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Logo } from '@/components/shared/Logo'
 
@@ -22,7 +22,7 @@ export default function ResetPasswordPage() {
     setLoading(true)
     setError('')
     try {
-      const supabase = createClient()
+      const supabase = createAuthClient()
       const { error: err } = await supabase.auth.updateUser({ password })
       if (err) setError(err.message)
       else setDone(true)

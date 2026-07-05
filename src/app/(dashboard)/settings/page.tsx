@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { User, Lock, Save, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { createAuthClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 const inputStyle = {
@@ -25,7 +25,7 @@ const sectionCard = {
 }
 
 export default function SettingsPage() {
-  const supabase = createClient()
+  const supabase = createAuthClient()
   const router = useRouter()
   const [profile, setProfile] = useState<any>(null)
   const [saving, setSaving] = useState(false)

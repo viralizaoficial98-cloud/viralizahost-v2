@@ -12,7 +12,7 @@ import {
   BILLING_LABEL, BILLING_DISCOUNT, BILLING_MONTHS,
   type BillingCycle, type CheckoutItem, type ServiceType,
 } from '@/store/checkoutStore'
-import { createClient, createStorageClient } from '@/lib/supabase/client'
+import { createClient, createAuthClient, createStorageClient } from '@/lib/supabase/client'
 
 // ─── constants ─────────────────────────────────────────────────────────────
 
@@ -436,10 +436,12 @@ function Step4Ident({ onNext, onBack }: { onNext: () => void; onBack: () => void
   const [loggingIn, setLoggingIn] = useState(false)
 
   useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    // Use auth client (no db.schema) for auth.getUser() — schema header must not be sent
+    const auth = createAuthClient()
+    const db   = createClient()
+    auth.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        supabase.from('profiles').select('full_name,email,phone').eq('id', user.id).single()
+        db.from('profiles').select('full_name,email,phone').eq('id', user.id).single()
           .then(({ data }) => {
             if (data) {
               setProfile(data as any)
@@ -456,12 +458,14 @@ function Step4Ident({ onNext, onBack }: { onNext: () => void; onBack: () => void
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoginError(''); setLoggingIn(true)
-    const supabase = createClient()
-    const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword })
+    // auth client (no db.schema) for signIn — schema header must not be sent to GoTrue
+    const auth = createAuthClient()
+    const db   = createClient()
+    const { data, error } = await auth.auth.signInWithPassword({ email: loginEmail, password: loginPassword })
     if (error) { setLoginError('E-mail ou senha incorretos.'); setLoggingIn(false); return }
     const user = data.user
     if (user) {
-      const { data: prof } = await supabase.from('profiles').select('full_name,email,phone').eq('id', user.id).single()
+      const { data: prof } = await db.from('profiles').select('full_name,email,phone').eq('id', user.id).single()
       if (prof) {
         setProfile(prof as any)
         setUserData({ name: (prof as any).full_name, email: (prof as any).email, phone: (prof as any).phone ?? '' })
