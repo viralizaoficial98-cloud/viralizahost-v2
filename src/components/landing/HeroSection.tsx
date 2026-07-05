@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Bot, ArrowRight, Shield, Zap, Star } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ArrowRight, Shield, Zap, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 /* ─── Types ─────────────────────────────────────────────────── */
@@ -33,28 +33,13 @@ type Slide = {
 
 /* ─── Slide data ─────────────────────────────────────────────── */
 const slides: Slide[] = [
-  /* ── SLIDE 1 — IA (NOT CHANGED) ─────────────────────────── */
+  /* ── SLIDE 1 — Vídeo IA ─────────────────────────────────── */
   {
     id: 0,
-    tag: 'Inteligência Artificial',
-    title: 'Automatize Processos com\nInteligência Artificial',
-    subtitle: 'Chatbots, automações inteligentes e agentes IA para transformar o seu negócio digitalmente.',
-    cta: 'Explorar Soluções IA',
-    ctaHref: '#servicos',
-    ctaSecondary: 'Saiba Mais',
-    ctaSecondaryHref: '#servicos',
-    icon: Bot,
-    bgImage: '/viraliza-ai-banner.png',
-    desktopPosition: 'right center',
-    tabletPosition: 'right center',
-    mobilePosition: 'center center',
+    imageOnly: true,       // no text overlay
+    bgImage: '',           // unused — video takes over
     bgColor: '#000000',
-    overlayColor: 'transparent',
-    overlayGradient: 'linear-gradient(to right, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.82) 32%, rgba(0,0,0,0.50) 60%, rgba(0,0,0,0.10) 100%)',
-    mobileOverlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.80) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.25) 100%)',
-    glowGradient: 'radial-gradient(ellipse 55% 70% at 82% 50%, rgba(245,183,0,0.08), transparent)',
     accentColor: '#F5B700',
-    features: ['Chatbots Inteligentes', 'Automação de Processos', 'Agentes IA'],
   },
 
   /* ── SLIDE 2 — E-mail Corporativo ───────────────────────── */
@@ -243,18 +228,37 @@ export function HeroSection() {
             {/* Base colour fill */}
             <div className="absolute inset-0" style={{ background: s.bgColor }} />
 
-            {/* ── imageOnly (slides 2 & 3): background-size:contain, sem corte ── */}
+            {/* ── imageOnly: slide 0 = video, slides 1 & 2 = static image ── */}
             {s.imageOnly ? (
-              /* Legacy full-bg mode (unused but kept for safety) */
-              <div
-                className="absolute inset-0"
-                style={{
-                  backgroundImage: `url(${s.bgImage})`,
-                  backgroundSize: s.bgSize ?? 'cover',
-                  backgroundPosition: pos,
-                  backgroundRepeat: 'no-repeat',
-                }}
-              />
+              i === 0 ? (
+                /* Slide 0 — full-screen video background */
+                <>
+                  <video
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="absolute inset-0 w-full h-full object-cover"
+                    aria-hidden="true"
+                  >
+                    <source src="/video_IA.mp4" type="video/mp4" />
+                  </video>
+                  {/* Dark overlay with subtle yellow edge glow */}
+                  <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.30) 50%, rgba(0,0,0,0.65) 100%)' }} />
+                  <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 100%, rgba(245,183,0,0.08), transparent)' }} />
+                </>
+              ) : (
+                /* Slides 1 & 2 — static image (unchanged) */
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage: `url(${s.bgImage})`,
+                    backgroundSize: s.bgSize ?? 'cover',
+                    backgroundPosition: pos,
+                    backgroundRepeat: 'no-repeat',
+                  }}
+                />
+              )
             ) : (
               /* Slide 0 — IA: parallax content slide */
               <div
