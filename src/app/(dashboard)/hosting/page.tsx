@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
-import { Server, HardDrive, Wifi, Shield, ExternalLink, Cpu, RefreshCw } from 'lucide-react'
+import { Server, HardDrive, Wifi, Shield, ExternalLink, Cpu, RefreshCw, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = { title: 'Hospedagem — ViralizaHost' }
@@ -23,12 +24,34 @@ async function fetchServices(userId: string) {
   return (result.data ?? []) as any[]
 }
 
+async function fetchHostingOrders(userId: string) {
+  const adminDb = await createAdminClient()
+  const { data } = await (adminDb as any)
+    .from('orders')
+    .select('id, status, amount, created_at, billing_cycle, order_items(service_name, service_type)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  const orders: any[] = data ?? []
+  return orders.filter((o: any) => {
+    const items: any[] = o.order_items ?? []
+    return items.some((i: any) => i.service_type === 'hosting' || i.service_type === 'reseller')
+  })
+}
+
 export default async function HostingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const services = await fetchServices(user.id)
+  const [services, hostingOrders] = await Promise.all([
+    fetchServices(user.id),
+    fetchHostingOrders(user.id),
+  ])
+
+  const pendingHostingOrders = hostingOrders.filter((o: any) =>
+    o.status === 'aguardando_confirmacao' || o.status === 'pending'
+  )
 
   return (
     <div className="space-y-7">
@@ -44,6 +67,51 @@ export default async function HostingPage() {
           <Server size={16} /> Adicionar Plano
         </a>
       </div>
+
+      {/* Pedidos de hosting pendentes */}
+      {pendingHostingOrders.length > 0 && (
+        <div className="rounded-2xl p-5" style={{ background: 'rgba(245,183,0,0.05)', border: '1px solid rgba(245,183,0,0.20)' }}>
+          <div className="flex items-center gap-2 mb-4">
+            <Clock size={15} style={{ color: '#D9A300' }} />
+            <h2 className="font-bold text-sm" style={{ color: '#0B0B0D' }}>Pedidos Aguardando Confirmação</h2>
+          </div>
+          <div className="space-y-3">
+            {pendingHostingOrders.map((order: any) => {
+              const item = (order.order_items ?? []).find((i: any) =>
+                i.service_type === 'hosting' || i.service_type === 'reseller'
+              )
+              const label = item?.service_name ?? 'Plano de Hospedagem'
+              const date  = new Date(order.created_at).toLocaleDateString('pt-AO')
+              const fmtAmt = `Kz ${Math.round(order.amount).toLocaleString('pt-AO')}`
+              return (
+                <div key={order.id} className="flex items-center justify-between py-3 px-4 rounded-xl bg-white"
+                  style={{ border: '1px solid rgba(245,183,0,0.25)' }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.20)' }}>
+                      <Server size={15} style={{ color: '#D9A300' }} />
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm" style={{ color: '#0B0B0D' }}>{label}</div>
+                      <div className="text-xs" style={{ color: '#94A3B8' }}>Enviado em {date} · {order.billing_cycle}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-black text-sm" style={{ color: '#0B0B0D' }}>{fmtAmt}</span>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full"
+                      style={{ background: 'rgba(245,183,0,0.15)', color: '#D9A300' }}>
+                      A confirmar
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs mt-3" style={{ color: '#94A3B8' }}>
+            Pagamento a ser verificado. O plano será ativado em até 24h úteis após confirmação.
+          </p>
+        </div>
+      )}
 
       {services.length > 0 ? (
         <div className="space-y-5">

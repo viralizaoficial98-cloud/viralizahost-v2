@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
-import { AlertCircle, TrendingUp, CheckCircle2, Clock, Server } from 'lucide-react'
+import { AlertCircle, TrendingUp, CheckCircle2, Clock, Server, ShoppingBag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { ServiceCard } from '@/components/dashboard/ServiceCard'
 import { redirect } from 'next/navigation'
@@ -16,6 +17,7 @@ const cardStyle = {
 // Todas as queries isoladas — falha individual nunca quebra a página
 async function fetchDashboardData(userId: string) {
   const supabase = await createClient()
+  const adminDb  = await createAdminClient()
 
   const results = await Promise.allSettled([
     supabase.from('domains').select('*', { count: 'exact', head: true }).eq('profile_id', userId).eq('status', 'active'),
@@ -31,6 +33,8 @@ async function fetchDashboardData(userId: string) {
     supabase.from('services')
       .select('id, plans(name, disk_gb, bandwidth_gb), hosting_accounts(primary_domain, disk_used_mb, bandwidth_used_mb), expires_at')
       .eq('profile_id', userId).eq('status', 'active').limit(4),
+    (adminDb as any).from('orders').select('id, status, amount, created_at, domain_name, payment_method, order_items(service_name, service_type)')
+      .eq('user_id', userId).order('created_at', { ascending: false }).limit(20),
   ])
 
   const getCount = (r: typeof results[0]) =>
@@ -46,6 +50,7 @@ async function fetchDashboardData(userId: string) {
     expiringItems:  getData(results[4]),
     recentActivity: getData(results[5]),
     activeServices: getData(results[6]),
+    orders:         getData(results[7]),
   }
 }
 
@@ -58,8 +63,12 @@ export default async function DashboardPage() {
 
   const {
     domainsCount, servicesCount, emailsCount, ticketsCount,
-    expiringItems, recentActivity, activeServices,
+    expiringItems, recentActivity, activeServices, orders,
   } = await fetchDashboardData(user.id)
+
+  const pendingOrders = orders.filter((o: any) =>
+    o.status === 'aguardando_confirmacao' || o.status === 'pending'
+  )
 
   const now = new Date()
   const in30days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
@@ -184,6 +193,53 @@ export default async function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {activeServices.map((svc: any) => <ServiceCard key={svc.id} svc={svc} />)}
           </div>
+        </div>
+      )}
+
+      {/* Pedidos Pendentes */}
+      {pendingOrders.length > 0 && (
+        <div className="rounded-2xl p-6" style={cardStyle}>
+          <div className="flex items-center gap-2 mb-5">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.20)' }}>
+              <ShoppingBag size={14} style={{ color: '#D9A300' }} />
+            </div>
+            <h2 className="text-sm font-bold" style={{ color: '#111827' }}>Pedidos Aguardando Confirmação</h2>
+            <span className="ml-auto text-xs font-black px-2.5 py-1 rounded-full"
+              style={{ background: 'rgba(245,183,0,0.12)', color: '#D9A300' }}>
+              {pendingOrders.length}
+            </span>
+          </div>
+          <div className="space-y-3">
+            {pendingOrders.map((order: any) => {
+              const items: any[] = order.order_items ?? []
+              const label = items[0]?.service_name ?? order.domain_name ?? 'Pedido'
+              const extra = items.length > 1 ? ` +${items.length - 1} item(s)` : ''
+              const date  = new Date(order.created_at).toLocaleDateString('pt-AO')
+              const fmtAmt = `Kz ${Math.round(order.amount).toLocaleString('pt-AO')}`
+              return (
+                <div key={order.id} className="flex items-center justify-between py-3 px-4 rounded-xl"
+                  style={{ background: 'rgba(245,183,0,0.05)', border: '1px solid rgba(245,183,0,0.15)' }}>
+                  <div>
+                    <div className="font-semibold text-sm" style={{ color: '#111827' }}>{label}{extra}</div>
+                    <div className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
+                      Enviado em {date} · {order.payment_method?.replace('_', ' ')}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-black" style={{ color: '#111827' }}>{fmtAmt}</span>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full"
+                      style={{ background: 'rgba(245,183,0,0.15)', color: '#D9A300' }}>
+                      A confirmar
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs mt-4" style={{ color: '#9CA3AF' }}>
+            O pagamento será verificado em até 24h úteis. Receberá confirmação por email.
+          </p>
         </div>
       )}
     </div>
