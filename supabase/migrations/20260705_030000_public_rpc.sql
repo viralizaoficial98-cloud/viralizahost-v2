@@ -7,6 +7,22 @@
 -- use SET search_path = viralizahost so they operate on viralizahost tables.
 -- ============================================================
 
+-- ── Ensure domains has order_id column (safe to re-run) ──────────────────────
+ALTER TABLE viralizahost.domains
+  ADD COLUMN IF NOT EXISTS order_id uuid REFERENCES viralizahost.orders(id) ON DELETE SET NULL;
+
+-- Unique constraint on domain name alone (for ON CONFLICT used in create_order)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'viralizahost.domains'::regclass
+    AND contype = 'u'
+    AND conname = 'domains_name_key'
+  ) THEN
+    ALTER TABLE viralizahost.domains ADD CONSTRAINT domains_name_key UNIQUE (name);
+  END IF;
+END $$;
+
 -- ── Drop old viralizahost-schema versions (replaced by public ones) ──────────
 DROP FUNCTION IF EXISTS viralizahost.create_order(uuid,text,text,text,text,numeric,text,text,text,jsonb);
 DROP FUNCTION IF EXISTS viralizahost.approve_order(uuid);
@@ -64,7 +80,7 @@ BEGIN
       (v_item->>'quantity')::int
     );
 
-    -- Look up plan by slug (domain/email items without a matching plan are skipped)
+    -- Look up plan by slug; domain/email items without a plan are skipped
     v_plan_id := NULL;
     SELECT id INTO v_plan_id FROM plans WHERE slug = v_item->>'plan_slug' LIMIT 1;
 
@@ -81,15 +97,15 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- 3. Create pending domain row
+  -- 3. Create pending domain row (no "registered" column — use registered_at DEFAULT)
   IF p_domain_name IS NOT NULL AND p_domain_name <> '' THEN
-    INSERT INTO domains (profile_id, name, status, registered, order_id)
-    VALUES (p_user_id, p_domain_name, 'pending', false, v_order_id)
+    INSERT INTO domains (profile_id, name, status, order_id)
+    VALUES (p_user_id, p_domain_name, 'pending', v_order_id)
     ON CONFLICT (name) DO UPDATE
       SET status     = 'pending',
-          registered = false,
           order_id   = EXCLUDED.order_id,
-          profile_id = EXCLUDED.profile_id;
+          profile_id = EXCLUDED.profile_id,
+          updated_at = now();
   END IF;
 
   RETURN jsonb_build_object('id', v_order_id, 'status', p_status);
@@ -108,9 +124,10 @@ SECURITY DEFINER
 SET search_path = viralizahost
 AS $$
 BEGIN
-  UPDATE orders   SET status = 'active',   updated_at = now() WHERE id = p_order_id;
-  UPDATE services SET status = 'active'                        WHERE order_id = p_order_id;
-  UPDATE domains  SET status = 'active',   registered = true   WHERE order_id = p_order_id;
+  UPDATE orders   SET status = 'active',    updated_at = now()   WHERE id = p_order_id;
+  UPDATE services SET status = 'active'                           WHERE order_id = p_order_id;
+  UPDATE domains  SET status = 'active',    registered_at = now(),
+                      updated_at = now()                          WHERE order_id = p_order_id;
   RETURN jsonb_build_object('ok', true, 'status', 'active');
 END;
 $$;
@@ -128,8 +145,8 @@ SET search_path = viralizahost
 AS $$
 BEGIN
   UPDATE orders   SET status = 'rejected', notes = p_notes, updated_at = now() WHERE id = p_order_id;
-  UPDATE services SET status = 'cancelled'                                       WHERE order_id = p_order_id;
-  UPDATE domains  SET status = 'cancelled'                                       WHERE order_id = p_order_id;
+  UPDATE services SET status = 'cancelled'                                        WHERE order_id = p_order_id;
+  UPDATE domains  SET status = 'cancelled', updated_at = now()                   WHERE order_id = p_order_id;
   RETURN jsonb_build_object('ok', true, 'status', 'rejected');
 END;
 $$;
