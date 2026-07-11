@@ -24,30 +24,35 @@ const SERVICE_ICONS: Record<ServiceType, React.ElementType> = {
 }
 
 const PLAN_CATALOG: Record<string, CheckoutItem> = {
+  // Hosting — slugs match site_hosting_plans.slug in DB
   starter:   { id: 'starter',   name: 'Starter Host',   type: 'hosting',  price: 4500,  currency: 'AOA', quantity: 1 },
   business:  { id: 'business',  name: 'Business Cloud', type: 'hosting',  price: 9500,  currency: 'AOA', quantity: 1 },
   pro:       { id: 'pro',       name: 'Cloud Pro',      type: 'hosting',  price: 19500, currency: 'AOA', quantity: 1 },
+  premium:   { id: 'premium',   name: 'Cloud Pro',      type: 'hosting',  price: 19500, currency: 'AOA', quantity: 1 },
   reseller:  { id: 'reseller',  name: 'Revenda WHM',    type: 'reseller', price: 35000, currency: 'AOA', quantity: 1 },
-  // EmailPricingSection IDs
-  'starter-mail':    { id: 'starter-mail',    name: 'Webmail Start',         type: 'email', price: 6800,  currency: 'AOA', quantity: 1 },
-  'business-mail':   { id: 'business-mail',   name: 'Webmail Business',      type: 'email', price: 14800, currency: 'AOA', quantity: 1 },
-  'enterprise-mail': { id: 'enterprise-mail', name: 'Webmail Enterprise',    type: 'email', price: 28000, currency: 'AOA', quantity: 1 },
-  'corporate-pro':   { id: 'corporate-pro',   name: 'Corporate Pro',         type: 'email', price: 45000, currency: 'AOA', quantity: 1 },
-  // EmailCorpSection IDs
-  'webmail-start':      { id: 'webmail-start',      name: 'Webmail Start',        type: 'email', price: 6800,  currency: 'AOA', quantity: 1 },
-  'webmail-business':   { id: 'webmail-business',   name: 'Webmail Business',     type: 'email', price: 14800, currency: 'AOA', quantity: 1 },
-  'webmail-enterprise': { id: 'webmail-enterprise', name: 'Webmail Enterprise',   type: 'email', price: 28000, currency: 'AOA', quantity: 1 },
-  'microsoft365':       { id: 'microsoft365',       name: 'Microsoft 365 Outlook',type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
-  // individual email pages
-  'microsoft-365-outlook': { id: 'microsoft-365-outlook', name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
-  // Domain TLDs — price = annual base price
+  // WordPress — slugs used in /hospedagem-wordpress page
+  'wp-start':  { id: 'wp-start',  name: 'WordPress Start',  type: 'hosting', price: 24900, currency: 'AOA', quantity: 1 },
+  'wp-pro':    { id: 'wp-pro',    name: 'WordPress Pro',    type: 'hosting', price: 49900, currency: 'AOA', quantity: 1 },
+  'wp-turbo':  { id: 'wp-turbo',  name: 'WordPress Turbo',  type: 'hosting', price: 99900, currency: 'AOA', quantity: 1 },
+  // Email — slugs match site_email_plans.slug in DB
+  'webmail-start':      { id: 'webmail-start',      name: 'Webmail Start',         type: 'email', price: 6800,  currency: 'AOA', quantity: 1 },
+  'webmail-business':   { id: 'webmail-business',   name: 'Webmail Business',      type: 'email', price: 14800, currency: 'AOA', quantity: 1 },
+  'webmail-enterprise': { id: 'webmail-enterprise', name: 'Webmail Enterprise',    type: 'email', price: 28000, currency: 'AOA', quantity: 1 },
+  'microsoft-365':      { id: 'microsoft-365',      name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
+  // Legacy email slugs (EmailPricingSection — page not currently rendered but kept for safety)
+  'starter-mail':       { id: 'starter-mail',       name: 'Webmail Start',         type: 'email', price: 6800,  currency: 'AOA', quantity: 1 },
+  'business-mail':      { id: 'business-mail',      name: 'Webmail Business',      type: 'email', price: 14800, currency: 'AOA', quantity: 1 },
+  'enterprise-mail':    { id: 'enterprise-mail',    name: 'Webmail Enterprise',    type: 'email', price: 28000, currency: 'AOA', quantity: 1 },
+  // Legacy aliases kept for backwards compat
+  'microsoft365':           { id: 'microsoft365',           name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
+  'microsoft-365-outlook':  { id: 'microsoft-365-outlook',  name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
+  // Domain TLDs — price = annual registration fee
   'domain.com':    { id: 'domain.com',    name: 'Domínio .com',    type: 'domain', price: 4500,  currency: 'AOA', quantity: 1 },
   'domain.net':    { id: 'domain.net',    name: 'Domínio .net',    type: 'domain', price: 5200,  currency: 'AOA', quantity: 1 },
   'domain.org':    { id: 'domain.org',    name: 'Domínio .org',    type: 'domain', price: 4800,  currency: 'AOA', quantity: 1 },
   'domain.ao':     { id: 'domain.ao',     name: 'Domínio .ao',     type: 'domain', price: 8000,  currency: 'AOA', quantity: 1 },
   'domain.com.br': { id: 'domain.com.br', name: 'Domínio .com.br', type: 'domain', price: 4900,  currency: 'AOA', quantity: 1 },
   'domain.io':     { id: 'domain.io',     name: 'Domínio .io',     type: 'domain', price: 18000, currency: 'AOA', quantity: 1 },
-  // domain-search fallback
   'domain-search': { id: 'domain-search', name: 'Domínio',         type: 'domain', price: 4500,  currency: 'AOA', quantity: 1 },
 }
 
@@ -804,39 +809,79 @@ function CheckoutContent() {
   const [catalogLoading, setCatalogLoading] = useState(true)
 
   const isDomainCheckout = items.length > 0 && items.every(i => i.type === 'domain')
+  const [planError, setPlanError] = useState<string | null>(null)
+
+  // Billing cycle URL param → store value mapping
+  const BILLING_URL_MAP: Record<string, BillingCycle> = {
+    monthly: 'monthly', annual: '1year', '1year': '1year',
+    '6months': '6months', '2years': '2years', '3years': '3years',
+  }
 
   // Load plan from URL with live DB prices — clears stale persisted state
   useEffect(() => {
     const planId = searchParams.get('plan')
     const domainParam = searchParams.get('domain')
+    const billingParam = searchParams.get('billing')
     clear()
     setStep(1)
+    setPlanError(null)
     setCatalogLoading(true)
+
+    // Apply billing cycle from URL if provided
+    if (billingParam && BILLING_URL_MAP[billingParam]) {
+      useCheckoutStore.getState().setBillingCycle(BILLING_URL_MAP[billingParam])
+    }
 
     const supabase = createClient()
     Promise.all([
       supabase.from('site_domains').select('extension,price_monthly,price_annual,currency,active').eq('active', true),
-      supabase.from('site_email_plans').select('slug,name,price_monthly,active').eq('active', true),
-      supabase.from('site_hosting_plans').select('slug,name,price_monthly,active').eq('active', true),
+      supabase.from('site_email_plans').select('slug,name,price_monthly,price_annual,active').eq('active', true),
+      supabase.from('site_hosting_plans').select('slug,name,price_monthly,price_annual,active').eq('active', true),
     ]).then(([{ data: domainRows }, { data: emailRows }, { data: hostingRows }]) => {
       // Build catalog: DB values override hardcoded fallbacks
       const catalog: Record<string, CheckoutItem> = { ...PLAN_CATALOG }
 
       domainRows?.forEach((d: any) => {
-        const key = 'domain' + d.extension  // '.com' → 'domain.com'
+        const key = 'domain' + d.extension
         const price = d.price_annual ?? d.price_monthly ?? 0
-        catalog[key] = { id: key, name: `Domínio ${d.extension}`, type: 'domain', price, currency: 'AOA', quantity: 1 }
+        if (price > 0) catalog[key] = { id: key, name: `Domínio ${d.extension}`, type: 'domain', price, currency: 'AOA', quantity: 1 }
       })
       emailRows?.forEach((e: any) => {
-        if (e.slug) catalog[e.slug] = { id: e.slug, name: e.name, type: 'email', price: e.price_monthly ?? 0, currency: 'AOA', quantity: 1 }
+        if (e.slug) {
+          const price = e.price_monthly ?? 0
+          if (price > 0) catalog[e.slug] = { id: e.slug, name: e.name, type: 'email', price, currency: 'AOA', quantity: 1 }
+        }
       })
       hostingRows?.forEach((h: any) => {
-        if (h.slug) catalog[h.slug] = { id: h.slug, name: h.name, type: 'hosting', price: h.price_monthly ?? 0, currency: 'AOA', quantity: 1 }
+        if (h.slug) {
+          const price = h.price_monthly ?? 0
+          if (price > 0) catalog[h.slug] = { id: h.slug, name: h.name, type: 'hosting', price, currency: 'AOA', quantity: 1 }
+        }
       })
 
       if (planId) {
         const plan = catalog[planId]
-        if (plan) {
+        if (plan && plan.price > 0) {
+          const name = domainParam ? `Domínio ${domainParam}` : plan.name
+          setItems([{ ...plan, name, quantity: 1 }])
+          if (plan.type === 'domain' && domainParam) {
+            useCheckoutStore.getState().setDomainName(domainParam)
+            useCheckoutStore.getState().setDomainAction('register')
+          }
+        } else if (plan && plan.price === 0) {
+          setPlanError('Não foi possível carregar o preço deste plano. Atualize a página ou entre em contacto com o suporte.')
+          console.error('[checkout] plan found but price=0:', planId, plan)
+        } else {
+          setPlanError('Plano não encontrado. Verifique o link ou entre em contacto com o suporte.')
+          console.error('[checkout] unknown plan slug:', planId)
+        }
+      }
+    }).catch((err) => {
+      console.error('[checkout] DB fetch failed, using hardcoded fallback:', err)
+      // DB unreachable: resolve from hardcoded fallback
+      if (planId) {
+        const plan = PLAN_CATALOG[planId]
+        if (plan && plan.price > 0) {
           const name = domainParam ? `Domínio ${domainParam}` : plan.name
           setItems([{ ...plan, name, quantity: 1 }])
           if (plan.type === 'domain' && domainParam) {
@@ -844,25 +889,12 @@ function CheckoutContent() {
             useCheckoutStore.getState().setDomainAction('register')
           }
         } else {
-          setItems([{ id: planId, name: planId, type: 'other', price: 0, currency: 'AOA', quantity: 1 }])
-        }
-      }
-    }).catch(() => {
-      // DB unreachable: resolve from hardcoded fallback
-      if (planId) {
-        const plan = PLAN_CATALOG[planId]
-        if (plan) {
-          const name = domainParam ? `Domínio ${domainParam}` : plan.name
-          setItems([{ ...plan, name, quantity: 1 }])
-          if (plan.type === 'domain' && domainParam) {
-            useCheckoutStore.getState().setDomainName(domainParam)
-            useCheckoutStore.getState().setDomainAction('register')
-          }
+          setPlanError('Não foi possível carregar o preço deste plano. Atualize a página ou entre em contacto com o suporte.')
         }
       }
     }).finally(() => setCatalogLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams.get('plan'), searchParams.get('domain')])
+  }, [searchParams.get('plan'), searchParams.get('domain'), searchParams.get('billing')])
 
   async function handleSubmit() {
     const state = useCheckoutStore.getState()
@@ -923,7 +955,19 @@ function CheckoutContent() {
           <div className="w-full lg:w-72 flex-shrink-0 space-y-4">
             {catalogLoading
               ? <div className="bg-white border border-[#E8E8E8] rounded-2xl p-8 shadow-sm flex justify-center"><Loader2 size={24} className="animate-spin text-[#F5B700]" /></div>
-              : <OrderSummary items={items} cycle={billingCycle} />
+              : planError
+                ? (
+                  <div className="bg-white border border-red-200 rounded-2xl p-6 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-bold text-red-700 mb-1">Plano não disponível</p>
+                        <p className="text-xs text-red-600">{planError}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+                : <OrderSummary items={items} cycle={billingCycle} />
             }
             <div className="bg-green-50 border border-green-200 rounded-xl p-4">
               <p className="text-xs font-black text-green-800 uppercase tracking-widest mb-2">Garantia</p>

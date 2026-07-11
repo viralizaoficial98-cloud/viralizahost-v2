@@ -109,7 +109,7 @@ const plans = [
   },
 ]
 
-type DbPlan = { id: string; name: string; description: string | null; badge: string | null; price_monthly: number | null; price_annual: number | null; discount_annual: number; features: string[] | null; active: boolean; featured: boolean; position: number }
+type DbPlan = { id: string; slug: string | null; name: string; description: string | null; badge: string | null; price_monthly: number | null; price_annual: number | null; discount_annual: number; features: string[] | null; active: boolean; featured: boolean; position: number }
 
 const PLAN_ICONS = [Zap, Rocket, Crown, Users, Server]
 const PLAN_ACCENTS = ['#3B82F6', '#F5B700', '#8B5CF6', '#EF4444', '#10B981']
@@ -177,7 +177,7 @@ export function PricingSection() {
                       </li>
                     ))}
                   </ul>
-                  <Link href={`/checkout?plan=${plan.id}`} className="block text-center py-3 rounded-2xl font-bold text-sm transition-all"
+                  <Link href={`/checkout?plan=${plan.slug ?? plan.id}&billing=${billing === 'annual' ? '1year' : 'monthly'}`} className="block text-center py-3 rounded-2xl font-bold text-sm transition-all"
                     style={plan.featured ? { background: accent, color: '#000', boxShadow: `0 8px 25px ${accent}40` } : { background: '#F3F4F6', color: '#0A0A0A' }}>
                     Começar agora
                   </Link>
