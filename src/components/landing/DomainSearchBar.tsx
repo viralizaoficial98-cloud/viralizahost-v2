@@ -15,7 +15,7 @@ const defaultExtensions: ExtItem[] = [
   { tld: '.io',     label: 'Startups & tech',    price: 'Kz 18.000/ano', priceNum: 18000, currency: 'AOA', popular: false },
 ]
 
-const currencySymbol: Record<string, string> = { AOA: 'Kz', USD: '$', BRL: 'R$', EUR: '€' }
+const currencySymbol: Record<string, string> = { AOA: 'Kz', AKZ: 'Kz', USD: '$', BRL: 'R$', EUR: '€' }
 
 // TLD → PLAN_CATALOG id
 const TLD_PLAN_ID: Record<string, string> = {

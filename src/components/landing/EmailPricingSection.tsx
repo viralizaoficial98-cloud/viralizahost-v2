@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Check, Mail, Shield, Database, Globe, Lock, Star, Phone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-type DbEmailPlan = { id: string; name: string; price_monthly: number | null; storage_gb: number; accounts: number; features: string[] | null; active: boolean; popular: boolean; color: string; position: number }
+type DbEmailPlan = { id: string; slug: string | null; name: string; price_monthly: number | null; storage_gb: number; accounts: number; features: string[] | null; active: boolean; popular: boolean; color: string; position: number }
 
 const emailPlans = [
   {
@@ -176,7 +176,7 @@ export function EmailPricingSection() {
                         </li>
                       ))}
                     </ul>
-                    <Link href={`/checkout?plan=${plan.id}`} className={`block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 ${
+                    <Link href={`/checkout?plan=${plan.slug ?? plan.id}`} className={`block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 ${
                       isPopular
                         ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300]'
                         : 'border border-[#E8E8E8] text-[#0A0A0A] hover:border-[#F5B700] hover:bg-[#F5B700]/5'

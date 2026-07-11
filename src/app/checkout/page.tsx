@@ -801,30 +801,66 @@ function CheckoutContent() {
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [catalogLoading, setCatalogLoading] = useState(true)
 
   const isDomainCheckout = items.length > 0 && items.every(i => i.type === 'domain')
 
-  // Always load plan from URL — clears stale persisted state
+  // Load plan from URL with live DB prices — clears stale persisted state
   useEffect(() => {
     const planId = searchParams.get('plan')
     const domainParam = searchParams.get('domain')
     clear()
-    if (planId) {
-      const plan = PLAN_CATALOG[planId]
-      if (plan) {
-        const name = domainParam ? `Domínio ${domainParam}` : plan.name
-        const isDomain = plan.type === 'domain'
-        setItems([{ ...plan, name, quantity: 1 }])
-        if (isDomain && domainParam) {
-          // Pre-fill domain info so Step 3 is skipped
-          useCheckoutStore.getState().setDomainName(domainParam)
-          useCheckoutStore.getState().setDomainAction('register')
-        }
-      } else {
-        setItems([{ id: planId, name: planId, type: 'other', price: 0, currency: 'AOA', quantity: 1 }])
-      }
-    }
     setStep(1)
+    setCatalogLoading(true)
+
+    const supabase = createClient()
+    Promise.all([
+      supabase.from('site_domains').select('extension,price_monthly,price_annual,currency,active').eq('active', true),
+      supabase.from('site_email_plans').select('slug,name,price_monthly,active').eq('active', true),
+      supabase.from('site_hosting_plans').select('slug,name,price_monthly,active').eq('active', true),
+    ]).then(([{ data: domainRows }, { data: emailRows }, { data: hostingRows }]) => {
+      // Build catalog: DB values override hardcoded fallbacks
+      const catalog: Record<string, CheckoutItem> = { ...PLAN_CATALOG }
+
+      domainRows?.forEach((d: any) => {
+        const key = 'domain' + d.extension  // '.com' → 'domain.com'
+        const price = d.price_annual ?? d.price_monthly ?? 0
+        catalog[key] = { id: key, name: `Domínio ${d.extension}`, type: 'domain', price, currency: 'AOA', quantity: 1 }
+      })
+      emailRows?.forEach((e: any) => {
+        if (e.slug) catalog[e.slug] = { id: e.slug, name: e.name, type: 'email', price: e.price_monthly ?? 0, currency: 'AOA', quantity: 1 }
+      })
+      hostingRows?.forEach((h: any) => {
+        if (h.slug) catalog[h.slug] = { id: h.slug, name: h.name, type: 'hosting', price: h.price_monthly ?? 0, currency: 'AOA', quantity: 1 }
+      })
+
+      if (planId) {
+        const plan = catalog[planId]
+        if (plan) {
+          const name = domainParam ? `Domínio ${domainParam}` : plan.name
+          setItems([{ ...plan, name, quantity: 1 }])
+          if (plan.type === 'domain' && domainParam) {
+            useCheckoutStore.getState().setDomainName(domainParam)
+            useCheckoutStore.getState().setDomainAction('register')
+          }
+        } else {
+          setItems([{ id: planId, name: planId, type: 'other', price: 0, currency: 'AOA', quantity: 1 }])
+        }
+      }
+    }).catch(() => {
+      // DB unreachable: resolve from hardcoded fallback
+      if (planId) {
+        const plan = PLAN_CATALOG[planId]
+        if (plan) {
+          const name = domainParam ? `Domínio ${domainParam}` : plan.name
+          setItems([{ ...plan, name, quantity: 1 }])
+          if (plan.type === 'domain' && domainParam) {
+            useCheckoutStore.getState().setDomainName(domainParam)
+            useCheckoutStore.getState().setDomainAction('register')
+          }
+        }
+      }
+    }).finally(() => setCatalogLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams.get('plan'), searchParams.get('domain')])
 
@@ -885,7 +921,10 @@ function CheckoutContent() {
         {/* Sidebar summary — hidden when done */}
         {!done && (
           <div className="w-full lg:w-72 flex-shrink-0 space-y-4">
-            <OrderSummary items={items} cycle={billingCycle} />
+            {catalogLoading
+              ? <div className="bg-white border border-[#E8E8E8] rounded-2xl p-8 shadow-sm flex justify-center"><Loader2 size={24} className="animate-spin text-[#F5B700]" /></div>
+              : <OrderSummary items={items} cycle={billingCycle} />
+            }
             <div className="bg-green-50 border border-green-200 rounded-xl p-4">
               <p className="text-xs font-black text-green-800 uppercase tracking-widest mb-2">Garantia</p>
               <p className="text-xs text-green-700">30 dias de garantia de satisfação. Sem perguntas.</p>

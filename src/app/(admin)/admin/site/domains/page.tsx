@@ -9,13 +9,13 @@ type Domain = {
   currency: string; popular: boolean; active: boolean; position: number
 }
 
-const empty: Omit<Domain, 'id' | 'position'> = { extension: '', price_monthly: null, price_annual: null, currency: 'AOA', popular: false, active: true }
+const empty: Omit<Domain, 'id' | 'position'> = { extension: '', price_monthly: null, price_annual: null, currency: 'AKZ', popular: false, active: true }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><label style={adminLabel}>{label}</label>{children}</div>
 }
 
-const currencyMap: Record<string, string> = { AOA: 'Kz', USD: '$', BRL: 'R$', EUR: '€' }
+const currencyMap: Record<string, string> = { AOA: 'Kz', AKZ: 'Kz', USD: '$', BRL: 'R$', EUR: '€' }
 
 export default function DomainsAdminPage() {
   const supabase = createClient() as any
@@ -98,7 +98,7 @@ export default function DomainsAdminPage() {
               <Field label="Extensão (ex: .com, .ao)"><input style={adminInput} value={form.extension} onChange={e => setForm(f => ({ ...f, extension: e.target.value }))} placeholder=".com" /></Field>
               <Field label="Moeda">
                 <select style={adminInput} value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}>
-                  <option value="AOA">AOA — Kwanza</option>
+                  <option value="AKZ">AKZ — Kwanza (Kz)</option>
                   <option value="USD">USD — Dólar</option>
                   <option value="BRL">BRL — Real</option>
                   <option value="EUR">EUR — Euro</option>

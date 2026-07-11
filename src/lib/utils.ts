@@ -26,6 +26,10 @@ export function getPlanPrice(plan: { price_akz: number; price_brl: number; price
   return map[currency]
 }
 
+export function formatKz(amount: number): string {
+  return `Kz ${amount.toLocaleString('pt-AO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+}
+
 export function truncate(str: string, length: number): string {
   return str.length > length ? str.slice(0, length) + '...' : str
 }
