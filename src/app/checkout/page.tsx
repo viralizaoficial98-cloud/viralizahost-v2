@@ -837,9 +837,17 @@ function CheckoutContent() {
       supabase.from('site_domains').select('extension,price_monthly,price_annual,currency,active').eq('active', true),
       supabase.from('site_email_plans').select('slug,name,price_monthly,price_annual,active').eq('active', true),
       supabase.from('site_hosting_plans').select('slug,name,price_monthly,price_annual,active').eq('active', true),
-    ]).then(([{ data: domainRows }, { data: emailRows }, { data: hostingRows }]) => {
+      supabase.from('products').select('slug,name,category,price_monthly,active').eq('active', true),
+    ]).then(([{ data: domainRows }, { data: emailRows }, { data: hostingRows }, { data: productRows }]) => {
       // Build catalog: DB values override hardcoded fallbacks
       const catalog: Record<string, CheckoutItem> = { ...PLAN_CATALOG }
+
+      const CATEGORY_TYPE: Record<string, ServiceType> = {
+        hosting: 'hosting', wordpress: 'hosting', vps: 'vps',
+        dedicated: 'dedicated', 'dedicated-windows': 'dedicated',
+        reseller: 'reseller', email: 'email', 'website-builder': 'other',
+        domain: 'domain',
+      }
 
       domainRows?.forEach((d: any) => {
         const key = 'domain' + d.extension
@@ -856,6 +864,14 @@ function CheckoutContent() {
         if (h.slug) {
           const price = h.price_monthly ?? 0
           if (price > 0) catalog[h.slug] = { id: h.slug, name: h.name, type: 'hosting', price, currency: 'AOA', quantity: 1 }
+        }
+      })
+      productRows?.forEach((p: any) => {
+        if (p.slug) {
+          const price = p.price_monthly ?? 0
+          const type: ServiceType = CATEGORY_TYPE[p.category] ?? 'other'
+          if (price > 0) catalog[p.slug] = { id: p.slug, name: p.name, type, price, currency: 'AOA', quantity: 1 }
+          else if (!catalog[p.slug]) catalog[p.slug] = { id: p.slug, name: p.name, type, price: 0, currency: 'AOA', quantity: 1 }
         }
       })
 

@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
-import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Monitor, HardDrive, Globe, Shield, Zap, Server, Headphones, Lock, RotateCcw } from 'lucide-react'
@@ -77,9 +78,10 @@ export default function ServidorDedicadoWindowsPage() {
           bgColor="#060810"
           highlights={['Windows Server 2022', 'Plesk Incluído', 'MS SQL Server', 'Remote Desktop']}
         />
-        <ServicePricingCards plans={plans} cols={3}
+        <DynamicServicePricing category="dedicated-windows" cols={3} showBillingToggle
           title="Servidor Dedicado Windows — Planos"
-          subtitle="Hardware exclusivo com Windows Server licenciado. Suporte especializado 24/7." />
+          subtitle="Hardware exclusivo com Windows Server licenciado. Suporte especializado 24/7."
+          fallbackPlans={plans} />
         <IncludedFeatures features={included} dark
           title="Infra-estrutura Windows completa incluída" />
         <FinalCTA

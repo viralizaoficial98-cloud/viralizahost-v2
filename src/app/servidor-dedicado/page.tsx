@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
-import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Cpu, HardDrive, Globe, Shield, Zap, Server, Headphones, Lock, RotateCcw } from 'lucide-react'
@@ -87,9 +88,10 @@ export default function ServidorDedicadoPage() {
           bgColor="#060810"
           highlights={['vCPU Exclusivas', 'RAM DDR5', 'NVMe SSD', 'Root Access Total']}
         />
-        <ServicePricingCards plans={plans} cols={4}
+        <DynamicServicePricing category="dedicated" cols={4} showBillingToggle
           title="Servidor Dedicado Linux — Planos"
-          subtitle="Recursos exclusivos, sem partilha. Máxima performance e controlo total." />
+          subtitle="Recursos exclusivos, sem partilha. Máxima performance e controlo total."
+          fallbackPlans={plans} />
         <IncludedFeatures features={included} dark
           title="Infra-estrutura enterprise incluída" />
         <FinalCTA

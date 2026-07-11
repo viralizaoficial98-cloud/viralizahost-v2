@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
-import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Cpu, HardDrive, Globe, Shield, Zap, Server, Headphones, Lock, RotateCcw } from 'lucide-react'
@@ -77,9 +78,10 @@ export default function ServidorVPSPage() {
           bgColor="#060b14"
           highlights={['RAM DDR5', 'NVMe SSD', 'IP Dedicado', 'Root Access']}
         />
-        <ServicePricingCards plans={plans} cols={3}
+        <DynamicServicePricing category="vps" cols={3} showBillingToggle
           title="Servidor VPS — Escolha o seu plano"
-          subtitle="Alta performance com escalabilidade total. Activação imediata." />
+          subtitle="Alta performance com escalabilidade total. Activação imediata."
+          fallbackPlans={plans} />
         <IncludedFeatures features={included} dark
           title="Infra-estrutura premium incluída" />
         <FinalCTA

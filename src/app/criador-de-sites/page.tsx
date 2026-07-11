@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
-import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Bot, Zap, Globe, Shield, BarChart, Headphones, Lock, Code, Layers } from 'lucide-react'
@@ -77,9 +78,10 @@ export default function CriadorDeSitesPage() {
           bgColor="#05080f"
           highlights={['Site pronto em minutos', 'Sem código', 'Hospedagem incluída', 'SEO automático']}
         />
-        <ServicePricingCards plans={plans} cols={3}
+        <DynamicServicePricing category="website-builder" cols={3} showBillingToggle
           title="Criador de Sites com IA — Planos"
-          subtitle="Crie sites profissionais sem nenhum conhecimento técnico." />
+          subtitle="Crie sites profissionais sem nenhum conhecimento técnico."
+          fallbackPlans={plans} />
         <IncludedFeatures features={included}
           title="Tudo incluído no seu criador de sites" />
         <FinalCTA

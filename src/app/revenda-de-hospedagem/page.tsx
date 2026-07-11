@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
-import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Users, Server, Globe, Shield, Mail, RotateCcw, Headphones, Lock, Layers } from 'lucide-react'
@@ -85,9 +86,10 @@ export default function RevendaDeHospedagemPage() {
           bgColor="#0a0a14"
           highlights={['WHM/cPanel Incluído', 'DNS Whitelabel', 'SSL por Conta', 'Suporte Revendedor']}
         />
-        <ServicePricingCards plans={plans} cols={4}
+        <DynamicServicePricing category="reseller" cols={4} showBillingToggle
           title="Revenda de Hospedagem — Escolha o plano"
-          subtitle="Comece a vender hospedagem hoje com a infraestrutura da ViralizaHost." />
+          subtitle="Comece a vender hospedagem hoje com a infraestrutura da ViralizaHost."
+          fallbackPlans={plans} />
         <IncludedFeatures features={included}
           title="Tudo o que precisa para revender hospedagem" />
         <FinalCTA
