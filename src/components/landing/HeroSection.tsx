@@ -221,7 +221,7 @@ export function HeroSection() {
       className="relative flex flex-col overflow-hidden"
       style={{
         background: '#000',
-        minHeight: bp === 'mobile' ? '760px' : bp === 'tablet' ? '720px' : 'calc(100vh - 80px)',
+        minHeight: bp === 'mobile' ? 'clamp(260px, 58vw, 420px)' : bp === 'tablet' ? '680px' : 'calc(100vh - 80px)',
       }}
       aria-label="Hero Slideshow"
     >
@@ -260,15 +260,18 @@ export function HeroSection() {
                   <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 100%, rgba(245,183,0,0.08), transparent)' }} />
                 </>
               ) : (
-                /* ── Image slide (DB banner or static fallback) ── */
+                /* ── Image slide (DB banner or static fallback) ──
+                   On mobile: object-fit contain so the full artwork is visible.
+                   On tablet/desktop: object-fit cover fills the section nicely. */
                 s.bgImage ? (
-                  <div
-                    className="absolute inset-0"
+                  <img
+                    src={s.bgImage}
+                    alt=""
+                    draggable={false}
+                    className="absolute inset-0 w-full h-full select-none"
                     style={{
-                      backgroundImage: `url(${s.bgImage})`,
-                      backgroundSize: s.bgSize ?? 'cover',
-                      backgroundPosition: pos,
-                      backgroundRepeat: 'no-repeat',
+                      objectFit: bp === 'mobile' ? 'contain' : 'cover',
+                      objectPosition: pos,
                     }}
                   />
                 ) : (
