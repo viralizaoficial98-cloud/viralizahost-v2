@@ -5,184 +5,201 @@ import { createAdminClient } from '@/lib/supabase/server'
 
 const seedBanners = [
   {
-    position: 0, active: true,
-    bg_image: '/viraliza-ai-banner.png', bg_color: '#000000', accent_color: '#F5B700',
-    tag: 'Inteligência Artificial',
-    title: 'Automatize Processos com\nInteligência Artificial',
-    subtitle: 'Chatbots, automações inteligentes e agentes IA para transformar o seu negócio digitalmente.',
-    cta_text: 'Explorar Soluções IA', cta_href: '#servicos',
-    cta_secondary_text: 'Saiba Mais', cta_secondary_href: '#servicos',
-    features: ['Chatbots Inteligentes', 'Automação de Processos', 'Agentes IA'],
-  },
-  {
     position: 1, active: true,
-    bg_image: '/viraliza-email-banner.png', bg_color: '#000000', accent_color: '#34D399',
-    tag: null, title: null, subtitle: null,
-    cta_text: null, cta_href: null, cta_secondary_text: null, cta_secondary_href: null,
-    features: [],
+    bg_image: '/viraliza-hosting-banner.png', bg_color: '#000000', accent_color: '#3b82f6',
+    tag: 'Hospedagem Web',
+    title: 'Profissional & Veloz',
+    subtitle: 'Servidores de alto desempenho em Angola para o seu negócio crescer online com segurança e velocidade.',
+    cta_text: 'Começar Agora', cta_href: '/checkout',
+    cta_secondary_text: 'Ver Planos', cta_secondary_href: '#planos',
+    features: ['99.9% Uptime', 'SSL Grátis', 'Suporte 24/7'],
   },
   {
     position: 2, active: true,
-    bg_image: '/servidores_banner.png', bg_color: '#000000', accent_color: '#F5B700',
-    tag: null, title: null, subtitle: null,
-    cta_text: null, cta_href: null, cta_secondary_text: null, cta_secondary_href: null,
-    features: [],
+    bg_image: '/viraliza-email-banner.png', bg_color: '#000000', accent_color: '#8b5cf6',
+    tag: 'Email Profissional',
+    title: 'Para o Seu Negócio',
+    subtitle: 'Tenha um email com o nome da sua empresa. Confiável, seguro e integrado com as melhores ferramentas do mercado.',
+    cta_text: 'Criar Email', cta_href: '/checkout',
+    cta_secondary_text: 'Saiba Mais', cta_secondary_href: '#email',
+    features: ['Anti-spam Avançado', 'Backup Diário', 'Webmail Incluído'],
+  },
+  {
+    position: 3, active: true,
+    bg_image: '/viraliza-domain-banner.png', bg_color: '#000000', accent_color: '#10b981',
+    tag: 'Domínios',
+    title: 'A Sua Identidade Online',
+    subtitle: 'Registe o domínio perfeito para o seu negócio. Disponível em .ao, .com, .net e muitas outras extensões.',
+    cta_text: 'Registar Domínio', cta_href: '/checkout',
+    cta_secondary_text: 'Verificar Disponibilidade', cta_secondary_href: '#dominios',
+    features: ['.ao Disponível', '.com Disponível', 'Transferência Grátis'],
   },
 ]
 
 const seedDomains = [
-  { position: 0, extension: '.com',    currency: 'AOA', price_monthly: null, price_annual: 4500,  popular: true,  active: true },
-  { position: 1, extension: '.net',    currency: 'AOA', price_monthly: null, price_annual: 5200,  popular: false, active: true },
-  { position: 2, extension: '.org',    currency: 'AOA', price_monthly: null, price_annual: 4800,  popular: false, active: true },
-  { position: 3, extension: '.ao',     currency: 'AOA', price_monthly: null, price_annual: 8000,  popular: true,  active: true },
-  { position: 4, extension: '.com.br', currency: 'BRL', price_monthly: null, price_annual: 49,    popular: false, active: true },
-  { position: 5, extension: '.io',     currency: 'AOA', price_monthly: null, price_annual: 18000, popular: false, active: true },
+  { position: 1, extension: '.com',    currency: 'AKZ', price_monthly: 4500,  price_annual: 4500,  popular: false, active: true },
+  { position: 2, extension: '.net',    currency: 'AKZ', price_monthly: 5200,  price_annual: 5200,  popular: false, active: true },
+  { position: 3, extension: '.org',    currency: 'AKZ', price_monthly: 4800,  price_annual: 4800,  popular: false, active: true },
+  { position: 4, extension: '.ao',     currency: 'AKZ', price_monthly: 8000,  price_annual: 8000,  popular: true,  active: true },
+  { position: 5, extension: '.com.br', currency: 'BRL', price_monthly: 49,    price_annual: 49,    popular: false, active: true },
+  { position: 6, extension: '.io',     currency: 'AKZ', price_monthly: 18000, price_annual: 18000, popular: false, active: true },
 ]
 
 const seedEmailPlans = [
   {
-    position: 0, active: true, popular: false, color: '#3B82F6',
-    name: 'Starter Mail', currency: 'AOA', price_monthly: 25000, price_annual: null,
-    storage_gb: 10, accounts: 5,
-    features: ['Anti-spam básico', 'Webmail moderno', 'IMAP / POP3 / SMTP', 'SSL/TLS seguro'],
+    slug: 'webmail-start', position: 1, active: true, popular: false, color: 'blue',
+    name: 'Webmail Start', price_monthly: 6800, storage_gb: 5, accounts: 1,
+    features: ['1 conta de email', '5 GB de armazenamento', 'Webmail incluído', 'Suporte básico'],
   },
   {
-    position: 1, active: true, popular: true, color: '#F5B700',
-    name: 'Business Mail', currency: 'AOA', price_monthly: 45000, price_annual: null,
-    storage_gb: 25, accounts: 10,
-    features: ['Anti-spam premium', 'Webmail moderno', 'IMAP / POP3 / SMTP', 'Backup semanal', 'SPF/DKIM/DMARC', 'Integração Outlook'],
+    slug: 'webmail-business', position: 2, active: true, popular: true, color: 'violet',
+    name: 'Webmail Business', price_monthly: 14800, storage_gb: 20, accounts: 5,
+    features: ['5 contas de email', '20 GB de armazenamento', 'Webmail incluído', 'Anti-spam avançado', 'Suporte prioritário'],
   },
   {
-    position: 2, active: true, popular: false, color: '#8B5CF6',
-    name: 'Enterprise Mail', currency: 'AOA', price_monthly: 95000, price_annual: null,
-    storage_gb: 50, accounts: 25,
-    features: ['Segurança avançada', 'Backup diário', 'SPF/DKIM/DMARC', 'Proteção avançada', 'Integração Outlook'],
+    slug: 'webmail-enterprise', position: 3, active: true, popular: false, color: 'emerald',
+    name: 'Webmail Enterprise', price_monthly: 28000, storage_gb: 50, accounts: 20,
+    features: ['20 contas de email', '50 GB de armazenamento', 'Webmail incluído', 'Anti-spam avançado', 'Backup diário', 'Suporte 24/7'],
+  },
+  {
+    slug: 'microsoft-365', position: 4, active: true, popular: false, color: 'orange',
+    name: 'Microsoft 365 Outlook', price_monthly: 52000, storage_gb: 50, accounts: 1,
+    features: ['1 conta Microsoft 365', '50 GB de armazenamento', 'Outlook, Teams, Word, Excel', 'OneDrive 1 TB', 'Suporte Microsoft', 'Integração completa Office'],
   },
 ]
 
 const seedHostingPlans = [
   {
-    position: 0, active: true, featured: false, badge: null,
-    name: 'Starter Host', description: 'Ideal para começar sua presença online',
-    price_monthly: 4500, price_annual: null, discount_annual: 20,
-    features: ['1 Site', '10 GB NVMe SSD', '100 GB Bandwidth', '5 Contas de Email', 'SSL Grátis', 'cPanel Premium', '3 Bases de Dados MySQL', 'Backup Semanal'],
+    slug: 'starter', position: 1, active: true, featured: false,
+    name: 'Starter Host', price_monthly: 4500, price_annual: 4500, currency: 'AKZ',
+    features: ['10 GB SSD', '100 GB Tráfego', '1 Domínio', 'SSL Grátis', 'cPanel', '1-click WordPress'],
   },
   {
-    position: 1, active: true, featured: true, badge: 'MAIS POPULAR',
-    name: 'Business Cloud', description: 'Para pequenas e m��dias empresas crescerem',
-    price_monthly: 9500, price_annual: null, discount_annual: 20,
-    features: ['5 Sites', '50 GB NVMe SSD', 'Bandwidth Ilimitado', '20 Contas de Email', 'SSL Grátis', 'cPanel Premium', '10 Bases de Dados MySQL', 'Backup Diário', 'Softaculous (400+ apps)'],
+    slug: 'business', position: 2, active: true, featured: true,
+    name: 'Business Cloud', price_monthly: 9500, price_annual: 9500, currency: 'AKZ',
+    features: ['25 GB SSD NVMe', '500 GB Tráfego', '5 Domínios', 'SSL Grátis', 'cPanel', 'Backups Diários', 'Email Profissional'],
   },
   {
-    position: 2, active: true, featured: false, badge: 'MELHOR VALOR',
-    name: 'Cloud Pro', description: 'Para empresas que exigem alta performance',
-    price_monthly: 19500, price_annual: null, discount_annual: 20,
-    features: ['Sites Ilimitados', '200 GB NVMe SSD', 'Bandwidth Ilimitado', 'Emails Ilimitados', 'Wildcard SSL Grátis', 'cPanel Premium', 'Bases de Dados Ilimitadas', 'Backup Diário Automático', 'IP Dedicado', 'Proteção DDoS Avançada'],
+    slug: 'premium', position: 3, active: true, featured: false,
+    name: 'Cloud Pro', price_monthly: 19500, price_annual: 19500, currency: 'AKZ',
+    features: ['60 GB SSD NVMe', 'Tráfego Ilimitado', '20 Domínios', 'SSL Grátis', 'cPanel', 'Backups Diários', 'IP Dedicado', 'Suporte Prioritário'],
+  },
+  {
+    slug: 'reseller', position: 4, active: true, featured: false,
+    name: 'Revenda WHM', price_monthly: 35000, price_annual: 35000, currency: 'AKZ',
+    features: ['150 GB SSD NVMe', 'Tráfego Ilimitado', 'Domínios Ilimitados', 'WHM/cPanel', 'WHMCS', 'IP Dedicado', 'Suporte 24/7'],
   },
 ]
 
 const seedTeam = [
   {
-    position: 0, active: true, is_ceo: true,
-    name: 'Manuel Muenho', title: 'CEO & Fundador', role: 'Liderança Estratégica',
-    bio: 'Visionário por trás da ViralizaHost, com foco em transformar o panorama digital angolano.',
-    photo_url: '/Manuel Muenho.jpeg', flag: '🇦🇴', country: 'Angola', accent_color: '#F5B700',
-  },
-  {
-    position: 1, active: true, is_ceo: false,
-    name: 'Ana Silva', title: 'Directora Técnica', role: 'Infraestrutura & DevOps',
-    bio: 'Especialista em infraestrutura cloud e automação de sistemas.',
-    photo_url: null, flag: '🇦🇴', country: 'Angola', accent_color: '#3B82F6',
+    position: 1, active: true, is_ceo: true,
+    name: 'Manuel Muenho', role: 'CEO & Founder', title: 'Chief Executive Officer',
+    bio: 'Fundador da ViralizaHost com visão de democratizar o acesso à tecnologia em Angola.',
+    photo_url: '/Manuel Muenho.jpeg', flag: '🇦🇴', country: 'Angola', accent_color: '#3b82f6',
   },
   {
     position: 2, active: true, is_ceo: false,
-    name: 'Carlos Rodrigues', title: 'Marketing & Growth', role: 'Tráfego Pago',
-    bio: 'Responsável pelo crescimento digital e aquisição de clientes.',
-    photo_url: null, flag: '🇦🇴', country: 'Angola', accent_color: '#10B981',
+    name: 'Lucas Marcelino', role: 'CTO', title: 'Chief Technology Officer',
+    bio: 'Responsável pela infraestrutura técnica e inovação dos nossos serviços de hospedagem.',
+    photo_url: null, flag: '🇦🇴', country: 'Angola', accent_color: '#8b5cf6',
+  },
+  {
+    position: 3, active: true, is_ceo: false,
+    name: 'Jacob Pessela', role: 'COO', title: 'Chief Operating Officer',
+    bio: 'Garante a excelência operacional e a qualidade dos serviços entregues aos nossos clientes.',
+    photo_url: null, flag: '🇦🇴', country: 'Angola', accent_color: '#10b981',
+  },
+  {
+    position: 4, active: true, is_ceo: false,
+    name: 'Vladimiro Francisco', role: 'Head of Infrastructure', title: 'Infraestrutura & DevOps',
+    bio: 'Especialista em servidores e redes, mantendo a disponibilidade e segurança da plataforma.',
+    photo_url: null, flag: '🇦🇴', country: 'Angola', accent_color: '#f59e0b',
+  },
+  {
+    position: 5, active: true, is_ceo: false,
+    name: 'Israel Soares', role: 'Head of Support', title: 'Suporte & Customer Success',
+    bio: 'Lidera a equipa de suporte garantindo que cada cliente receba ajuda rápida e eficaz.',
+    photo_url: null, flag: '🇦🇴', country: 'Angola', accent_color: '#ef4444',
+  },
+  {
+    position: 6, active: true, is_ceo: false,
+    name: 'Arnaldo Eduardo', role: 'Head of Sales', title: 'Vendas & Parcerias',
+    bio: 'Responsável pelo crescimento comercial e desenvolvimento de parcerias estratégicas.',
+    photo_url: null, flag: '🇦🇴', country: 'Angola', accent_color: '#06b6d4',
   },
 ]
+
+// Upsert conflict columns per table
+const UPSERT_CONFLICT: Record<string, string> = {
+  site_banners:       'position',
+  site_domains:       'extension',
+  site_email_plans:   'slug',
+  site_hosting_plans: 'slug',
+  site_team:          'name',
+}
 
 // Helpers -----------------------------------------------------------------
 
 const TABLES = ['site_banners', 'site_domains', 'site_email_plans', 'site_hosting_plans', 'site_team'] as const
 const DATASETS = [seedBanners, seedDomains, seedEmailPlans, seedHostingPlans, seedTeam]
 
-async function seedTable(
+async function getCount(
+  db: Awaited<ReturnType<typeof createAdminClient>>,
+  table: string,
+): Promise<{ count: number; error?: string }> {
+  const { count, error } = await (db as any)
+    .from(table)
+    .select('*', { count: 'exact', head: true })
+
+  if (error) {
+    console.error(`[seed-site] count error on ${table}:`, JSON.stringify(error))
+    return { count: 0, error: `count failed: ${error.message}` }
+  }
+  return { count: count ?? 0 }
+}
+
+async function upsertTable(
   db: Awaited<ReturnType<typeof createAdminClient>>,
   table: string,
   data: object[]
 ): Promise<{ seeded: boolean; count: number; error?: string }> {
-  console.log(`[seed-site] checking ${table}...`)
-
-  const { count, error: countErr } = await (db as any)
+  const { error } = await (db as any)
     .from(table)
-    .select('*', { count: 'exact', head: true })
+    .upsert(data, { onConflict: UPSERT_CONFLICT[table] })
 
-  if (countErr) {
-    console.error(`[seed-site] ❌ count error on ${table}:`, JSON.stringify(countErr))
-    return { seeded: false, count: 0, error: `count failed: ${countErr.message} (code: ${countErr.code})` }
+  if (error) {
+    console.error(`[seed-site] upsert error on ${table}:`, JSON.stringify(error))
+    return { seeded: false, count: 0, error: `upsert failed: ${error.message}` }
   }
 
-  console.log(`[seed-site] ${table} has ${count} rows`)
-
-  if ((count ?? 0) > 0) {
-    return { seeded: false, count: count ?? 0 }
-  }
-
-  const { error: insertErr } = await (db as any).from(table).insert(data)
-
-  if (insertErr) {
-    console.error(`[seed-site] ❌ insert error on ${table}:`, JSON.stringify(insertErr))
-    return { seeded: false, count: 0, error: `insert failed: ${insertErr.message} (code: ${insertErr.code})` }
-  }
-
-  console.log(`[seed-site] ✅ seeded ${data.length} rows into ${table}`)
   return { seeded: true, count: data.length }
 }
 
 // Handlers ----------------------------------------------------------------
 
 export async function POST() {
-  console.log('[seed-site] POST called — creating admin client...')
-
   const db = await createAdminClient()
 
-  console.log('[seed-site] admin client ready — starting seed...')
-
   const summary = await Promise.all(
-    TABLES.map((t, i) => seedTable(db, t, DATASETS[i]).then(r => ({ table: t, ...r })))
+    TABLES.map((t, i) => upsertTable(db, t, DATASETS[i]).then(r => ({ table: t, ...r })))
   )
 
-  const seededCount  = summary.filter(s => s.seeded).length
-  const skippedCount = summary.filter(s => !s.seeded && !s.error).length
-  const errorCount   = summary.filter(s => s.error).length
+  const seededCount = summary.filter(s => s.seeded).length
+  const errorCount  = summary.filter(s => s.error).length
 
-  console.log(`[seed-site] done — seeded: ${seededCount}, skipped: ${skippedCount}, errors: ${errorCount}`)
-  console.log('[seed-site] summary:', JSON.stringify(summary))
-
-  return NextResponse.json({ ok: errorCount === 0, summary, seededCount, skippedCount, errorCount })
+  return NextResponse.json({ ok: errorCount === 0, summary, seededCount, errorCount })
 }
 
 export async function GET() {
-  console.log('[seed-site] GET called — reading counts...')
-
   const db = await createAdminClient()
 
-  const results = await Promise.all(
-    TABLES.map(t => (db as any).from(t).select('*', { count: 'exact', head: true }))
-  )
+  const results = await Promise.all(TABLES.map(t => getCount(db, t)))
 
   const counts = TABLES.reduce((acc, t, i) => {
-    const r = results[i]
-    if (r.error) {
-      console.error(`[seed-site] GET count error on ${t}:`, JSON.stringify(r.error))
-      acc[t] = 0
-    } else {
-      acc[t] = r.count ?? 0
-    }
+    acc[t] = results[i].count
     return acc
   }, {} as Record<string, number>)
 
-  console.log('[seed-site] counts:', JSON.stringify(counts))
   return NextResponse.json(counts)
 }
