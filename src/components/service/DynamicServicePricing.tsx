@@ -114,17 +114,19 @@ export function DynamicServicePricing({ category, subcategory, title = 'Escolha 
           <p className="text-[#666] max-w-xl mx-auto text-sm md:text-base">{subtitle}</p>
 
           {showBillingToggle && (
-            <div className="inline-flex items-center gap-1 bg-white border border-[#E8E8E8] rounded-2xl p-1.5 shadow-sm mt-6">
-              {(Object.keys(CYCLE_LABELS) as BillingCycle[]).map(c => (
-                <button
-                  key={c}
-                  onClick={() => setBilling(c)}
-                  className={`px-4 py-2 rounded-xl font-semibold text-xs transition-all ${billing === c ? 'bg-[#F5B700] text-[#0A0A0A] shadow-sm' : 'text-gray-500 hover:text-[#0A0A0A]'}`}
-                >
-                  {CYCLE_LABELS[c]}
-                  {CYCLE_DISCOUNTS[c] > 0 && <span className="ml-1 opacity-70">-{CYCLE_DISCOUNTS[c]}%</span>}
-                </button>
-              ))}
+            <div className="flex justify-center mt-6">
+              <div className="flex items-center gap-1 bg-white border border-[#E8E8E8] rounded-2xl p-1.5 shadow-sm overflow-x-auto max-w-full" style={{ scrollbarWidth: 'none' }}>
+                {(Object.keys(CYCLE_LABELS) as BillingCycle[]).map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setBilling(c)}
+                    className={`shrink-0 px-3 sm:px-4 py-2 rounded-xl font-semibold text-xs transition-all whitespace-nowrap ${billing === c ? 'bg-[#F5B700] text-[#0A0A0A] shadow-sm' : 'text-gray-500 hover:text-[#0A0A0A]'}`}
+                  >
+                    {CYCLE_LABELS[c]}
+                    {CYCLE_DISCOUNTS[c] > 0 && <span className="ml-1 opacity-70">-{CYCLE_DISCOUNTS[c]}%</span>}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>

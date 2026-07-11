@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Custom breakpoint for very small screens (used in checkout label) */
+@custom-variant xs (&:where([data-viewport~="xs"], [data-viewport~="xs"] *));
+@media (min-width: 480px) { .xs\:inline { display: inline !important; } .xs\:hidden { display: none !important; } }
+
 :root {
   --brand-yellow: #F5B700;
   --brand-yellow-dark: #D9A300;
@@ -24,7 +28,11 @@ body {
   color: #0A0A0A;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
+
+/* Prevent horizontal overflow on all pages */
+html { overflow-x: hidden; }
 
 /* ANIMATIONS */
 @keyframes fadeInUp {

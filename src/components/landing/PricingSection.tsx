@@ -197,10 +197,10 @@ export function PricingSection() {
         {/* Header */}
         <div className="text-center mb-16">
           <span className="section-tag mb-5 inline-flex">Hospedagem Premium</span>
-          <h2 className="text-4xl lg:text-5xl font-black text-[#0A0A0A] mb-5">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0A0A0A] mb-5">
             Planos de <span className="gradient-text">Hospedagem</span>
           </h2>
-          <p className="text-gray-500 text-xl max-w-2xl mx-auto mb-8">
+          <p className="text-gray-500 text-base sm:text-xl max-w-2xl mx-auto mb-8">
             Escolha o plano ideal para escalar o seu negócio. SSL grátis, cPanel Premium, backup e suporte 24/7.
           </p>
 
@@ -208,7 +208,7 @@ export function PricingSection() {
           <div className="inline-flex items-center gap-2 bg-white border border-[#E8E8E8] rounded-2xl p-1.5 shadow-sm">
             <button
               onClick={() => setBilling('monthly')}
-              className={`px-6 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+              className={`px-4 sm:px-6 py-2.5 rounded-xl font-semibold text-sm transition-all ${
                 billing === 'monthly'
                   ? 'bg-[#0A0A0A] text-white shadow-sm'
                   : 'text-gray-500 hover:text-[#0A0A0A]'
@@ -218,7 +218,7 @@ export function PricingSection() {
             </button>
             <button
               onClick={() => setBilling('annual')}
-              className={`px-6 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-6 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 ${
                 billing === 'annual'
                   ? 'bg-[#F5B700] text-[#0A0A0A] shadow-sm'
                   : 'text-gray-500 hover:text-[#0A0A0A]'

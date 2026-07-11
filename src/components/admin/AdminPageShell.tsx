@@ -13,23 +13,23 @@ interface AdminPageShellProps {
 
 export function AdminPageShell({ title, subtitle, backHref = '/admin/site', action, children }: AdminPageShellProps) {
   return (
-    <div className="space-y-7">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <div className="space-y-5 md:space-y-7">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Link href={backHref}
-            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0"
             style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#E2E8F0' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#F1F5F9' }}
           >
             <ArrowLeft size={16} />
           </Link>
-          <div>
-            <h1 className="text-2xl font-black" style={{ color: '#0B0B0D' }}>{title}</h1>
-            <p className="text-sm" style={{ color: '#64748B' }}>{subtitle}</p>
+          <div className="min-w-0">
+            <h1 className="text-xl md:text-2xl font-black truncate" style={{ color: '#0B0B0D' }}>{title}</h1>
+            <p className="text-sm truncate" style={{ color: '#64748B' }}>{subtitle}</p>
           </div>
         </div>
-        {action}
+        {action && <div className="shrink-0">{action}</div>}
       </div>
       {children}
     </div>

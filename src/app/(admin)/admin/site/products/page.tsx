@@ -281,15 +281,15 @@ export default function AdminProductsPage() {
   const filtered = filterCat ? products.filter(p => p.category === filterCat) : products
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-6xl mx-auto px-0 sm:px-2 py-4 md:py-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-black text-[#0A0A0A]">Gestão de Produtos</h1>
+          <h1 className="text-xl md:text-2xl font-black text-[#0A0A0A]">Gestão de Produtos</h1>
           <p className="text-sm text-[#888] mt-1">Todos os planos e serviços do website, carregados dinamicamente.</p>
         </div>
         <button
           onClick={() => { setCreating(true); setEditingId(null) }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#F5B700] text-[#0A0A0A] text-sm font-bold rounded-xl hover:bg-[#D9A300] transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#F5B700] text-[#0A0A0A] text-sm font-bold rounded-xl hover:bg-[#D9A300] transition-colors self-start sm:self-auto shrink-0"
         >
           <Plus size={15} /> Novo Produto
         </button>

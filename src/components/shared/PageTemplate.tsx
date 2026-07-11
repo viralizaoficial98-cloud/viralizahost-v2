@@ -49,12 +49,12 @@ export function PageTemplate({
               {badge}
             </div>
             {titleHtml ? (
-              <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6"
+              <h1 className="text-3xl sm:text-4xl lg:text-6xl font-black text-white leading-tight mb-6"
                 dangerouslySetInnerHTML={{ __html: titleHtml }} />
             ) : (
-              <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">{title}</h1>
+              <h1 className="text-3xl sm:text-4xl lg:text-6xl font-black text-white leading-tight mb-6">{title}</h1>
             )}
-            <p className="text-lg lg:text-xl leading-relaxed mb-10 max-w-2xl mx-auto"
+            <p className="text-base lg:text-xl leading-relaxed mb-10 max-w-2xl mx-auto"
               style={{ color: 'rgba(255,255,255,0.60)' }}>{subtitle}</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href={ctaHref}
