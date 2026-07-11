@@ -100,7 +100,13 @@ function dbToSlide(b: DbBanner, i: number): Slide {
     ctaSecondary: b.cta_secondary_text ?? undefined,
     ctaSecondaryHref: b.cta_secondary_href ?? undefined,
     features: b.features ?? undefined,
-    imageOnly: !b.title && !b.tag,
+    // Always imageOnly: banner images contain their own text baked in;
+    // index 0 renders as video, index 1+ render as background image.
+    imageOnly: true,
+    bgSize: 'contain',
+    desktopPosition: 'center center',
+    tabletPosition: 'center center',
+    mobilePosition: 'center center',
   }
 }
 
