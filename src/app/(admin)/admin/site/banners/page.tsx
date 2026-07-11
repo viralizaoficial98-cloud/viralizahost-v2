@@ -1,9 +1,10 @@
 'use client'
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Plus, Pencil, Trash2, ChevronUp, ChevronDown,
-  Eye, EyeOff, Image as ImageIcon, Upload, X, Loader2, CheckCircle, AlertCircle, Link2,
+  AlertCircle, CheckCircle, ChevronDown, ChevronUp,
+  Eye, EyeOff, Image as ImageIcon, Link2,
+  Loader2, Pencil, Plus, Trash2, Upload, X,
 } from 'lucide-react'
 import {
   AdminPageShell, adminCard, adminInput, adminLabel,
@@ -26,27 +27,24 @@ const empty: Omit<Banner, 'id' | 'position'> = {
   cta_secondary_text: '', cta_secondary_href: '#', features: [],
 }
 
-/* ─── Resolve public URL from any bg_image value ────────────────────── */
+/* ─── Resolve displayable URL ────────────────────────────────────────── */
 function resolveBannerImageUrl(value: string | null | undefined): string | null {
   if (!value) return null
   const s = value.trim()
   if (!s) return null
-  // Absolute URL (storage or external)
   if (s.startsWith('http://') || s.startsWith('https://')) return s
-  // Relative to /public
   if (s.startsWith('/')) return s
   return null
 }
 
+/* ─── Upload state ───────────────────────────────────────────────────── */
 type UploadState =
   | { status: 'idle' }
   | { status: 'uploading'; progress: number }
   | { status: 'success'; url: string; name: string }
   | { status: 'error'; message: string }
 
-const BUCKET = 'site-banners'
-const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
-const ALLOWED = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+const ALLOWED_EXT = '.png,.jpg,.jpeg,.webp'
 
 /* ─── ImageUploadArea ────────────────────────────────────────────────── */
 function ImageUploadArea({
@@ -56,7 +54,6 @@ function ImageUploadArea({
   currentUrl: string | null
   onUrlChange: (url: string) => void
 }) {
-  const supabase = createClient() as any
   const fileRef = useRef<HTMLInputElement>(null)
   const [upload, setUpload] = useState<UploadState>({ status: 'idle' })
   const [dragging, setDragging] = useState(false)
@@ -66,58 +63,41 @@ function ImageUploadArea({
   const resolved = resolveBannerImageUrl(currentUrl)
 
   const handleFile = useCallback(async (file: File) => {
-    if (!ALLOWED.includes(file.type)) {
-      setUpload({ status: 'error', message: 'Formato não suportado. Use PNG, JPG, JPEG ou WEBP.' })
-      return
-    }
-    if (file.size > MAX_BYTES) {
-      setUpload({ status: 'error', message: `Ficheiro muito grande (${(file.size / 1024 / 1024).toFixed(1)} MB). Máximo: 10 MB.` })
-      return
-    }
+    setUpload({ status: 'uploading', progress: 10 })
 
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png'
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-
-    setUpload({ status: 'uploading', progress: 0 })
-
-    // Supabase JS v2 does not expose upload progress natively; simulate incremental
+    // Animate progress while request is in-flight
+    let pct = 10
     const ticker = setInterval(() => {
-      setUpload(prev => prev.status === 'uploading'
-        ? { status: 'uploading', progress: Math.min((prev as any).progress + 12, 85) }
-        : prev
-      )
-    }, 200)
+      pct = Math.min(pct + 10, 85)
+      setUpload({ status: 'uploading', progress: pct })
+    }, 250)
 
-    const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-      cacheControl: '31536000',
-      upsert: false,
-      contentType: file.type,
-    })
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
 
-    clearInterval(ticker)
+      const res = await fetch('/api/admin/storage/banner', { method: 'POST', body: fd })
+      clearInterval(ticker)
 
-    if (error) {
-      setUpload({ status: 'error', message: `Erro no upload: ${error.message}` })
-      return
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        setUpload({ status: 'error', message: json.error ?? 'Erro desconhecido' })
+        return
+      }
+
+      setUpload({ status: 'success', url: json.publicUrl, name: json.fileName })
+      onUrlChange(json.publicUrl)
+    } catch (err: any) {
+      clearInterval(ticker)
+      setUpload({ status: 'error', message: err.message ?? 'Falha na ligação ao servidor' })
     }
-
-    const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path)
-    const publicUrl: string = urlData?.publicUrl ?? ''
-
-    setUpload({ status: 'success', url: publicUrl, name: file.name })
-    onUrlChange(publicUrl)
-  }, [supabase, onUrlChange])
+  }, [onUrlChange])
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragging(false)
     const file = e.dataTransfer.files?.[0]
     if (file) handleFile(file)
   }, [handleFile])
-
-  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) handleFile(file)
-  }
 
   const removeImage = () => { onUrlChange(''); setUpload({ status: 'idle' }) }
 
@@ -130,7 +110,7 @@ function ImageUploadArea({
         <div className="relative rounded-xl overflow-hidden" style={{ border: '1px solid #E2E8F0' }}>
           <img
             src={resolved}
-            alt="Preview do banner"
+            alt="Preview"
             className="w-full h-36 object-cover"
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
           />
@@ -143,8 +123,8 @@ function ImageUploadArea({
           >
             <X size={14} />
           </button>
-          <div className="absolute bottom-0 left-0 right-0 px-3 py-1.5 text-xs" style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}>
-            {resolved.startsWith('http') ? 'Supabase Storage' : 'Ficheiro local /public'}
+          <div className="absolute bottom-0 left-0 right-0 px-3 py-1 text-xs truncate" style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}>
+            {resolved.startsWith('http') ? 'Supabase Storage' : 'Ficheiro /public'}
           </div>
         </div>
       )}
@@ -156,7 +136,7 @@ function ImageUploadArea({
         onDragOver={e => e.preventDefault()}
         onDrop={onDrop}
         onClick={() => fileRef.current?.click()}
-        className="relative flex flex-col items-center justify-center gap-2 rounded-xl cursor-pointer transition-all"
+        className="flex flex-col items-center justify-center gap-2 rounded-xl cursor-pointer transition-all"
         style={{
           border: `2px dashed ${dragging ? '#F5B700' : '#E2E8F0'}`,
           background: dragging ? 'rgba(245,183,0,0.04)' : '#FAFAFA',
@@ -164,13 +144,19 @@ function ImageUploadArea({
           minHeight: 100,
         }}
       >
-        <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.webp" className="sr-only" onChange={onInputChange} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept={ALLOWED_EXT}
+          className="sr-only"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
+        />
 
         {upload.status === 'uploading' ? (
           <>
             <Loader2 size={24} className="animate-spin" style={{ color: '#F5B700' }} />
             <div className="w-full max-w-xs rounded-full h-1.5" style={{ background: '#E2E8F0' }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${upload.progress}%`, background: '#F5B700' }} />
+              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${upload.progress}%`, background: '#F5B700' }} />
             </div>
             <span className="text-xs" style={{ color: '#94A3B8' }}>A enviar… {upload.progress}%</span>
           </>
@@ -179,6 +165,7 @@ function ImageUploadArea({
             <CheckCircle size={22} style={{ color: '#10B981' }} />
             <span className="text-xs font-semibold" style={{ color: '#10B981' }}>Upload concluído</span>
             <span className="text-xs" style={{ color: '#94A3B8' }}>{upload.name}</span>
+            <span className="text-xs" style={{ color: '#64748B' }}>Clique ou arraste para substituir</span>
           </>
         ) : (
           <>
@@ -187,13 +174,14 @@ function ImageUploadArea({
               {resolved ? 'Substituir imagem' : 'Selecionar imagem'}
             </span>
             <span className="text-xs text-center" style={{ color: '#94A3B8' }}>
-              Arraste aqui ou clique para selecionar<br />PNG, JPG, WEBP · Máx. 10 MB · Recomendado: 1920×800
+              Arraste aqui ou clique para selecionar<br />
+              PNG, JPG, WEBP · Máx. 10 MB · Recomendado: 1920×800
             </span>
           </>
         )}
       </div>
 
-      {/* Upload error */}
+      {/* Error */}
       {upload.status === 'error' && (
         <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.20)', color: '#DC2626' }}>
           <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
@@ -201,7 +189,7 @@ function ImageUploadArea({
         </div>
       )}
 
-      {/* URL fallback toggle */}
+      {/* URL fallback */}
       <button
         type="button"
         onClick={() => setShowUrlInput(v => !v)}
@@ -213,7 +201,7 @@ function ImageUploadArea({
       </button>
 
       {showUrlInput && (
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <input
             style={adminInput}
             value={urlDraft}
@@ -222,7 +210,7 @@ function ImageUploadArea({
             onBlur={() => onUrlChange(urlDraft)}
           />
           <p className="text-xs" style={{ color: '#94A3B8' }}>
-            Use apenas caminhos de ficheiros em <code>/public</code> ou URLs do Supabase Storage.
+            Ficheiros em <code>/public</code> ou URLs públicas do Supabase Storage.
           </p>
         </div>
       )}
@@ -254,7 +242,9 @@ export default function BannersPage() {
   }
   useEffect(() => { load() }, [])
 
-  const openNew = () => { setEditing(null); setForm(empty); setFeaturesText(''); setShowModal(true) }
+  const openNew = () => {
+    setEditing(null); setForm(empty); setFeaturesText(''); setShowModal(true)
+  }
   const openEdit = (b: Banner) => {
     setEditing(b)
     setForm({
@@ -336,34 +326,36 @@ export default function BannersPage() {
                   <tr key={b.id} style={{ borderBottom: i < banners.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
                     <td style={{ padding: '14px 20px' }}>
                       <div className="flex items-center gap-0.5">
-                        <button onClick={() => move(b, -1)} className="p-1 rounded transition-colors" style={{ color: '#CBD5E1' }} onMouseEnter={e => (e.currentTarget as any).style.color = '#0B0B0D'} onMouseLeave={e => (e.currentTarget as any).style.color = '#CBD5E1'}><ChevronUp size={13} /></button>
+                        <button onClick={() => move(b, -1)} className="p-1 rounded" style={{ color: '#CBD5E1' }} onMouseEnter={e => (e.currentTarget as any).style.color = '#0B0B0D'} onMouseLeave={e => (e.currentTarget as any).style.color = '#CBD5E1'}><ChevronUp size={13} /></button>
                         <span className="text-xs font-mono font-bold w-5 text-center" style={{ color: '#64748B' }}>{b.position}</span>
-                        <button onClick={() => move(b, 1)} className="p-1 rounded transition-colors" style={{ color: '#CBD5E1' }} onMouseEnter={e => (e.currentTarget as any).style.color = '#0B0B0D'} onMouseLeave={e => (e.currentTarget as any).style.color = '#CBD5E1'}><ChevronDown size={13} /></button>
+                        <button onClick={() => move(b, 1)} className="p-1 rounded" style={{ color: '#CBD5E1' }} onMouseEnter={e => (e.currentTarget as any).style.color = '#0B0B0D'} onMouseLeave={e => (e.currentTarget as any).style.color = '#CBD5E1'}><ChevronDown size={13} /></button>
                       </div>
                     </td>
                     <td style={{ padding: '14px 20px' }}>
                       {previewUrl ? (
-                        <img
-                          src={previewUrl}
-                          alt=""
-                          className="h-10 w-20 object-cover rounded-lg"
-                          style={{ border: '1px solid #E2E8F0' }}
-                          onError={e => {
-                            const img = e.currentTarget as HTMLImageElement
-                            img.style.display = 'none'
-                            const fallback = img.nextElementSibling as HTMLElement | null
-                            if (fallback) fallback.style.display = 'flex'
-                          }}
-                        />
-                      ) : null}
-                      <div
-                        className="h-10 w-20 rounded-lg items-center justify-center"
-                        style={{ background: b.bg_color ?? '#000', border: '1px solid #E2E8F0', display: previewUrl ? 'none' : 'flex' }}
-                      >
-                        {!previewUrl && (
+                        <>
+                          <img
+                            src={previewUrl}
+                            alt=""
+                            className="h-10 w-20 object-cover rounded-lg"
+                            style={{ border: '1px solid #E2E8F0' }}
+                            onError={e => {
+                              const img = e.currentTarget as HTMLImageElement
+                              img.style.display = 'none'
+                              const sib = img.nextElementSibling as HTMLElement | null
+                              if (sib) sib.style.display = 'flex'
+                            }}
+                          />
+                          {/* Fallback if image fails to load */}
+                          <div className="h-10 w-20 rounded-lg items-center justify-center hidden" style={{ background: b.bg_color ?? '#000', border: '1px solid #E2E8F0' }}>
+                            <ImageIcon size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="h-10 w-20 rounded-lg flex items-center justify-center" style={{ background: b.bg_color ?? '#000', border: '1px solid #E2E8F0' }}>
                           <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>▶ vídeo</span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '14px 20px' }}>
                       <div className="font-semibold text-sm" style={{ color: '#0B0B0D' }}>
@@ -378,7 +370,7 @@ export default function BannersPage() {
                     <td style={{ padding: '14px 20px' }}>
                       <button
                         onClick={() => toggle(b)}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-full transition-all"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-full"
                         style={b.active
                           ? { background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.20)' }
                           : { background: '#F1F5F9', color: '#94A3B8', border: '1px solid #E2E8F0' }}
@@ -389,8 +381,8 @@ export default function BannersPage() {
                     </td>
                     <td style={{ padding: '14px 20px' }}>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => openEdit(b)} className="p-2 rounded-lg transition-all" style={{ color: '#94A3B8', background: '#F8FAFC' }} onMouseEnter={e => { (e.currentTarget as any).style.color = '#D9A300'; (e.currentTarget as any).style.background = 'rgba(245,183,0,0.08)' }} onMouseLeave={e => { (e.currentTarget as any).style.color = '#94A3B8'; (e.currentTarget as any).style.background = '#F8FAFC' }}><Pencil size={14} /></button>
-                        <button onClick={() => remove(b.id)} className="p-2 rounded-lg transition-all" style={{ color: '#94A3B8', background: '#F8FAFC' }} onMouseEnter={e => { (e.currentTarget as any).style.color = '#DC2626'; (e.currentTarget as any).style.background = 'rgba(239,68,68,0.08)' }} onMouseLeave={e => { (e.currentTarget as any).style.color = '#94A3B8'; (e.currentTarget as any).style.background = '#F8FAFC' }}><Trash2 size={14} /></button>
+                        <button onClick={() => openEdit(b)} className="p-2 rounded-lg" style={{ color: '#94A3B8', background: '#F8FAFC' }} onMouseEnter={e => { (e.currentTarget as any).style.color = '#D9A300'; (e.currentTarget as any).style.background = 'rgba(245,183,0,0.08)' }} onMouseLeave={e => { (e.currentTarget as any).style.color = '#94A3B8'; (e.currentTarget as any).style.background = '#F8FAFC' }}><Pencil size={14} /></button>
+                        <button onClick={() => remove(b.id)} className="p-2 rounded-lg" style={{ color: '#94A3B8', background: '#F8FAFC' }} onMouseEnter={e => { (e.currentTarget as any).style.color = '#DC2626'; (e.currentTarget as any).style.background = 'rgba(239,68,68,0.08)' }} onMouseLeave={e => { (e.currentTarget as any).style.color = '#94A3B8'; (e.currentTarget as any).style.background = '#F8FAFC' }}><Trash2 size={14} /></button>
                       </div>
                     </td>
                   </tr>
@@ -408,18 +400,16 @@ export default function BannersPage() {
             <div className="px-6 py-5" style={{ borderBottom: '1px solid #F1F5F9' }}>
               <h2 className="font-black text-lg" style={{ color: '#0B0B0D' }}>{editing ? 'Editar Banner' : 'Novo Banner'}</h2>
               <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
-                Slide {editing?.position ?? (banners.length + 1)} — as alterações aparecem imediatamente no carousel
+                Slide {editing?.position ?? (banners.length + 1)} — alterações refletem imediatamente no carousel
               </p>
             </div>
 
             <div className="px-6 py-5 space-y-4">
-              {/* Image upload */}
               <ImageUploadArea
                 currentUrl={form.bg_image}
                 onUrlChange={url => setForm(f => ({ ...f, bg_image: url }))}
               />
 
-              {/* Text content */}
               <Field label="Tag">
                 <input style={adminInput} value={form.tag ?? ''} onChange={e => setForm(f => ({ ...f, tag: e.target.value }))} placeholder="ex: Inteligência Artificial" />
               </Field>
@@ -430,23 +420,13 @@ export default function BannersPage() {
                 <textarea style={{ ...adminInput, resize: 'none' }} rows={2} value={form.subtitle ?? ''} onChange={e => setForm(f => ({ ...f, subtitle: e.target.value }))} />
               </Field>
 
-              {/* CTAs */}
               <div className="grid grid-cols-2 gap-3">
-                <Field label="CTA Principal">
-                  <input style={adminInput} value={form.cta_text ?? ''} onChange={e => setForm(f => ({ ...f, cta_text: e.target.value }))} placeholder="Texto botão" />
-                </Field>
-                <Field label="Link CTA">
-                  <input style={adminInput} value={form.cta_href ?? ''} onChange={e => setForm(f => ({ ...f, cta_href: e.target.value }))} placeholder="/checkout" />
-                </Field>
-                <Field label="CTA Secundário">
-                  <input style={adminInput} value={form.cta_secondary_text ?? ''} onChange={e => setForm(f => ({ ...f, cta_secondary_text: e.target.value }))} placeholder="Saiba Mais" />
-                </Field>
-                <Field label="Link Secundário">
-                  <input style={adminInput} value={form.cta_secondary_href ?? ''} onChange={e => setForm(f => ({ ...f, cta_secondary_href: e.target.value }))} placeholder="#" />
-                </Field>
+                <Field label="CTA Principal"><input style={adminInput} value={form.cta_text ?? ''} onChange={e => setForm(f => ({ ...f, cta_text: e.target.value }))} placeholder="Começar Agora" /></Field>
+                <Field label="Link CTA"><input style={adminInput} value={form.cta_href ?? ''} onChange={e => setForm(f => ({ ...f, cta_href: e.target.value }))} placeholder="/checkout" /></Field>
+                <Field label="CTA Secundário"><input style={adminInput} value={form.cta_secondary_text ?? ''} onChange={e => setForm(f => ({ ...f, cta_secondary_text: e.target.value }))} placeholder="Saiba Mais" /></Field>
+                <Field label="Link Secundário"><input style={adminInput} value={form.cta_secondary_href ?? ''} onChange={e => setForm(f => ({ ...f, cta_secondary_href: e.target.value }))} placeholder="#" /></Field>
               </div>
 
-              {/* Colors */}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Cor de Fundo">
                   <div className="flex items-center gap-2">
@@ -462,18 +442,16 @@ export default function BannersPage() {
                 </Field>
               </div>
 
-              {/* Features */}
               <Field label="Destaques (um por linha)">
                 <textarea
                   style={{ ...adminInput, resize: 'none' }}
                   rows={3}
                   value={featuresText}
                   onChange={e => setFeaturesText(e.target.value)}
-                  placeholder={'Chatbots Inteligentes\nAutomação de Processos\nIntegração Completa'}
+                  placeholder={'IA Avançada\nAutomação 24/7\nIntegração Completa'}
                 />
               </Field>
 
-              {/* Active */}
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} className="rounded" />
                 <span className="text-sm font-semibold" style={{ color: '#0B0B0D' }}>Ativo (visível no site)</span>
