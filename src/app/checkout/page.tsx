@@ -24,36 +24,83 @@ const SERVICE_ICONS: Record<ServiceType, React.ElementType> = {
 }
 
 const PLAN_CATALOG: Record<string, CheckoutItem> = {
-  // Hosting — slugs match site_hosting_plans.slug in DB
-  starter:   { id: 'starter',   name: 'Starter Host',   type: 'hosting',  price: 4500,  currency: 'AOA', quantity: 1 },
-  business:  { id: 'business',  name: 'Business Cloud', type: 'hosting',  price: 9500,  currency: 'AOA', quantity: 1 },
-  pro:       { id: 'pro',       name: 'Cloud Pro',      type: 'hosting',  price: 19500, currency: 'AOA', quantity: 1 },
-  premium:   { id: 'premium',   name: 'Cloud Pro',      type: 'hosting',  price: 19500, currency: 'AOA', quantity: 1 },
-  reseller:  { id: 'reseller',  name: 'Revenda WHM',    type: 'reseller', price: 35000, currency: 'AOA', quantity: 1 },
-  // WordPress — slugs used in /hospedagem-wordpress page
+  // ── Hosting ────────────────────────────────────────────────────────────────
+  'hosting-start':    { id: 'hosting-start',    name: 'Plano Start',           type: 'hosting',  price: 19900,  currency: 'AOA', quantity: 1 },
+  'hosting-business': { id: 'hosting-business', name: 'Plano Business',        type: 'hosting',  price: 39900,  currency: 'AOA', quantity: 1 },
+  'hosting-turbo':    { id: 'hosting-turbo',    name: 'Plano Turbo',           type: 'hosting',  price: 79900,  currency: 'AOA', quantity: 1 },
+  // legacy hosting slugs (backward compat)
+  starter:   { id: 'hosting-start',    name: 'Plano Start',    type: 'hosting',  price: 19900, currency: 'AOA', quantity: 1 },
+  business:  { id: 'hosting-business', name: 'Plano Business', type: 'hosting',  price: 39900, currency: 'AOA', quantity: 1 },
+  pro:       { id: 'hosting-turbo',    name: 'Plano Turbo',    type: 'hosting',  price: 79900, currency: 'AOA', quantity: 1 },
+  premium:   { id: 'hosting-turbo',    name: 'Plano Turbo',    type: 'hosting',  price: 79900, currency: 'AOA', quantity: 1 },
+  // ── WordPress ──────────────────────────────────────────────────────────────
   'wp-start':  { id: 'wp-start',  name: 'WordPress Start',  type: 'hosting', price: 24900, currency: 'AOA', quantity: 1 },
   'wp-pro':    { id: 'wp-pro',    name: 'WordPress Pro',    type: 'hosting', price: 49900, currency: 'AOA', quantity: 1 },
   'wp-turbo':  { id: 'wp-turbo',  name: 'WordPress Turbo',  type: 'hosting', price: 99900, currency: 'AOA', quantity: 1 },
-  // Email — slugs match site_email_plans.slug in DB
-  'webmail-start':      { id: 'webmail-start',      name: 'Webmail Start',         type: 'email', price: 6800,  currency: 'AOA', quantity: 1 },
-  'webmail-business':   { id: 'webmail-business',   name: 'Webmail Business',      type: 'email', price: 14800, currency: 'AOA', quantity: 1 },
-  'webmail-enterprise': { id: 'webmail-enterprise', name: 'Webmail Enterprise',    type: 'email', price: 28000, currency: 'AOA', quantity: 1 },
-  'microsoft-365':      { id: 'microsoft-365',      name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
-  // Legacy email slugs (EmailPricingSection — page not currently rendered but kept for safety)
-  'starter-mail':       { id: 'starter-mail',       name: 'Webmail Start',         type: 'email', price: 6800,  currency: 'AOA', quantity: 1 },
-  'business-mail':      { id: 'business-mail',      name: 'Webmail Business',      type: 'email', price: 14800, currency: 'AOA', quantity: 1 },
-  'enterprise-mail':    { id: 'enterprise-mail',    name: 'Webmail Enterprise',    type: 'email', price: 28000, currency: 'AOA', quantity: 1 },
-  // Legacy aliases kept for backwards compat
-  'microsoft365':           { id: 'microsoft365',           name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
-  'microsoft-365-outlook':  { id: 'microsoft-365-outlook',  name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
-  // Domain TLDs — price = annual registration fee
-  'domain.com':    { id: 'domain.com',    name: 'Domínio .com',    type: 'domain', price: 4500,  currency: 'AOA', quantity: 1 },
-  'domain.net':    { id: 'domain.net',    name: 'Domínio .net',    type: 'domain', price: 5200,  currency: 'AOA', quantity: 1 },
-  'domain.org':    { id: 'domain.org',    name: 'Domínio .org',    type: 'domain', price: 4800,  currency: 'AOA', quantity: 1 },
-  'domain.ao':     { id: 'domain.ao',     name: 'Domínio .ao',     type: 'domain', price: 8000,  currency: 'AOA', quantity: 1 },
-  'domain.com.br': { id: 'domain.com.br', name: 'Domínio .com.br', type: 'domain', price: 4900,  currency: 'AOA', quantity: 1 },
-  'domain.io':     { id: 'domain.io',     name: 'Domínio .io',     type: 'domain', price: 18000, currency: 'AOA', quantity: 1 },
+  // ── Reseller ───────────────────────────────────────────────────────────────
+  'reseller-start':      { id: 'reseller-start',      name: 'Revenda Start',      type: 'reseller', price: 59900,  currency: 'AOA', quantity: 1 },
+  'reseller-growth':     { id: 'reseller-growth',     name: 'Revenda Growth',     type: 'reseller', price: 99900,  currency: 'AOA', quantity: 1 },
+  'reseller-business':   { id: 'reseller-business',   name: 'Revenda Business',   type: 'reseller', price: 179900, currency: 'AOA', quantity: 1 },
+  'reseller-enterprise': { id: 'reseller-enterprise', name: 'Revenda Enterprise', type: 'reseller', price: 0,      currency: 'AOA', quantity: 1 },
+  reseller: { id: 'reseller-start', name: 'Revenda Start', type: 'reseller', price: 59900, currency: 'AOA', quantity: 1 },
+  // ── Email ──────────────────────────────────────────────────────────────────
+  'email-starter':        { id: 'email-starter',        name: 'Email Starter',         type: 'email', price: 6800,  currency: 'AOA', quantity: 1 },
+  'email-standard':       { id: 'email-standard',       name: 'Email Standard',        type: 'email', price: 14800, currency: 'AOA', quantity: 1 },
+  'email-premium':        { id: 'email-premium',        name: 'Email Premium',         type: 'email', price: 28000, currency: 'AOA', quantity: 1 },
+  'microsoft-365-outlook':{ id: 'microsoft-365-outlook',name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
+  // legacy email aliases
+  'webmail-start':      { id: 'email-starter',         name: 'Email Starter',         type: 'email', price: 6800,  currency: 'AOA', quantity: 1 },
+  'webmail-business':   { id: 'email-standard',        name: 'Email Standard',        type: 'email', price: 14800, currency: 'AOA', quantity: 1 },
+  'webmail-enterprise': { id: 'email-premium',         name: 'Email Premium',         type: 'email', price: 28000, currency: 'AOA', quantity: 1 },
+  'microsoft-365':      { id: 'microsoft-365-outlook', name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
+  'microsoft365':       { id: 'microsoft-365-outlook', name: 'Microsoft 365 Outlook', type: 'email', price: 52000, currency: 'AOA', quantity: 1 },
+  'starter-mail':       { id: 'email-starter',  name: 'Email Starter',  type: 'email', price: 6800,  currency: 'AOA', quantity: 1 },
+  'business-mail':      { id: 'email-standard', name: 'Email Standard', type: 'email', price: 14800, currency: 'AOA', quantity: 1 },
+  'enterprise-mail':    { id: 'email-premium',  name: 'Email Premium',  type: 'email', price: 28000, currency: 'AOA', quantity: 1 },
+  // ── VPS ────────────────────────────────────────────────────────────────────
+  'vps-nvme2': { id: 'vps-nvme2', name: 'VPS NVMe 2', type: 'vps', price: 45000,  currency: 'AOA', quantity: 1 },
+  'vps-nvme4': { id: 'vps-nvme4', name: 'VPS NVMe 4', type: 'vps', price: 85000,  currency: 'AOA', quantity: 1 },
+  'vps-nvme8': { id: 'vps-nvme8', name: 'VPS NVMe 8', type: 'vps', price: 159000, currency: 'AOA', quantity: 1 },
+  'vps-n8n-start':  { id: 'vps-n8n-start',  name: 'n8n Start',          type: 'vps', price: 55000,  currency: 'AOA', quantity: 1 },
+  'vps-n8n-pro':    { id: 'vps-n8n-pro',    name: 'n8n Pro',            type: 'vps', price: 99000,  currency: 'AOA', quantity: 1 },
+  'vps-n8n-scale':  { id: 'vps-n8n-scale',  name: 'n8n Scale',          type: 'vps', price: 179000, currency: 'AOA', quantity: 1 },
+  'vps-openclaw-start': { id: 'vps-openclaw-start', name: 'OpenClaw Start', type: 'vps', price: 65000,  currency: 'AOA', quantity: 1 },
+  'vps-openclaw-pro':   { id: 'vps-openclaw-pro',   name: 'OpenClaw Pro',   type: 'vps', price: 119000, currency: 'AOA', quantity: 1 },
+  'vps-openclaw-scale': { id: 'vps-openclaw-scale', name: 'OpenClaw Scale', type: 'vps', price: 219000, currency: 'AOA', quantity: 1 },
+  'vps-evolution-start': { id: 'vps-evolution-start', name: 'Evolution Start', type: 'vps', price: 69000,  currency: 'AOA', quantity: 1 },
+  'vps-evolution-pro':   { id: 'vps-evolution-pro',   name: 'Evolution Pro',   type: 'vps', price: 129000, currency: 'AOA', quantity: 1 },
+  'vps-evolution-scale': { id: 'vps-evolution-scale', name: 'Evolution Scale', type: 'vps', price: 249000, currency: 'AOA', quantity: 1 },
+  'vps-ai-cloud-start':      { id: 'vps-ai-cloud-start',      name: 'AI Cloud Start',      type: 'vps', price: 89000,  currency: 'AOA', quantity: 1 },
+  'vps-ai-cloud-pro':        { id: 'vps-ai-cloud-pro',        name: 'AI Cloud Pro',        type: 'vps', price: 169000, currency: 'AOA', quantity: 1 },
+  'vps-ai-cloud-enterprise': { id: 'vps-ai-cloud-enterprise', name: 'AI Cloud Enterprise', type: 'vps', price: 349000, currency: 'AOA', quantity: 1 },
+  // ── Dedicated Linux ────────────────────────────────────────────────────────
+  'ded-16': { id: 'ded-16', name: 'Dedicado NVMe 16', type: 'dedicated', price: 249000, currency: 'AOA', quantity: 1 },
+  'ded-32': { id: 'ded-32', name: 'Dedicado NVMe 32', type: 'dedicated', price: 449000, currency: 'AOA', quantity: 1 },
+  'ded-64': { id: 'ded-64', name: 'Dedicado NVMe 64', type: 'dedicated', price: 799000, currency: 'AOA', quantity: 1 },
+  // ── Dedicated Windows ──────────────────────────────────────────────────────
+  'win-black':    { id: 'win-black',    name: 'Black',    type: 'dedicated', price: 299000, currency: 'AOA', quantity: 1 },
+  'win-sapphire': { id: 'win-sapphire', name: 'Sapphire', type: 'dedicated', price: 549000, currency: 'AOA', quantity: 1 },
+  'win-diamond':  { id: 'win-diamond',  name: 'Diamond',  type: 'dedicated', price: 999000, currency: 'AOA', quantity: 1 },
+  // ── AI Site Builder ────────────────────────────────────────────────────────
+  'ia-starter':  { id: 'ia-starter',  name: 'IA Starter',  type: 'other', price: 14900, currency: 'AOA', quantity: 1 },
+  'ia-pro':      { id: 'ia-pro',      name: 'IA Pro',      type: 'other', price: 29900, currency: 'AOA', quantity: 1 },
+  'ia-business': { id: 'ia-business', name: 'IA Business', type: 'other', price: 59900, currency: 'AOA', quantity: 1 },
+  // ── Domains ────────────────────────────────────────────────────────────────
+  'domain-com':    { id: 'domain-com',    name: 'Domínio .com',    type: 'domain', price: 4500,  currency: 'AOA', quantity: 1 },
+  'domain-net':    { id: 'domain-net',    name: 'Domínio .net',    type: 'domain', price: 5200,  currency: 'AOA', quantity: 1 },
+  'domain-org':    { id: 'domain-org',    name: 'Domínio .org',    type: 'domain', price: 4800,  currency: 'AOA', quantity: 1 },
+  'domain-ao':     { id: 'domain-ao',     name: 'Domínio .ao',     type: 'domain', price: 8000,  currency: 'AOA', quantity: 1 },
+  'domain-co-ao':  { id: 'domain-co-ao',  name: 'Domínio .co.ao',  type: 'domain', price: 7500,  currency: 'AOA', quantity: 1 },
+  'domain-com-br': { id: 'domain-com-br', name: 'Domínio .com.br', type: 'domain', price: 4900,  currency: 'AOA', quantity: 1 },
+  'domain-io':     { id: 'domain-io',     name: 'Domínio .io',     type: 'domain', price: 18000, currency: 'AOA', quantity: 1 },
   'domain-search': { id: 'domain-search', name: 'Domínio',         type: 'domain', price: 4500,  currency: 'AOA', quantity: 1 },
+  // legacy dot-separated domain keys (old format)
+  'domain.com':    { id: 'domain-com',    name: 'Domínio .com',    type: 'domain', price: 4500,  currency: 'AOA', quantity: 1 },
+  'domain.net':    { id: 'domain-net',    name: 'Domínio .net',    type: 'domain', price: 5200,  currency: 'AOA', quantity: 1 },
+  'domain.org':    { id: 'domain-org',    name: 'Domínio .org',    type: 'domain', price: 4800,  currency: 'AOA', quantity: 1 },
+  'domain.ao':     { id: 'domain-ao',     name: 'Domínio .ao',     type: 'domain', price: 8000,  currency: 'AOA', quantity: 1 },
+  'domain.com.br': { id: 'domain-com-br', name: 'Domínio .com.br', type: 'domain', price: 4900,  currency: 'AOA', quantity: 1 },
+  'domain.io':     { id: 'domain-io',     name: 'Domínio .io',     type: 'domain', price: 18000, currency: 'AOA', quantity: 1 },
 }
 
 // ─── helpers ───────────────────────────────────────────────────────────────
@@ -832,96 +879,71 @@ function CheckoutContent() {
       useCheckoutStore.getState().setBillingCycle(BILLING_URL_MAP[billingParam])
     }
 
+    const CATEGORY_TYPE: Record<string, ServiceType> = {
+      hosting: 'hosting', wordpress: 'hosting', vps: 'vps',
+      dedicated: 'dedicated', 'dedicated-windows': 'dedicated',
+      reseller: 'reseller', email: 'email', 'website-builder': 'other',
+      domain: 'domain',
+    }
+
     const supabase = createClient()
-    Promise.all([
-      supabase.from('site_domains').select('extension,price_monthly,price_annual,currency,active').eq('active', true),
-      supabase.from('site_email_plans').select('slug,name,price_monthly,price_annual,active').eq('active', true),
-      supabase.from('site_hosting_plans').select('slug,name,price_monthly,price_annual,active').eq('active', true),
-      supabase.from('products').select('slug,name,category,price_monthly,active').eq('active', true),
-    ]).then(([{ data: domainRows }, { data: emailRows }, { data: hostingRows }, { data: productRows }]) => {
-      // Build catalog: DB values override hardcoded fallbacks
-      const catalog: Record<string, CheckoutItem> = { ...PLAN_CATALOG }
+    // Single source of truth: products table
+    ;(async () => {
+      try {
+        const { data: productRows, error: productError } = await (supabase as any)
+          .from('products')
+          .select('slug,name,category,price_monthly,price_1year,active')
+          .eq('active', true)
 
-      const CATEGORY_TYPE: Record<string, ServiceType> = {
-        hosting: 'hosting', wordpress: 'hosting', vps: 'vps',
-        dedicated: 'dedicated', 'dedicated-windows': 'dedicated',
-        reseller: 'reseller', email: 'email', 'website-builder': 'other',
-        domain: 'domain',
-      }
+        const catalog: Record<string, CheckoutItem> = { ...PLAN_CATALOG }
 
-      domainRows?.forEach((d: any) => {
-        const key = 'domain' + d.extension
-        const price = d.price_annual ?? d.price_monthly ?? 0
-        if (price > 0) catalog[key] = { id: key, name: `Domínio ${d.extension}`, type: 'domain', price, currency: 'AOA', quantity: 1 }
-      })
-      emailRows?.forEach((e: any) => {
-        if (e.slug) {
-          const price = e.price_monthly ?? 0
-          if (price > 0) catalog[e.slug] = { id: e.slug, name: e.name, type: 'email', price, currency: 'AOA', quantity: 1 }
+        if (productError) {
+          console.warn('[checkout] products table error, using fallback catalog:', productError.message)
         }
-      })
-      const HOST_NAME_SLUG: Record<string, string> = {
-        'Starter Host': 'starter', 'Business Cloud': 'business',
-        'Cloud Pro': 'pro', 'Cloud Premium': 'pro', 'Revenda WHM': 'reseller',
-      }
-      const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(s)
-      hostingRows?.forEach((h: any) => {
-        // Resolve canonical slug: use DB slug unless it's a UUID fallback
-        const slug = (h.slug && !isUUID(h.slug)) ? h.slug : (HOST_NAME_SLUG[h.name] ?? null)
-        if (slug) {
-          const price = h.price_monthly ?? 0
-          if (price > 0) catalog[slug] = { id: slug, name: h.name, type: 'hosting', price, currency: 'AOA', quantity: 1 }
-        }
-        // Also index by raw UUID slug so old links still resolve
-        if (h.slug && isUUID(h.slug) && !catalog[h.slug]) {
-          const price = h.price_monthly ?? 0
-          const canonical = HOST_NAME_SLUG[h.name] ?? h.slug
-          if (price > 0) catalog[h.slug] = { id: canonical, name: h.name, type: 'hosting', price, currency: 'AOA', quantity: 1 }
-        }
-      })
-      productRows?.forEach((p: any) => {
-        if (p.slug) {
+
+        productRows?.forEach((p: any) => {
+          if (!p.slug) return
           const price = p.price_monthly ?? 0
           const type: ServiceType = CATEGORY_TYPE[p.category] ?? 'other'
-          if (price > 0) catalog[p.slug] = { id: p.slug, name: p.name, type, price, currency: 'AOA', quantity: 1 }
-          else if (!catalog[p.slug]) catalog[p.slug] = { id: p.slug, name: p.name, type, price: 0, currency: 'AOA', quantity: 1 }
-        }
-      })
+          catalog[p.slug] = { id: p.slug, name: p.name, type, price, currency: 'AOA', quantity: 1 }
+        })
 
-      if (planId) {
-        const plan = catalog[planId]
-        if (plan && plan.price > 0) {
-          const name = domainParam ? `Domínio ${domainParam}` : plan.name
-          setItems([{ ...plan, name, quantity: 1 }])
-          if (plan.type === 'domain' && domainParam) {
-            useCheckoutStore.getState().setDomainName(domainParam)
-            useCheckoutStore.getState().setDomainAction('register')
+        if (planId) {
+          const plan = catalog[planId]
+          if (plan && plan.price > 0) {
+            const name = domainParam ? `Domínio ${domainParam}` : plan.name
+            setItems([{ ...plan, name, quantity: 1 }])
+            if (plan.type === 'domain' && domainParam) {
+              useCheckoutStore.getState().setDomainName(domainParam)
+              useCheckoutStore.getState().setDomainAction('register')
+            }
+          } else if (plan && plan.price === 0) {
+            setPlanError('Plano não disponível. Entre em contacto com o suporte para contratar este serviço.')
+            console.error('[checkout] plan price=0:', planId)
+          } else {
+            setPlanError('Plano não encontrado. Verifique o link ou entre em contacto com o suporte.')
+            console.error('[checkout] unknown slug:', planId, '— available:', Object.keys(catalog).join(', '))
           }
-        } else if (plan && plan.price === 0) {
-          setPlanError('Não foi possível carregar o preço deste plano. Atualize a página ou entre em contacto com o suporte.')
-          console.error('[checkout] plan found but price=0:', planId, plan)
-        } else {
-          setPlanError('Plano não encontrado. Verifique o link ou entre em contacto com o suporte.')
-          console.error('[checkout] unknown plan slug:', planId)
         }
-      }
-    }).catch((err) => {
-      console.error('[checkout] DB fetch failed, using hardcoded fallback:', err)
-      // DB unreachable: resolve from hardcoded fallback
-      if (planId) {
-        const plan = PLAN_CATALOG[planId]
-        if (plan && plan.price > 0) {
-          const name = domainParam ? `Domínio ${domainParam}` : plan.name
-          setItems([{ ...plan, name, quantity: 1 }])
-          if (plan.type === 'domain' && domainParam) {
-            useCheckoutStore.getState().setDomainName(domainParam)
-            useCheckoutStore.getState().setDomainAction('register')
+      } catch (err) {
+        console.error('[checkout] fetch error, using fallback catalog:', err)
+        if (planId) {
+          const plan = PLAN_CATALOG[planId]
+          if (plan && plan.price > 0) {
+            const name = domainParam ? `Domínio ${domainParam}` : plan.name
+            setItems([{ ...plan, name, quantity: 1 }])
+            if (plan.type === 'domain' && domainParam) {
+              useCheckoutStore.getState().setDomainName(domainParam)
+              useCheckoutStore.getState().setDomainAction('register')
+            }
+          } else {
+            setPlanError('Não foi possível carregar este plano. Tente novamente ou entre em contacto com o suporte.')
           }
-        } else {
-          setPlanError('Não foi possível carregar o preço deste plano. Atualize a página ou entre em contacto com o suporte.')
         }
+      } finally {
+        setCatalogLoading(false)
       }
-    }).finally(() => setCatalogLoading(false))
+    })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams.get('plan'), searchParams.get('domain'), searchParams.get('billing')])
 

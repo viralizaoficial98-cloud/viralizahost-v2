@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
-import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Workflow, Zap, Shield, HardDrive, Globe, MessageCircle, Headphones, Lock, Server } from 'lucide-react'
@@ -12,9 +13,9 @@ export const metadata: Metadata = {
   description: 'Servidor VPS com n8n pré-instalado para automações, integrações, IA e produtividade. Fluxos ilimitados.',
 }
 
-const plans: PricingPlan[] = [
+const fallbackPlans: PricingPlan[] = [
   {
-    id: 'n8n-start',
+    id: 'vps-n8n-start',
     name: 'n8n Start',
     price: 'Kz 55.000',
     period: '/mês',
@@ -24,7 +25,7 @@ const plans: PricingPlan[] = [
     cta: 'Começar com n8n Start',
   },
   {
-    id: 'n8n-pro',
+    id: 'vps-n8n-pro',
     name: 'n8n Pro',
     price: 'Kz 99.000',
     period: '/mês',
@@ -35,7 +36,7 @@ const plans: PricingPlan[] = [
     cta: 'Começar com n8n Pro',
   },
   {
-    id: 'n8n-scale',
+    id: 'vps-n8n-scale',
     name: 'n8n Scale',
     price: 'Kz 179.000',
     period: '/mês',
@@ -79,16 +80,21 @@ export default function VPSn8nPage() {
           bgColor="#060b14"
           highlights={['n8n Pré-instalado', 'Fluxos Ilimitados', 'WhatsApp Integrado', 'Root Access']}
         />
-        <ServicePricingCards plans={plans} cols={3}
+        <DynamicServicePricing
+          category="vps"
+          subcategory="n8n"
+          cols={3}
+          showBillingToggle
           title="VPS n8n — Automação sem limites"
-          subtitle="Servidor pronto com n8n configurado. Active e comece a automatizar hoje." />
+          subtitle="Servidor pronto com n8n configurado. Active e comece a automatizar hoje."
+          fallbackPlans={fallbackPlans} />
         <IncludedFeatures features={included} dark
           title="Tudo incluído no VPS n8n" />
         <FinalCTA
           title="Comece a automatizar hoje com n8n"
           subtitle="Servidor pré-configurado, fluxos ilimitados e suporte especializado."
           cta="Contratar VPS n8n"
-          ctaHref="/register?plan=n8n-pro" />
+          ctaHref="/checkout?plan=vps-n8n-pro" />
       </main>
       <Footer />
     </>

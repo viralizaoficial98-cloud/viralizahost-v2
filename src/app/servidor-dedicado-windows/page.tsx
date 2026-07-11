@@ -88,7 +88,7 @@ export default function ServidorDedicadoWindowsPage() {
           title="Implante o seu servidor Windows hoje"
           subtitle="Windows Server licenciado, Plesk incluído e suporte de especialistas Microsoft."
           cta="Contratar Servidor Windows"
-          ctaHref="/register?plan=win-sapphire" />
+          ctaHref="/checkout?plan=win-sapphire" />
       </main>
       <Footer />
     </>

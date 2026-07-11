@@ -96,7 +96,7 @@ export default function RevendaDeHospedagemPage() {
           title="Inicie o seu negócio de hospedagem hoje"
           subtitle="Infraestrutura premium, marca própria e suporte dedicado ao revendedor."
           cta="Começar a Revender"
-          ctaHref="/register?plan=revenda-start" />
+          ctaHref="/checkout?plan=reseller-start" />
       </main>
       <Footer />
     </>

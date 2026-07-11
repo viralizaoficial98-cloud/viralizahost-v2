@@ -205,6 +205,7 @@ function ProductForm({ initial, onSave, onCancel }: {
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [filterCat, setFilterCat] = useState('')
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -215,56 +216,20 @@ export default function AdminProductsPage() {
 
   const supabase = createClient()
 
-  const HOST_NAME_SLUG: Record<string, string> = {
-    'Starter Host': 'starter', 'Business Cloud': 'business',
-    'Cloud Pro': 'pro', 'Cloud Premium': 'pro', 'Revenda WHM': 'reseller',
-  }
-  const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(s)
-
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     const { data, error } = await (supabase as any)
       .from('products')
       .select('*, product_features(id, feature, included, position)')
       .order('category').order('position')
 
-    if (data && (data as Product[]).length > 0) {
-      setProducts(data as Product[])
+    if (error) {
+      setLoadError(`Erro ao carregar produtos: ${error.message}`)
       setLoading(false)
       return
     }
-
-    // Fallback: build product list from site_hosting_plans + site_email_plans
-    const [{ data: hostingRows }, { data: emailRows }] = await Promise.all([
-      supabase.from('site_hosting_plans').select('*').order('position'),
-      supabase.from('site_email_plans').select('*').order('position'),
-    ])
-
-    const fallback: Product[] = []
-    let pos = 0
-    hostingRows?.forEach((h: any) => {
-      const slug = (h.slug && !isUUID(h.slug)) ? h.slug : (HOST_NAME_SLUG[h.name] ?? h.slug ?? h.id)
-      fallback.push({
-        id: h.id, slug, category: 'hosting', name: h.name,
-        description: h.description ?? null, badge: h.badge ?? null,
-        popular: !!h.featured, active: !!h.active, position: pos++,
-        price_monthly: h.price_monthly ?? null, price_6months: null,
-        price_1year: h.price_annual ?? null, price_2years: null, price_3years: null,
-        color: null, href_override: null, product_features: [],
-      })
-    })
-    emailRows?.forEach((e: any) => {
-      const slug = (e.slug && !isUUID(e.slug)) ? e.slug : e.id
-      fallback.push({
-        id: e.id, slug, category: 'email', name: e.name,
-        description: e.description ?? null, badge: e.badge ?? null,
-        popular: !!e.featured, active: !!e.active, position: pos++,
-        price_monthly: e.price_monthly ?? null, price_6months: null,
-        price_1year: e.price_annual ?? null, price_2years: null, price_3years: null,
-        color: null, href_override: null, product_features: [],
-      })
-    })
-    setProducts(fallback)
+    setProducts((data ?? []) as Product[])
     setLoading(false)
   }, [])
 
@@ -358,6 +323,11 @@ export default function AdminProductsPage() {
 
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-[#F5B700]" /></div>
+      ) : loadError ? (
+        <div className="flex flex-col items-center py-20 gap-3">
+          <p className="text-red-600 font-semibold text-sm">{loadError}</p>
+          <button onClick={load} className="text-xs px-4 py-2 bg-[#F5B700] text-[#0A0A0A] font-bold rounded-lg hover:bg-[#D9A300] transition-colors">Tentar novamente</button>
+        </div>
       ) : (
         <div className="space-y-2">
           {filtered.map(product => {
@@ -432,7 +402,7 @@ export default function AdminProductsPage() {
 
           {filtered.length === 0 && !loading && (
             <div className="text-center py-16 text-[#AAA]">
-              <p className="text-sm">Nenhum produto encontrado. Crie o primeiro!</p>
+              <p className="text-sm">{filterCat ? `Nenhum produto na categoria "${CATEGORIES.find(c => c.value === filterCat)?.label ?? filterCat}".` : 'Nenhum produto no catálogo. Aplique a migração SQL ou crie o primeiro produto manualmente.'}</p>
             </div>
           )}
         </div>

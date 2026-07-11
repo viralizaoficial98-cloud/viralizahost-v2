@@ -98,7 +98,7 @@ export default function ServidorDedicadoPage() {
           title="Implante a sua infra-estrutura dedicada hoje"
           subtitle="Activação rápida, migração gratuita e suporte de engenheiros especializados."
           cta="Contratar Servidor Dedicado"
-          ctaHref="/register?plan=ded-32" />
+          ctaHref="/checkout?plan=ded-32" />
       </main>
       <Footer />
     </>

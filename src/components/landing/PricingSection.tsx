@@ -109,21 +109,10 @@ const plans = [
   },
 ]
 
-type DbPlan = { id: string; slug: string | null; name: string; description: string | null; badge: string | null; price_monthly: number | null; price_annual: number | null; discount_annual: number; features: string[] | null; active: boolean; featured: boolean; position: number }
+type DbPlan = { id: string; slug: string; name: string; description: string | null; badge: string | null; price_monthly: number | null; price_1year: number | null; popular: boolean; active: boolean; position: number; cta_label: string | null }
 
 const PLAN_ICONS = [Zap, Rocket, Crown, Users, Server]
 const PLAN_ACCENTS = ['#3B82F6', '#F5B700', '#8B5CF6', '#EF4444', '#10B981']
-
-// Fallback: map plan name → canonical slug when DB slug is a UUID
-const NAME_TO_SLUG: Record<string, string> = {
-  'Starter Host': 'starter', 'Business Cloud': 'business',
-  'Cloud Pro': 'pro', 'Cloud Premium': 'pro', 'Revenda WHM': 'reseller',
-}
-const isUUID = (s: string | null) => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(s)
-function resolveSlug(plan: DbPlan) {
-  if (!isUUID(plan.slug) && plan.slug) return plan.slug
-  return NAME_TO_SLUG[plan.name] ?? plan.id
-}
 
 export function PricingSection() {
   const { format, currency } = useCurrency()
@@ -132,7 +121,13 @@ export function PricingSection() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('site_hosting_plans').select('*').eq('active', true).order('position')
+    supabase
+      .from('products')
+      .select('id,slug,name,description,badge,price_monthly,price_1year,popular,active,position,cta_label')
+      .eq('category', 'hosting')
+      .eq('active', true)
+      .is('subcategory', null)
+      .order('position')
       .then(({ data }) => { if (data && data.length > 0) setDbPlans(data as DbPlan[]) })
   }, [])
 
@@ -158,14 +153,13 @@ export function PricingSection() {
             {dbPlans.map((plan, i) => {
               const Icon    = PLAN_ICONS[i % PLAN_ICONS.length]
               const accent  = PLAN_ACCENTS[i % PLAN_ACCENTS.length]
-              const price   = billing === 'annual' && plan.price_annual ? plan.price_annual : plan.price_monthly
-              const features = plan.features ?? []
+              const price   = billing === 'annual' && plan.price_1year ? plan.price_1year : plan.price_monthly
               return (
                 <div key={plan.id} className="relative rounded-3xl p-7 flex flex-col"
-                  style={{ background: plan.featured ? '#0A0A0A' : '#FFFFFF', border: plan.featured ? `2px solid ${accent}` : '1px solid #E8E8E8', boxShadow: plan.featured ? `0 20px 60px ${accent}25` : '0 4px 20px rgba(0,0,0,0.06)' }}>
+                  style={{ background: plan.popular ? '#0A0A0A' : '#FFFFFF', border: plan.popular ? `2px solid ${accent}` : '1px solid #E8E8E8', boxShadow: plan.popular ? `0 20px 60px ${accent}25` : '0 4px 20px rgba(0,0,0,0.06)' }}>
                   {plan.badge && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="text-xs font-black px-3 py-1 rounded-full" style={{ background: accent, color: plan.featured ? '#000' : '#fff' }}>{plan.badge}</span>
+                      <span className="text-xs font-black px-3 py-1 rounded-full" style={{ background: accent, color: plan.popular ? '#000' : '#fff' }}>{plan.badge}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-3 mb-4">
@@ -173,24 +167,18 @@ export function PricingSection() {
                       <Icon size={18} style={{ color: accent }} />
                     </div>
                     <div>
-                      <h3 className="font-black text-base" style={{ color: plan.featured ? '#fff' : '#0A0A0A' }}>{plan.name}</h3>
-                      {plan.description && <p className="text-xs" style={{ color: plan.featured ? 'rgba(255,255,255,0.5)' : '#94A3B8' }}>{plan.description}</p>}
+                      <h3 className="font-black text-base" style={{ color: plan.popular ? '#fff' : '#0A0A0A' }}>{plan.name}</h3>
+                      {plan.description && <p className="text-xs" style={{ color: plan.popular ? 'rgba(255,255,255,0.5)' : '#94A3B8' }}>{plan.description}</p>}
                     </div>
                   </div>
                   <div className="mb-5">
                     <span className="text-3xl font-black" style={{ color: accent }}>Kz {price?.toLocaleString() ?? '—'}</span>
-                    <span className="text-sm ml-1" style={{ color: plan.featured ? 'rgba(255,255,255,0.4)' : '#94A3B8' }}>/mês</span>
+                    <span className="text-sm ml-1" style={{ color: plan.popular ? 'rgba(255,255,255,0.4)' : '#94A3B8' }}>/mês</span>
                   </div>
-                  <ul className="space-y-2 flex-1 mb-6">
-                    {features.map((f, fi) => (
-                      <li key={fi} className="flex items-center gap-2 text-sm" style={{ color: plan.featured ? 'rgba(255,255,255,0.8)' : '#374151' }}>
-                        <Check size={14} style={{ color: accent, flexShrink: 0 }} /> {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href={`/checkout?plan=${resolveSlug(plan)}&billing=${billing === 'annual' ? '1year' : 'monthly'}`} className="block text-center py-3 rounded-2xl font-bold text-sm transition-all"
-                    style={plan.featured ? { background: accent, color: '#000', boxShadow: `0 8px 25px ${accent}40` } : { background: '#F3F4F6', color: '#0A0A0A' }}>
-                    Começar agora
+                  <div className="flex-1 mb-6" />
+                  <Link href={`/checkout?plan=${plan.slug}&billing=${billing === 'annual' ? '1year' : 'monthly'}`} className="block text-center py-3 rounded-2xl font-bold text-sm transition-all"
+                    style={plan.popular ? { background: accent, color: '#000', boxShadow: `0 8px 25px ${accent}40` } : { background: '#F3F4F6', color: '#0A0A0A' }}>
+                    {plan.cta_label ?? 'Começar agora'}
                   </Link>
                 </div>
               )
@@ -311,7 +299,7 @@ export function PricingSection() {
                   </div>
 
                   {/* CTA */}
-                  <Link href={`/checkout?plan=${plan.id}`}
+                  <Link href={`/checkout?plan=${plan.id}&billing=${billing === 'annual' ? '1year' : 'monthly'}`}
                     className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
                       plan.is_popular
                         ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'

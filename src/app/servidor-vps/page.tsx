@@ -88,7 +88,7 @@ export default function ServidorVPSPage() {
           title="Active o seu VPS em minutos"
           subtitle="Activação imediata, root access total e suporte especializado 24/7."
           cta="Contratar VPS"
-          ctaHref="/register?plan=vps-nvme4" />
+          ctaHref="/checkout?plan=vps-nvme4" />
       </main>
       <Footer />
     </>

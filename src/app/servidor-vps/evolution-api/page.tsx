@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
-import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { MessageCircle, Zap, Shield, HardDrive, Globe, Lock, Headphones, Server, Workflow } from 'lucide-react'
@@ -12,9 +13,9 @@ export const metadata: Metadata = {
   description: 'Servidor VPS com Evolution API para WhatsApp Business, chatbots, integrações e automações. Múltiplos números.',
 }
 
-const plans: PricingPlan[] = [
+const fallbackPlans: PricingPlan[] = [
   {
-    id: 'evolution-start',
+    id: 'vps-evolution-start',
     name: 'Evolution Start',
     price: 'Kz 69.000',
     period: '/mês',
@@ -24,7 +25,7 @@ const plans: PricingPlan[] = [
     cta: 'Começar com Evolution Start',
   },
   {
-    id: 'evolution-pro',
+    id: 'vps-evolution-pro',
     name: 'Evolution Pro',
     price: 'Kz 129.000',
     period: '/mês',
@@ -35,7 +36,7 @@ const plans: PricingPlan[] = [
     cta: 'Começar com Evolution Pro',
   },
   {
-    id: 'evolution-scale',
+    id: 'vps-evolution-scale',
     name: 'Evolution Scale',
     price: 'Kz 249.000',
     period: '/mês',
@@ -79,16 +80,21 @@ export default function VPSEvolutionAPIPage() {
           bgColor="#062006"
           highlights={['Evolution API Instalada', 'Múltiplos Números', 'Webhooks Avançados', 'Integrações CRM']}
         />
-        <ServicePricingCards plans={plans} cols={3}
+        <DynamicServicePricing
+          category="vps"
+          subcategory="evolution-api"
+          cols={3}
+          showBillingToggle
           title="VPS Evolution API — Planos"
-          subtitle="Servidor pré-configurado com Evolution API. Comece a automatizar o WhatsApp hoje." />
+          subtitle="Servidor pré-configurado com Evolution API. Comece a automatizar o WhatsApp hoje."
+          fallbackPlans={fallbackPlans} />
         <IncludedFeatures features={included} dark
           title="Tudo incluído no VPS Evolution API" />
         <FinalCTA
           title="Comece a automatizar o WhatsApp hoje"
           subtitle="Servidor pré-configurado, múltiplos números e integrações completas."
           cta="Contratar Evolution API"
-          ctaHref="/register?plan=evolution-pro" />
+          ctaHref="/checkout?plan=vps-evolution-pro" />
       </main>
       <Footer />
     </>

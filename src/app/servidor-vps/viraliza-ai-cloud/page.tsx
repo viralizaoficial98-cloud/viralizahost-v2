@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
-import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Bot, Zap, MessageCircle, Globe, Shield, HardDrive, Lock, Headphones, Layers } from 'lucide-react'
@@ -12,9 +13,9 @@ export const metadata: Metadata = {
   description: 'Configure assistentes inteligentes, integrações e automações sem complicação. WhatsApp, Gmail, Slack e mais.',
 }
 
-const plans: PricingPlan[] = [
+const fallbackPlans: PricingPlan[] = [
   {
-    id: 'ai-cloud-start',
+    id: 'vps-ai-cloud-start',
     name: 'AI Cloud Start',
     price: 'Kz 89.000',
     period: '/mês',
@@ -24,7 +25,7 @@ const plans: PricingPlan[] = [
     cta: 'Começar com AI Cloud Start',
   },
   {
-    id: 'ai-cloud-pro',
+    id: 'vps-ai-cloud-pro',
     name: 'AI Cloud Pro',
     price: 'Kz 169.000',
     period: '/mês',
@@ -35,7 +36,7 @@ const plans: PricingPlan[] = [
     cta: 'Começar com AI Cloud Pro',
   },
   {
-    id: 'ai-cloud-enterprise',
+    id: 'vps-ai-cloud-enterprise',
     name: 'AI Cloud Enterprise',
     price: 'Kz 349.000',
     period: '/mês',
@@ -80,16 +81,21 @@ export default function ViralizaAICloudPage() {
           bgColor="#04060f"
           highlights={['Agentes de IA', 'WhatsApp + Telegram', 'Gmail + Google Agenda', 'Integrações Empresariais']}
         />
-        <ServicePricingCards plans={plans} cols={3}
+        <DynamicServicePricing
+          category="vps"
+          subcategory="viraliza-ai-cloud"
+          cols={3}
+          showBillingToggle
           title="Viraliza AI Cloud — Planos"
-          subtitle="Agentes de IA integrados com as ferramentas do seu negócio." />
+          subtitle="Agentes de IA integrados com as ferramentas do seu negócio."
+          fallbackPlans={fallbackPlans} />
         <IncludedFeatures features={included} dark
           title="Tudo incluído no Viraliza AI Cloud" />
         <FinalCTA
           title="Active os seus agentes de IA hoje"
           subtitle="Assistentes inteligentes, integrações completas e suporte especializado."
           cta="Contratar AI Cloud"
-          ctaHref="/register?plan=ai-cloud-pro" />
+          ctaHref="/checkout?plan=vps-ai-cloud-pro" />
       </main>
       <Footer />
     </>

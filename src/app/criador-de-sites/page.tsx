@@ -88,7 +88,7 @@ export default function CriadorDeSitesPage() {
           title="Crie o seu site agora com IA"
           subtitle="Sem código, sem design, sem complicações. O site fica pronto em minutos."
           cta="Começar Grátis"
-          ctaHref="/register?plan=ia-starter" />
+          ctaHref="/checkout?plan=ia-starter" />
       </main>
       <Footer />
     </>

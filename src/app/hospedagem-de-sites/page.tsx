@@ -2,17 +2,19 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
-import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
+import { ServicePricingCards } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Server, Shield, Zap, HardDrive, Mail, RotateCcw, Headphones, Globe, Lock } from 'lucide-react'
+import type { PricingPlan } from '@/components/service/ServicePricingCards'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 
 export const metadata: Metadata = {
   title: 'Hospedagem de Sites Premium',
   description: 'Hospedagem web premium com LiteSpeed, NVMe SSD, SSL grátis, cPanel e suporte 24/7. Uptime 99.9% garantido.',
 }
 
-const plans: PricingPlan[] = [
+const fallbackPlans: PricingPlan[] = [
   {
     id: 'hosting-start',
     name: 'Plano Start',
@@ -78,9 +80,13 @@ export default function HospedagemDeSitesPage() {
           bgColor="#080d1a"
           highlights={['LiteSpeed Enterprise', 'NVMe SSD Gen4', 'Uptime 99.9%', 'cPanel Incluído']}
         />
-        <ServicePricingCards plans={plans} cols={3}
+        <DynamicServicePricing
+          category="hosting"
+          cols={3}
+          showBillingToggle
           title="Hospedagem de Sites — Escolha o seu plano"
-          subtitle="Sem compromisso. Todos os planos com garantia de 30 dias." />
+          subtitle="Sem compromisso. Todos os planos com garantia de 30 dias."
+          fallbackPlans={fallbackPlans} />
         <IncludedFeatures features={included} />
         <FinalCTA
           title="Comece hoje com 30 dias de garantia"

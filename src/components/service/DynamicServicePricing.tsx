@@ -19,6 +19,7 @@ type ProductWithFeatures = Product & {
 
 interface Props {
   category: string
+  subcategory?: string
   title?: string
   subtitle?: string
   cols?: 2 | 3 | 4
@@ -33,24 +34,29 @@ const CYCLE_DISCOUNTS: Record<BillingCycle, number> = {
   monthly: 0, '6months': 15, '1year': 30, '2years': 45, '3years': 55,
 }
 
-export function DynamicServicePricing({ category, title = 'Escolha o plano ideal', subtitle = 'Todos os planos incluem suporte técnico especializado e garantia de 30 dias.', cols = 3, showBillingToggle = false, fallbackPlans }: Props) {
+export function DynamicServicePricing({ category, subcategory, title = 'Escolha o plano ideal', subtitle = 'Todos os planos incluem suporte técnico especializado e garantia de 30 dias.', cols = 3, showBillingToggle = false, fallbackPlans }: Props) {
   const [plans, setPlans] = useState<ProductWithFeatures[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [billing, setBilling] = useState<BillingCycle>('monthly')
 
   useEffect(() => {
     const supabase = createClient()
-    supabase
+    let query = supabase
       .from('products')
       .select('*, product_features(feature, included, position)')
       .eq('category', category)
       .eq('active', true)
+    if (subcategory) query = query.eq('subcategory', subcategory)
+    else query = query.is('subcategory', null)
+    query
       .order('position', { ascending: true })
-      .then(({ data, error }) => {
-        if (!error && data && data.length > 0) setPlans(data as ProductWithFeatures[])
+      .then(({ data, error: err }) => {
+        if (err) { setError(err.message); setLoading(false); return }
+        if (data && data.length > 0) setPlans(data as ProductWithFeatures[])
         setLoading(false)
       })
-  }, [category])
+  }, [category, subcategory])
 
   const gridClass: Record<number, string> = {
     2: 'md:grid-cols-2',
@@ -199,7 +205,7 @@ export function DynamicServicePricing({ category, title = 'Escolha o plano ideal
                           : 'bg-[#0A0A0A] text-white hover:bg-[#1A1A1A]'
                       }`}
                     >
-                      Começar Agora
+                      {(plan as any).cta_label ?? 'Começar Agora'}
                     </Link>
                   </div>
                 </div>

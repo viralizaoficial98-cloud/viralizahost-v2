@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
-import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Shield, Bot, Zap, HardDrive, Globe, Lock, Headphones, Server, Layers } from 'lucide-react'
@@ -12,9 +13,9 @@ export const metadata: Metadata = {
   description: 'VPS pré-configurado com OpenClaw para agentes de IA autónomos, automação sem código e integrações avançadas.',
 }
 
-const plans: PricingPlan[] = [
+const fallbackPlans: PricingPlan[] = [
   {
-    id: 'openclaw-start',
+    id: 'vps-openclaw-start',
     name: 'OpenClaw Start',
     price: 'Kz 65.000',
     period: '/mês',
@@ -24,7 +25,7 @@ const plans: PricingPlan[] = [
     cta: 'Começar com OpenClaw Start',
   },
   {
-    id: 'openclaw-pro',
+    id: 'vps-openclaw-pro',
     name: 'OpenClaw Pro',
     price: 'Kz 119.000',
     period: '/mês',
@@ -35,7 +36,7 @@ const plans: PricingPlan[] = [
     cta: 'Começar com OpenClaw Pro',
   },
   {
-    id: 'openclaw-scale',
+    id: 'vps-openclaw-scale',
     name: 'OpenClaw Scale',
     price: 'Kz 219.000',
     period: '/mês',
@@ -79,16 +80,21 @@ export default function VPSOpenClawPage() {
           bgColor="#06060f"
           highlights={['Agentes Autónomos', 'Automação Sem Código', 'Cofre Seguro', 'Integrações Ilimitadas']}
         />
-        <ServicePricingCards plans={plans} cols={3}
+        <DynamicServicePricing
+          category="vps"
+          subcategory="openclaw"
+          cols={3}
+          showBillingToggle
           title="VPS OpenClaw — Agentes de IA para o seu negócio"
-          subtitle="Servidor pré-configurado com OpenClaw. Active e comece a automatizar com IA hoje." />
+          subtitle="Servidor pré-configurado com OpenClaw. Active e comece a automatizar com IA hoje."
+          fallbackPlans={fallbackPlans} />
         <IncludedFeatures features={included} dark
           title="Tudo incluído no VPS OpenClaw" />
         <FinalCTA
           title="Active os seus agentes de IA hoje"
           subtitle="Servidor pré-configurado, automação sem código e suporte especializado."
           cta="Contratar OpenClaw"
-          ctaHref="/register?plan=openclaw-pro" />
+          ctaHref="/checkout?plan=vps-openclaw-pro" />
       </main>
       <Footer />
     </>
