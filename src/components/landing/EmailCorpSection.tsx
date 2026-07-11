@@ -1,115 +1,63 @@
 'use client'
 import Link from 'next/link'
-import { Check, X, Mail, Briefcase, Building2, Monitor } from 'lucide-react'
-import { useState } from 'react'
+import { Check, X, Mail, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
-const plans = [
-  {
-    id: 'webmail-start',
-    name: 'Webmail Start',
-    icon: Mail,
-    description: 'Ideal para pequenas empresas.',
-    tagline: 'Para começar',
-    priceMonthly: 8500,
-    priceAnnual: 6800,
-    accent: '#3B82F6',
-    is_popular: false,
-    badge: null,
-    features: [
-      { text: '5 Contas de E-mail', included: true },
-      { text: 'Webmail Premium', included: true },
-      { text: '5 GB por conta', included: true },
-      { text: 'SSL Seguro', included: true },
-      { text: 'AntiSpam', included: true },
-      { text: 'Backup Semanal', included: true },
-      { text: 'SPF / DKIM', included: true },
-      { text: 'DMARC', included: false },
-      { text: 'IP Dedicada', included: false },
-      { text: 'Backup Diário', included: false },
-    ],
-  },
-  {
-    id: 'webmail-business',
-    name: 'Webmail Business',
-    icon: Briefcase,
-    description: 'Ideal para empresas em crescimento.',
-    tagline: 'Mais popular',
-    priceMonthly: 18500,
-    priceAnnual: 14800,
-    accent: '#F5B700',
-    is_popular: true,
-    badge: 'MAIS POPULAR',
-    features: [
-      { text: '15 Contas de E-mail', included: true },
-      { text: 'Webmail Premium', included: true },
-      { text: '15 GB por conta', included: true },
-      { text: 'Backup Diário', included: true },
-      { text: 'AntiSpam Premium', included: true },
-      { text: 'SPF / DKIM / DMARC', included: true },
-      { text: 'Alta Entregabilidade', included: true },
-      { text: 'SSL Seguro', included: true },
-      { text: 'IP Dedicada', included: false },
-      { text: 'Suporte prioritário', included: false },
-    ],
-  },
-  {
-    id: 'webmail-enterprise',
-    name: 'Webmail Enterprise',
-    icon: Building2,
-    description: 'Alta performance para grandes equipas.',
-    tagline: 'Empresarial',
-    priceMonthly: 35000,
-    priceAnnual: 28000,
-    accent: '#8B5CF6',
-    is_popular: false,
-    badge: 'EMPRESARIAL',
-    features: [
-      { text: '50 Contas de E-mail', included: true },
-      { text: '50 GB por conta', included: true },
-      { text: 'Backup Diário', included: true },
-      { text: 'AntiSpam Avançado', included: true },
-      { text: 'DMARC Premium', included: true },
-      { text: 'IP Dedicada', included: true },
-      { text: 'Alta Disponibilidade', included: true },
-      { text: 'SPF / DKIM / DMARC', included: true },
-      { text: 'Suporte prioritário', included: true },
-      { text: 'SLA garantido', included: true },
-    ],
-  },
-  {
-    id: 'microsoft365',
-    name: 'Microsoft 365 Outlook',
-    icon: Monitor,
-    description: 'Solução premium Microsoft.',
-    tagline: 'Microsoft 365',
-    priceMonthly: 65000,
-    priceAnnual: 52000,
-    accent: '#EF4444',
-    is_popular: false,
-    badge: 'MICROSOFT 365',
-    features: [
-      { text: 'Outlook Premium', included: true },
-      { text: 'Microsoft Teams', included: true },
-      { text: 'OneDrive 1 TB', included: true },
-      { text: 'Word & Excel', included: true },
-      { text: 'Exchange Online', included: true },
-      { text: 'Backup Cloud', included: true },
-      { text: 'Segurança Microsoft', included: true },
-      { text: 'SPF / DKIM / DMARC', included: true },
-      { text: 'Suporte especializado', included: true },
-      { text: 'Alta Disponibilidade', included: true },
-    ],
-  },
-]
+type DbEmailPlan = {
+  id: string
+  slug: string | null
+  name: string
+  description: string | null
+  badge: string | null
+  price_monthly: number | null
+  price_annual: number | null
+  discount_annual: number | null
+  storage_gb: number | null
+  accounts: number | null
+  features: string[] | null
+  active: boolean
+  popular: boolean
+  color: string | null
+  position: number
+}
+
+const fmt = (v: number) => `Kz ${v.toLocaleString('pt-AO')}`
 
 export function EmailCorpSection() {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('annual')
+  const [plans, setPlans] = useState<DbEmailPlan[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
-  const getPrice = (plan: typeof plans[0]) =>
-    billing === 'annual' ? plan.priceAnnual : plan.priceMonthly
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('site_email_plans')
+      .select('id,slug,name,description,badge,price_monthly,price_annual,discount_annual,storage_gb,accounts,features,active,popular,color,position')
+      .eq('active', true)
+      .order('position', { ascending: true })
+      .then(({ data, error: err }) => {
+        console.log('[EMAIL PLANS DB]', data, err)
+        if (err || !data) { setError(true) } else { setPlans(data) }
+        setLoading(false)
+      })
+  }, [])
 
-  const fmt = (v: number) =>
-    `Kz ${v.toLocaleString('pt-AO')}`
+  const getPrice = (plan: DbEmailPlan) => {
+    if (billing === 'annual') {
+      if (plan.price_annual != null) return plan.price_annual
+      if (plan.price_monthly != null && plan.discount_annual != null) {
+        return Math.round(plan.price_monthly * (1 - plan.discount_annual / 100))
+      }
+      if (plan.price_monthly != null) return Math.round(plan.price_monthly * 0.8)
+    }
+    return plan.price_monthly ?? 0
+  }
+
+  const getOriginalPrice = (plan: DbEmailPlan) => plan.price_monthly ?? 0
+
+  const accent = (plan: DbEmailPlan) => plan.color ?? '#3B82F6'
 
   return (
     <section id="email-plans" className="py-24 bg-[#F8F8F8] relative overflow-hidden">
@@ -152,112 +100,129 @@ export function EmailCorpSection() {
           </div>
         </div>
 
+        {/* Loading */}
+        {loading && (
+          <div className="flex justify-center py-20">
+            <Loader2 size={32} className="animate-spin text-[#F5B700]" />
+          </div>
+        )}
+
+        {/* Error */}
+        {!loading && error && (
+          <div className="text-center py-20 text-gray-400">
+            Não foi possível carregar os planos. Por favor, tente novamente.
+          </div>
+        )}
+
         {/* Plans grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          {plans.map((plan) => {
-            const Icon = plan.icon
-            return (
-              <div
-                key={plan.id}
-                className={`relative rounded-3xl overflow-hidden transition-all duration-300 hover-lift ${
-                  plan.is_popular
-                    ? 'bg-[#0A0A0A] border-2 border-[#F5B700] shadow-[0_20px_60px_rgba(0,0,0,0.15)]'
-                    : 'bg-white border border-[#E8E8E8] shadow-sm hover:border-[#F5B700]/40'
-                }`}
-              >
-                {/* Badge */}
-                {plan.badge && (
-                  <div
-                    className={`text-center py-2.5 text-xs font-black tracking-widest ${
-                      plan.is_popular ? 'bg-[#F5B700] text-[#0A0A0A]' : 'text-white text-[10px]'
-                    }`}
-                    style={!plan.is_popular ? { background: plan.accent } : {}}
-                  >
-                    ★ {plan.badge}
-                  </div>
-                )}
-
-                <div className={`p-7 ${plan.badge ? 'pt-6' : ''}`}>
-                  {/* Icon & name */}
-                  <div className="flex items-center gap-3 mb-5">
+        {!loading && !error && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            {plans.map((plan) => {
+              const price = getPrice(plan)
+              const originalPrice = getOriginalPrice(plan)
+              const color = accent(plan)
+              const planKey = plan.slug ?? plan.id
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative rounded-3xl overflow-hidden transition-all duration-300 hover-lift ${
+                    plan.popular
+                      ? 'bg-[#0A0A0A] border-2 border-[#F5B700] shadow-[0_20px_60px_rgba(0,0,0,0.15)]'
+                      : 'bg-white border border-[#E8E8E8] shadow-sm hover:border-[#F5B700]/40'
+                  }`}
+                >
+                  {/* Badge */}
+                  {plan.badge && (
                     <div
-                      className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm"
-                      style={{
-                        background: plan.is_popular ? `${plan.accent}25` : `${plan.accent}12`,
-                        border: `1px solid ${plan.accent}30`,
-                      }}
+                      className={`text-center py-2.5 text-xs font-black tracking-widest ${
+                        plan.popular ? 'bg-[#F5B700] text-[#0A0A0A]' : 'text-white text-[10px]'
+                      }`}
+                      style={!plan.popular ? { background: color } : {}}
                     >
-                      <Icon size={20} style={{ color: plan.accent }} />
+                      ★ {plan.badge}
                     </div>
-                    <div>
-                      <div className={`font-bold text-base leading-tight ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
-                        {plan.name}
-                      </div>
-                      <div className="text-xs mt-0.5 text-gray-400">{plan.tagline}</div>
-                    </div>
-                  </div>
+                  )}
 
-                  <p className={`text-sm mb-6 leading-relaxed ${plan.is_popular ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {plan.description}
-                  </p>
-
-                  {/* Price */}
-                  <div className="mb-6">
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <span className={`text-3xl font-black ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
-                        {fmt(getPrice(plan))}
-                      </span>
-                      <span className={`text-sm ${plan.is_popular ? 'text-gray-500' : 'text-gray-400'}`}>/mês</span>
-                    </div>
-                    {billing === 'annual' && (
-                      <div className={`text-xs line-through ${plan.is_popular ? 'text-gray-600' : 'text-gray-400'}`}>
-                        {fmt(plan.priceMonthly)}/mês
-                      </div>
-                    )}
-                    {billing === 'annual' && (
-                      <div className="text-xs text-green-500 font-semibold mt-1">✓ Economize 20% no plano anual</div>
-                    )}
-                  </div>
-
-                  {/* CTA */}
-                  <Link
-                    href={`/checkout?plan=${plan.id}`}
-                    className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
-                      plan.is_popular
-                        ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'
-                        : 'bg-[#0A0A0A] text-white hover:bg-[#222] shadow-sm'
-                    }`}
-                  >
-                    Começar Agora →
-                  </Link>
-
-                  {/* Divider */}
-                  <div className={`mb-6 h-px ${plan.is_popular ? 'bg-white/10' : 'bg-[#F0F0F0]'}`} />
-
-                  {/* Features */}
-                  <div className="space-y-3">
-                    {plan.features.map((f) => (
+                  <div className={`p-7 ${plan.badge ? 'pt-6' : ''}`}>
+                    {/* Icon & name */}
+                    <div className="flex items-center gap-3 mb-5">
                       <div
-                        key={f.text}
-                        className={`flex items-center gap-3 text-sm ${
-                          f.included
-                            ? plan.is_popular ? 'text-gray-300' : 'text-gray-700'
-                            : plan.is_popular ? 'text-gray-600' : 'text-gray-300'
-                        }`}
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm"
+                        style={{
+                          background: plan.popular ? `${color}25` : `${color}12`,
+                          border: `1px solid ${color}30`,
+                        }}
                       >
-                        {f.included
-                          ? <Check size={15} className="text-green-500 flex-shrink-0" />
-                          : <X size={15} className="text-gray-300 flex-shrink-0" />
-                        }
-                        {f.text}
+                        <Mail size={20} style={{ color }} />
                       </div>
-                    ))}
+                      <div>
+                        <div className={`font-bold text-base leading-tight ${plan.popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
+                          {plan.name}
+                        </div>
+                      </div>
+                    </div>
+
+                    {plan.description && (
+                      <p className={`text-sm mb-6 leading-relaxed ${plan.popular ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {plan.description}
+                      </p>
+                    )}
+
+                    {/* Price */}
+                    <div className="mb-6">
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <span className={`text-3xl font-black ${plan.popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
+                          {fmt(price)}
+                        </span>
+                        <span className={`text-sm ${plan.popular ? 'text-gray-500' : 'text-gray-400'}`}>/mês</span>
+                      </div>
+                      {billing === 'annual' && price < originalPrice && (
+                        <div className={`text-xs line-through ${plan.popular ? 'text-gray-600' : 'text-gray-400'}`}>
+                          {fmt(originalPrice)}/mês
+                        </div>
+                      )}
+                      {billing === 'annual' && price < originalPrice && (
+                        <div className="text-xs text-green-500 font-semibold mt-1">✓ Economize no plano anual</div>
+                      )}
+                    </div>
+
+                    {/* CTA */}
+                    <Link
+                      href={`/checkout?plan=${planKey}`}
+                      className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
+                        plan.popular
+                          ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'
+                          : 'bg-[#0A0A0A] text-white hover:bg-[#222] shadow-sm'
+                      }`}
+                    >
+                      Começar Agora →
+                    </Link>
+
+                    {/* Divider */}
+                    <div className={`mb-6 h-px ${plan.popular ? 'bg-white/10' : 'bg-[#F0F0F0]'}`} />
+
+                    {/* Features */}
+                    {plan.features && plan.features.length > 0 && (
+                      <div className="space-y-3">
+                        {plan.features.map((f) => (
+                          <div
+                            key={f}
+                            className={`flex items-center gap-3 text-sm ${
+                              plan.popular ? 'text-gray-300' : 'text-gray-700'
+                            }`}
+                          >
+                            <Check size={15} className="text-green-500 flex-shrink-0" />
+                            {f}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
 
         <p className="text-center text-gray-400 text-sm mt-10">
           ✓ Sem contratos &nbsp;•&nbsp; ✓ Cancele a qualquer momento &nbsp;•&nbsp; ✓ Activação imediata
