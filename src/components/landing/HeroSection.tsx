@@ -18,8 +18,10 @@ type Slide = {
   mobileOverlayGradient?: string
   glowGradient?: string
   accentColor: string
-  /** Full-width background image slide (no text) — legacy mode */
+  /** true = full-width image/video banner (no text overlay) */
   imageOnly?: boolean
+  /** true = render as looping video (only meaningful when imageOnly is true) */
+  isVideo?: boolean
   tag?: string
   title?: string
   subtitle?: string
@@ -31,21 +33,20 @@ type Slide = {
   features?: string[]
 }
 
-/* ─── Slide data ─────────────────────────────────────────────── */
-const slides: Slide[] = [
-  /* ── SLIDE 1 — Vídeo IA ─────────────────────────────────── */
+/* ─── Hardcoded fallback slides (used only when DB returns 0 active rows) ── */
+const FALLBACK_SLIDES: Slide[] = [
   {
     id: 0,
-    imageOnly: true,       // no text overlay
-    bgImage: '',           // unused — video takes over
+    imageOnly: true,
+    isVideo: true,        // ← explicit flag, not index-based
+    bgImage: '',
     bgColor: '#000000',
     accentColor: '#F5B700',
   },
-
-  /* ── SLIDE 2 — E-mail Corporativo ───────────────────────── */
   {
     id: 1,
     imageOnly: true,
+    isVideo: false,
     bgImage: '/viraliza-email-banner.png',
     bgColor: '#000000',
     bgSize: 'contain',
@@ -54,11 +55,10 @@ const slides: Slide[] = [
     mobilePosition: 'center center',
     accentColor: '#34D399',
   },
-
-  /* ── SLIDE 3 — Servidores Premium ────────────────────────── */
   {
     id: 2,
     imageOnly: true,
+    isVideo: false,
     bgImage: '/servidores_banner.png',
     bgColor: '#000000',
     bgSize: 'contain',
@@ -73,6 +73,7 @@ const slides: Slide[] = [
 type DbBanner = {
   id: string
   position: number
+  active: boolean
   bg_image: string | null
   bg_color: string | null
   accent_color: string | null
@@ -100,10 +101,9 @@ function dbToSlide(b: DbBanner, i: number): Slide {
     ctaSecondary: b.cta_secondary_text ?? undefined,
     ctaSecondaryHref: b.cta_secondary_href ?? undefined,
     features: b.features ?? undefined,
-    // Always imageOnly: banner images contain their own text baked in;
-    // index 0 renders as video, index 1+ render as background image.
     imageOnly: true,
-    bgSize: 'contain',
+    isVideo: false,   // DB banners are NEVER video — always background images
+    bgSize: 'cover',  // uploaded images fill the whole space
     desktopPosition: 'center center',
     tabletPosition: 'center center',
     mobilePosition: 'center center',
@@ -135,7 +135,7 @@ function getBgPosition(s: Slide, bp: 'mobile' | 'tablet' | 'desktop') {
 
 /* ─── Component ──────────────────────────────────────────────── */
 export function HeroSection() {
-  const [activeSlides, setActiveSlides] = useState<Slide[]>(slides)
+  const [activeSlides, setActiveSlides] = useState<Slide[]>(FALLBACK_SLIDES)
   const [current, setCurrent] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -143,21 +143,27 @@ export function HeroSection() {
   const sectionRef = useRef<HTMLElement>(null)
   const bp = useBreakpoint()
 
-  /* fetch banners from DB, fallback to hardcoded */
+  /* Fetch active banners from DB — single source of truth */
   useEffect(() => {
     const supabase = createClient()
-    supabase
+    ;(supabase as any)
       .from('site_banners')
       .select('*')
+      .eq('active', true)
       .order('position')
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setActiveSlides((data as DbBanner[]).map(dbToSlide))
+      .then(({ data, error }: { data: DbBanner[] | null; error: unknown }) => {
+        if (error) {
+          console.warn('[HeroSection] failed to load banners from DB, using fallback:', error)
+          return // keep FALLBACK_SLIDES
         }
+        if (data && data.length > 0) {
+          setActiveSlides(data.map(dbToSlide))
+        }
+        // if data is empty keep the fallback
       })
   }, [])
 
-  /* scroll parallax — only used by slide 0 */
+  /* scroll parallax */
   useEffect(() => {
     const onScroll = () => {
       if (sectionRef.current) {
@@ -234,44 +240,49 @@ export function HeroSection() {
             {/* Base colour fill */}
             <div className="absolute inset-0" style={{ background: s.bgColor }} />
 
-            {/* ── imageOnly: slide 0 = video, slides 1 & 2 = static image ── */}
             {s.imageOnly ? (
-              i === 0 ? (
-                /* Slide 0 — full-screen video background */
+              s.isVideo ? (
+                /* ── Video slide ── */
                 <>
                   <video
                     autoPlay
                     muted
                     loop
                     playsInline
+                    poster="/video_poster.jpg"
                     className="absolute inset-0 w-full h-full object-cover"
                     aria-hidden="true"
+                    preload="metadata"
                   >
                     <source src="/video_IA.mp4" type="video/mp4" />
                   </video>
-                  {/* Dark overlay with subtle yellow edge glow */}
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.30) 50%, rgba(0,0,0,0.65) 100%)' }} />
                   <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 100%, rgba(245,183,0,0.08), transparent)' }} />
                 </>
               ) : (
-                /* Slides 1 & 2 — static image (unchanged) */
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    backgroundImage: `url(${s.bgImage})`,
-                    backgroundSize: s.bgSize ?? 'cover',
-                    backgroundPosition: pos,
-                    backgroundRepeat: 'no-repeat',
-                  }}
-                />
+                /* ── Image slide (DB banner or static fallback) ── */
+                s.bgImage ? (
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backgroundImage: `url(${s.bgImage})`,
+                      backgroundSize: s.bgSize ?? 'cover',
+                      backgroundPosition: pos,
+                      backgroundRepeat: 'no-repeat',
+                    }}
+                  />
+                ) : (
+                  /* bgImage empty — show accent colour fill */
+                  <div className="absolute inset-0" style={{ background: s.bgColor }} />
+                )
               )
             ) : (
-              /* Slide 0 — IA: parallax content slide */
+              /* Parallax content slide (non-imageOnly) */
               <div
                 className="absolute"
                 style={{
                   inset: '-8%',
-                  backgroundImage: `url(${s.bgImage})`,
+                  backgroundImage: s.bgImage ? `url(${s.bgImage})` : undefined,
                   backgroundSize: 'cover',
                   backgroundPosition: pos,
                   backgroundRepeat: 'no-repeat',
@@ -296,7 +307,7 @@ export function HeroSection() {
               <div className="absolute inset-0" style={{ background: s.glowGradient }} />
             )}
 
-            {/* Slide 0 vignette */}
+            {/* Vignette for non-imageOnly slides */}
             {!s.imageOnly && (
               <>
                 <div className="absolute inset-0"
@@ -318,7 +329,7 @@ export function HeroSection() {
         }}
       />
 
-      {/* ── Slide content (slide 0 only) ─────────────────────── */}
+      {/* ── Slide content (only for non-imageOnly slides) ─────── */}
       <div className={`relative z-10 flex-1 flex flex-col justify-center ${bp === 'mobile' ? 'pt-20 pb-8' : 'pt-28 pb-16'}`}>
         {!slide.imageOnly && (
           <div className="container mx-auto px-4 lg:px-8">
