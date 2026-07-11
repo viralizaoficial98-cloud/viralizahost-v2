@@ -114,6 +114,17 @@ type DbPlan = { id: string; slug: string | null; name: string; description: stri
 const PLAN_ICONS = [Zap, Rocket, Crown, Users, Server]
 const PLAN_ACCENTS = ['#3B82F6', '#F5B700', '#8B5CF6', '#EF4444', '#10B981']
 
+// Fallback: map plan name → canonical slug when DB slug is a UUID
+const NAME_TO_SLUG: Record<string, string> = {
+  'Starter Host': 'starter', 'Business Cloud': 'business',
+  'Cloud Pro': 'pro', 'Cloud Premium': 'pro', 'Revenda WHM': 'reseller',
+}
+const isUUID = (s: string | null) => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(s)
+function resolveSlug(plan: DbPlan) {
+  if (!isUUID(plan.slug) && plan.slug) return plan.slug
+  return NAME_TO_SLUG[plan.name] ?? plan.id
+}
+
 export function PricingSection() {
   const { format, currency } = useCurrency()
   const [billing, setBilling] = useState<'monthly' | 'annual'>('annual')
@@ -177,7 +188,7 @@ export function PricingSection() {
                       </li>
                     ))}
                   </ul>
-                  <Link href={`/checkout?plan=${plan.slug ?? plan.id}&billing=${billing === 'annual' ? '1year' : 'monthly'}`} className="block text-center py-3 rounded-2xl font-bold text-sm transition-all"
+                  <Link href={`/checkout?plan=${resolveSlug(plan)}&billing=${billing === 'annual' ? '1year' : 'monthly'}`} className="block text-center py-3 rounded-2xl font-bold text-sm transition-all"
                     style={plan.featured ? { background: accent, color: '#000', boxShadow: `0 8px 25px ${accent}40` } : { background: '#F3F4F6', color: '#0A0A0A' }}>
                     Começar agora
                   </Link>

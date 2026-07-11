@@ -860,10 +860,23 @@ function CheckoutContent() {
           if (price > 0) catalog[e.slug] = { id: e.slug, name: e.name, type: 'email', price, currency: 'AOA', quantity: 1 }
         }
       })
+      const HOST_NAME_SLUG: Record<string, string> = {
+        'Starter Host': 'starter', 'Business Cloud': 'business',
+        'Cloud Pro': 'pro', 'Cloud Premium': 'pro', 'Revenda WHM': 'reseller',
+      }
+      const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(s)
       hostingRows?.forEach((h: any) => {
-        if (h.slug) {
+        // Resolve canonical slug: use DB slug unless it's a UUID fallback
+        const slug = (h.slug && !isUUID(h.slug)) ? h.slug : (HOST_NAME_SLUG[h.name] ?? null)
+        if (slug) {
           const price = h.price_monthly ?? 0
-          if (price > 0) catalog[h.slug] = { id: h.slug, name: h.name, type: 'hosting', price, currency: 'AOA', quantity: 1 }
+          if (price > 0) catalog[slug] = { id: slug, name: h.name, type: 'hosting', price, currency: 'AOA', quantity: 1 }
+        }
+        // Also index by raw UUID slug so old links still resolve
+        if (h.slug && isUUID(h.slug) && !catalog[h.slug]) {
+          const price = h.price_monthly ?? 0
+          const canonical = HOST_NAME_SLUG[h.name] ?? h.slug
+          if (price > 0) catalog[h.slug] = { id: canonical, name: h.name, type: 'hosting', price, currency: 'AOA', quantity: 1 }
         }
       })
       productRows?.forEach((p: any) => {

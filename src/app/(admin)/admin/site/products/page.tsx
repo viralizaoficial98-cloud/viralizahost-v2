@@ -215,13 +215,56 @@ export default function AdminProductsPage() {
 
   const supabase = createClient()
 
+  const HOST_NAME_SLUG: Record<string, string> = {
+    'Starter Host': 'starter', 'Business Cloud': 'business',
+    'Cloud Pro': 'pro', 'Cloud Premium': 'pro', 'Revenda WHM': 'reseller',
+  }
+  const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(s)
+
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
+    const { data, error } = await (supabase as any)
       .from('products')
       .select('*, product_features(id, feature, included, position)')
       .order('category').order('position')
-    setProducts((data ?? []) as Product[])
+
+    if (data && (data as Product[]).length > 0) {
+      setProducts(data as Product[])
+      setLoading(false)
+      return
+    }
+
+    // Fallback: build product list from site_hosting_plans + site_email_plans
+    const [{ data: hostingRows }, { data: emailRows }] = await Promise.all([
+      supabase.from('site_hosting_plans').select('*').order('position'),
+      supabase.from('site_email_plans').select('*').order('position'),
+    ])
+
+    const fallback: Product[] = []
+    let pos = 0
+    hostingRows?.forEach((h: any) => {
+      const slug = (h.slug && !isUUID(h.slug)) ? h.slug : (HOST_NAME_SLUG[h.name] ?? h.slug ?? h.id)
+      fallback.push({
+        id: h.id, slug, category: 'hosting', name: h.name,
+        description: h.description ?? null, badge: h.badge ?? null,
+        popular: !!h.featured, active: !!h.active, position: pos++,
+        price_monthly: h.price_monthly ?? null, price_6months: null,
+        price_1year: h.price_annual ?? null, price_2years: null, price_3years: null,
+        color: null, href_override: null, product_features: [],
+      })
+    })
+    emailRows?.forEach((e: any) => {
+      const slug = (e.slug && !isUUID(e.slug)) ? e.slug : e.id
+      fallback.push({
+        id: e.id, slug, category: 'email', name: e.name,
+        description: e.description ?? null, badge: e.badge ?? null,
+        popular: !!e.featured, active: !!e.active, position: pos++,
+        price_monthly: e.price_monthly ?? null, price_6months: null,
+        price_1year: e.price_annual ?? null, price_2years: null, price_3years: null,
+        color: null, href_override: null, product_features: [],
+      })
+    })
+    setProducts(fallback)
     setLoading(false)
   }, [])
 
