@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient, createAuthClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { requireAdminRole } from '@/lib/api/require-admin'
 import { revalidatePath } from 'next/cache'
-
-async function requireAdmin() {
-  const auth = await createAuthClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
-  return user
-}
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAdmin()
+    await requireAdminRole()
     const { id } = await params
     const body = await req.json()
     const { product_features, ...productData } = body
@@ -27,23 +21,29 @@ export async function PUT(
       .select()
       .single()
 
-    if (error) return NextResponse.json({ success: false, message: error.message, details: error.details }, { status: 400 })
+    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 })
 
+    // Replace all features atomically
     if (product_features !== undefined) {
       await (supabase as any).from('product_features').delete().eq('product_id', id)
       if (product_features?.length) {
-        await (supabase as any).from('product_features').insert(
-          product_features.map((f: any, i: number) => ({ product_id: id, feature: f.feature, included: f.included, position: i }))
+        const { error: featErr } = await (supabase as any).from('product_features').insert(
+          product_features.map((f: any, i: number) => ({
+            product_id: id,
+            feature: f.feature,
+            included: f.included ?? true,
+            position: i,
+          }))
         )
+        if (featErr) console.error('[products] feature replace error:', featErr.message)
       }
     }
 
-    revalidatePath('/admin/site/products')
-
-
+    revalidatePath('/', 'layout')
     return NextResponse.json({ success: true, data })
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: err.message === 'Não autenticado' ? 401 : 500 })
+    const status = (err as any).status ?? 500
+    return NextResponse.json({ success: false, message: err.message }, { status })
   }
 }
 
@@ -52,18 +52,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAdmin()
+    await requireAdminRole()
     const { id } = await params
 
     const supabase = await createAdminClient()
     const { error } = await (supabase as any).from('products').delete().eq('id', id)
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 })
 
-    revalidatePath('/admin/site/products')
-
-
+    revalidatePath('/', 'layout')
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: err.message === 'Não autenticado' ? 401 : 500 })
+    const status = (err as any).status ?? 500
+    return NextResponse.json({ success: false, message: err.message }, { status })
   }
 }

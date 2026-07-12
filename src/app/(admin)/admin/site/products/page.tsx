@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Loader2, Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronUp, GripVertical, Database, AlertTriangle, Copy, Search } from 'lucide-react'
 
 type Feature = { id?: string; feature: string; included: boolean; position: number }
@@ -312,27 +311,33 @@ export default function AdminProductsPage() {
   const [deleting, setDeleting] = useState(false)
   const [msg, setMsg] = useState<{ text: string; type: 'ok' | 'err' } | null>(null)
 
-  const supabase = createClient()
-
   const load = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
     setTablesMissing(false)
-    const { data, error } = await (supabase as any)
-      .from('products')
-      .select('*, product_features(id, feature, included, position)')
-      .order('category').order('position')
 
-    if (error) {
-      if (error.message?.includes("Could not find the table") || error.message?.includes("does not exist")) {
-        setTablesMissing(true)
-      } else {
-        setLoadError(`Erro ao carregar produtos: ${error.message}`)
+    try {
+      const res = await fetch('/api/admin/products', { cache: 'no-store' })
+      const json = await res.json()
+
+      if (!res.ok || !json.success) {
+        const msg: string = json.message ?? ''
+        if (msg.includes('Could not find') || msg.includes('does not exist')) {
+          setTablesMissing(true)
+        } else {
+          setLoadError('Não foi possível carregar os produtos. Tente novamente.')
+          console.error('[products] load error:', msg)
+        }
+        setLoading(false)
+        return
       }
-      setLoading(false)
-      return
+
+      setProducts((json.data ?? []) as Product[])
+    } catch (e: any) {
+      setLoadError('Erro de ligação. Verifique a sua ligação à internet e tente novamente.')
+      console.error('[products] fetch error:', e)
     }
-    setProducts((data ?? []) as Product[])
+
     setLoading(false)
   }, [])
 
@@ -344,26 +349,30 @@ export default function AdminProductsPage() {
   }
 
   async function handleSave(data: Partial<Product> & { product_features?: Feature[] }, id?: string) {
-    const { product_features, ...productData } = data
+    const payload = { ...data }
 
     if (id) {
-      const { error } = await (supabase.from('products') as any).update({ ...productData, updated_at: new Date().toISOString() }).eq('id', id)
-      if (error) throw new Error(error.message)
-      // Replace features
-      await (supabase as any).from('product_features').delete().eq('product_id', id)
-      if (product_features?.length) {
-        await (supabase as any).from('product_features').insert(
-          product_features.map((f, i) => ({ product_id: id, feature: f.feature, included: f.included, position: i }))
-        )
+      const res = await fetch(`/api/admin/products/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        console.error('[products] update error:', json.message)
+        throw new Error('Não foi possível guardar as alterações. Tente novamente.')
       }
       flash('Produto actualizado com sucesso.')
     } else {
-      const { data: created, error } = await (supabase as any).from('products').insert(productData as any).select().single()
-      if (error) throw new Error(error.message)
-      if (product_features?.length && created) {
-        await (supabase as any).from('product_features').insert(
-          product_features.map((f, i) => ({ product_id: created.id, feature: f.feature, included: f.included, position: i }))
-        )
+      const res = await fetch('/api/admin/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        console.error('[products] create error:', json.message)
+        throw new Error('Não foi possível criar o produto. Tente novamente.')
       }
       flash('Produto criado com sucesso.')
     }
@@ -375,10 +384,22 @@ export default function AdminProductsPage() {
 
   async function handleDelete(id: string) {
     setDeleting(true)
-    const { error } = await (supabase as any).from('products').delete().eq('id', id)
+    try {
+      const res = await fetch(`/api/admin/products/${id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        console.error('[products] delete error:', json.message)
+        flash('Não foi possível eliminar o produto. Tente novamente.', 'err')
+      } else {
+        flash('Produto eliminado.')
+        await load()
+      }
+    } catch (e: any) {
+      console.error('[products] delete error:', e)
+      flash('Erro de ligação ao eliminar produto.', 'err')
+    }
     setDeleting(false)
     setDeleteId(null)
-    if (error) { flash(error.message, 'err') } else { flash('Produto eliminado.'); await load() }
   }
 
   const filtered = products.filter(p => {
