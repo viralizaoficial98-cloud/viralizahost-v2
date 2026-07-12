@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
@@ -31,24 +32,26 @@ const included = [
   { icon: Headphones, title: 'Suporte Especializado', desc: 'Equipa com conhecimento profundo em WordPress disponível 24/7.' },
 ]
 
-export default function HospedagemWordPressPage() {
+export default async function HospedagemWordPressPage() {
+  const banner = await getBannerPage('hospedagem-wordpress')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumb="Hospedagem WordPress"
-          tag="WordPress Optimizado"
-          title="Crie um blog ou site WordPress em minutos com IA"
-          subtitle="WordPress otimizado, rápido, seguro e pronto para crescer. Com criador de sites por IA, CDN global e backup diário."
-          price="A partir de Kz 24.900/mês"
-          cta="Ver Planos WordPress"
-          ctaHref="#planos"
-          ctaSecondary="Falar com Especialista"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1629654297299-c8506221ca97?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#0a0f1e"
-          highlights={['WordPress Pré-instalado', 'Criador com IA', 'CDN Global', 'Backup Diário']}
+          breadcrumb={banner?.breadcrumb ?? 'Hospedagem WordPress'}
+          tag={banner?.tag ?? 'WordPress Optimizado'}
+          title={banner?.title ?? 'Hospedagem WordPress optimizada para máxima performance'}
+          subtitle={banner?.subtitle ?? 'WordPress pré-instalado, LiteSpeed, SSL grátis, CDN global e criador de sites com IA incluído em todos os planos.'}
+          price={banner?.price_text ?? 'A partir de Kz 24.900/mês'}
+          cta={banner?.button_primary_text ?? 'Ver Planos WordPress'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#080d1a'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["WordPress Pré-instalado","LiteSpeed Cache","CDN Global","SSL Grátis"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <DynamicServicePricing category="wordpress" cols={3} showBillingToggle
           title="Hospedagem WordPress — Escolha o plano"

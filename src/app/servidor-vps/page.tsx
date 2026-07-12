@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -59,24 +60,26 @@ const included = [
   { icon: Headphones, title: 'Suporte 24/7', desc: 'Suporte técnico especializado em servidores disponível sempre.' },
 ]
 
-export default function ServidorVPSPage() {
+export default async function ServidorVPSPage() {
+  const banner = await getBannerPage('servidor-vps')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumb="Servidor VPS"
-          tag="Servidores Cloud VPS"
-          title="Servidor VPS de alta performance para projectos exigentes"
-          subtitle="Infraestrutura segura, rápida e escalável para sistemas, sites, automações e aplicações. RAM DDR5 e NVMe SSD incluídos."
-          price="A partir de Kz 45.000/mês"
-          cta="Ver Planos VPS"
-          ctaHref="#planos"
-          ctaSecondary="Falar com Especialista"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#060b14"
-          highlights={['RAM DDR5', 'NVMe SSD', 'IP Dedicado', 'Root Access']}
+          breadcrumb={banner?.breadcrumb ?? 'Servidor VPS'}
+          tag={banner?.tag ?? 'Servidores Cloud VPS'}
+          title={banner?.title ?? 'Servidor VPS de alta performance para projectos exigentes'}
+          subtitle={banner?.subtitle ?? 'Infraestrutura segura, rápida e escalável para sistemas, sites, automações e aplicações. RAM DDR5 e NVMe SSD incluídos.'}
+          price={banner?.price_text ?? 'A partir de Kz 45.000/mês'}
+          cta={banner?.button_primary_text ?? 'Ver Planos VPS'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#060b14'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["RAM DDR5","NVMe SSD","IP Dedicado","Root Access"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <DynamicServicePricing category="vps" cols={3} showBillingToggle
           title="Servidor VPS — Escolha o seu plano"

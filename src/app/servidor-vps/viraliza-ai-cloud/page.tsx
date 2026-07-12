@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -60,26 +61,28 @@ const included = [
   { icon: Headphones, title: 'Suporte IA 24/7', desc: 'Equipa especializada em inteligência artificial disponível sempre.' },
 ]
 
-export default function ViralizaAICloudPage() {
+export default async function ViralizaAICloudPage() {
+  const banner = await getBannerPage('vps-viraliza-ai-cloud')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumbParent="Servidor VPS"
-          breadcrumbParentHref="/servidor-vps"
-          breadcrumb="Viraliza AI Cloud"
-          tag="IA & Automação Empresarial"
-          title="Agentes de IA prontos para automatizar o seu negócio"
-          subtitle="Configure assistentes inteligentes, integrações e automações sem complicação. WhatsApp, Gmail, Slack, Trello e muito mais."
-          price="A partir de Kz 89.000/mês"
-          cta="Ver Planos AI Cloud"
-          ctaHref="#planos"
-          ctaSecondary="Falar com Especialista"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#04060f"
-          highlights={['Agentes de IA', 'WhatsApp + Telegram', 'Gmail + Google Agenda', 'Integrações Empresariais']}
+          breadcrumb={banner?.breadcrumb ?? 'Viraliza AI Cloud'}
+          breadcrumbParent={banner?.breadcrumb_parent ?? 'Servidor VPS'}
+          breadcrumbParentHref={banner?.breadcrumb_parent_href ?? '/servidor-vps'}
+          tag={banner?.tag ?? 'IA & Automação Empresarial'}
+          title={banner?.title ?? 'Agentes de IA prontos para automatizar o seu negócio'}
+          subtitle={banner?.subtitle ?? 'Configure assistentes inteligentes, integrações e automações sem complicação. WhatsApp, Gmail, Slack, Trello e muito mais.'}
+          price={banner?.price_text ?? 'A partir de Kz 89.000/mês'}
+          cta={banner?.button_primary_text ?? 'Ver Planos AI Cloud'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#04060f'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["Agentes de IA","WhatsApp + Telegram","Gmail + Google Agenda","Integrações Empresariais"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <DynamicServicePricing
           category="vps"

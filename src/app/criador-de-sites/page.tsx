@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -59,24 +60,26 @@ const included = [
   { icon: Headphones, title: 'Suporte 24/7', desc: 'Equipa especializada sempre disponível para ajudar.' },
 ]
 
-export default function CriadorDeSitesPage() {
+export default async function CriadorDeSitesPage() {
+  const banner = await getBannerPage('criador-de-sites')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumb="Criador de Sites com IA"
-          tag="Com Inteligência Artificial"
-          title="Crie o seu site profissional em minutos com IA"
-          subtitle="Descreve o teu negócio. A inteligência artificial cria o site completo, com textos, imagens e design. Sem código, sem design."
-          price="A partir de Kz 14.900/mês"
-          cta="Criar Meu Site com IA"
-          ctaHref="#planos"
-          ctaSecondary="Ver Demonstração"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#05080f"
-          highlights={['Site pronto em minutos', 'Sem código', 'Hospedagem incluída', 'SEO automático']}
+          breadcrumb={banner?.breadcrumb ?? 'Criador de Sites com IA'}
+          tag={banner?.tag ?? 'Com Inteligência Artificial'}
+          title={banner?.title ?? 'Crie o seu site profissional em minutos com IA'}
+          subtitle={banner?.subtitle ?? 'Descreve o teu negócio. A inteligência artificial cria o site completo, com textos, imagens e design. Sem código, sem design.'}
+          price={banner?.price_text ?? 'A partir de Kz 14.900/mês'}
+          cta={banner?.button_primary_text ?? 'Criar Meu Site com IA'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Ver Demonstração'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#05080f'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["Site pronto em minutos","Sem código","Hospedagem incluída","SEO automático"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <DynamicServicePricing category="website-builder" cols={3} showBillingToggle
           title="Criador de Sites com IA — Planos"

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { ServicePricingCards } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
@@ -61,24 +62,26 @@ const included = [
   { icon: Lock, title: 'Proteção DDoS', desc: 'Protecção avançada contra ataques de negação de serviço.' },
 ]
 
-export default function HospedagemDeSitesPage() {
+export default async function HospedagemDeSitesPage() {
+  const banner = await getBannerPage('hospedagem-de-sites')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumb="Hospedagem de Sites"
-          tag="Hospedagem Premium"
-          title="Hospedagem de Sites Premium para o seu Negócio"
-          subtitle="Performance ultrarrápida com LiteSpeed, NVMe SSD, SSL grátis, cPanel e suporte técnico especializado 24/7."
-          price="A partir de Kz 19.900/mês"
-          cta="Ver Planos"
-          ctaHref="#planos"
-          ctaSecondary="Falar com Especialista"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#080d1a"
-          highlights={['LiteSpeed Enterprise', 'NVMe SSD Gen4', 'Uptime 99.9%', 'cPanel Incluído']}
+          breadcrumb={banner?.breadcrumb ?? 'Hospedagem de Sites'}
+          tag={banner?.tag ?? 'Hospedagem Premium'}
+          title={banner?.title ?? 'Hospedagem de Sites Premium para o seu Negócio'}
+          subtitle={banner?.subtitle ?? 'Performance ultrarrápida com LiteSpeed, NVMe SSD, SSL grátis, cPanel e suporte técnico especializado 24/7.'}
+          price={banner?.price_text ?? 'A partir de Kz 19.900/mês'}
+          cta={banner?.button_primary_text ?? 'Ver Planos'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#080d1a'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["LiteSpeed Enterprise","NVMe SSD Gen4","Uptime 99.9%","cPanel Incluído"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <DynamicServicePricing
           category="hosting"

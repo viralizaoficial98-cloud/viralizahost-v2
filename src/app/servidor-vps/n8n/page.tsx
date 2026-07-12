@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -59,26 +60,28 @@ const included = [
   { icon: Headphones, title: 'Suporte n8n 24/7', desc: 'Equipa especializada em automações e n8n disponível sempre.' },
 ]
 
-export default function VPSn8nPage() {
+export default async function VPSn8nPage() {
+  const banner = await getBannerPage('vps-n8n')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumbParent="Servidor VPS"
-          breadcrumbParentHref="/servidor-vps"
-          breadcrumb="VPS n8n Auto-hospedado"
-          tag="Automação com n8n"
-          title="Crie e rode as suas automações em minutos"
-          subtitle="Servidor VPS com n8n preparado para automações, integrações com WhatsApp, Google Sheets, CRMs e muito mais. Fluxos ilimitados."
-          price="A partir de Kz 55.000/mês"
-          cta="Ver Planos n8n"
-          ctaHref="#planos"
-          ctaSecondary="Falar com Especialista"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#060b14"
-          highlights={['n8n Pré-instalado', 'Fluxos Ilimitados', 'WhatsApp Integrado', 'Root Access']}
+          breadcrumb={banner?.breadcrumb ?? 'VPS n8n Auto-hospedado'}
+          breadcrumbParent={banner?.breadcrumb_parent ?? 'Servidor VPS'}
+          breadcrumbParentHref={banner?.breadcrumb_parent_href ?? '/servidor-vps'}
+          tag={banner?.tag ?? 'Automação com n8n'}
+          title={banner?.title ?? 'Crie e rode as suas automações em minutos'}
+          subtitle={banner?.subtitle ?? 'Servidor VPS com n8n preparado para automações, integrações com WhatsApp, Google Sheets, CRMs e muito mais. Fluxos ilimitados.'}
+          price={banner?.price_text ?? 'A partir de Kz 55.000/mês'}
+          cta={banner?.button_primary_text ?? 'Ver Planos n8n'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#060b14'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["n8n Pré-instalado","Fluxos Ilimitados","WhatsApp Integrado","Root Access"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <DynamicServicePricing
           category="vps"
