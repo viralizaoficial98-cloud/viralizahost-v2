@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronUp, GripVertical } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronUp, GripVertical, Database, AlertTriangle, Copy } from 'lucide-react'
 
 type Feature = { id?: string; feature: string; included: boolean; position: number }
 
@@ -202,10 +202,94 @@ function ProductForm({ initial, onSave, onCancel }: {
   )
 }
 
+function SetupBanner({ onSuccess }: { onSuccess: () => void }) {
+  const [running, setRunning] = useState(false)
+  const [result, setResult] = useState<{ success: boolean; message: string; sql?: string } | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  async function runSetup() {
+    setRunning(true)
+    try {
+      const res = await fetch('/api/admin/setup-products', { method: 'POST' })
+      const data = await res.json()
+      setResult(data)
+      if (data.success) setTimeout(onSuccess, 1500)
+    } catch (e: any) {
+      setResult({ success: false, message: e.message })
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  function copySQL() {
+    if (result?.sql) {
+      navigator.clipboard.writeText(result.sql)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-6">
+      <div className="flex items-start gap-4">
+        <AlertTriangle size={22} className="text-amber-500 shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <h3 className="font-black text-[#0A0A0A] mb-1">Base de dados não configurada</h3>
+          <p className="text-sm text-amber-800 mb-4">
+            A tabela <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono text-xs">viralizahost.products</code> não foi encontrada.
+            Clique em <strong>Configurar Agora</strong> para criar as tabelas e carregar o catálogo de produtos.
+          </p>
+
+          {!result && (
+            <button
+              onClick={runSetup}
+              disabled={running}
+              className="flex items-center gap-2 px-5 py-2.5 bg-[#F5B700] text-[#0A0A0A] text-sm font-bold rounded-xl hover:bg-[#D9A300] transition-colors disabled:opacity-50"
+            >
+              {running ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+              {running ? 'A configurar…' : 'Configurar Agora'}
+            </button>
+          )}
+
+          {result && (
+            <div className={`rounded-xl p-4 ${result.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+              <p className={`text-sm font-semibold mb-2 ${result.success ? 'text-green-700' : 'text-red-700'}`}>
+                {result.success ? '✓ ' : '✗ '}{result.message}
+              </p>
+              {!result.success && result.sql && (
+                <div>
+                  <p className="text-xs text-[#666] mb-2">
+                    Execute este SQL manualmente no{' '}
+                    <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="underline text-[#0A0A0A]">
+                      Supabase Dashboard → SQL Editor
+                    </a>:
+                  </p>
+                  <div className="relative">
+                    <pre className="bg-[#0A0A0A] text-green-400 text-[10px] rounded-lg p-3 overflow-x-auto max-h-48 font-mono">
+                      {result.sql.slice(0, 600)}…
+                    </pre>
+                    <button
+                      onClick={copySQL}
+                      className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-white/10 hover:bg-white/20 text-white text-[10px] rounded transition-colors"
+                    >
+                      <Copy size={10} /> {copied ? 'Copiado!' : 'Copiar SQL'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [tablesMissing, setTablesMissing] = useState(false)
   const [filterCat, setFilterCat] = useState('')
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -219,13 +303,18 @@ export default function AdminProductsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
+    setTablesMissing(false)
     const { data, error } = await (supabase as any)
       .from('products')
       .select('*, product_features(id, feature, included, position)')
       .order('category').order('position')
 
     if (error) {
-      setLoadError(`Erro ao carregar produtos: ${error.message}`)
+      if (error.message?.includes("Could not find the table") || error.message?.includes("does not exist")) {
+        setTablesMissing(true)
+      } else {
+        setLoadError(`Erro ao carregar produtos: ${error.message}`)
+      }
       setLoading(false)
       return
     }
@@ -301,6 +390,9 @@ export default function AdminProductsPage() {
         </div>
       )}
 
+      {tablesMissing && <SetupBanner onSuccess={load} />}
+
+      {!tablesMissing && (<>
       {/* Filter by category */}
       <div className="flex gap-2 flex-wrap mb-6">
         <button onClick={() => setFilterCat('')} className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-colors ${!filterCat ? 'bg-[#0A0A0A] text-white' : 'bg-white border border-[#E8E8E8] text-[#666] hover:border-[#0A0A0A]'}`}>
@@ -407,6 +499,7 @@ export default function AdminProductsPage() {
           )}
         </div>
       )}
+      </>)}
 
       {/* Delete confirmation */}
       {deleteId && (
