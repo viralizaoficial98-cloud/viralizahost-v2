@@ -4,7 +4,6 @@ import { Check, X, Zap, Crown, Rocket, Users, Server } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { Currency } from '@/types'
-import { createClient } from '@/lib/supabase/client'
 
 const plans = [
   {
@@ -120,15 +119,16 @@ export function PricingSection() {
   const [dbPlans, setDbPlans] = useState<DbPlan[] | null>(null)
 
   useEffect(() => {
-    const supabase = createClient()
-    supabase
-      .from('products')
-      .select('id,slug,name,description,badge,price_monthly,price_1year,popular,active,position,cta_label')
-      .eq('category', 'hosting')
-      .eq('active', true)
-      .is('subcategory', null)
-      .order('position')
-      .then(({ data }) => { if (data && data.length > 0) setDbPlans(data as DbPlan[]) })
+    fetch('/api/products?category=hosting', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(json => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setDbPlans(json.data as DbPlan[])
+        } else if (!json.success) {
+          console.error('[PricingSection] API error:', json.message, json.details)
+        }
+      })
+      .catch(err => console.error('[PricingSection] fetch error:', err))
   }, [])
 
   const getPrice = (price: Record<Currency, number>) => {

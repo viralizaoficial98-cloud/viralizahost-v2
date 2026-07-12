@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { Loader2, Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronUp, GripVertical, Database, AlertTriangle, Copy } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronUp, GripVertical, Database, AlertTriangle, Copy, Search } from 'lucide-react'
 
 type Feature = { id?: string; feature: string; included: boolean; position: number }
 
@@ -256,25 +255,38 @@ function SetupBanner({ onSuccess }: { onSuccess: () => void }) {
               <p className={`text-sm font-semibold mb-2 ${result.success ? 'text-green-700' : 'text-red-700'}`}>
                 {result.success ? '✓ ' : '✗ '}{result.message}
               </p>
-              {!result.success && result.sql && (
-                <div>
-                  <p className="text-xs text-[#666] mb-2">
-                    Execute este SQL manualmente no{' '}
-                    <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="underline text-[#0A0A0A]">
-                      Supabase Dashboard → SQL Editor
-                    </a>:
-                  </p>
-                  <div className="relative">
-                    <pre className="bg-[#0A0A0A] text-green-400 text-[10px] rounded-lg p-3 overflow-x-auto max-h-48 font-mono">
-                      {result.sql.slice(0, 600)}…
-                    </pre>
-                    <button
-                      onClick={copySQL}
-                      className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-white/10 hover:bg-white/20 text-white text-[10px] rounded transition-colors"
-                    >
-                      <Copy size={10} /> {copied ? 'Copiado!' : 'Copiar SQL'}
-                    </button>
+              {!result.success && (
+                <div className="space-y-3">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-xs font-bold text-amber-800 mb-1">Como resolver em 3 passos:</p>
+                    <ol className="text-xs text-amber-700 space-y-1 list-decimal list-inside">
+                      <li>Abra o <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="underline font-semibold">Supabase Dashboard → SQL Editor</a></li>
+                      <li>Copie e execute o ficheiro <code className="bg-amber-100 px-1 rounded font-mono">supabase/migrations/20260712_000000_products_rpc.sql</code></li>
+                      <li>Volte aqui e clique em <strong>Configurar Agora</strong> novamente</li>
+                    </ol>
                   </div>
+                  {result.sql && (
+                    <div>
+                      <p className="text-xs text-[#666] mb-2">Ou execute este comando rápido:</p>
+                      <div className="relative">
+                        <pre className="bg-[#0A0A0A] text-green-400 text-[10px] rounded-lg p-3 overflow-x-auto max-h-32 font-mono">
+                          {result.sql}
+                        </pre>
+                        <button
+                          onClick={copySQL}
+                          className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-white/10 hover:bg-white/20 text-white text-[10px] rounded transition-colors"
+                        >
+                          <Copy size={10} /> {copied ? 'Copiado!' : 'Copiar'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => { setResult(null); runSetup() }}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#F5B700] text-[#0A0A0A] text-xs font-bold rounded-lg hover:bg-[#D9A300] transition-colors"
+                  >
+                    <Database size={12} /> Tentar novamente
+                  </button>
                 </div>
               )}
             </div>
@@ -291,6 +303,7 @@ export default function AdminProductsPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [tablesMissing, setTablesMissing] = useState(false)
   const [filterCat, setFilterCat] = useState('')
+  const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -298,27 +311,33 @@ export default function AdminProductsPage() {
   const [deleting, setDeleting] = useState(false)
   const [msg, setMsg] = useState<{ text: string; type: 'ok' | 'err' } | null>(null)
 
-  const supabase = createClient()
-
   const load = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
     setTablesMissing(false)
-    const { data, error } = await (supabase as any)
-      .from('products')
-      .select('*, product_features(id, feature, included, position)')
-      .order('category').order('position')
 
-    if (error) {
-      if (error.message?.includes("Could not find the table") || error.message?.includes("does not exist")) {
-        setTablesMissing(true)
-      } else {
-        setLoadError(`Erro ao carregar produtos: ${error.message}`)
+    try {
+      const res = await fetch('/api/admin/products', { cache: 'no-store' })
+      const json = await res.json()
+
+      if (!res.ok || !json.success) {
+        const msg: string = json.message ?? ''
+        if (msg.includes('Could not find') || msg.includes('does not exist')) {
+          setTablesMissing(true)
+        } else {
+          setLoadError('Não foi possível carregar os produtos. Tente novamente.')
+          console.error('[products] load error:', msg)
+        }
+        setLoading(false)
+        return
       }
-      setLoading(false)
-      return
+
+      setProducts((json.data ?? []) as Product[])
+    } catch (e: any) {
+      setLoadError('Erro de ligação. Verifique a sua ligação à internet e tente novamente.')
+      console.error('[products] fetch error:', e)
     }
-    setProducts((data ?? []) as Product[])
+
     setLoading(false)
   }, [])
 
@@ -330,26 +349,30 @@ export default function AdminProductsPage() {
   }
 
   async function handleSave(data: Partial<Product> & { product_features?: Feature[] }, id?: string) {
-    const { product_features, ...productData } = data
+    const payload = { ...data }
 
     if (id) {
-      const { error } = await (supabase.from('products') as any).update({ ...productData, updated_at: new Date().toISOString() }).eq('id', id)
-      if (error) throw new Error(error.message)
-      // Replace features
-      await (supabase as any).from('product_features').delete().eq('product_id', id)
-      if (product_features?.length) {
-        await (supabase as any).from('product_features').insert(
-          product_features.map((f, i) => ({ product_id: id, feature: f.feature, included: f.included, position: i }))
-        )
+      const res = await fetch(`/api/admin/products/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        console.error('[products] update error:', json.message)
+        throw new Error('Não foi possível guardar as alterações. Tente novamente.')
       }
       flash('Produto actualizado com sucesso.')
     } else {
-      const { data: created, error } = await (supabase as any).from('products').insert(productData as any).select().single()
-      if (error) throw new Error(error.message)
-      if (product_features?.length && created) {
-        await (supabase as any).from('product_features').insert(
-          product_features.map((f, i) => ({ product_id: created.id, feature: f.feature, included: f.included, position: i }))
-        )
+      const res = await fetch('/api/admin/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        console.error('[products] create error:', json.message)
+        throw new Error('Não foi possível criar o produto. Tente novamente.')
       }
       flash('Produto criado com sucesso.')
     }
@@ -361,20 +384,43 @@ export default function AdminProductsPage() {
 
   async function handleDelete(id: string) {
     setDeleting(true)
-    const { error } = await (supabase as any).from('products').delete().eq('id', id)
+    try {
+      const res = await fetch(`/api/admin/products/${id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        console.error('[products] delete error:', json.message)
+        flash('Não foi possível eliminar o produto. Tente novamente.', 'err')
+      } else {
+        flash('Produto eliminado.')
+        await load()
+      }
+    } catch (e: any) {
+      console.error('[products] delete error:', e)
+      flash('Erro de ligação ao eliminar produto.', 'err')
+    }
     setDeleting(false)
     setDeleteId(null)
-    if (error) { flash(error.message, 'err') } else { flash('Produto eliminado.'); await load() }
   }
 
-  const filtered = filterCat ? products.filter(p => p.category === filterCat) : products
+  const filtered = products.filter(p => {
+    if (filterCat && p.category !== filterCat) return false
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      return p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q) || (p.description ?? '').toLowerCase().includes(q)
+    }
+    return true
+  })
 
   return (
     <div className="max-w-6xl mx-auto px-0 sm:px-2 py-4 md:py-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-[#0A0A0A]">Gestão de Produtos</h1>
-          <p className="text-sm text-[#888] mt-1">Todos os planos e serviços do website, carregados dinamicamente.</p>
+          <p className="text-sm text-[#888] mt-1">
+            {products.length > 0
+              ? `${filtered.length === products.length ? products.length : `${filtered.length} de ${products.length}`} produto(s) — carregados dinamicamente do website.`
+              : 'Todos os planos e serviços do website, carregados dinamicamente.'}
+          </p>
         </div>
         <button
           onClick={() => { setCreating(true); setEditingId(null) }}
@@ -393,7 +439,26 @@ export default function AdminProductsPage() {
       {tablesMissing && <SetupBanner onSuccess={load} />}
 
       {!tablesMissing && (<>
-      {/* Filter by category */}
+      {/* Search + filter */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AAA]" />
+          <input
+            className="w-full border border-[#E8E8E8] rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:border-[#F5B700] transition-colors"
+            placeholder="Pesquisar por nome, slug ou descrição…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        {(search || filterCat) && (
+          <button
+            onClick={() => { setSearch(''); setFilterCat('') }}
+            className="text-xs px-3 py-2 border border-[#E8E8E8] text-[#888] rounded-xl hover:border-[#0A0A0A] hover:text-[#0A0A0A] transition-colors whitespace-nowrap"
+          >
+            Limpar filtros
+          </button>
+        )}
+      </div>
       <div className="flex gap-2 flex-wrap mb-6">
         <button onClick={() => setFilterCat('')} className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-colors ${!filterCat ? 'bg-[#0A0A0A] text-white' : 'bg-white border border-[#E8E8E8] text-[#666] hover:border-[#0A0A0A]'}`}>
           Todos
@@ -494,7 +559,18 @@ export default function AdminProductsPage() {
 
           {filtered.length === 0 && !loading && (
             <div className="text-center py-16 text-[#AAA]">
-              <p className="text-sm">{filterCat ? `Nenhum produto na categoria "${CATEGORIES.find(c => c.value === filterCat)?.label ?? filterCat}".` : 'Nenhum produto no catálogo. Aplique a migração SQL ou crie o primeiro produto manualmente.'}</p>
+              <p className="text-sm">
+                {search
+                  ? `Nenhum produto encontrado para "${search}".`
+                  : filterCat
+                  ? `Nenhum produto na categoria "${CATEGORIES.find(c => c.value === filterCat)?.label ?? filterCat}".`
+                  : 'Nenhum produto no catálogo. Clique em "Novo Produto" para adicionar o primeiro.'}
+              </p>
+              {(search || filterCat) && (
+                <button onClick={() => { setSearch(''); setFilterCat('') }} className="mt-3 text-xs text-[#F5B700] underline">
+                  Limpar filtros
+                </button>
+              )}
             </div>
           )}
         </div>

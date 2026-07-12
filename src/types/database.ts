@@ -482,11 +482,52 @@ export interface Database {
           position?: number
         }
       }
+      products: {
+        Row: {
+          id: string
+          slug: string
+          category: string
+          subcategory: string | null
+          name: string
+          description: string | null
+          badge: string | null
+          popular: boolean
+          active: boolean
+          position: number
+          price_monthly: number | null
+          price_6months: number | null
+          price_1year: number | null
+          price_2years: number | null
+          price_3years: number | null
+          color: string | null
+          href_override: string | null
+          cta_label: string | null
+          image_url: string | null
+          meta: Record<string, unknown>
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['viralizahost']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['viralizahost']['Tables']['products']['Insert']>
+      }
+      product_features: {
+        Row: {
+          id: string
+          product_id: string
+          feature: string
+          included: boolean
+          position: number
+        }
+        Insert: Omit<Database['viralizahost']['Tables']['product_features']['Row'], 'id'>
+        Update: Partial<Database['viralizahost']['Tables']['product_features']['Insert']>
+      }
     }
     Views: Record<string, never>
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean }
       is_staff: { Args: Record<string, never>; Returns: boolean }
+      setup_product_catalog: { Args: Record<string, never>; Returns: { success: boolean; products: number } }
+      check_product_catalog: { Args: Record<string, never>; Returns: { exists: boolean; products: number; features: number } }
     }
     Enums: {
       user_role: UserRole
