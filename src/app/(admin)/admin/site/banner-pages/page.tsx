@@ -452,11 +452,13 @@ export default function AdminBannerPagesPage() {
   async function handleSave(data: Partial<BannerPage>, id?: string) {
     const url = id ? `/api/admin/banner-pages/${id}` : '/api/admin/banner-pages'
     const method = id ? 'PUT' : 'POST'
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+    // Strip DB-managed fields so we never send id/timestamps in the body
+    const { id: _id, created_at: _ca, updated_at: _ts, ...payload } = data as any
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     const json = await res.json()
     if (!res.ok || !json.success) {
-      console.error('[banner-pages] save error:', json.message)
-      throw new Error('Não foi possível guardar o banner. Tente novamente.')
+      console.error('[banner-pages] save error:', json)
+      throw new Error(json.message ?? 'Não foi possível guardar o banner. Tente novamente.')
     }
     flash(id ? 'Banner actualizado com sucesso.' : 'Banner criado com sucesso.')
     setEditingId(null)
