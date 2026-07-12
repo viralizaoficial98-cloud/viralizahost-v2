@@ -10,12 +10,14 @@ export async function PUT(
   try {
     await requireAdminRole()
     const { id } = await params
-    const body = await req.json()
+    const rawBody = await req.json()
+    // Strip immutable columns so Supabase never tries to UPDATE the primary key
+    const { id: _id, created_at: _ca, updated_at: _ts, ...updatePayload } = rawBody
 
     const supabase = await createAdminClient()
     const { data, error } = await (supabase as any)
       .from('banner_pages')
-      .update({ ...body, updated_at: new Date().toISOString() })
+      .update({ ...updatePayload, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single()
