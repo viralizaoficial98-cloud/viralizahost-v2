@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -67,24 +68,26 @@ const included = [
   { icon: Headphones, title: 'Suporte ao Revendedor', desc: 'Linha de suporte dedicada para revendedores disponível 24/7.' },
 ]
 
-export default function RevendaDeHospedagemPage() {
+export default async function RevendaDeHospedagemPage() {
+  const banner = await getBannerPage('revenda-de-hospedagem')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumb="Revenda de Hospedagem"
-          tag="Revenda WHM/cPanel"
-          title="Crie a sua própria empresa de hospedagem com a ViralizaHost"
-          subtitle="Venda hospedagem para os seus clientes usando a nossa infraestrutura premium. WHM, cPanel, DNS privado e marca própria."
-          price="A partir de Kz 59.900/mês"
-          cta="Ver Planos de Revenda"
-          ctaHref="#planos"
-          ctaSecondary="Falar com Comercial"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1591808216268-1e7c1b31b9d2?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#0a0a14"
-          highlights={['WHM/cPanel Incluído', 'DNS Whitelabel', 'SSL por Conta', 'Suporte Revendedor']}
+          breadcrumb={banner?.breadcrumb ?? 'Revenda de Hospedagem'}
+          tag={banner?.tag ?? 'Revenda WHM/cPanel'}
+          title={banner?.title ?? 'Crie a sua própria empresa de hospedagem com a ViralizaHost'}
+          subtitle={banner?.subtitle ?? 'Venda hospedagem para os seus clientes usando a nossa infraestrutura premium. WHM, cPanel, DNS privado e marca própria.'}
+          price={banner?.price_text ?? 'A partir de Kz 59.900/mês'}
+          cta={banner?.button_primary_text ?? 'Ver Planos de Revenda'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Comercial'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1591808216268-1e7c1b31b9d2?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#0a0a14'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["WHM/cPanel Incluído","DNS Whitelabel","SSL por Conta","Suporte Revendedor"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <DynamicServicePricing category="reseller" cols={4} showBillingToggle
           title="Revenda de Hospedagem — Escolha o plano"

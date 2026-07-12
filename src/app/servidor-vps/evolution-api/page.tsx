@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -59,26 +60,28 @@ const included = [
   { icon: Headphones, title: 'Suporte Especializado', desc: 'Equipa com conhecimento em Evolution API e WhatsApp disponível 24/7.' },
 ]
 
-export default function VPSEvolutionAPIPage() {
+export default async function VPSEvolutionAPIPage() {
+  const banner = await getBannerPage('vps-evolution-api')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumbParent="Servidor VPS"
-          breadcrumbParentHref="/servidor-vps"
-          breadcrumb="VPS Evolution API"
-          tag="WhatsApp Business API"
-          title="Automatize, integre e escale o seu WhatsApp com Evolution API"
-          subtitle="Servidor VPS preparado para WhatsApp Business, chatbots, integrações e automações. Múltiplos números, webhooks e painel completo."
-          price="A partir de Kz 69.000/mês"
-          cta="Ver Planos Evolution API"
-          ctaHref="#planos"
-          ctaSecondary="Falar com Especialista"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1617791160536-598cf32026fb?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#062006"
-          highlights={['Evolution API Instalada', 'Múltiplos Números', 'Webhooks Avançados', 'Integrações CRM']}
+          breadcrumb={banner?.breadcrumb ?? 'VPS Evolution API'}
+          breadcrumbParent={banner?.breadcrumb_parent ?? 'Servidor VPS'}
+          breadcrumbParentHref={banner?.breadcrumb_parent_href ?? '/servidor-vps'}
+          tag={banner?.tag ?? 'WhatsApp Business API'}
+          title={banner?.title ?? 'Automatize, integre e escale o seu WhatsApp com Evolution API'}
+          subtitle={banner?.subtitle ?? 'Servidor VPS preparado para WhatsApp Business, chatbots, integrações e automações. Múltiplos números, webhooks e painel completo.'}
+          price={banner?.price_text ?? 'A partir de Kz 69.000/mês'}
+          cta={banner?.button_primary_text ?? 'Ver Planos Evolution API'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1617791160536-598cf32026fb?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#062006'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["Evolution API Instalada","Múltiplos Números","Webhooks Avançados","Integrações CRM"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <DynamicServicePricing
           category="vps"

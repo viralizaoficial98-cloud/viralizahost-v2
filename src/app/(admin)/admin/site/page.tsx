@@ -1,15 +1,16 @@
 'use client'
 import Link from 'next/link'
-import { Monitor, Image, Globe, Mail, Users, Server, RefreshCw, Sparkles, Package } from 'lucide-react'
+import { Monitor, Image, Globe, Mail, Users, Server, RefreshCw, Sparkles, Package, LayoutTemplate } from 'lucide-react'
 import { useEffect, useState, useCallback } from 'react'
 
 const modules = [
-  { href: '/admin/site/banners',       icon: Image,   label: 'Banners / Hero',       desc: 'Slides do carrossel principal',   color: '#F5B700', table: 'site_banners' },
-  { href: '/admin/site/domains',       icon: Globe,   label: 'Domínios',             desc: 'Extensões e preços de domínios',  color: '#3B82F6', table: 'site_domains' },
-  { href: '/admin/site/email-plans',   icon: Mail,    label: 'Planos de Email',      desc: 'Planos de email corporativo',     color: '#10B981', table: 'site_email_plans' },
-  { href: '/admin/site/hosting-plans', icon: Server,  label: 'Planos de Hospedagem', desc: 'Planos e preços de hosting',      color: '#EF4444', table: 'site_hosting_plans' },
-  { href: '/admin/site/products',      icon: Package, label: 'Produtos / Catálogo',  desc: 'WordPress, VPS, Dedicados, etc.', color: '#8B5CF6', table: 'products' },
-  { href: '/admin/site/team',          icon: Users,   label: 'Equipa',               desc: 'Membros e estrutura',             color: '#6B7280', table: 'site_team' },
+  { href: '/admin/site/banners',       icon: Image,          label: 'Banners / Hero',       desc: 'Slides do carrossel principal',   color: '#F5B700', table: 'site_banners' },
+  { href: '/admin/site/banner-pages',  icon: LayoutTemplate, label: 'Banner das Páginas',   desc: 'Hero de cada página de serviço',  color: '#F97316', table: 'banner_pages' },
+  { href: '/admin/site/domains',       icon: Globe,          label: 'Domínios',             desc: 'Extensões e preços de domínios',  color: '#3B82F6', table: 'site_domains' },
+  { href: '/admin/site/email-plans',   icon: Mail,           label: 'Planos de Email',      desc: 'Planos de email corporativo',     color: '#10B981', table: 'site_email_plans' },
+  { href: '/admin/site/hosting-plans', icon: Server,         label: 'Planos de Hospedagem', desc: 'Planos e preços de hosting',      color: '#EF4444', table: 'site_hosting_plans' },
+  { href: '/admin/site/products',      icon: Package,        label: 'Produtos / Catálogo',  desc: 'WordPress, VPS, Dedicados, etc.', color: '#8B5CF6', table: 'products' },
+  { href: '/admin/site/team',          icon: Users,          label: 'Equipa',               desc: 'Membros e estrutura',             color: '#6B7280', table: 'site_team' },
 ]
 
 export default function SitePage() {

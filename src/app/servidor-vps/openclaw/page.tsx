@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -59,26 +60,28 @@ const included = [
   { icon: Headphones, title: 'Suporte Especializado', desc: 'Equipa com expertise em IA e agentes disponível 24/7.' },
 ]
 
-export default function VPSOpenClawPage() {
+export default async function VPSOpenClawPage() {
+  const banner = await getBannerPage('vps-openclaw')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumbParent="Servidor VPS"
-          breadcrumbParentHref="/servidor-vps"
-          breadcrumb="VPS OpenClaw"
-          tag="Agentes de IA Autónomos"
-          title="Coloque um agente de IA a agir por si"
-          subtitle="Mais autonomia, mais controlo e menos tarefas manuais no seu dia a dia. OpenClaw pré-instalado e pronto para começar."
-          price="A partir de Kz 65.000/mês"
-          cta="Ver Planos OpenClaw"
-          ctaHref="#planos"
-          ctaSecondary="Falar com Especialista"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#06060f"
-          highlights={['Agentes Autónomos', 'Automação Sem Código', 'Cofre Seguro', 'Integrações Ilimitadas']}
+          breadcrumb={banner?.breadcrumb ?? 'VPS OpenClaw'}
+          breadcrumbParent={banner?.breadcrumb_parent ?? 'Servidor VPS'}
+          breadcrumbParentHref={banner?.breadcrumb_parent_href ?? '/servidor-vps'}
+          tag={banner?.tag ?? 'Agentes de IA Autónomos'}
+          title={banner?.title ?? 'Coloque um agente de IA a agir por si'}
+          subtitle={banner?.subtitle ?? 'Mais autonomia, mais controlo e menos tarefas manuais no seu dia a dia. OpenClaw pré-instalado e pronto para começar.'}
+          price={banner?.price_text ?? 'A partir de Kz 65.000/mês'}
+          cta={banner?.button_primary_text ?? 'Ver Planos OpenClaw'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#06060f'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["Agentes Autónomos","Automação Sem Código","Cofre Seguro","Integrações Ilimitadas"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <DynamicServicePricing
           category="vps"

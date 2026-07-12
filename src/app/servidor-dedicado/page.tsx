@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -69,24 +70,26 @@ const included = [
   { icon: Headphones, title: 'Suporte Especializado 24/7', desc: 'Equipa de engenheiros de infra-estrutura disponível a qualquer hora.' },
 ]
 
-export default function ServidorDedicadoPage() {
+export default async function ServidorDedicadoPage() {
+  const banner = await getBannerPage('servidor-dedicado')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumb="Servidor Dedicado Linux"
-          tag="Infraestrutura Dedicada"
-          title="Infraestrutura dedicada para alta performance"
-          subtitle="Servidores Linux dedicados para projectos robustos, sistemas críticos e alta demanda. Recursos exclusivos, root access e SLA garantido."
-          price="A partir de Kz 249.000/mês"
-          cta="Ver Planos Dedicado"
-          ctaHref="#planos"
-          ctaSecondary="Falar com Especialista"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#060810"
-          highlights={['vCPU Exclusivas', 'RAM DDR5', 'NVMe SSD', 'Root Access Total']}
+          breadcrumb={banner?.breadcrumb ?? 'Servidor Dedicado Linux'}
+          tag={banner?.tag ?? 'Infraestrutura Dedicada'}
+          title={banner?.title ?? 'Infraestrutura dedicada para alta performance'}
+          subtitle={banner?.subtitle ?? 'Servidores Linux dedicados para projectos robustos, sistemas críticos e alta demanda. Recursos exclusivos, root access e SLA garantido.'}
+          price={banner?.price_text ?? 'A partir de Kz 249.000/mês'}
+          cta={banner?.button_primary_text ?? 'Ver Planos Dedicado'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#060810'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["vCPU Exclusivas","RAM DDR5","NVMe SSD","Root Access Total"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <DynamicServicePricing category="dedicated" cols={4} showBillingToggle
           title="Servidor Dedicado Linux — Planos"

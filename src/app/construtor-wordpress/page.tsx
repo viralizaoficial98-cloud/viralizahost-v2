@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
@@ -58,24 +59,26 @@ const included = [
   { icon: Headphones, title: 'Suporte Especializado', desc: 'Equipa com expertise em WordPress disponível 24/7.' },
 ]
 
-export default function ConstrutorWordPressPage() {
+export default async function ConstrutorWordPressPage() {
+  const banner = await getBannerPage('construtor-wordpress')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumb="Construtor WordPress"
-          tag="WordPress + Builder Visual"
-          title="Crie sites WordPress incríveis com builder visual"
-          subtitle="WordPress optimizado com builder drag-and-drop, plugins premium, SSL grátis e hospedagem de alta performance."
-          price="A partir de Kz 29.900/mês"
-          cta="Ver Planos"
-          ctaHref="#planos"
-          ctaSecondary="Falar com Especialista"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1580584126903-c17d41830450?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#0a0c14"
-          highlights={['Builder Visual', 'Plugins Premium', 'WordPress Pré-instalado', 'CDN Global']}
+          breadcrumb={banner?.breadcrumb ?? 'Construtor WordPress'}
+          tag={banner?.tag ?? 'WordPress + Builder Visual'}
+          title={banner?.title ?? 'Crie sites WordPress incríveis com builder visual'}
+          subtitle={banner?.subtitle ?? 'WordPress optimizado com builder drag-and-drop, plugins premium, SSL grátis e hospedagem de alta performance.'}
+          price={banner?.price_text ?? 'A partir de Kz 29.900/mês'}
+          cta={banner?.button_primary_text ?? 'Ver Planos'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1580584126903-c17d41830450?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#0a0c14'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["Builder Visual","Plugins Premium","WordPress Pré-instalado","CDN Global"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <ServicePricingCards plans={plans} cols={3}
           title="Construtor WordPress — Planos"

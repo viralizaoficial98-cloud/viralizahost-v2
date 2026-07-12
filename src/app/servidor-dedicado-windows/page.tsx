@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -59,24 +60,26 @@ const included = [
   { icon: Headphones, title: 'Suporte Windows 24/7', desc: 'Equipa com especialização em ambientes Windows Server e MS SQL.' },
 ]
 
-export default function ServidorDedicadoWindowsPage() {
+export default async function ServidorDedicadoWindowsPage() {
+  const banner = await getBannerPage('servidor-dedicado-windows')
   return (
     <>
       <Header />
       <main>
         <ServiceHero
-          breadcrumb="Servidor Dedicado Windows"
-          tag="Windows Server + Plesk"
-          title="Máxima performance para projectos em ASP.NET e MS SQL"
-          subtitle="Servidor dedicado Windows com Plesk, ASP.NET, Microsoft SQL Server, Remote Desktop e alta estabilidade para sistemas críticos."
-          price="A partir de Kz 299.000/mês"
-          cta="Ver Planos Windows"
-          ctaHref="#planos"
-          ctaSecondary="Falar com Especialista"
-          ctaSecondaryHref="/tickets"
-          bgImage="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920&q=80&auto=format&fit=crop"
-          bgColor="#060810"
-          highlights={['Windows Server 2022', 'Plesk Incluído', 'MS SQL Server', 'Remote Desktop']}
+          breadcrumb={banner?.breadcrumb ?? 'Servidor Dedicado Windows'}
+          tag={banner?.tag ?? 'Windows Server + Plesk'}
+          title={banner?.title ?? 'Máxima performance para projectos em ASP.NET e MS SQL'}
+          subtitle={banner?.subtitle ?? 'Servidor dedicado Windows com Plesk, ASP.NET, Microsoft SQL Server, Remote Desktop e alta estabilidade para sistemas críticos.'}
+          price={banner?.price_text ?? 'A partir de Kz 299.000/mês'}
+          cta={banner?.button_primary_text ?? 'Ver Planos Windows'}
+          ctaHref={banner?.button_primary_link ?? '#planos'}
+          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
+          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920&q=80&auto=format&fit=crop'}
+          bgColor={banner?.bg_color ?? '#060810'}
+          highlights={banner?.highlights?.length ? banner.highlights : ["Windows Server 2022","Plesk Incluído","MS SQL Server","Remote Desktop"]}
+          guarantee={banner?.show_guarantee ?? true}
         />
         <DynamicServicePricing category="dedicated-windows" cols={3} showBillingToggle
           title="Servidor Dedicado Windows — Planos"
