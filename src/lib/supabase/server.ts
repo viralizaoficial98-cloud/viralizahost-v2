@@ -58,6 +58,21 @@ export function createRpcClient() {
   )
 }
 
+// ── Admin write client — plain supabase-js, service role, viralizahost schema
+// Unlike createAdminClient (which uses @supabase/ssr and injects the user's
+// session JWT from cookies), this client ALWAYS sends the service_role JWT.
+// Use for all admin INSERT / UPDATE / DELETE operations.
+export function createAdminWriteClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+      db: { schema: 'viralizahost' },
+    }
+  )
+}
+
 // ── Auth-only client — reads user session from cookies, NO db.schema
 // Use for auth.getUser() so the schema header is never sent to the auth service.
 export async function createAuthClient() {
