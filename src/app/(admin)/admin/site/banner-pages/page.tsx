@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Loader2, Pencil, Check, X, Upload, Image as ImageIcon, Eye, EyeOff, ChevronDown, ChevronUp, Globe, Plus } from 'lucide-react'
+import { Loader2, Pencil, Check, X, Image as ImageIcon, Eye, EyeOff, ChevronDown, ChevronUp, Globe, Plus, Sparkles } from 'lucide-react'
 
 type BannerPage = {
   id: string
@@ -388,22 +388,33 @@ function BannerForm({
   )
 }
 
+function isTableMissingError(msg: string) {
+  return msg.toLowerCase().includes('could not find') || msg.toLowerCase().includes('does not exist') || msg.includes('42P01')
+}
+
 export default function AdminBannerPagesPage() {
   const [banners, setBanners] = useState<BannerPage[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [tableMissing, setTableMissing] = useState(false)
+  const [settingUp, setSettingUp] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ text: string; type: 'ok' | 'err' } | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true); setLoadError(null)
+    setLoading(true); setLoadError(null); setTableMissing(false)
     try {
       const res = await fetch('/api/admin/banner-pages', { cache: 'no-store' })
       const json = await res.json()
       if (!res.ok || !json.success) {
-        setLoadError(`Erro ${res.status}: ${json.message ?? 'Não foi possível carregar os banners'}`)
+        const errMsg = json.message ?? 'Não foi possível carregar os banners'
+        if (isTableMissingError(errMsg)) {
+          setTableMissing(true)
+        } else {
+          setLoadError(`Erro ${res.status}: ${errMsg}`)
+        }
         console.error('[banner-pages] load error:', json)
       } else {
         setBanners(json.data ?? [])
@@ -415,6 +426,21 @@ export default function AdminBannerPagesPage() {
       setLoading(false)
     }
   }, [])
+
+  async function handleSetup() {
+    setSettingUp(true)
+    try {
+      const res = await fetch('/api/admin/setup-banner-pages', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok || !json.ok) throw new Error(json.error ?? 'Erro ao configurar')
+      flash(`Tabela criada e ${json.count ?? 0} banners inseridos com sucesso.`, 'ok')
+      await load()
+    } catch (e: any) {
+      flash(e.message ?? 'Erro ao configurar', 'err')
+    } finally {
+      setSettingUp(false)
+    }
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -485,6 +511,33 @@ export default function AdminBannerPagesPage() {
       {/* Loading */}
       {loading && (
         <div className="flex justify-center py-16"><Loader2 size={28} className="animate-spin text-[#F5B700]" /></div>
+      )}
+
+      {/* Table missing — setup banner */}
+      {!loading && tableMissing && (
+        <div className="p-6 rounded-2xl flex items-center gap-4"
+          style={{ background: 'rgba(245,183,0,0.06)', border: '1px solid rgba(245,183,0,0.20)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.25)' }}>
+            <Sparkles size={18} style={{ color: '#D9A300' }} />
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-sm" style={{ color: '#0B0B0D' }}>Tabela não encontrada</p>
+            <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
+              A tabela <code className="bg-[#F5F5F5] px-1 py-0.5 rounded text-[10px]">banner_pages</code> ainda não existe.
+              Clique em &ldquo;Configurar agora&rdquo; para criá-la e inserir os 18 banners pré-configurados para todas as páginas de serviço.
+            </p>
+          </div>
+          <button
+            onClick={handleSetup}
+            disabled={settingUp}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', color: '#000', boxShadow: '0 4px 14px rgba(245,183,0,0.30)', border: 'none', cursor: 'pointer', opacity: settingUp ? 0.7 : 1 }}
+          >
+            {settingUp ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            {settingUp ? 'A configurar…' : 'Configurar agora'}
+          </button>
+        </div>
       )}
 
       {/* Error */}

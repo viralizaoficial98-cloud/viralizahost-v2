@@ -1,4 +1,4 @@
-import { createRpcClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export type BannerPageData = {
   id: string
@@ -27,9 +27,6 @@ export type BannerPageData = {
 // Returns null when not found — caller falls back to hardcoded defaults
 export async function getBannerPage(slug: string): Promise<BannerPageData | null> {
   try {
-    // createRpcClient = service_role, no schema header → need explicit schema via PostgREST
-    // We use createAdminClient which has schema viralizahost set
-    const { createAdminClient } = await import('@/lib/supabase/server')
     const supabase = await createAdminClient()
     const { data, error } = await (supabase as any)
       .from('banner_pages')
@@ -48,7 +45,6 @@ export async function getBannerPage(slug: string): Promise<BannerPageData | null
 // Used by admin — returns all banners regardless of is_active
 export async function getAllBannerPages(): Promise<BannerPageData[]> {
   try {
-    const { createAdminClient } = await import('@/lib/supabase/server')
     const supabase = await createAdminClient()
     const { data, error } = await (supabase as any)
       .from('banner_pages')
