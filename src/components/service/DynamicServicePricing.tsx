@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react'
 import { Check, X, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { getPriceForCycle, formatKz, type BillingCycle, type Product } from '@/lib/products'
 
 const BADGE_COLORS: Record<string, string> = {
@@ -41,21 +40,20 @@ export function DynamicServicePricing({ category, subcategory, title = 'Escolha 
   const [billing, setBilling] = useState<BillingCycle>('monthly')
 
   useEffect(() => {
-    const supabase = createClient()
-    let query = supabase
-      .from('products')
-      .select('*, product_features(feature, included, position)')
-      .eq('category', category)
-      .eq('active', true)
-    if (subcategory) query = (query as any).eq('subcategory', subcategory)
-    else query = (query as any).is('subcategory', null)
-    ;(query as any)
-      .order('position', { ascending: true })
-      .then(({ data, error: err }: { data: ProductWithFeatures[] | null; error: { message: string } | null }) => {
-        if (err) { setError(err.message); setLoading(false); return }
-        if (data && data.length > 0) setPlans(data)
-        setLoading(false)
+    const params = new URLSearchParams({ category })
+    if (subcategory) params.set('subcategory', subcategory)
+
+    fetch(`/api/products?${params}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(json => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setPlans(json.data as ProductWithFeatures[])
+        } else if (!json.success) {
+          console.error('[DynamicServicePricing] API error:', json.message, json.details)
+        }
       })
+      .catch(err => console.error('[DynamicServicePricing] fetch error:', err))
+      .finally(() => setLoading(false))
   }, [category, subcategory])
 
   const gridClass: Record<number, string> = {

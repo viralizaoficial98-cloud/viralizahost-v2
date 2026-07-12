@@ -892,7 +892,7 @@ function CheckoutContent() {
       try {
         const { data: productRows, error: productError } = await (supabase as any)
           .from('products')
-          .select('slug,name,category,price_monthly,price_1year,active')
+          .select('slug,name,category,price_monthly,price_6months,price_1year,price_2years,price_3years,active,cta_label')
           .eq('active', true)
 
         const catalog: Record<string, CheckoutItem> = { ...PLAN_CATALOG }
