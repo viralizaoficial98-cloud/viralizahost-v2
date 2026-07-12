@@ -18,7 +18,10 @@ export async function GET(req: NextRequest) {
     if (category) query = query.eq('category', category)
 
     const { data, error } = await query
-    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 })
+    if (error) {
+      console.error('[api/admin/products] DB error:', { message: error.message, code: error.code, details: error.details, hint: error.hint })
+      return NextResponse.json({ success: false, message: error.message, code: error.code, details: error.details, hint: error.hint }, { status: 500 })
+    }
     return NextResponse.json({ success: true, data: data ?? [] })
   } catch (err: any) {
     const status = (err as any).status ?? 500
