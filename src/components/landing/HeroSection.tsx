@@ -5,19 +5,21 @@ import { ChevronLeft, ChevronRight, ArrowRight, Shield, Zap, Star } from 'lucide
 import { createClient } from '@/lib/supabase/client'
 
 /* ─── Constants ──────────────────────────────────────────────── */
-/** Height of the fixed site header — images must start below this. */
-const HEADER_H = 68
+const HEADER_H = 68 // px — fixed site header height
 
 /* ─── Types ─────────────────────────────────────────────────── */
 type Slide = {
   id: number
   bgImage: string
   bgColor: string
-  desktopPosition?: string
-  tabletPosition?: string
-  mobilePosition?: string
+  /** object-position value for desktop (default "center center") */
+  objectPosition?: string
+  /** object-position value for mobile (default = objectPosition) */
+  objectPositionMobile?: string
+  /** CSS scale applied to the image, e.g. "1.05" (default "1") */
+  imageScale?: string
   accentColor: string
-  /** true = full-width image/video banner; text overlay is NOT rendered */
+  /** true = full-width image/video artwork — no text overlay rendered */
   imageOnly?: boolean
   /** true = render as looping video (only when imageOnly is true) */
   isVideo?: boolean
@@ -32,7 +34,14 @@ type Slide = {
   features?: string[]
 }
 
-/* ─── Fallback slides (used only when DB returns 0 active rows) ─ */
+/* ─── Fallback slides ────────────────────────────────────────── */
+/*
+ * Used only when Supabase returns 0 active banners.
+ * objectPosition is tuned for each banner's composition:
+ *   viraliza-email-banner.png  1536×1024  (3:2)  — main content left + centre-right
+ *   servidores_banner.png      1672×941   (16:9) — wide layout, centre works
+ * The AI video uses cover/object-fit automatically.
+ */
 const FALLBACK_SLIDES: Slide[] = [
   {
     id: 0,
@@ -40,6 +49,7 @@ const FALLBACK_SLIDES: Slide[] = [
     isVideo: true,
     bgImage: '',
     bgColor: '#000000',
+    objectPosition: '60% center',
     accentColor: '#F5B700',
   },
   {
@@ -48,6 +58,8 @@ const FALLBACK_SLIDES: Slide[] = [
     isVideo: false,
     bgImage: '/viraliza-email-banner.png',
     bgColor: '#000000',
+    objectPosition: 'center center',
+    objectPositionMobile: 'center center',
     accentColor: '#34D399',
   },
   {
@@ -56,6 +68,8 @@ const FALLBACK_SLIDES: Slide[] = [
     isVideo: false,
     bgImage: '/servidores_banner.png',
     bgColor: '#000000',
+    objectPosition: 'center center',
+    objectPositionMobile: 'center center',
     accentColor: '#F5B700',
   },
 ]
@@ -84,6 +98,8 @@ function dbToSlide(b: DbBanner, i: number): Slide {
     bgImage: b.bg_image ?? '',
     bgColor: b.bg_color ?? '#000000',
     accentColor: b.accent_color ?? '#F5B700',
+    objectPosition: 'center center',
+    objectPositionMobile: 'center center',
     tag: b.tag ?? undefined,
     title: b.title ?? undefined,
     subtitle: b.subtitle ?? undefined,
@@ -92,7 +108,7 @@ function dbToSlide(b: DbBanner, i: number): Slide {
     ctaSecondary: b.cta_secondary_text ?? undefined,
     ctaSecondaryHref: b.cta_secondary_href ?? undefined,
     features: b.features ?? undefined,
-    imageOnly: true,   // DB banners are artwork — no text overlay
+    imageOnly: true,
     isVideo: false,
   }
 }
@@ -115,26 +131,20 @@ function useBreakpoint() {
 }
 
 /**
- * Total section height (including the 68 px portion hidden behind the fixed header).
- * Image/video occupies only the VISIBLE portion (from HEADER_H to bottom).
+ * Total section height (top of page → bottom).
+ * The fixed header overlaps the first HEADER_H px.
+ * Visible image area = height − HEADER_H.
  *
- * Rationale per breakpoint:
- *  mobile  – 4:3 visible area so even the 3:2 email banner fits comfortably.
- *  tablet  – 16:9 visible area.
- *  desktop – 16:9 visible area, capped at 820 px total.
+ * Spec-requested heights (visible area):
+ *   desktop  clamp(560px, 72vh, 820px)
+ *   tablet   520px
+ *   mobile   420px
  */
 function sectionHeight(bp: 'mobile' | 'tablet' | 'desktop'): string {
-  if (bp === 'mobile') {
-    // visible area ≈ 4/3 × vw  →  total = visible + HEADER_H
-    // clamp: min 300px total, max 580px total
-    return `clamp(300px, calc(${HEADER_H}px + 133.33vw), 580px)`
-  }
-  if (bp === 'tablet') {
-    // visible area ≈ 9/16 × vw  →  total = visible + HEADER_H
-    return `clamp(520px, calc(${HEADER_H}px + 56.25vw), 700px)`
-  }
-  // desktop
-  return `clamp(600px, calc(${HEADER_H}px + 56.25vw), 820px)`
+  if (bp === 'mobile')  return `${420 + HEADER_H}px`    // 488px total
+  if (bp === 'tablet')  return `${520 + HEADER_H}px`    // 588px total
+  // desktop: clamp with header offset
+  return `clamp(${560 + HEADER_H}px, calc(72vh + ${HEADER_H}px), ${820 + HEADER_H}px)`
 }
 
 /* ─── Component ──────────────────────────────────────────────── */
@@ -146,7 +156,7 @@ export function HeroSection() {
   const sectionRef = useRef<HTMLElement>(null)
   const bp = useBreakpoint()
 
-  /* Fetch active banners from DB */
+  /* Fetch active banners from DB — single source of truth */
   useEffect(() => {
     const supabase = createClient()
     ;(supabase as any)
@@ -159,9 +169,7 @@ export function HeroSection() {
           console.warn('[HeroSection] failed to load banners from DB, using fallback:', error)
           return
         }
-        if (data && data.length > 0) {
-          setActiveSlides(data.map(dbToSlide))
-        }
+        if (data && data.length > 0) setActiveSlides(data.map(dbToSlide))
       })
   }, [])
 
@@ -212,18 +220,23 @@ export function HeroSection() {
   const Icon = slide?.icon
 
   return (
+    /*
+     * The section is a direct child of <main> — no container wrapper limits its width.
+     * overflow-hidden clips the cover-positioned images to the section bounds.
+     */
     <section
       ref={sectionRef}
       className="relative w-full overflow-hidden"
-      style={{
-        background: '#000',
-        minHeight: sectionHeight(bp),
-      }}
+      style={{ background: '#000', minHeight: sectionHeight(bp) }}
       aria-label="Hero Slideshow"
     >
-      {/* ── Background slide layers ─────────────────────────── */}
+      {/* ── Slide layers (absolutely stacked) ──────────────────── */}
       {activeSlides.map((s, i) => {
         const active = i === current
+        const objPos = bp === 'mobile'
+          ? (s.objectPositionMobile ?? s.objectPosition ?? 'center center')
+          : (s.objectPosition ?? 'center center')
+        const scale = s.imageScale ?? '1'
 
         return (
           <div
@@ -232,14 +245,12 @@ export function HeroSection() {
             style={{ opacity: active ? 1 : 0 }}
             aria-hidden={!active}
           >
-            {/* Base colour fill — always visible (letterbox fill for contain) */}
+            {/* Solid colour base — shows as letterbox only if image fails to load */}
             <div className="absolute inset-0" style={{ background: s.bgColor }} />
 
             {s.imageOnly ? (
               s.isVideo ? (
-                /* ── Video slide ──
-                   Video occupies the visible area below the fixed header.
-                   object-fit: cover is correct for video (it's ambient motion, not artwork). */
+                /* ── Video slide ──────────────────────────────── */
                 <>
                   <video
                     autoPlay muted loop playsInline
@@ -251,53 +262,89 @@ export function HeroSection() {
                       top: HEADER_H,
                       height: `calc(100% - ${HEADER_H}px)`,
                       objectFit: 'cover',
-                      objectPosition: 'center center',
+                      objectPosition: objPos,
                     }}
                   >
                     <source src="/video_IA.mp4" type="video/mp4" />
                   </video>
-                  <div className="absolute inset-0"
-                    style={{ top: HEADER_H, background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.30) 50%, rgba(0,0,0,0.65) 100%)' }} />
+                  <div
+                    className="absolute left-0 right-0 bottom-0"
+                    style={{
+                      top: HEADER_H,
+                      background: 'linear-gradient(to bottom, rgba(0,0,0,0.50) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.60) 100%)',
+                    }}
+                  />
                 </>
               ) : s.bgImage ? (
-                /* ── Artwork image slide ──
-                   object-fit: contain — the full banner design is always visible.
-                   object-position: center — centred in the visible area below the header.
-                   bgColor fills any letterbox space. */
-                <img
-                  src={s.bgImage}
-                  alt=""
-                  draggable={false}
-                  className="absolute left-0 right-0 bottom-0 w-full select-none pointer-events-none"
-                  style={{
-                    top: HEADER_H,
-                    height: `calc(100% - ${HEADER_H}px)`,
-                    objectFit: 'contain',
-                    objectPosition: 'center center',
-                  }}
-                />
+                /*
+                 * ── Artwork image slide ────────────────────────
+                 *
+                 * Two-layer technique — fills full width WITHOUT cropping artwork:
+                 *
+                 * Layer 1 (blur fill): the same image, scaled to cover the entire
+                 *   visible area with blur+dim. Eliminates any black letterbox bars
+                 *   for banners that don't match the section's aspect ratio.
+                 *
+                 * Layer 2 (sharp main): the real image with object-fit contain,
+                 *   centred on top of the blur. Full artwork always visible.
+                 *
+                 * For images that already match the section ratio (≈16:9), both
+                 * layers align perfectly and the blur is imperceptible.
+                 */
+                <>
+                  {/* Layer 1 — blurred background fill */}
+                  <div
+                    className="absolute left-0 right-0 bottom-0 overflow-hidden"
+                    style={{ top: HEADER_H }}
+                  >
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: '-5%',
+                        backgroundImage: `url(${s.bgImage})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: objPos,
+                        backgroundRepeat: 'no-repeat',
+                        filter: 'blur(22px) brightness(0.55)',
+                      }}
+                    />
+                  </div>
+
+                  {/* Layer 2 — sharp main image (full artwork, no cropping) */}
+                  <img
+                    src={s.bgImage}
+                    alt=""
+                    draggable={false}
+                    className="absolute left-0 right-0 bottom-0 w-full select-none pointer-events-none"
+                    style={{
+                      top: HEADER_H,
+                      height: `calc(100% - ${HEADER_H}px)`,
+                      objectFit: 'contain',
+                      objectPosition: objPos,
+                      transform: scale !== '1' ? `scale(${scale})` : undefined,
+                      transformOrigin: 'center center',
+                    }}
+                  />
+                </>
               ) : (
                 <div className="absolute inset-0" style={{ background: s.bgColor }} />
               )
             ) : (
-              /* ── Parallax background for text slides (non-imageOnly) ── */
+              /* ── Parallax background for text slides ──────── */
               s.bgImage && (
                 <div
-                  className="absolute"
+                  className="absolute inset-0"
                   style={{
-                    inset: '-8%',
                     backgroundImage: `url(${s.bgImage})`,
                     backgroundSize: 'cover',
-                    backgroundPosition: s.desktopPosition ?? 'center center',
+                    backgroundPosition: objPos,
                     backgroundRepeat: 'no-repeat',
-                    transform: `scale(${isTransitioning && active ? 1.01 : 1.04})`,
-                    transition: isTransitioning ? 'transform 0.7s ease' : 'none',
                   }}
                 />
               )
             )}
 
-            {/* Vignette — only for non-imageOnly text slides */}
+            {/* Vignette — only for text slides */}
             {!s.imageOnly && (
               <>
                 <div className="absolute inset-0"
@@ -310,7 +357,7 @@ export function HeroSection() {
         )
       })}
 
-      {/* Grid dot overlay */}
+      {/* Subtle grid dot pattern */}
       <div
         className="absolute inset-0 pointer-events-none z-[1]"
         style={{
@@ -319,7 +366,7 @@ export function HeroSection() {
         }}
       />
 
-      {/* ── Text content — only for non-imageOnly text slides ─────── */}
+      {/* ── Text content — only for non-imageOnly text slides ─── */}
       {!slide.imageOnly && (
         <div
           className="absolute left-0 right-0 bottom-16 z-10 flex items-center"
@@ -342,9 +389,7 @@ export function HeroSection() {
               >
                 {slide.title!.split('\n').map((line, i) => (
                   <span key={i}>
-                    {i === 0
-                      ? line
-                      : (<><br /><span style={{ color: slide.accentColor }}>{line}</span></>)}
+                    {i === 0 ? line : (<><br /><span style={{ color: slide.accentColor }}>{line}</span></>)}
                   </span>
                 ))}
               </h1>
@@ -416,13 +461,15 @@ export function HeroSection() {
         </div>
       )}
 
-      {/* ── Carousel controls — absolutely at bottom, safe zone 24px ─ */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 pb-4 pt-3"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 100%)' }}>
-        <div className="container mx-auto px-4 lg:px-8">
-          <div className="flex items-center justify-between max-w-4xl">
+      {/* ── Carousel controls — bottom safe zone with gradient ─── */}
+      <div
+        className="absolute bottom-0 left-0 right-0 z-10 pb-4 pt-8"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.50) 0%, transparent 100%)' }}
+      >
+        <div className="px-4 lg:px-8">
+          <div className="flex items-center justify-between">
 
-            {/* Progress dots */}
+            {/* Progress indicators */}
             <div className="flex items-center gap-3">
               {activeSlides.map((s, i) => (
                 <button
@@ -462,6 +509,7 @@ export function HeroSection() {
                 <ChevronRight size={bp === 'mobile' ? 15 : 18} />
               </button>
             </div>
+
           </div>
         </div>
       </div>
