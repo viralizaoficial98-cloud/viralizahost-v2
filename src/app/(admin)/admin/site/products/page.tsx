@@ -322,11 +322,11 @@ export default function AdminProductsPage() {
 
       if (!res.ok || !json.success) {
         const msg: string = json.message ?? ''
+        console.error('[products] load error:', { status: res.status, message: msg, code: json.code, details: json.details, hint: json.hint })
         if (msg.includes('Could not find') || msg.includes('does not exist')) {
           setTablesMissing(true)
         } else {
-          setLoadError('Não foi possível carregar os produtos. Tente novamente.')
-          console.error('[products] load error:', msg)
+          setLoadError(`Erro ${res.status}: ${msg || 'Não foi possível carregar os produtos'}`)
         }
         setLoading(false)
         return
