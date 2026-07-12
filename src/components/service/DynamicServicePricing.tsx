@@ -47,13 +47,13 @@ export function DynamicServicePricing({ category, subcategory, title = 'Escolha 
       .select('*, product_features(feature, included, position)')
       .eq('category', category)
       .eq('active', true)
-    if (subcategory) query = query.eq('subcategory', subcategory)
-    else query = query.is('subcategory', null)
-    query
+    if (subcategory) query = (query as any).eq('subcategory', subcategory)
+    else query = (query as any).is('subcategory', null)
+    ;(query as any)
       .order('position', { ascending: true })
-      .then(({ data, error: err }) => {
+      .then(({ data, error: err }: { data: ProductWithFeatures[] | null; error: { message: string } | null }) => {
         if (err) { setError(err.message); setLoading(false); return }
-        if (data && data.length > 0) setPlans(data as ProductWithFeatures[])
+        if (data && data.length > 0) setPlans(data)
         setLoading(false)
       })
   }, [category, subcategory])
