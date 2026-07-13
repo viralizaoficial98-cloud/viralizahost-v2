@@ -614,6 +614,27 @@ function Step4Ident({ onNext, onBack }: { onNext: () => void; onBack: () => void
 
 // ─── Step 5: Payment ────────────────────────────────────────────────────────
 
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  function copy() {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <button
+      onClick={copy}
+      className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border"
+      style={copied
+        ? { background: '#E6F9EE', borderColor: '#00B14F', color: '#00B14F' }
+        : { background: '#F5F5F5', borderColor: '#E0E0E0', color: '#555' }}
+    >
+      {copied ? '✓ Copiado' : 'Copiar'}
+    </button>
+  )
+}
+
 function Step5Payment({ onSubmit, onBack, submitting, error }: { onSubmit: () => void; onBack: () => void; submitting: boolean; error?: string }) {
   const { paymentMethod, setPaymentMethod, transferRef, setTransferRef, setProofFileUrl } = useCheckoutStore()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -683,7 +704,9 @@ function Step5Payment({ onSubmit, onBack, submitting, error }: { onSubmit: () =>
       {/* BIC Transfer details */}
       {paymentMethod === 'bic_transfer' && (
         <div className="bg-[#FAFAFA] border border-[#E8E8E8] rounded-xl p-5 mb-6 space-y-4">
-          <p className="text-sm font-bold text-[#0A0A0A]">Dados para transferência:</p>
+          <p className="text-sm font-bold text-[#0A0A0A]">Dados para transferência bancária BIC:</p>
+
+          {/* Bank card image */}
           <div className="rounded-xl overflow-hidden border border-[#E8E8E8] max-w-xs">
             <Image
               src="/cartão BIC.jpeg"
@@ -694,6 +717,24 @@ function Step5Payment({ onSubmit, onBack, submitting, error }: { onSubmit: () =>
               unoptimized
             />
           </div>
+
+          {/* Account details with copy buttons */}
+          <div className="bg-white border border-[#E8E8E8] rounded-xl overflow-hidden">
+            {[
+              { label: 'Titular', value: 'VIRALIZA FÁCIL ANGOLA, LDA' },
+              { label: 'Coordenada BIC', value: '005100002477517910141' },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[#F0F0F0] last:border-b-0">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black text-[#999] uppercase tracking-widest mb-0.5">{label}</p>
+                  <p className="text-sm font-bold text-[#0A0A0A] font-mono break-all">{value}</p>
+                </div>
+                <CopyButton value={value} />
+              </div>
+            ))}
+          </div>
+
+          {/* Reference + proof upload */}
           <div className="space-y-2">
             <p className="text-xs text-[#888]">Após efectuar a transferência, envie o comprovativo:</p>
             <input
@@ -866,7 +907,8 @@ function CheckoutContent() {
 
   // Load plan from URL with live DB prices — clears stale persisted state
   useEffect(() => {
-    const planId = searchParams.get('plan')
+    const tldParam    = searchParams.get('tld')
+    const planId      = searchParams.get('plan')
     const domainParam = searchParams.get('domain')
     const billingParam = searchParams.get('billing')
     clear()
@@ -887,9 +929,32 @@ function CheckoutContent() {
     }
 
     const supabase = createClient()
-    // Single source of truth: products table
+
     ;(async () => {
       try {
+        // ── Domain via TLD param (single source of truth: site_domains) ────────
+        if (tldParam) {
+          const res = await fetch('/api/domains')
+          const json = await res.json()
+          const row = (json.domains ?? []).find((d: any) => d.extension === tldParam)
+
+          const price = row?.price_annual ?? row?.price_monthly
+            ?? PLAN_CATALOG[`domain${tldParam.replace(/\./g, '-')}`]?.price
+            ?? 4500
+          const currency = row?.currency ?? 'AOA'
+          const itemId = `domain${tldParam.replace(/\./g, '-')}`
+          const name = domainParam ? `Domínio ${domainParam}` : `Domínio ${tldParam}`
+
+          setItems([{ id: itemId, name, type: 'domain', price, currency, quantity: 1 }])
+          if (domainParam) {
+            useCheckoutStore.getState().setDomainName(domainParam)
+            useCheckoutStore.getState().setDomainAction('register')
+          }
+          setCatalogLoading(false)
+          return
+        }
+
+        // ── Non-domain plan via plan param (products table) ───────────────────
         const { data: productRows, error: productError } = await (supabase as any)
           .from('products')
           .select('slug,name,category,price_monthly,price_6months,price_1year,price_2years,price_3years,active,cta_label')
@@ -927,7 +992,7 @@ function CheckoutContent() {
         }
       } catch (err) {
         console.error('[checkout] fetch error, using fallback catalog:', err)
-        if (planId) {
+        if (planId && !tldParam) {
           const plan = PLAN_CATALOG[planId]
           if (plan && plan.price > 0) {
             const name = domainParam ? `Domínio ${domainParam}` : plan.name
@@ -945,7 +1010,7 @@ function CheckoutContent() {
       }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams.get('plan'), searchParams.get('domain'), searchParams.get('billing')])
+  }, [searchParams.get('tld'), searchParams.get('plan'), searchParams.get('domain'), searchParams.get('billing')])
 
   async function handleSubmit() {
     const state = useCheckoutStore.getState()

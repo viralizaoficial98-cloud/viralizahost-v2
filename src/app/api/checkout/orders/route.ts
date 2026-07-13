@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { createRpcClient } from '@/lib/supabase/server'
+import { createAuthClient, createAdminClient, createRpcClient, createAdminWriteClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
   try {
@@ -75,7 +73,35 @@ export async function POST(req: NextRequest) {
     const dbPayment = paymentMap[paymentMethod] ?? 'bank_transfer'
     const status    = paymentMethod === 'bic_transfer' ? 'aguardando_confirmacao' : 'pending'
 
-    // ── 4. Build items payload ─────────────────────────────────────────────
+    // ── 4. Server-side price validation for domain items ──────────────────
+    const domainItems = (items ?? []).filter((i: any) => i.type === 'domain')
+    if (domainItems.length > 0) {
+      const dbClient = createAdminWriteClient()
+      const { data: dbDomains } = await dbClient
+        .from('site_domains')
+        .select('extension, price_annual, price_monthly')
+        .eq('active', true)
+
+      for (const item of domainItems) {
+        // Derive TLD from plan id: 'domain-com' → '.com', 'domain-com-br' → '.com.br'
+        const tld = '.' + (item.id as string).replace(/^domain-/, '').replace(/-/g, '.')
+        const row = dbDomains?.find((d: any) => d.extension === tld)
+        if (row) {
+          const expected = row.price_annual ?? row.price_monthly ?? 0
+          if (expected > 0) {
+            const pct = Math.abs(item.price - expected) / expected
+            if (pct > 0.15) {
+              console.error('[checkout/orders] price tamper detected — submitted:', item.price, 'expected:', expected, 'tld:', tld)
+              return NextResponse.json({ error: 'Preço inválido. Atualize a página e tente novamente.' }, { status: 400 })
+            }
+            // Override with DB price to prevent rounding drift
+            item.price = expected
+          }
+        }
+      }
+    }
+
+    // ── 5. Build items payload ─────────────────────────────────────────────
     // Map checkout plan IDs to DB plan slugs (plans table uses different slugs)
     const PLAN_SLUG_MAP: Record<string, string> = { pro: 'premium' }
     const rpcItems = (items ?? []).map((item: any) => {
@@ -91,7 +117,7 @@ export async function POST(req: NextRequest) {
 
     console.log('[checkout/orders] CALLING RPC create_order — userId:', userId, 'items:', rpcItems.length)
 
-    // ── 5. Call RPC via rpcClient (NO db.schema) ───────────────────────────
+    // ── 6. Call RPC via rpcClient (NO db.schema) ───────────────────────────
     // public.create_order uses SECURITY DEFINER + SET search_path = viralizahost
     // so it operates on viralizahost tables without PostgREST needing the schema exposed.
     const rpcClient = createRpcClient()
