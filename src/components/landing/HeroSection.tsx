@@ -135,16 +135,14 @@ function useBreakpoint() {
  * The fixed header overlaps the first HEADER_H px.
  * Visible image area = height − HEADER_H.
  *
- * Spec-requested heights (visible area):
- *   desktop  clamp(560px, 72vh, 820px)
- *   tablet   520px
- *   mobile   420px
+ *   mobile   460px visible  (528px total)
+ *   tablet   560px visible  (628px total)  — wider area for iPad landscape
+ *   desktop  clamp(600px, 76vh, 880px) visible
  */
 function sectionHeight(bp: 'mobile' | 'tablet' | 'desktop'): string {
-  if (bp === 'mobile')  return `${420 + HEADER_H}px`    // 488px total
-  if (bp === 'tablet')  return `${520 + HEADER_H}px`    // 588px total
-  // desktop: clamp with header offset
-  return `clamp(${560 + HEADER_H}px, calc(72vh + ${HEADER_H}px), ${820 + HEADER_H}px)`
+  if (bp === 'mobile')  return `${460 + HEADER_H}px`
+  if (bp === 'tablet')  return `${560 + HEADER_H}px`
+  return `clamp(${600 + HEADER_H}px, calc(76vh + ${HEADER_H}px), ${880 + HEADER_H}px)`
 }
 
 /* ─── Component ──────────────────────────────────────────────── */
@@ -279,17 +277,15 @@ export function HeroSection() {
                 /*
                  * ── Artwork image slide ────────────────────────
                  *
-                 * Two-layer technique — fills full width WITHOUT cropping artwork:
+                 * Two-layer technique — true full-width coverage:
                  *
-                 * Layer 1 (blur fill): the same image, scaled to cover the entire
-                 *   visible area with blur+dim. Eliminates any black letterbox bars
-                 *   for banners that don't match the section's aspect ratio.
+                 * Layer 1 (blur fill): same image blurred + dimmed, covers the
+                 *   entire visible area. Acts as a premium bokeh background and
+                 *   eliminates any solid-colour gaps if the main image loads late.
                  *
-                 * Layer 2 (sharp main): the real image with object-fit contain,
-                 *   centred on top of the blur. Full artwork always visible.
-                 *
-                 * For images that already match the section ratio (≈16:9), both
-                 * layers align perfectly and the blur is imperceptible.
+                 * Layer 2 (sharp main): object-fit cover — fills 100 % width and
+                 *   height of the visible area without letterbox bars. objectPosition
+                 *   controls which part of the image is kept in frame.
                  */
                 <>
                   {/* Layer 1 — blurred background fill */}
@@ -300,17 +296,17 @@ export function HeroSection() {
                     <div
                       style={{
                         position: 'absolute',
-                        inset: '-5%',
+                        inset: '-8%',
                         backgroundImage: `url(${s.bgImage})`,
                         backgroundSize: 'cover',
                         backgroundPosition: objPos,
                         backgroundRepeat: 'no-repeat',
-                        filter: 'blur(22px) brightness(0.55)',
+                        filter: 'blur(28px) brightness(0.45)',
                       }}
                     />
                   </div>
 
-                  {/* Layer 2 — sharp main image (full artwork, no cropping) */}
+                  {/* Layer 2 — sharp main image, full-width cover */}
                   <img
                     src={s.bgImage}
                     alt=""
@@ -319,7 +315,7 @@ export function HeroSection() {
                     style={{
                       top: HEADER_H,
                       height: `calc(100% - ${HEADER_H}px)`,
-                      objectFit: 'contain',
+                      objectFit: 'cover',
                       objectPosition: objPos,
                       transform: scale !== '1' ? `scale(${scale})` : undefined,
                       transformOrigin: 'center center',
