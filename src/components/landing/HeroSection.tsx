@@ -306,7 +306,9 @@ export function HeroSection() {
                     />
                   </div>
 
-                  {/* Layer 2 — sharp main image, full-width cover */}
+                  {/* Layer 2 — sharp main image
+                      Mobile: contain — full artwork visible, blur fills letterbox gaps
+                      Tablet/Desktop: cover — fills the full section width/height */}
                   <img
                     src={s.bgImage}
                     alt=""
@@ -315,8 +317,8 @@ export function HeroSection() {
                     style={{
                       top: HEADER_H,
                       height: `calc(100% - ${HEADER_H}px)`,
-                      objectFit: 'cover',
-                      objectPosition: objPos,
+                      objectFit: bp === 'mobile' ? 'contain' : 'cover',
+                      objectPosition: bp === 'mobile' ? 'center center' : objPos,
                       transform: scale !== '1' ? `scale(${scale})` : undefined,
                       transformOrigin: 'center center',
                     }}
