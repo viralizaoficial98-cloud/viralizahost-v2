@@ -9,7 +9,6 @@ export type DomainRow = {
   price_monthly: number | null
   currency: string
   popular: boolean
-  label: string | null
 }
 
 const currencySymbol: Record<string, string> = { AOA: 'Kz', AKZ: 'Kz', USD: '$', BRL: 'R$', EUR: '€' }
@@ -28,8 +27,7 @@ export function DominiosListing({
     if (!q) return extensions
     return extensions.filter(
       e =>
-        e.extension.toLowerCase().includes(q) ||
-        (e.label ?? '').toLowerCase().includes(q)
+        e.extension.toLowerCase().includes(q)
     )
   }, [extensions, query])
 
@@ -137,7 +135,7 @@ export function DominiosListing({
                   )}
                   <div className="text-2xl font-black text-[#0A0A0A] mb-1">{ext.extension}</div>
                   <div className="text-[11px] text-[#999] mb-3 leading-tight min-h-[2rem]">
-                    {ext.label || ext.extension}
+                    {ext.extension}
                   </div>
                   <div className="text-[13px] font-bold text-[#0A0A0A] mb-4">{priceText}</div>
                   <span

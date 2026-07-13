@@ -26,7 +26,7 @@ export default async function DominiosPage() {
   const supabase = createAdminWriteClient()
   const { data, error } = await supabase
     .from('site_domains')
-    .select('extension, price_annual, price_monthly, currency, popular, label')
+    .select('extension, price_annual, price_monthly, currency, popular')
     .eq('active', true)
     .order('position')
 
