@@ -109,6 +109,12 @@ function fmtPrice(n: number) {
   return `Kz ${n.toLocaleString('pt-AO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
+/** Ensures TLD always has a leading dot: 'ao' → '.ao', '.ao' → '.ao' */
+function normalizeTld(value: string): string {
+  const clean = value.trim().toLowerCase()
+  return clean.startsWith('.') ? clean : `.${clean}`
+}
+
 const DOMAIN_YEARS: Record<BillingCycle, number> = {
   monthly: 1, '6months': 1, '1year': 1, '2years': 2, '3years': 3,
 }
@@ -123,6 +129,14 @@ function calcItemTotal(item: CheckoutItem, cycle: BillingCycle) {
     return item.price * item.quantity * years * (1 - discount)
   }
   return item.price * item.quantity * BILLING_MONTHS[cycle] * (1 - BILLING_DISCOUNT[cycle])
+}
+
+/** Base cost before discount — uses domain formula for domains, hosting formula otherwise */
+function calcItemBase(item: CheckoutItem, cycle: BillingCycle) {
+  if (item.type === 'domain') {
+    return item.price * item.quantity * DOMAIN_YEARS[cycle]
+  }
+  return item.price * item.quantity * BILLING_MONTHS[cycle]
 }
 
 // ─── sub-components ────────────────────────────────────────────────────────
@@ -159,9 +173,9 @@ function StepBar({ current }: { current: number }) {
 }
 
 function OrderSummary({ items, cycle }: { items: CheckoutItem[]; cycle: BillingCycle }) {
-  const discount = BILLING_DISCOUNT[cycle]
-  const total = items.reduce((acc, i) => acc + calcItemTotal(i, cycle), 0)
-  const baseTotal = items.reduce((acc, i) => acc + i.price * i.quantity * BILLING_MONTHS[cycle], 0)
+  const total    = items.reduce((acc, i) => acc + calcItemTotal(i, cycle), 0)
+  const baseTotal = items.reduce((acc, i) => acc + calcItemBase(i, cycle), 0)
+  const hasDiscount = baseTotal > total
 
   return (
     <div className="bg-white border border-[#E8E8E8] rounded-2xl p-5 shadow-sm">
@@ -172,6 +186,11 @@ function OrderSummary({ items, cycle }: { items: CheckoutItem[]; cycle: BillingC
         <>
           {items.map(item => {
             const Icon = SERVICE_ICONS[item.type]
+            const isDomain = item.type === 'domain'
+            const years = DOMAIN_YEARS[cycle]
+            const label = isDomain
+              ? `${years} ano${years > 1 ? 's' : ''} × ${item.quantity}`
+              : `${BILLING_LABEL[cycle]} × ${item.quantity}`
             return (
               <div key={item.id} className="flex items-start gap-3 mb-3">
                 <div className="w-8 h-8 rounded-lg bg-[#FFF8E1] flex items-center justify-center flex-shrink-0">
@@ -179,7 +198,7 @@ function OrderSummary({ items, cycle }: { items: CheckoutItem[]; cycle: BillingC
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-[#0A0A0A] truncate">{item.name}</p>
-                  <p className="text-xs text-[#888]">{BILLING_LABEL[cycle]} × {item.quantity}</p>
+                  <p className="text-xs text-[#888]">{label}</p>
                 </div>
                 <p className="text-sm font-bold text-[#0A0A0A] whitespace-nowrap">
                   {fmtPrice(calcItemTotal(item, cycle))}
@@ -188,13 +207,13 @@ function OrderSummary({ items, cycle }: { items: CheckoutItem[]; cycle: BillingC
             )
           })}
           <div className="border-t border-[#F0F0F0] mt-4 pt-4 space-y-1">
-            {discount > 0 && (
+            {hasDiscount && (
               <>
                 <div className="flex justify-between text-sm text-[#888]">
                   <span>Subtotal</span><span>{fmtPrice(baseTotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-green-600 font-semibold">
-                  <span>Desconto {Math.round(discount * 100)}%</span>
+                  <span>Desconto</span>
                   <span>-{fmtPrice(baseTotal - total)}</span>
                 </div>
               </>
@@ -224,7 +243,7 @@ function Step1Cycle({ onNext }: { onNext: () => void }) {
       <p className="text-[#888] text-sm mb-6">Períodos mais longos têm descontos maiores.</p>
       <div className="space-y-3 mb-8">
         {cycles.map(c => {
-          const disc = BILLING_DISCOUNT[c]
+          const disc = isDomainOnly ? DOMAIN_DISCOUNT[c] : BILLING_DISCOUNT[c]
           const active = billingCycle === c
           return (
             <button
@@ -293,7 +312,7 @@ function Step2Cart({ onNext, onBack }: { onNext: () => void; onBack: () => void 
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-[#0A0A0A] text-sm">{item.name}</p>
-                <p className="text-xs text-[#888]">{fmtPrice(item.price)}/mês</p>
+                <p className="text-xs text-[#888]">{fmtPrice(item.price)}{item.type === 'domain' ? '/ano' : '/mês'}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-6 h-6 rounded-md border border-[#E8E8E8] flex items-center justify-center hover:border-[#F5B700] transition-colors">
@@ -932,25 +951,51 @@ function CheckoutContent() {
 
     ;(async () => {
       try {
-        // ── Domain via TLD param (single source of truth: site_domains) ────────
+        // ── Domain via TLD param ──────────────────────────────────────────────
+        // Single source of truth: viralizahost.site_domains
+        // Uses the same browser client as DomainSearchBar — no API route, no fallback.
         if (tldParam) {
-          const res = await fetch('/api/domains')
-          const json = await res.json()
-          const row = (json.domains ?? []).find((d: any) => d.extension === tldParam)
+          const normalizedTld = normalizeTld(tldParam)
+          console.log('[checkout] domain load — tld:', normalizedTld, 'domain:', domainParam)
 
-          const price = row?.price_annual ?? row?.price_monthly
-            ?? PLAN_CATALOG[`domain${tldParam.replace(/\./g, '-')}`]?.price
-            ?? 4500
-          const currency = row?.currency ?? 'AOA'
-          const itemId = `domain${tldParam.replace(/\./g, '-')}`
-          const name = domainParam ? `Domínio ${domainParam}` : `Domínio ${tldParam}`
+          const { data: domainRow, error: dbErr } = await (supabase as any)
+            .from('site_domains')
+            .select('extension, price_annual, price_monthly, currency')
+            .eq('extension', normalizedTld)
+            .eq('active', true)
+            .single() as { data: { extension: string; price_annual: number | null; price_monthly: number | null; currency: string } | null; error: any }
 
-          setItems([{ id: itemId, name, type: 'domain', price, currency, quantity: 1 }])
+          console.log('[checkout] site_domains result:', {
+            extension: domainRow?.extension,
+            price_annual: domainRow?.price_annual,
+            price_monthly: domainRow?.price_monthly,
+            currency: domainRow?.currency,
+            error: dbErr?.message ?? null,
+          })
+
+          if (dbErr || !domainRow) {
+            setPlanError('Não foi possível carregar o preço actual deste domínio. Por favor, tente novamente.')
+            console.error('[checkout] site_domains error for tld:', normalizedTld, dbErr?.message)
+            return
+          }
+
+          const price = domainRow.price_annual ?? domainRow.price_monthly
+          if (!price || price <= 0) {
+            setPlanError('O preço deste domínio não está disponível. Contacte o suporte.')
+            console.error('[checkout] price is null/zero for tld:', normalizedTld)
+            return
+          }
+
+          const itemId = `domain${normalizedTld.replace(/\./g, '-')}`
+          const name = domainParam ? `Domínio ${domainParam}` : `Domínio ${normalizedTld}`
+
+          console.log('[checkout] setting item — id:', itemId, 'price:', price, 'source: site_domains')
+
+          setItems([{ id: itemId, name, type: 'domain', price, currency: (domainRow.currency ?? 'AOA') as any, quantity: 1 }])
           if (domainParam) {
             useCheckoutStore.getState().setDomainName(domainParam)
             useCheckoutStore.getState().setDomainAction('register')
           }
-          setCatalogLoading(false)
           return
         }
 
@@ -984,26 +1029,24 @@ function CheckoutContent() {
             }
           } else if (plan && plan.price === 0) {
             setPlanError('Plano não disponível. Entre em contacto com o suporte para contratar este serviço.')
-            console.error('[checkout] plan price=0:', planId)
           } else {
             setPlanError('Plano não encontrado. Verifique o link ou entre em contacto com o suporte.')
-            console.error('[checkout] unknown slug:', planId, '— available:', Object.keys(catalog).join(', '))
           }
         }
       } catch (err) {
-        console.error('[checkout] fetch error, using fallback catalog:', err)
+        console.error('[checkout] unexpected error:', err)
+        // Only fall back to PLAN_CATALOG for non-domain plans
         if (planId && !tldParam) {
           const plan = PLAN_CATALOG[planId]
-          if (plan && plan.price > 0) {
-            const name = domainParam ? `Domínio ${domainParam}` : plan.name
+          if (plan && plan.price > 0 && plan.type !== 'domain') {
+            const name = domainParam ? plan.name : plan.name
             setItems([{ ...plan, name, quantity: 1 }])
-            if (plan.type === 'domain' && domainParam) {
-              useCheckoutStore.getState().setDomainName(domainParam)
-              useCheckoutStore.getState().setDomainAction('register')
-            }
           } else {
             setPlanError('Não foi possível carregar este plano. Tente novamente ou entre em contacto com o suporte.')
           }
+        } else if (tldParam) {
+          // Never fall back for domain prices
+          setPlanError('Não foi possível carregar o preço actual deste domínio. Por favor, tente novamente.')
         }
       } finally {
         setCatalogLoading(false)

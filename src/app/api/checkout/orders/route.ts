@@ -102,7 +102,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 5. Build items payload ─────────────────────────────────────────────
-    // Map checkout plan IDs to DB plan slugs (plans table uses different slugs)
     const PLAN_SLUG_MAP: Record<string, string> = { pro: 'premium' }
     const rpcItems = (items ?? []).map((item: any) => {
       const slug = item.id as string
@@ -115,7 +114,23 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    console.log('[checkout/orders] CALLING RPC create_order — userId:', userId, 'items:', rpcItems.length)
+    // ── 5b. Re-compute total server-side from validated prices ─────────────
+    const DOMAIN_YEARS_SRV: Record<string, number> = { monthly: 1, '6months': 1, '1year': 1, '2years': 2, '3years': 3 }
+    const DOMAIN_DISC_SRV:  Record<string, number> = { monthly: 0, '6months': 0, '1year': 0, '2years': 0.10, '3years': 0.15 }
+    const HOST_MONTHS_SRV:  Record<string, number> = { monthly: 1, '6months': 6, '1year': 12, '2years': 24, '3years': 36 }
+    const HOST_DISC_SRV:    Record<string, number> = { monthly: 0, '6months': 0.15, '1year': 0.30, '2years': 0.45, '3years': 0.55 }
+
+    const serverAmount = Math.round((items ?? []).reduce((acc: number, item: any) => {
+      const price = Math.round(item.price)
+      const qty   = item.quantity ?? 1
+      const cycle = billingCycle ?? 'monthly'
+      if (item.type === 'domain') {
+        return acc + price * qty * (DOMAIN_YEARS_SRV[cycle] ?? 1) * (1 - (DOMAIN_DISC_SRV[cycle] ?? 0))
+      }
+      return acc + price * qty * (HOST_MONTHS_SRV[cycle] ?? 1) * (1 - (HOST_DISC_SRV[cycle] ?? 0))
+    }, 0))
+
+    console.log('[checkout/orders] CALLING RPC create_order — userId:', userId, 'items:', rpcItems.length, 'serverAmount:', serverAmount)
 
     // ── 6. Call RPC via rpcClient (NO db.schema) ───────────────────────────
     // public.create_order uses SECURITY DEFINER + SET search_path = viralizahost
@@ -127,7 +142,7 @@ export async function POST(req: NextRequest) {
       p_domain_name:    domainName    ?? '',
       p_domain_action:  domainAction  ?? '',
       p_payment_method: dbPayment,
-      p_amount:         Math.round(amount ?? 0),
+      p_amount:         serverAmount,
       p_proof_file:     proofFileUrl  ?? '',
       p_transfer_ref:   transferRef   ?? '',
       p_status:         status,
