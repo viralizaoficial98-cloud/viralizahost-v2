@@ -17,16 +17,6 @@ const defaultExtensions: ExtItem[] = [
 
 const currencySymbol: Record<string, string> = { AOA: 'Kz', AKZ: 'Kz', USD: '$', BRL: 'R$', EUR: '€' }
 
-// TLD → PLAN_CATALOG id
-const TLD_PLAN_ID: Record<string, string> = {
-  '.com':    'domain.com',
-  '.net':    'domain.net',
-  '.org':    'domain.org',
-  '.ao':     'domain.ao',
-  '.com.br': 'domain.com.br',
-  '.io':     'domain.io',
-}
-
 // Suggested TLDs to show when user types without extension
 const SUGGEST_TLDS = ['.com', '.ao', '.net', '.org', '.io']
 
@@ -93,7 +83,8 @@ export function DomainSearchBar() {
     setResults([])
 
     // Determine which TLDs to check
-    const matchedTld = Object.keys(TLD_PLAN_ID).find(tld => q.endsWith(tld))
+    const allTlds = extensions.map(e => e.tld)
+    const matchedTld = allTlds.find(tld => q.endsWith(tld))
     let tlds: string[]
     let baseName: string
 
@@ -142,14 +133,15 @@ export function DomainSearchBar() {
   }
 
   function goToCheckout(domain: string, tld: string) {
-    const planId = TLD_PLAN_ID[tld] ?? 'domain-search'
-    router.push(`/checkout?plan=${planId}&domain=${encodeURIComponent(domain)}`)
+    router.push(`/checkout?tld=${encodeURIComponent(tld)}&domain=${encodeURIComponent(domain)}`)
   }
 
   function handleRegisterTld(tld: string) {
-    const planId = TLD_PLAN_ID[tld] ?? 'domain-search'
-    const domainName = query.trim() ? `${query.trim()}${tld}` : tld
-    router.push(`/checkout?plan=${planId}&domain=${encodeURIComponent(domainName)}`)
+    const domainName = query.trim() ? `${query.trim()}${tld}` : ''
+    const url = domainName
+      ? `/checkout?tld=${encodeURIComponent(tld)}&domain=${encodeURIComponent(domainName)}`
+      : `/checkout?tld=${encodeURIComponent(tld)}`
+    router.push(url)
   }
 
   return (
@@ -396,7 +388,7 @@ export function DomainSearchBar() {
           {/* CTA link */}
           <div className="text-center mb-16">
             <a href="/dominios" className="inline-flex items-center gap-2 text-[#F5B700] font-bold text-sm hover:gap-3 transition-all duration-200">
-              Ver todos os domínios disponíveis <span>→</span>
+              Ver todos os domínios e preços <span>→</span>
             </a>
           </div>
 
