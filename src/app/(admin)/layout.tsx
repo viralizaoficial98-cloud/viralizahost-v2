@@ -22,9 +22,6 @@ const adminNav = [
   { href: '/admin/settings',  icon: Settings,        label: 'Configurações',  exact: false },
 ]
 
-const sidebarBg  = 'linear-gradient(180deg, #0A0C10 0%, #0D1018 100%)'
-const sidebarBdr = '1px solid rgba(255,255,255,0.06)'
-
 function AdminSidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const router   = useRouter()
@@ -37,18 +34,32 @@ function AdminSidebar({ onClose }: { onClose?: () => void }) {
   }
 
   return (
-    <aside className="flex flex-col h-full w-64 flex-shrink-0" style={{ background: sidebarBg, borderRight: sidebarBdr }}>
+    <aside className="flex flex-col h-full w-64 flex-shrink-0"
+      style={{ background: '#FFFFFF', borderRight: '1px solid #E5E7EB' }}>
+
       {/* Logo */}
-      <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: sidebarBdr }}>
+      <div className="px-5 py-4 flex items-center justify-between"
+        style={{ borderBottom: '1px solid #E5E7EB' }}>
         <Link href="/" aria-label="ViralizaHost" className="flex flex-col gap-1">
-          <Image src="/logotipo_branco.png" alt="ViralizaHost" width={148} height={38} priority style={{ height: 32, width: 'auto', objectFit: 'contain' }} />
+          <Image
+            src="/logo-viraliza-yellow.png"
+            alt="ViralizaHost"
+            width={148} height={38}
+            priority
+            style={{ height: 32, width: 'auto', objectFit: 'contain' }}
+          />
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#F5B700' }} />
-            <span className="text-[10px] font-semibold" style={{ color: '#F5B700' }}>Painel Administrativo</span>
+            <span className="text-[10px] font-semibold" style={{ color: '#92720A' }}>Painel Administrativo</span>
           </div>
         </Link>
         {onClose && (
-          <button onClick={onClose} className="ml-2 p-1.5 rounded-lg md:hidden" style={{ color: 'rgba(255,255,255,0.4)' }} aria-label="Fechar menu">
+          <button
+            onClick={onClose}
+            className="ml-2 p-1.5 rounded-lg md:hidden transition-colors"
+            style={{ color: '#6B7280' }}
+            aria-label="Fechar menu"
+          >
             <X size={18} />
           </button>
         )}
@@ -56,7 +67,8 @@ function AdminSidebar({ onClose }: { onClose?: () => void }) {
 
       {/* Nav label */}
       <div className="px-5 pt-5 pb-1.5">
-        <span className="text-[10px] font-black tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.20)' }}>Administração</span>
+        <span className="text-[10px] font-black tracking-widest uppercase"
+          style={{ color: '#9CA3AF' }}>Administração</span>
       </div>
 
       {/* Nav */}
@@ -64,37 +76,68 @@ function AdminSidebar({ onClose }: { onClose?: () => void }) {
         {adminNav.map(({ href, icon: Icon, label, exact }) => {
           const active = exact ? pathname === href : (pathname === href || pathname.startsWith(href + '/'))
           return (
-            <Link key={href} href={href}
+            <Link
+              key={href}
+              href={href}
               onClick={onClose}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200"
-              style={{ background: active ? 'rgba(245,183,0,0.12)' : 'transparent', color: active ? '#F5B700' : 'rgba(255,255,255,0.45)' }}
-              onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.80)' } }}
-              onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)' } }}
+              style={{
+                background: active ? '#F5B700' : 'transparent',
+                color:      active ? '#111111' : '#6B7280',
+              }}
+              onMouseEnter={e => {
+                if (!active) {
+                  (e.currentTarget as HTMLElement).style.background = '#FFF8E1'
+                  ;(e.currentTarget as HTMLElement).style.color = '#111111'
+                }
+              }}
+              onMouseLeave={e => {
+                if (!active) {
+                  (e.currentTarget as HTMLElement).style.background = 'transparent'
+                  ;(e.currentTarget as HTMLElement).style.color = '#6B7280'
+                }
+              }}
             >
               <Icon size={17} className="shrink-0" />
               <span className="font-medium text-sm">{label}</span>
-              {active && <ChevronRight size={13} className="ml-auto opacity-50" />}
+              {active && <ChevronRight size={13} className="ml-auto" style={{ opacity: 0.6 }} />}
             </Link>
           )
         })}
       </nav>
 
       {/* Footer */}
-      <div className="px-3 pb-5 space-y-0.5" style={{ borderTop: sidebarBdr, paddingTop: '1rem' }}>
-        <Link href="/dashboard" onClick={onClose}
+      <div className="px-3 pb-5 space-y-0.5"
+        style={{ borderTop: '1px solid #E5E7EB', paddingTop: '1rem' }}>
+        <Link
+          href="/dashboard"
+          onClick={onClose}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-sm"
-          style={{ color: 'rgba(255,255,255,0.35)' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.70)' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.35)' }}
+          style={{ color: '#6B7280' }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = '#FFF8E1'
+            ;(e.currentTarget as HTMLElement).style.color = '#111111'
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = 'transparent'
+            ;(e.currentTarget as HTMLElement).style.color = '#6B7280'
+          }}
         >
           <LayoutDashboard size={17} className="shrink-0" />
           <span className="font-medium">Área do Cliente</span>
         </Link>
-        <button onClick={handleLogout}
+        <button
+          onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full transition-all duration-200 text-left text-sm"
-          style={{ color: 'rgba(255,255,255,0.35)' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; (e.currentTarget as HTMLElement).style.color = '#F87171' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.35)' }}
+          style={{ color: '#9CA3AF' }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.07)'
+            ;(e.currentTarget as HTMLElement).style.color = '#DC2626'
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = 'transparent'
+            ;(e.currentTarget as HTMLElement).style.color = '#9CA3AF'
+          }}
         >
           <LogOut size={17} className="shrink-0" />
           <span className="font-medium">Sair</span>
