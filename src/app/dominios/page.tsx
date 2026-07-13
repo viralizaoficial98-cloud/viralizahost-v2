@@ -1,19 +1,17 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { FloatingChat } from '@/components/layout/FloatingChat'
 import { createAdminWriteClient } from '@/lib/supabase/server'
-import { Globe, Shield, Lock, Zap, RefreshCw, Headphones } from 'lucide-react'
+import { Shield, Lock, Zap, RefreshCw, Globe, Headphones } from 'lucide-react'
+import { DominiosListing } from '@/components/landing/DominiosListing'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Domínios — Todos os preços | ViralizaHost',
   description: 'Veja todos os domínios disponíveis e registe o seu com o melhor preço em Angola.',
 }
-
-export const revalidate = 300
-
-const currencySymbol: Record<string, string> = { AOA: 'Kz', AKZ: 'Kz', USD: '$', BRL: 'R$', EUR: '€' }
 
 const benefits = [
   { icon: Lock, title: 'SSL Grátis', desc: 'HTTPS incluído no registo' },
@@ -24,24 +22,16 @@ const benefits = [
   { icon: Headphones, title: 'Suporte 24/7', desc: 'Equipa técnica especializada' },
 ]
 
-type DomainRow = {
-  extension: string
-  price_annual: number | null
-  price_monthly: number | null
-  currency: string
-  popular: boolean
-  label: string | null
-}
-
 export default async function DominiosPage() {
   const supabase = createAdminWriteClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('site_domains')
     .select('extension, price_annual, price_monthly, currency, popular, label')
     .eq('active', true)
     .order('position')
 
-  const extensions: DomainRow[] = data ?? []
+  const extensions = data ?? []
+  const fetchError = error ? error.message : null
 
   return (
     <>
@@ -63,59 +53,8 @@ export default async function DominiosPage() {
           </p>
         </section>
 
-        {/* Extensions grid */}
-        <section className="bg-white py-16 px-4">
-          <div className="max-w-6xl mx-auto">
-            {extensions.length === 0 ? (
-              <div className="text-center text-[#AAA] py-20">
-                <Globe size={40} className="mx-auto mb-4 opacity-30" />
-                <p className="text-sm">Não foi possível carregar os domínios. Tente novamente mais tarde.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {extensions.map(ext => {
-                  const price = ext.price_annual ?? ext.price_monthly ?? 0
-                  const sym = currencySymbol[ext.currency] ?? ext.currency
-                  const priceFormatted = `${sym} ${price.toLocaleString('pt-AO')}/ano`
-                  const popular = ext.popular
-
-                  return (
-                    <Link
-                      key={ext.extension}
-                      href={`/checkout?tld=${encodeURIComponent(ext.extension)}`}
-                      className="group relative flex flex-col items-center text-center bg-white border rounded-2xl p-5 transition-all duration-200 hover:shadow-[0_8px_32px_rgba(245,183,0,0.22)] hover:-translate-y-1"
-                      style={{
-                        borderColor: popular ? '#F5B700' : '#EBEBEB',
-                        boxShadow: popular ? '0 4px 24px rgba(245,183,0,0.18)' : '0 2px 12px rgba(0,0,0,0.05)',
-                      }}
-                    >
-                      {popular && (
-                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#F5B700] text-[#0A0A0A] text-[10px] font-black px-3 py-0.5 rounded-full tracking-wide uppercase">
-                          Popular
-                        </span>
-                      )}
-                      <div className="text-2xl font-black text-[#0A0A0A] mb-1">{ext.extension}</div>
-                      <div className="text-[11px] text-[#999] mb-3 leading-tight min-h-[2rem]">
-                        {ext.label || ext.extension}
-                      </div>
-                      <div className="text-[13px] font-bold text-[#0A0A0A] mb-4">{priceFormatted}</div>
-                      <span
-                        className="w-full py-2 rounded-xl text-xs font-bold border text-center transition-all duration-200 group-hover:bg-[#F5B700] group-hover:border-[#F5B700] group-hover:text-[#0A0A0A]"
-                        style={{
-                          background: popular ? '#F5B700' : 'transparent',
-                          borderColor: popular ? '#F5B700' : '#D0D0D0',
-                          color: popular ? '#0A0A0A' : '#444',
-                        }}
-                      >
-                        Registar
-                      </span>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </section>
+        {/* Extensions grid with search */}
+        <DominiosListing extensions={extensions} fetchError={fetchError} />
 
         {/* Benefits */}
         <section className="bg-[#FAFAFA] py-16 px-4">

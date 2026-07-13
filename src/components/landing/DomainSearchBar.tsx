@@ -55,7 +55,7 @@ export function DomainSearchBar() {
             const sym = currencySymbol[d.currency] ?? d.currency
             return {
               tld: d.extension,
-              label: d.popular ? 'Angola oficial' : d.extension,
+              label: d.label || d.extension,
               price: `${sym} ${priceNum.toLocaleString('pt-AO')}/ano`,
               priceNum,
               currency: d.currency,
