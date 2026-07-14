@@ -20,7 +20,7 @@ export interface SyncResult {
   syncedAt: string
 }
 
-// ── Disk value parsing ────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function parseDiskMb(val: string | number | undefined | null): number {
   if (!val) return 0
@@ -41,6 +41,7 @@ function parseDiskLimitMb(val: string | number | undefined | null): number | nul
 function isValidEmail(email: string): boolean {
   return (
     typeof email === 'string' &&
+    email.length > 0 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
     !email.includes('localhost') &&
     !email.toLowerCase().startsWith('root@')
@@ -52,11 +53,12 @@ function provisionalName(domain: string, username: string): string {
   return base.charAt(0).toUpperCase() + base.slice(1)
 }
 
-// ── Main sync function ────────────────────────────────────────────────────────
+// ── Main sync ─────────────────────────────────────────────────────────────────
 
 export async function syncWhmAccounts(): Promise<SyncResult> {
   const db = createAdminWriteClient()
   const syncedAt = new Date().toISOString()
+
   const result: SyncResult = {
     total: 0,
     whmAccountsCreated: 0,
@@ -73,25 +75,37 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
   }
 
   // ── 1. Load WHM config ────────────────────────────────────────────────────
-  const { data: serverRow } = await db
+  console.log('[sync] loading WHM config…')
+  const { data: serverRow, error: serverErr } = await db
     .from('servers')
     .select('id, whm_url, whm_api_token, whm_username')
     .eq('name', WHM_CONFIG_NAME)
     .maybeSingle()
 
-  if (!serverRow?.whm_url || !serverRow?.whm_api_token) {
-    throw new Error('WHM não configurado. Configure primeiro em Configurações → WHM/cPanel API.')
+  if (serverErr) throw new Error(`[servers lookup] ${serverErr.message}`)
+  if (!serverRow) throw new Error('WHM não configurado. Configure em Configurações → WHM/cPanel API.')
+
+  const sr = serverRow as {
+    id: string
+    whm_url: string | null
+    whm_api_token: string | null
+    whm_username: string | null
   }
 
-  const token = decryptSecret(serverRow.whm_api_token)
-  if (!token) throw new Error('Falha ao desencriptar o token WHM.')
+  if (!sr.whm_url || !sr.whm_api_token) {
+    throw new Error('WHM URL ou token em falta. Configure em Configurações → WHM/cPanel API.')
+  }
 
-  const serverId: string = serverRow.id as string
+  const token = decryptSecret(sr.whm_api_token)
+  if (!token) throw new Error('Falha ao desencriptar o token WHM. Verifique WHM_ENCRYPTION_KEY.')
+
+  const serverId = sr.id
   const config: WHMConfig = {
-    url: serverRow.whm_url as string,
+    url:      sr.whm_url,
     token,
-    username: (serverRow.whm_username as string) ?? 'root',
+    username: sr.whm_username ?? 'root',
   }
+  console.log('[sync] WHM config OK — server id:', serverId)
 
   // ── 2. Load package mappings ──────────────────────────────────────────────
   const { data: mappingsRaw } = await db
@@ -99,23 +113,42 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
     .select('whm_package_name, plan_id')
     .eq('server_id', serverId)
 
-  const packageToplan = new Map<string, string | null>()
+  const packageToPlan = new Map<string, string>()
   for (const m of (mappingsRaw ?? []) as Array<{ whm_package_name: string; plan_id: string | null }>) {
-    packageToplan.set(m.whm_package_name, m.plan_id)
+    if (m.plan_id) packageToPlan.set(m.whm_package_name, m.plan_id)
   }
+  console.log('[sync] package mappings loaded:', packageToPlan.size)
 
-  // ── 3. Fetch accounts from WHM ────────────────────────────────────────────
+  // ── 3. Load fallback plan (used when no mapping exists and plan_id is NOT NULL) ──
+  const { data: fallbackPlanRow } = await db
+    .from('plans')
+    .select('id, name')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  const fallbackPlanId: string | null = fallbackPlanRow
+    ? (fallbackPlanRow as { id: string }).id
+    : null
+  console.log('[sync] fallback plan:', fallbackPlanId ? (fallbackPlanRow as { name: string }).name : 'none')
+
+  // ── 4. Fetch WHM accounts ─────────────────────────────────────────────────
+  console.log('[sync] fetching WHM accounts…')
   const accounts = await listAccountsFull(config)
   result.total = accounts.length
+  console.log('[sync] accounts received from WHM:', accounts.length)
 
   if (accounts.length === 0) return result
 
   const syncedUsernames = new Set<string>()
 
-  // ── 4. Process each account ───────────────────────────────────────────────
+  // ── 5. Process each account ───────────────────────────────────────────────
   for (const acct of accounts) {
     syncedUsernames.add(acct.user)
-    if (acct.suspended) result.suspended++ ; else result.active++
+    if (acct.suspended) result.suspended++
+    else result.active++
+
+    console.log(`[sync][${acct.user}] processing — domain: ${acct.domain} email: ${acct.email} plan: ${acct.plan}`)
 
     try {
       const diskUsed  = parseDiskMb(acct.diskused)
@@ -124,190 +157,254 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
         ? new Date(acct.unix_startdate * 1000).toISOString()
         : null
 
-      // ── 4a. Upsert into whm_accounts ───────────────────────────────────
-      const { data: existingWa } = await db
-        .from('whm_accounts')
-        .select('id, profile_id, service_id, hosting_account_id')
-        .eq('server_id', serverId)
-        .eq('whm_username', acct.user)
-        .maybeSingle()
+      // ── STEP A: Upsert whm_accounts (optional table — skip if not ready) ──
+      let whmAccountId: string | null = null
+      try {
+        const whmPayload = {
+          server_id:          serverId,
+          whm_username:       acct.user,
+          primary_domain:     acct.domain,
+          contact_email:      acct.email || null,
+          package_name:       acct.plan || null,
+          ip_address:         acct.ip || null,
+          owner:              acct.owner || null,
+          partition:          acct.partition || null,
+          disk_used_mb:       diskUsed,
+          disk_limit_mb:      diskLimit,
+          unix_startdate:     acct.unix_startdate || null,
+          account_created_at: accountCreatedAt,
+          is_suspended:       acct.suspended,
+          suspension_reason:  acct.suspendreason || null,
+          theme:              acct.theme || null,
+          php_version:        acct.phpversion || null,
+          max_pop:            acct.maxpop || null,
+          max_sub:            acct.maxsub || null,
+          max_sql:            acct.maxsql || null,
+          max_ftp:            acct.maxftp || null,
+          status:             acct.suspended ? 'suspended' : 'active',
+          raw_metadata:       { user: acct.user, domain: acct.domain, plan: acct.plan, ip: acct.ip },
+          last_synced_at:     syncedAt,
+          updated_at:         syncedAt,
+        }
 
-      const whmAccountPayload = {
-        server_id:          serverId,
-        whm_username:       acct.user,
-        primary_domain:     acct.domain,
-        contact_email:      acct.email || null,
-        package_name:       acct.plan || null,
-        ip_address:         acct.ip || null,
-        owner:              acct.owner || null,
-        partition:          acct.partition || null,
-        disk_used_mb:       diskUsed,
-        disk_limit_mb:      diskLimit,
-        unix_startdate:     acct.unix_startdate || null,
-        account_created_at: accountCreatedAt,
-        is_suspended:       acct.suspended,
-        suspension_reason:  acct.suspendreason || null,
-        theme:              acct.theme || null,
-        php_version:        acct.phpversion || null,
-        max_pop:            acct.maxpop || null,
-        max_sub:            acct.maxsub || null,
-        max_sql:            acct.maxsql || null,
-        max_ftp:            acct.maxftp || null,
-        status:             acct.suspended ? 'suspended' : 'active',
-        raw_metadata:       { user: acct.user, domain: acct.domain, plan: acct.plan, ip: acct.ip },
-        last_synced_at:     syncedAt,
-        updated_at:         syncedAt,
-      }
-
-      let whmAccountId: string
-
-      if (existingWa) {
-        await db.from('whm_accounts').update(whmAccountPayload).eq('id', existingWa.id)
-        whmAccountId = existingWa.id as string
-        result.whmAccountsUpdated++
-      } else {
-        const { data: inserted } = await db
+        const { data: whmAcct, error: whmErr } = await db
           .from('whm_accounts')
-          .insert({ ...whmAccountPayload, created_at: syncedAt })
+          .upsert(whmPayload, { onConflict: 'server_id,whm_username' })
           .select('id')
           .single()
-        whmAccountId = (inserted as { id: string }).id
-        result.whmAccountsCreated++
+
+        if (whmErr) {
+          console.warn(`[sync][${acct.user}] whm_accounts upsert: ${whmErr.message}`)
+          // Non-fatal — continue without whmAccountId
+        } else if (whmAcct) {
+          whmAccountId = (whmAcct as { id: string }).id
+          console.log(`[sync][${acct.user}] whm_account id: ${whmAccountId}`)
+        }
+      } catch (whmEx) {
+        console.warn(`[sync][${acct.user}] whm_accounts exception: ${String(whmEx)}`)
       }
 
-      // ── 4b. Check if hosting_account already exists ─────────────────────
-      const { data: existingHa } = await db
+      // ── STEP B: Check if hosting_account already exists ───────────────────
+      console.log(`[sync][${acct.user}] checking hosting_accounts…`)
+      const { data: existingHa, error: existingHaErr } = await db
         .from('hosting_accounts')
         .select('id, profile_id, service_id')
         .eq('cpanel_username', acct.user)
         .maybeSingle()
 
+      if (existingHaErr) {
+        throw new Error(`[hosting_accounts lookup] ${existingHaErr.message}`)
+      }
+
       if (existingHa) {
-        // Update data fields only — don't change ownership
-        await db.from('hosting_accounts').update({
+        // ── UPDATE existing ─────────────────────────────────────────────────
+        const ha = existingHa as { id: string; profile_id: string; service_id: string }
+        console.log(`[sync][${acct.user}] hosting_account EXISTS id=${ha.id} — updating`)
+
+        const baseUpdate = {
           disk_used_mb:      diskUsed,
+          status:            acct.suspended ? 'suspended' : 'active',
+          updated_at:        syncedAt,
+        }
+        const { error: haUpdateErr } = await db
+          .from('hosting_accounts')
+          .update(baseUpdate)
+          .eq('id', ha.id)
+
+        if (haUpdateErr) {
+          console.warn(`[sync][${acct.user}] hosting_accounts base update: ${haUpdateErr.message}`)
+        }
+
+        // Attempt to update new columns (non-fatal if columns don't exist yet)
+        const { error: haExtErr } = await db.from('hosting_accounts').update({
           disk_limit_mb:     diskLimit,
           package_name:      acct.plan || null,
           ip_address:        acct.ip || null,
           suspension_reason: acct.suspendreason || null,
-          status:            acct.suspended ? 'suspended' : 'active',
           last_synced_at:    syncedAt,
-          updated_at:        syncedAt,
-        }).eq('id', existingHa.id)
+        }).eq('id', ha.id)
 
-        // Keep whm_account linked to existing portal records
-        await db.from('whm_accounts').update({
-          profile_id:         existingHa.profile_id,
-          service_id:         existingHa.service_id,
-          hosting_account_id: existingHa.id,
-        }).eq('id', whmAccountId)
+        if (haExtErr) {
+          console.warn(`[sync][${acct.user}] hosting_accounts extended update: ${haExtErr.message}`)
+        }
+
+        // Link whm_account if we have one
+        if (whmAccountId) {
+          const { error: linkErr } = await db.from('whm_accounts').update({
+            profile_id:         ha.profile_id,
+            service_id:         ha.service_id,
+            hosting_account_id: ha.id,
+          }).eq('id', whmAccountId)
+          if (linkErr) console.warn(`[sync][${acct.user}] whm_account link: ${linkErr.message}`)
+        }
 
         result.servicesUpdated++
         continue
       }
 
-      // ── 4c. No hosting_account — find or create profile ─────────────────
-      const email = acct.email
+      console.log(`[sync][${acct.user}] no hosting_account found — will create`)
 
+      // ── STEP C: Find or create profile ────────────────────────────────────
       let profileId: string | null = null
 
-      if (isValidEmail(email)) {
-        // Try to find existing profile by email
-        const { data: existingProfile } = await db
+      if (!isValidEmail(acct.email)) {
+        console.warn(`[sync][${acct.user}] email invalid or missing ("${acct.email}") — skipping client creation`)
+        // Still update whm_account status
+        if (whmAccountId) {
+          await db.from('whm_accounts').update({ status: 'active', last_synced_at: syncedAt }).eq('id', whmAccountId)
+        }
+        result.errors.push({ username: acct.user, error: `Email inválido ou em falta: "${acct.email}"` })
+        continue
+      }
+
+      console.log(`[sync][${acct.user}] looking up profile by email: ${acct.email}`)
+      const { data: existingProfile, error: profileLookupErr } = await db
+        .from('profiles')
+        .select('id')
+        .eq('email', acct.email)
+        .maybeSingle()
+
+      if (profileLookupErr) {
+        throw new Error(`[profiles lookup] ${profileLookupErr.message}`)
+      }
+
+      if (existingProfile) {
+        profileId = (existingProfile as { id: string }).id
+        console.log(`[sync][${acct.user}] profile found: ${profileId}`)
+        result.clientsLinked++
+      } else {
+        // ── CREATE auth user ────────────────────────────────────────────────
+        console.log(`[sync][${acct.user}] creating auth user for ${acct.email}…`)
+        const { data: authData, error: authErr } = await db.auth.admin.createUser({
+          email:          acct.email,
+          email_confirm:  true,
+          user_metadata: {
+            full_name: provisionalName(acct.domain, acct.user),
+            source:    'whm_sync',
+          },
+        })
+
+        if (authErr) {
+          throw new Error(`[auth.createUser] ${authErr.message}`)
+        }
+        if (!authData?.user) {
+          throw new Error('[auth.createUser] createUser returned no user object')
+        }
+
+        const newUserId = authData.user.id
+        console.log(`[sync][${acct.user}] auth user created: ${newUserId}`)
+
+        // ── CREATE profile ──────────────────────────────────────────────────
+        const { data: profileRow, error: profileErr } = await db
           .from('profiles')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle()
-
-        if (existingProfile) {
-          profileId = existingProfile.id as string
-          result.clientsLinked++
-        } else {
-          // Auto-create auth user (no password — must use "forgot password" to log in)
-          const { data: authData, error: authErr } = await db.auth.admin.createUser({
-            email,
-            email_confirm: true,
-            user_metadata: {
-              full_name: provisionalName(acct.domain, acct.user),
-              source: 'whm_sync',
-            },
-          })
-
-          if (authErr || !authData?.user) {
-            result.errors.push({
-              username: acct.user,
-              error: `Erro ao criar utilizador: ${authErr?.message ?? 'desconhecido'}`,
-            })
-            continue
-          }
-
-          const newUserId = authData.user.id
-          const name = provisionalName(acct.domain, acct.user)
-
-          // Create profile row
-          await db.from('profiles').upsert({
+          .upsert({
             id:         newUserId,
-            email,
-            full_name:  name,
+            email:      acct.email,
+            full_name:  provisionalName(acct.domain, acct.user),
             role:       'client',
             is_active:  true,
             created_at: syncedAt,
             updated_at: syncedAt,
           }, { onConflict: 'id' })
+          .select('id')
+          .single()
 
-          // Create client row
-          await db.from('clients').upsert({
-            profile_id: newUserId,
-            notes:      'Importado via sincronização WHM',
-            created_at: syncedAt,
-            updated_at: syncedAt,
-          }, { onConflict: 'profile_id' })
-
-          profileId = newUserId
-          result.clientsCreated++
+        if (profileErr) {
+          throw new Error(`[profiles upsert] ${profileErr.message}`)
         }
+        if (!profileRow) {
+          throw new Error('[profiles upsert] upsert returned null data')
+        }
+
+        profileId = (profileRow as { id: string }).id
+        console.log(`[sync][${acct.user}] profile created/confirmed: ${profileId}`)
+
+        // ── CREATE client record ────────────────────────────────────────────
+        const { error: clientErr } = await db.from('clients').upsert({
+          profile_id: newUserId,
+          notes:      'Importado via sincronização WHM',
+          created_at: syncedAt,
+          updated_at: syncedAt,
+        }, { onConflict: 'profile_id' })
+
+        if (clientErr) {
+          // Non-fatal: client record is optional
+          console.warn(`[sync][${acct.user}] clients upsert: ${clientErr.message}`)
+        } else {
+          console.log(`[sync][${acct.user}] client record ok`)
+        }
+
+        result.clientsCreated++
       }
 
-      // Without a profile we still store the whm_account but can't create service/hosting
-      if (!profileId) continue
-
-      // ── 4d. Resolve plan_id from package mapping ─────────────────────────
-      let planId: string | null = null
-      if (acct.plan && packageToplan.has(acct.plan)) {
-        planId = packageToplan.get(acct.plan) ?? null
+      // profileId must be set here
+      if (!profileId) {
+        throw new Error('[profile] profileId is null after lookup/creation — this should not happen')
       }
 
-      // ── 4e. Create service record ─────────────────────────────────────────
-      const serviceStatus = acct.suspended ? 'suspended' : 'active'
-      const startedAt = accountCreatedAt ?? syncedAt
+      // ── STEP D: Resolve plan_id ───────────────────────────────────────────
+      const mappedPlanId = packageToPlan.get(acct.plan ?? '') ?? null
+      const planId: string | null = mappedPlanId ?? fallbackPlanId
+      console.log(`[sync][${acct.user}] planId resolved: ${planId} (mapped: ${mappedPlanId}, fallback: ${fallbackPlanId})`)
 
-      const { data: newService } = await db
+      if (!planId) {
+        console.warn(`[sync][${acct.user}] no plan available — services.plan_id will be null (requires migration)`)
+      }
+
+      // ── STEP E: Create service ────────────────────────────────────────────
+      console.log(`[sync][${acct.user}] creating service…`)
+      const { data: newService, error: svcErr } = await db
         .from('services')
         .insert({
           profile_id:    profileId,
           plan_id:       planId,
           server_id:     serverId,
-          status:        serviceStatus,
+          status:        acct.suspended ? 'suspended' : 'active',
           billing_cycle: 'monthly',
           price:         0,
           currency:      'AKZ',
-          started_at:    startedAt,
-          notes:         `Importado do WHM — pacote: ${acct.plan || 'desconhecido'}`,
+          started_at:    accountCreatedAt ?? syncedAt,
+          notes:         `WHM sync — pacote: ${acct.plan || 'desconhecido'}`,
           created_at:    syncedAt,
           updated_at:    syncedAt,
         })
         .select('id')
         .single()
 
+      if (svcErr) {
+        throw new Error(`[services insert] ${svcErr.message}`)
+      }
       if (!newService) {
-        result.errors.push({ username: acct.user, error: 'Falha ao criar serviço.' })
-        continue
+        throw new Error('[services insert] insert returned null data (no error returned by DB)')
       }
 
       const serviceId = (newService as { id: string }).id
+      console.log(`[sync][${acct.user}] service created: ${serviceId}`)
 
-      // ── 4f. Create hosting_account record ────────────────────────────────
-      const { data: newHa } = await db
+      // ── STEP F: Create hosting_account ────────────────────────────────────
+      // Insert with the ORIGINAL columns that definitely exist in the schema
+      console.log(`[sync][${acct.user}] creating hosting_account…`)
+      const { data: newHa, error: haInsertErr } = await db
         .from('hosting_accounts')
         .insert({
           service_id:        serviceId,
@@ -315,47 +412,61 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
           server_id:         serverId,
           cpanel_username:   acct.user,
           primary_domain:    acct.domain,
-          status:            serviceStatus,
+          status:            acct.suspended ? 'suspended' : 'active',
           disk_used_mb:      diskUsed,
-          disk_limit_mb:     diskLimit,
           bandwidth_used_mb: 0,
           email_count:       0,
           db_count:          0,
           php_version:       acct.phpversion || '8.2',
           ssl_enabled:       false,
-          package_name:      acct.plan || null,
-          ip_address:        acct.ip || null,
-          last_synced_at:    syncedAt,
-          created_at:        syncedAt,
-          updated_at:        syncedAt,
         })
         .select('id')
         .single()
 
+      if (haInsertErr) {
+        throw new Error(`[hosting_accounts insert] ${haInsertErr.message}`)
+      }
       if (!newHa) {
-        result.errors.push({ username: acct.user, error: 'Falha ao criar conta de hospedagem.' })
-        continue
+        throw new Error('[hosting_accounts insert] insert returned null data (no error returned by DB)')
       }
 
       const haId = (newHa as { id: string }).id
+      console.log(`[sync][${acct.user}] hosting_account created: ${haId}`)
 
-      // ── 4g. Link whm_account to portal records ────────────────────────────
-      await db.from('whm_accounts').update({
-        profile_id:         profileId,
-        service_id:         serviceId,
-        hosting_account_id: haId,
-      }).eq('id', whmAccountId)
+      // Attempt to add new columns from migration (non-fatal)
+      const { error: haExtErr2 } = await db.from('hosting_accounts').update({
+        disk_limit_mb:     diskLimit,
+        package_name:      acct.plan || null,
+        ip_address:        acct.ip || null,
+        last_synced_at:    syncedAt,
+      }).eq('id', haId)
+
+      if (haExtErr2) {
+        console.warn(`[sync][${acct.user}] hosting_accounts extended cols: ${haExtErr2.message}`)
+      }
+
+      // ── STEP G: Link whm_account ──────────────────────────────────────────
+      if (whmAccountId) {
+        const { error: linkErr } = await db.from('whm_accounts').update({
+          profile_id:         profileId,
+          service_id:         serviceId,
+          hosting_account_id: haId,
+        }).eq('id', whmAccountId)
+        if (linkErr) console.warn(`[sync][${acct.user}] whm_account final link: ${linkErr.message}`)
+      }
 
       result.servicesCreated++
+      console.log(`[sync][${acct.user}] ✓ done`)
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[sync][${acct.user}] ✗ FAILED: ${msg}`)
       result.errors.push({ username: acct.user, error: msg })
     }
   }
 
-  // ── 5. Mark accounts no longer in WHM ─────────────────────────────────────
-  if (syncedUsernames.size > 0) {
+  // ── 6. Mark accounts no longer in WHM ─────────────────────────────────────
+  try {
     const { data: allWhmAccounts } = await db
       .from('whm_accounts')
       .select('id, whm_username')
@@ -372,7 +483,18 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
         result.markedMissing++
       }
     }
+  } catch (ex) {
+    console.warn('[sync] mark-missing step failed (non-fatal):', String(ex))
   }
+
+  console.log('[sync] complete:', JSON.stringify({
+    total:            result.total,
+    clientsCreated:   result.clientsCreated,
+    clientsLinked:    result.clientsLinked,
+    servicesCreated:  result.servicesCreated,
+    servicesUpdated:  result.servicesUpdated,
+    errors:           result.errors.length,
+  }))
 
   return result
 }
