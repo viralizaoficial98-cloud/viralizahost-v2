@@ -248,6 +248,55 @@ export async function getServerLoad(config: WHMConfig) {
   }
 }
 
+// ── Extended account type with all WHM fields ─────────────────────────────────
+
+export interface WHMAccountFull extends WHMAccount {
+  suspendreason: string
+  unix_startdate: number
+  owner: string
+  partition: string
+  maxftp: string
+  theme: string
+}
+
+export async function listAccountsFull(config: WHMConfig): Promise<WHMAccountFull[]> {
+  const data = await whmRequest(config, 'listaccts', { searchtype: 'domain', search: '' })
+  return (data.data?.acct ?? []).map((a: Record<string, unknown>) => ({
+    user:           String(a.user         ?? ''),
+    domain:         String(a.domain       ?? ''),
+    email:          String(a.email        ?? ''),
+    plan:           String(a.plan         ?? ''),
+    diskused:       String(a.diskused     ?? '0'),
+    disklimit:      String(a.disklimit    ?? 'unlimited'),
+    ip:             String(a.ip           ?? ''),
+    suspended:      a.suspended === 1 || a.suspended === '1' || a.suspended === true,
+    maxpop:         String(a.maxpop       ?? 'unlimited'),
+    maxsub:         String(a.maxsub       ?? 'unlimited'),
+    maxsql:         String(a.maxsql       ?? 'unlimited'),
+    phpversion:     String(a.phpversion   ?? '8.2'),
+    suspendreason:  String(a.suspendreason ?? ''),
+    unix_startdate: Number(a.unix_startdate ?? 0),
+    owner:          String(a.owner        ?? 'root'),
+    partition:      String(a.partition    ?? 'home'),
+    maxftp:         String(a.maxftp       ?? 'unlimited'),
+    theme:          String(a.theme        ?? ''),
+  }))
+}
+
+export async function createUserSession(
+  config: WHMConfig,
+  cpanelUsername: string,
+  service: 'cpaneld' | 'webmaild',
+): Promise<{ url: string; expire: number }> {
+  const data = await whmRequest(config, 'create_user_session', {
+    user: cpanelUsername,
+    service,
+  })
+  const session = data.data
+  if (!session?.url) throw new Error('WHM não devolveu URL de sessão')
+  return { url: String(session.url), expire: Number(session.expire ?? 3600) }
+}
+
 export async function createEmailAccount(config: WHMConfig, domain: string, email: string, password: string, quota = 500) {
   // cPanel API via WHM proxy
   const cpanelUser = domain.replace(/\./g, '_').slice(0, 8)

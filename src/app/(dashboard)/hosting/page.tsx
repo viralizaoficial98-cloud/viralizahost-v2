@@ -1,8 +1,9 @@
 import { Metadata } from 'next'
-import { Server, HardDrive, Wifi, Shield, ExternalLink, Cpu, RefreshCw, Clock } from 'lucide-react'
+import { Server, HardDrive, Wifi, Shield, Cpu, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { SSOButtons } from '@/components/hosting/SSOButtons'
 
 export const metadata: Metadata = { title: 'Hospedagem — ViralizaHost' }
 
@@ -17,7 +18,7 @@ async function fetchServices(userId: string) {
   const supabase = await createClient()
   const result = await supabase
     .from('services')
-    .select('id, expires_at, status, plans(name, disk_gb, bandwidth_gb, php_version), hosting_accounts(primary_domain, disk_used_mb, bandwidth_used_mb, email_count, db_count, cpanel_url)')
+    .select('id, expires_at, status, plans(name, disk_gb, bandwidth_gb, php_version), hosting_accounts(primary_domain, disk_used_mb, disk_limit_mb, bandwidth_used_mb, email_count, db_count, cpanel_url, package_name, ip_address, status)')
     .eq('profile_id', userId)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -118,15 +119,17 @@ export default async function HostingPage() {
           {services.map((svc: any) => {
             const plan = svc.plans
             const ha   = svc.hosting_accounts?.[0]
-            const diskGb     = plan?.disk_gb ?? 0
-            const diskUsedMb = ha?.disk_used_mb ?? 0
-            const diskPct    = diskGb > 0 ? Math.round((diskUsedMb / (diskGb * 1024)) * 100) : 0
-            const bwGb       = plan?.bandwidth_gb ?? 0
-            const bwUsedMb   = ha?.bandwidth_used_mb ?? 0
-            const bwPct      = bwGb > 0 ? Math.round((bwUsedMb / (bwGb * 1024)) * 100) : 0
-            const expires    = svc.expires_at ? new Date(svc.expires_at).toLocaleDateString('pt-BR') : '—'
-            const diskColor  = diskPct > 80 ? '#EF4444' : '#3B82F6'
-            const bwColor    = bwPct > 80 ? '#EF4444' : '#10B981'
+            // Disk: prefer WHM real limit, fall back to plan's disk_gb
+            const diskUsedMb  = ha?.disk_used_mb ?? 0
+            const diskLimitMb = ha?.disk_limit_mb ?? (plan?.disk_gb ? plan.disk_gb * 1024 : 0)
+            const diskPct     = diskLimitMb > 0 ? Math.round((diskUsedMb / diskLimitMb) * 100) : 0
+            const bwGb        = plan?.bandwidth_gb ?? 0
+            const bwUsedMb    = ha?.bandwidth_used_mb ?? 0
+            const bwPct       = bwGb > 0 ? Math.round((bwUsedMb / (bwGb * 1024)) * 100) : 0
+            const expires     = svc.expires_at ? new Date(svc.expires_at).toLocaleDateString('pt-BR') : '—'
+            const diskColor   = diskPct > 80 ? '#EF4444' : '#3B82F6'
+            const bwColor     = bwPct > 80 ? '#EF4444' : '#10B981'
+            const haStatus    = ha?.status ?? svc.status
 
             return (
               <div key={svc.id} style={card}>
@@ -148,17 +151,12 @@ export default async function HostingPage() {
                       <Shield size={10} /> SSL
                     </span>
                     <span className="text-xs font-bold px-2.5 py-1 rounded-full"
-                      style={{ background: 'rgba(245,183,0,0.10)', color: '#D9A300', border: '1px solid rgba(245,183,0,0.25)' }}>
-                      Ativo
+                      style={haStatus === 'suspended'
+                        ? { background: 'rgba(239,68,68,0.10)', color: '#DC2626', border: '1px solid rgba(239,68,68,0.25)' }
+                        : { background: 'rgba(245,183,0,0.10)', color: '#D9A300', border: '1px solid rgba(245,183,0,0.25)' }}>
+                      {haStatus === 'suspended' ? 'Suspenso' : 'Ativo'}
                     </span>
                   </div>
-                  {ha?.cpanel_url && (
-                    <a href={ha.cpanel_url} target="_blank" rel="noopener noreferrer"
-                      className="p-2 rounded-lg transition-colors ml-1"
-                      style={{ color: '#94A3B8' }}>
-                      <ExternalLink size={15} />
-                    </a>
-                  )}
                 </div>
 
                 {/* Metrics */}
@@ -170,7 +168,7 @@ export default async function HostingPage() {
                       <span className="text-xs font-semibold" style={{ color: '#64748B' }}>Armazenamento</span>
                     </div>
                     <div className="font-bold text-sm mb-2" style={{ color: '#0B0B0D' }}>
-                      {(diskUsedMb / 1024).toFixed(1)} GB / {diskGb} GB
+                      {(diskUsedMb / 1024).toFixed(1)} GB {diskLimitMb > 0 ? `/ ${(diskLimitMb / 1024).toFixed(1)} GB` : '/ Ilimitado'}
                     </div>
                     <div className="h-2 rounded-full overflow-hidden" style={{ background: '#F1F5F9' }}>
                       <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(diskPct, 100)}%`, background: diskColor }} />
@@ -205,16 +203,23 @@ export default async function HostingPage() {
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex flex-col gap-2">
-                    <button className="w-full py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                      style={{ background: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0' }}>
-                      <ExternalLink size={12} /> Abrir cPanel
-                    </button>
-                    <button className="w-full py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                      style={{ background: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0' }}>
-                      <RefreshCw size={12} /> Backup Agora
-                    </button>
+                  {/* SSO Actions */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Cpu size={13} style={{ color: '#F5B700' }} />
+                      <span className="text-xs font-semibold" style={{ color: '#64748B' }}>Acesso Direto</span>
+                    </div>
+                    <SSOButtons serviceId={svc.id} />
+                    {ha?.package_name && (
+                      <div className="text-[11px] mt-2" style={{ color: '#94A3B8' }}>
+                        Pacote: {ha.package_name}
+                      </div>
+                    )}
+                    {ha?.ip_address && (
+                      <div className="text-[11px]" style={{ color: '#94A3B8' }}>
+                        IP: {ha.ip_address}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

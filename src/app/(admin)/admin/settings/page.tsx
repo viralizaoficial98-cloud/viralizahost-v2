@@ -3,7 +3,9 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Settings, Server, Globe, CreditCard, Mail,
   CheckCircle, AlertCircle, Loader2, Wifi, WifiOff,
+  RefreshCw, Users, HardDrive, ExternalLink,
 } from 'lucide-react'
+import Link from 'next/link'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const inputStyle = {
@@ -275,6 +277,181 @@ function WhmSection() {
   )
 }
 
+// ── WHM Sync Section ──────────────────────────────────────────────────────────
+
+interface SyncResult {
+  total: number
+  whmAccountsCreated: number
+  whmAccountsUpdated: number
+  clientsCreated: number
+  clientsLinked: number
+  servicesCreated: number
+  servicesUpdated: number
+  suspended: number
+  active: number
+  markedMissing: number
+  errors: Array<{ username: string; error: string }>
+  syncedAt: string
+}
+
+function WhmSyncSection() {
+  const [syncing,  setSyncing]  = useState(false)
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
+  const [syncError, setSyncError]  = useState('')
+  const abortRef = useRef<AbortController | null>(null)
+
+  const handleSync = async () => {
+    if (syncing) return
+    setSyncing(true)
+    setSyncResult(null)
+    setSyncError('')
+    abortRef.current?.abort()
+    abortRef.current = new AbortController()
+
+    try {
+      const res = await fetch('/api/admin/whm/sync', {
+        method: 'POST',
+        credentials: 'include',
+        signal: abortRef.current.signal,
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setSyncError(data.error ?? 'Erro ao sincronizar.')
+      } else {
+        setSyncResult(data as SyncResult)
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      setSyncError('Erro de comunicação com o servidor.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const fmtDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleString('pt-AO', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      })
+    } catch { return iso }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs" style={{ color: '#64748B' }}>
+            Importa e sincroniza todas as contas cPanel existentes no servidor WHM com o portal ViralizaHost.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          style={syncing ? btnDisabled : btnPrimary}
+          aria-label="Sincronizar contas WHM"
+        >
+          {syncing
+            ? <><Loader2 size={14} className="animate-spin" /> Sincronizando…</>
+            : <><RefreshCw size={14} /> Sincronizar Contas WHM</>
+          }
+        </button>
+
+        <Link
+          href="/admin/servers/whm-accounts"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl transition-all"
+          style={{ background: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0' }}
+        >
+          <ExternalLink size={12} /> Ver Contas Importadas
+        </Link>
+      </div>
+
+      {syncing && (
+        <div className="rounded-xl p-4 flex items-center gap-3"
+          style={{ background: '#FFF8E1', border: '1px solid rgba(245,183,0,0.30)' }}>
+          <Loader2 size={16} className="animate-spin" style={{ color: '#D9A300' }} />
+          <div>
+            <p className="text-sm font-semibold" style={{ color: '#92720A' }}>Sincronização em curso…</p>
+            <p className="text-xs" style={{ color: '#B45309' }}>A consultar contas no WHM e a atualizar o portal.</p>
+          </div>
+        </div>
+      )}
+
+      {syncError && (
+        <div className="rounded-xl p-4 space-y-1"
+          style={{ background: '#FEF2F2', border: '1px solid #FCA5A5' }}>
+          <div className="flex items-center gap-2">
+            <AlertCircle size={14} style={{ color: '#DC2626' }} />
+            <span className="font-bold text-sm" style={{ color: '#991B1B' }}>Erro na sincronização</span>
+          </div>
+          <p className="text-xs" style={{ color: '#B91C1C' }}>{syncError}</p>
+        </div>
+      )}
+
+      {syncResult && (
+        <div className="rounded-xl p-4 space-y-3"
+          style={{ background: '#ECFDF5', border: '1px solid #6EE7B7' }}>
+          <div className="flex items-center gap-2">
+            <CheckCircle size={16} style={{ color: '#059669' }} />
+            <span className="font-bold text-sm" style={{ color: '#065F46' }}>
+              Sincronização concluída — {fmtDate(syncResult.syncedAt)}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { icon: <HardDrive size={13} />, label: 'Contas WHM', value: syncResult.total },
+              { icon: <Users size={13} />,     label: 'Clientes criados', value: syncResult.clientsCreated },
+              { icon: <Users size={13} />,     label: 'Clientes ligados', value: syncResult.clientsLinked },
+              { icon: <Server size={13} />,    label: 'Serviços criados', value: syncResult.servicesCreated },
+              { icon: <Server size={13} />,    label: 'Serviços atualizados', value: syncResult.servicesUpdated },
+              { icon: <CheckCircle size={13} />, label: 'Ativos', value: syncResult.active },
+            ].map(item => (
+              <div key={item.label} className="flex items-center gap-2 text-xs" style={{ color: '#047857' }}>
+                <span style={{ color: '#059669' }}>{item.icon}</span>
+                <span className="font-semibold">{item.value}</span>
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {syncResult.suspended > 0 && (
+            <p className="text-xs" style={{ color: '#B45309' }}>
+              ⚠ {syncResult.suspended} conta(s) suspensa(s) no WHM
+            </p>
+          )}
+          {syncResult.markedMissing > 0 && (
+            <p className="text-xs" style={{ color: '#64748B' }}>
+              {syncResult.markedMissing} conta(s) ausente(s) do WHM (marcadas como inativas)
+            </p>
+          )}
+
+          {syncResult.errors.length > 0 && (
+            <div className="rounded-lg p-3 space-y-1" style={{ background: 'rgba(239,68,68,0.08)' }}>
+              <p className="text-xs font-bold" style={{ color: '#DC2626' }}>
+                {syncResult.errors.length} erro(s) encontrado(s):
+              </p>
+              {syncResult.errors.slice(0, 5).map(e => (
+                <p key={e.username} className="text-[11px]" style={{ color: '#B91C1C' }}>
+                  {e.username}: {e.error}
+                </p>
+              ))}
+              {syncResult.errors.length > 5 && (
+                <p className="text-[11px]" style={{ color: '#B91C1C' }}>
+                  +{syncResult.errors.length - 5} erros adicionais
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Gateways (static for now) ─────────────────────────────────────────────────
 const gateways = [
   { name: 'Mercado Pago',              enabled: true  },
@@ -409,6 +586,22 @@ export default function AdminSettingsPage() {
         </div>
 
       </div>
+
+      {/* ── WHM Sync (full width) ─────────────────────────────────────────── */}
+      <div style={card}>
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.20)' }}>
+            <RefreshCw size={15} style={{ color: '#D9A300' }} />
+          </div>
+          <div>
+            <h2 className="font-bold text-sm" style={{ color: '#0B0B0D' }}>Sincronização de Contas WHM</h2>
+            <p className="text-[11px]" style={{ color: '#94A3B8' }}>Importa clientes e hospedagens do servidor WHM para o portal</p>
+          </div>
+        </div>
+        <WhmSyncSection />
+      </div>
+
     </div>
   )
 }
