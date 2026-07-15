@@ -1,7 +1,6 @@
 import { Metadata } from 'next'
-import { Globe, Plus, RefreshCw, Lock, Shield } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { Globe, Plus, RefreshCw, Lock, Shield, Server } from 'lucide-react'
+import { createAuthClient, createAdminWriteClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = { title: 'Domínios — ViralizaHost' }
@@ -15,6 +14,7 @@ const card = {
 
 const statusMap: Record<string, { label: string; bg: string; color: string; border: string }> = {
   active:      { label: 'Ativo',       bg: 'rgba(16,185,129,0.08)',  color: '#059669', border: 'rgba(16,185,129,0.20)' },
+  suspended:   { label: 'Suspenso',    bg: 'rgba(239,68,68,0.08)',   color: '#DC2626', border: 'rgba(239,68,68,0.20)' },
   expired:     { label: 'Expirado',    bg: 'rgba(239,68,68,0.08)',   color: '#DC2626', border: 'rgba(239,68,68,0.20)' },
   pending:     { label: 'Pendente',    bg: 'rgba(245,183,0,0.10)',   color: '#D9A300', border: 'rgba(245,183,0,0.25)' },
   cancelled:   { label: 'Cancelado',   bg: 'rgba(107,114,128,0.08)', color: '#6B7280', border: 'rgba(107,114,128,0.20)' },
@@ -22,47 +22,64 @@ const statusMap: Record<string, { label: string; bg: string; color: string; bord
   locked:      { label: 'Bloqueado',   bg: 'rgba(107,114,128,0.08)', color: '#6B7280', border: 'rgba(107,114,128,0.20)' },
 }
 
-async function fetchData(userId: string) {
-  const supabase  = await createClient()
-  const adminDb   = await createAdminClient()
+async function fetchDomains(userId: string) {
+  const db = createAdminWriteClient()
 
-  // Domains from the domains table (includes pending ones created by RPC)
-  const domainsResult = await supabase
-    .from('domains')
-    .select('*')
-    .eq('profile_id', userId)
-    .order('created_at', { ascending: false })
+  const [haResult, domainsResult] = await Promise.allSettled([
+    // Primary domains from hosting accounts (WHM)
+    db.from('hosting_accounts')
+      .select('id, primary_domain, status, last_synced_at, package_name, ip_address')
+      .eq('profile_id', userId)
+      .not('primary_domain', 'is', null),
 
-  // Pending orders that have a domain_name but no entry yet in domains table
-  // (fallback for edge cases where RPC partial-failed)
-  const ordersResult = await (adminDb as any)
-    .from('orders')
-    .select('id, status, amount, created_at, domain_name')
-    .eq('user_id', userId)
-    .not('domain_name', 'is', null)
-    .in('status', ['pending', 'aguardando_confirmacao'])
-    .order('created_at', { ascending: false })
+    // Portal-registered domains
+    db.from('domains')
+      .select('id, name, full_domain, extension, status, expires_at, auto_renew, registrar, is_locked, nameservers, registered_at')
+      .eq('profile_id', userId)
+      .order('created_at', { ascending: false }),
+  ])
 
-  const domains = (domainsResult.data ?? []) as any[]
-  const orders  = ((ordersResult as any).data ?? []) as any[]
+  const hostingAccounts = haResult.status === 'fulfilled' ? (haResult.value.data ?? []) : []
+  const portalDomains   = domainsResult.status === 'fulfilled' ? (domainsResult.value.data ?? []) : []
 
-  // Only show pending orders that aren't already reflected in the domains table
-  const domainNames = new Set(domains.map((d: any) => d.name))
-  const orphanOrders = orders.filter((o: any) => o.domain_name && !domainNames.has(o.domain_name))
+  // Build domain list: hosting primary domains first, then registered
+  const hostingDomains = (hostingAccounts as any[]).map((ha: any) => ({
+    id: `ha-${ha.id}`,
+    name: ha.primary_domain,
+    full_domain: ha.primary_domain,
+    status: ha.status === 'suspended' ? 'suspended' : 'active',
+    type: 'principal',
+    source: 'whm',
+    ip_address: ha.ip_address,
+    package_name: ha.package_name,
+    last_synced_at: ha.last_synced_at,
+    expires_at: null,
+    auto_renew: null,
+    registrar: null,
+    is_locked: false,
+  }))
 
-  return { domains, orphanOrders }
+  // Avoid duplicates (domain registered AND in hosting)
+  const hostingDomainNames = new Set(hostingDomains.map((d: any) => d.full_domain?.toLowerCase()))
+  const uniquePortalDomains = (portalDomains as any[]).filter(
+    (d: any) => !hostingDomainNames.has((d.full_domain ?? d.name)?.toLowerCase())
+  ).map((d: any) => ({ ...d, type: 'registrado', source: 'portal' }))
+
+  const allDomains = [...hostingDomains, ...uniquePortalDomains]
+
+  return allDomains
 }
 
 export default async function DomainsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const authDb = await createAuthClient()
+  const { data: { user } } = await authDb.auth.getUser()
   if (!user) redirect('/login')
 
-  const { domains, orphanOrders } = await fetchData(user.id)
+  const allDomains = await fetchDomains(user.id)
 
-  const activeCount   = domains.filter(d => d.status === 'active').length
-  const expiredCount  = domains.filter(d => d.status === 'expired').length
-  const pendingCount  = domains.filter(d => d.status === 'pending').length + orphanOrders.length
+  const activeCount   = allDomains.filter((d: any) => d.status === 'active').length
+  const expiredCount  = allDomains.filter((d: any) => d.status === 'expired').length
+  const pendingCount  = allDomains.filter((d: any) => d.status === 'pending' || d.status === 'suspended').length
 
   return (
     <div className="space-y-7">
@@ -104,18 +121,20 @@ export default async function DomainsPage() {
           <h2 className="font-bold text-sm" style={{ color: '#0B0B0D' }}>Meus Domínios</h2>
           <span className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full"
             style={{ background: '#F1F5F9', color: '#64748B' }}>
-            {domains.length + orphanOrders.length} domínio{(domains.length + orphanOrders.length) !== 1 ? 's' : ''}
+            {allDomains.length} domínio{allDomains.length !== 1 ? 's' : ''}
           </span>
         </div>
 
-        {domains.length > 0 || orphanOrders.length > 0 ? (
+        {allDomains.length > 0 ? (
           <div>
-            {/* Domains from domains table */}
-            {domains.map((domain: any, i: number) => {
+            {allDomains.map((domain: any, i: number) => {
               const s = statusMap[domain.status] ?? statusMap.pending
-              const expires = domain.expires_at ? new Date(domain.expires_at).toLocaleDateString('pt-AO') : '—'
+              const expires = domain.expires_at ? new Date(domain.expires_at).toLocaleDateString('pt-AO') : null
+              const lastSync = domain.last_synced_at ? new Date(domain.last_synced_at).toLocaleDateString('pt-AO') : null
               const name = domain.full_domain ?? domain.name ?? '—'
-              const isLast = i === domains.length - 1 && orphanOrders.length === 0
+              const isLast = i === allDomains.length - 1
+              const isWHM = domain.source === 'whm'
+
               return (
                 <div key={domain.id}
                   className="px-6 py-4 flex items-center gap-4"
@@ -125,14 +144,21 @@ export default async function DomainsPage() {
                     <Globe size={17} style={{ color: '#D9A300' }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-sm" style={{ color: '#0B0B0D' }}>{name}</span>
                       {domain.is_locked && <Lock size={11} style={{ color: '#94A3B8' }} />}
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                        style={{ background: isWHM ? 'rgba(59,130,246,0.08)' : 'rgba(16,185,129,0.08)', color: isWHM ? '#2563EB' : '#059669' }}>
+                        {domain.type}
+                      </span>
                     </div>
-                    <div className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
-                      {domain.status === 'pending'
-                        ? 'Aguardando confirmação de pagamento'
-                        : `Expira: ${expires}${domain.registrar ? ` · ${domain.registrar}` : ''}`}
+                    <div className="text-xs mt-0.5 flex items-center gap-3 flex-wrap" style={{ color: '#94A3B8' }}>
+                      {domain.ip_address && (
+                        <span className="flex items-center gap-1"><Server size={9} /> {domain.ip_address}</span>
+                      )}
+                      {expires && <span>Expira: {expires}</span>}
+                      {lastSync && <span className="flex items-center gap-1"><RefreshCw size={9} /> {lastSync}</span>}
+                      {domain.registrar && <span>{domain.registrar}</span>}
                     </div>
                   </div>
                   <div className="hidden sm:flex items-center gap-3">
@@ -154,31 +180,6 @@ export default async function DomainsPage() {
                 </div>
               )
             })}
-
-            {/* Orphan orders (edge case fallback) */}
-            {orphanOrders.map((order: any, i: number) => {
-              const s = statusMap.pending
-              return (
-                <div key={order.id}
-                  className="px-6 py-4 flex items-center gap-4"
-                  style={{ borderBottom: i < orphanOrders.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: 'rgba(245,183,0,0.08)', border: '1px solid rgba(245,183,0,0.15)' }}>
-                    <Globe size={17} style={{ color: '#D9A300' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="font-bold text-sm" style={{ color: '#0B0B0D' }}>{order.domain_name}</span>
-                    <div className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
-                      Aguardando confirmação de pagamento
-                    </div>
-                  </div>
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full shrink-0"
-                    style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
-                    {s.label}
-                  </span>
-                </div>
-              )
-            })}
           </div>
         ) : (
           <div className="py-16 text-center">
@@ -186,9 +187,9 @@ export default async function DomainsPage() {
               style={{ background: 'rgba(245,183,0,0.08)', border: '1px solid rgba(245,183,0,0.15)' }}>
               <Globe size={28} style={{ color: '#D9A300' }} />
             </div>
-            <p className="font-semibold text-sm mb-1" style={{ color: '#0B0B0D' }}>Nenhum domínio registado</p>
+            <p className="font-semibold text-sm mb-1" style={{ color: '#0B0B0D' }}>Nenhum domínio encontrado</p>
             <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>
-              Registe o seu primeiro domínio e comece a construir a sua presença online
+              Registe o seu primeiro domínio ou sincronize a sua conta de hospedagem
             </p>
             <a href="/checkout?plan=domain.com"
               className="px-5 py-2.5 rounded-xl text-sm font-bold text-black inline-block"
@@ -198,12 +199,6 @@ export default async function DomainsPage() {
           </div>
         )}
       </div>
-
-      {pendingCount > 0 && (
-        <p className="text-xs text-center" style={{ color: '#9CA3AF' }}>
-          Os pagamentos são verificados em até 24h úteis. Receberá confirmação por e-mail.
-        </p>
-      )}
     </div>
   )
 }

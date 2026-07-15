@@ -9,7 +9,7 @@ export async function GET() {
     const supabase = createAdminWriteClient()
     const { data, error } = await supabase
       .from('site_domains')
-      .select('extension, price_annual, price_monthly, currency, popular, label, active')
+      .select('extension, price_annual, price_monthly, currency, popular, active')
       .eq('active', true)
       .order('position')
 
