@@ -284,6 +284,7 @@ interface SyncResult {
   imported: number
   whmAccountsCreated: number
   whmAccountsUpdated: number
+  whmDbErrors: number
   clientsCreated: number
   clientsLinked: number
   servicesCreated: number
@@ -429,6 +430,19 @@ function WhmSyncSection() {
             <p className="text-xs" style={{ color: '#64748B' }}>
               {syncResult.markedMissing} conta(s) ausente(s) do WHM (marcadas como inativas)
             </p>
+          )}
+
+          {(syncResult.whmDbErrors ?? 0) > 0 && (
+            <div className="rounded-lg p-3 space-y-1" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <p className="text-xs font-bold" style={{ color: '#DC2626' }}>
+                ⚠ {syncResult.whmDbErrors} conta(s) não gravadas em whm_accounts
+              </p>
+              <p className="text-[11px]" style={{ color: '#B91C1C' }}>
+                As migrações WHM podem não ter sido aplicadas.
+                Aceda a <strong>Servidores → Contas WHM</strong> e clique em &quot;Aplicar Migrações WHM&quot;,
+                depois sincronize novamente.
+              </p>
+            </div>
           )}
 
           {(syncResult.pending ?? 0) > 0 && (

@@ -10,6 +10,7 @@ export interface SyncResult {
   imported: number
   whmAccountsCreated: number
   whmAccountsUpdated: number
+  whmDbErrors: number           // accounts that couldn't be saved to whm_accounts (migration needed)
   clientsCreated: number
   clientsLinked: number
   servicesCreated: number
@@ -77,6 +78,7 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
     imported: 0,
     whmAccountsCreated: 0,
     whmAccountsUpdated: 0,
+    whmDbErrors: 0,
     clientsCreated: 0,
     clientsLinked: 0,
     servicesCreated: 0,
@@ -175,53 +177,65 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
 
       const hasPendingEmail = !email
 
-      // ── STEP A: Upsert whm_accounts (non-fatal if table doesn't exist yet) ──
+      // ── STEP A: Upsert whm_accounts ──────────────────────────────────────────
+      // Two-step: base columns first (original schema), then new columns (non-fatal).
+      // This makes the sync robust even if migration 2 hasn't been applied yet.
       let whmAccountId: string | null = null
       try {
-        const whmPayload = {
-          server_id:            serverId,
-          whm_username:         acct.user,
-          primary_domain:       acct.domain,
-          contact_email:        email,
-          package_name:         acct.plan || null,
-          ip_address:           acct.ip || null,
-          owner:                acct.owner || null,
-          partition:            acct.partition || null,
-          disk_used_mb:         diskUsed,
-          disk_limit_mb:        diskLimit,
-          unix_startdate:       acct.unix_startdate || null,
-          account_created_at:   accountCreatedAt,
-          is_suspended:         acct.suspended,
-          suspension_reason:    acct.suspendreason || null,
-          theme:                acct.theme || null,
-          php_version:          acct.phpversion || null,
-          max_pop:              acct.maxpop || null,
-          max_sub:              acct.maxsub || null,
-          max_sql:              acct.maxsql || null,
-          max_ftp:              acct.maxftp || null,
-          status:               acct.suspended ? 'suspended' : 'active',
-          sync_status:          hasPendingEmail ? 'pending_email' : 'linked',
-          requires_manual_link: hasPendingEmail,
-          link_status:          hasPendingEmail ? 'unlinked' : 'linked',
-          notes:                hasPendingEmail
-            ? 'Conta importada do WHM aguardando associação manual porque não possui e-mail válido.'
-            : null,
-          raw_metadata:         { user: acct.user, domain: acct.domain, plan: acct.plan, ip: acct.ip },
-          last_synced_at:       syncedAt,
-          updated_at:           syncedAt,
+        // Step A-1: base payload — only columns from migration 1 (20260714)
+        const whmBasePayload = {
+          server_id:          serverId,
+          whm_username:       acct.user,
+          primary_domain:     acct.domain,
+          contact_email:      email,
+          package_name:       acct.plan || null,
+          ip_address:         acct.ip || null,
+          owner:              acct.owner || null,
+          partition:          acct.partition || null,
+          disk_used_mb:       diskUsed,
+          disk_limit_mb:      diskLimit,
+          unix_startdate:     acct.unix_startdate || null,
+          account_created_at: accountCreatedAt,
+          is_suspended:       acct.suspended,
+          suspension_reason:  acct.suspendreason || null,
+          theme:              acct.theme || null,
+          php_version:        acct.phpversion || null,
+          max_pop:            acct.maxpop || null,
+          max_sub:            acct.maxsub || null,
+          max_sql:            acct.maxsql || null,
+          max_ftp:            acct.maxftp || null,
+          status:             acct.suspended ? 'suspended' : 'active',
+          raw_metadata:       { user: acct.user, domain: acct.domain, plan: acct.plan, ip: acct.ip },
+          last_synced_at:     syncedAt,
+          updated_at:         syncedAt,
         }
 
         const { data: whmAcct, error: whmErr } = await db
           .from('whm_accounts')
-          .upsert(whmPayload, { onConflict: 'server_id,whm_username' })
+          .upsert(whmBasePayload, { onConflict: 'server_id,whm_username' })
           .select('id')
           .single()
 
         if (whmErr) {
-          console.warn(`[sync][${acct.user}] whm_accounts upsert: ${whmErr.message}`)
+          console.warn(`[sync][${acct.user}] whm_accounts upsert (base): ${whmErr.message}`)
+          result.whmDbErrors++
         } else if (whmAcct) {
           whmAccountId = (whmAcct as { id: string }).id
           console.log(`[sync][${acct.user}] whm_account id: ${whmAccountId}`)
+
+          // Step A-2: update extended columns (migration 2 — non-fatal if columns don't exist)
+          const { error: extErr } = await db.from('whm_accounts').update({
+            sync_status:          hasPendingEmail ? 'pending_email' : 'linked',
+            requires_manual_link: hasPendingEmail,
+            link_status:          hasPendingEmail ? 'unlinked' : 'linked',
+            notes:                hasPendingEmail
+              ? 'Conta importada do WHM aguardando associação manual porque não possui e-mail válido.'
+              : null,
+          }).eq('id', whmAccountId)
+
+          if (extErr) {
+            console.warn(`[sync][${acct.user}] whm_accounts extended cols (migration 2 needed): ${extErr.message}`)
+          }
         }
       } catch (whmEx) {
         console.warn(`[sync][${acct.user}] whm_accounts exception: ${String(whmEx)}`)
@@ -481,6 +495,7 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
   console.log('[sync] complete:', JSON.stringify({
     total:           result.total,
     imported:        result.imported,
+    whmDbErrors:     result.whmDbErrors,
     clientsCreated:  result.clientsCreated,
     clientsLinked:   result.clientsLinked,
     servicesCreated: result.servicesCreated,
