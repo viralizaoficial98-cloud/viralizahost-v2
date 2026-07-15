@@ -17,7 +17,7 @@ export default function ForgotPasswordPage() {
     try {
       const supabase = createAuthClient()
       const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: 'https://viralizahost.com/reset-password',
       })
       if (authError) {
         setError(authError.message)
