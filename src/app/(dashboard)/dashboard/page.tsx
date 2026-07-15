@@ -1,7 +1,8 @@
 import { Metadata } from 'next'
-import { Globe, Server, Mail, TicketIcon, HardDrive, RefreshCw, CheckCircle2, Clock, ExternalLink, ArrowRight, Shield } from 'lucide-react'
+import { Globe, Server, Mail, TicketIcon, HardDrive, RefreshCw, Clock, ExternalLink, ArrowRight, Shield } from 'lucide-react'
 import { createAuthClient, createAdminWriteClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { StatCard } from '@/components/dashboard/StatCard'
 
 export const metadata: Metadata = { title: 'Dashboard — ViralizaHost' }
 
@@ -51,35 +52,6 @@ const statCards = [
   { type: 'tickets',  label: 'Tickets Abertos',        href: '/tickets',  iconBg: 'rgba(239,68,68,0.12)',  iconBorder: 'rgba(239,68,68,0.25)',  iconColor: '#DC2626', shadow: 'rgba(239,68,68,0.20)' },
 ]
 
-function StatCard({ label, value, href, iconBg, iconBorder, iconColor, shadow, Icon }: {
-  label: string; value: number; href: string; iconBg: string; iconBorder: string; iconColor: string; shadow: string; Icon: React.ElementType
-}) {
-  return (
-    <a href={href} className="block group">
-      <div className="rounded-2xl p-6 transition-all duration-300 group-hover:-translate-y-1 cursor-pointer"
-        style={{
-          background: '#FFFFFF',
-          border: '1px solid #E5E7EB',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        }}
-        onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => { (e.currentTarget as HTMLDivElement).style.boxShadow = `0 8px 24px ${shadow}, 0 2px 8px rgba(0,0,0,0.04)` }}
-        onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div className="flex items-start justify-between mb-4">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
-            style={{ background: iconBg, border: `1px solid ${iconBorder}` }}>
-            <Icon size={22} style={{ color: iconColor }} />
-          </div>
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200"
-            style={{ background: iconBg }}>
-            <ArrowRight size={14} style={{ color: iconColor }} />
-          </div>
-        </div>
-        <div className="text-3xl font-black mb-1.5 tabular-nums" style={{ color: '#111827' }}>{value}</div>
-        <div className="text-sm font-medium" style={{ color: '#6B7280' }}>{label}</div>
-      </div>
-    </a>
-  )
-}
 
 function ActivityIcon({ type, success }: { type: string; success: boolean }) {
   const iconMap: Record<string, { emoji: string; bg: string; color: string }> = {
