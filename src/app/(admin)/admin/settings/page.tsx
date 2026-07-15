@@ -281,12 +281,14 @@ function WhmSection() {
 
 interface SyncResult {
   total: number
+  imported: number
   whmAccountsCreated: number
   whmAccountsUpdated: number
   clientsCreated: number
   clientsLinked: number
   servicesCreated: number
   servicesUpdated: number
+  pending: number
   suspended: number
   active: number
   markedMissing: number
@@ -403,12 +405,12 @@ function WhmSyncSection() {
 
           <div className="grid grid-cols-2 gap-2">
             {[
-              { icon: <HardDrive size={13} />, label: 'Contas WHM', value: syncResult.total },
-              { icon: <Users size={13} />,     label: 'Clientes criados', value: syncResult.clientsCreated },
-              { icon: <Users size={13} />,     label: 'Clientes ligados', value: syncResult.clientsLinked },
-              { icon: <Server size={13} />,    label: 'Serviços criados', value: syncResult.servicesCreated },
-              { icon: <Server size={13} />,    label: 'Serviços atualizados', value: syncResult.servicesUpdated },
-              { icon: <CheckCircle size={13} />, label: 'Ativos', value: syncResult.active },
+              { icon: <HardDrive size={13} />,   label: 'Contas encontradas',    value: syncResult.total },
+              { icon: <HardDrive size={13} />,   label: 'Contas importadas',     value: syncResult.imported ?? syncResult.total },
+              { icon: <Users size={13} />,       label: 'Clientes criados',      value: syncResult.clientsCreated },
+              { icon: <Users size={13} />,       label: 'Contas associadas',     value: syncResult.clientsLinked + syncResult.servicesCreated },
+              { icon: <Server size={13} />,      label: 'Serviços atualizados',  value: syncResult.servicesUpdated },
+              { icon: <CheckCircle size={13} />, label: 'Ativas',                value: syncResult.active },
             ].map(item => (
               <div key={item.label} className="flex items-center gap-2 text-xs" style={{ color: '#047857' }}>
                 <span style={{ color: '#059669' }}>{item.icon}</span>
@@ -429,10 +431,22 @@ function WhmSyncSection() {
             </p>
           )}
 
+          {(syncResult.pending ?? 0) > 0 && (
+            <div className="rounded-lg p-3 space-y-1" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+              <p className="text-xs font-bold" style={{ color: '#92720A' }}>
+                {syncResult.pending} conta(s) pendente(s) de associação
+              </p>
+              <p className="text-[11px]" style={{ color: '#B45309' }}>
+                Estas contas foram importadas mas não têm e-mail válido.
+                Aceda a &quot;Ver Contas Importadas&quot; para associar manualmente.
+              </p>
+            </div>
+          )}
+
           {syncResult.errors.length > 0 && (
             <div className="rounded-lg p-3 space-y-1" style={{ background: 'rgba(239,68,68,0.08)' }}>
               <p className="text-xs font-bold" style={{ color: '#DC2626' }}>
-                {syncResult.errors.length} erro(s) encontrado(s):
+                {syncResult.errors.length} erro(s) técnico(s):
               </p>
               {syncResult.errors.slice(0, 5).map(e => (
                 <p key={e.username} className="text-[11px]" style={{ color: '#B91C1C' }}>

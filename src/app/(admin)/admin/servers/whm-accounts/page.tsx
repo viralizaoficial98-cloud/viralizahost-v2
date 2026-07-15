@@ -2,8 +2,9 @@ import { Metadata } from 'next'
 import { createAdminWriteClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { Server, Users, RefreshCw, ExternalLink, AlertTriangle, CheckCircle2, Search } from 'lucide-react'
+import { Server, Users, RefreshCw, ExternalLink, Search } from 'lucide-react'
 import Link from 'next/link'
+import WhmAccountsTable from '@/components/admin/WhmAccountsTable'
 
 export const metadata: Metadata = { title: 'Contas WHM — Admin ViralizaHost' }
 
@@ -14,48 +15,6 @@ const card = {
 
 interface PageProps {
   searchParams: Promise<{ status?: string; linked?: string; package?: string; search?: string; page?: string }>
-}
-
-function DiskBar({ used, limit }: { used: number; limit: number | null }) {
-  if (!limit) return <span className="text-xs" style={{ color: '#94A3B8' }}>{used} MB / Ilimitado</span>
-  const pct = Math.round((used / limit) * 100)
-  const color = pct > 85 ? '#EF4444' : pct > 60 ? '#F59E0B' : '#10B981'
-  return (
-    <div className="space-y-1">
-      <div className="text-xs" style={{ color: '#64748B' }}>
-        {(used / 1024).toFixed(1)} GB / {(limit / 1024).toFixed(1)} GB
-      </div>
-      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#F1F5F9', width: 80 }}>
-        <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: color }} />
-      </div>
-      <div className="text-[11px]" style={{ color: '#94A3B8' }}>{pct}%</div>
-    </div>
-  )
-}
-
-function StatusBadge({ status, suspended }: { status: string; suspended: boolean }) {
-  if (suspended || status === 'suspended') {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
-        style={{ background: 'rgba(239,68,68,0.10)', color: '#DC2626' }}>
-        <AlertTriangle size={10} /> Suspenso
-      </span>
-    )
-  }
-  if (status === 'missing_from_whm') {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
-        style={{ background: 'rgba(100,116,139,0.10)', color: '#64748B' }}>
-        Ausente do WHM
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
-      style={{ background: 'rgba(16,185,129,0.10)', color: '#059669' }}>
-      <CheckCircle2 size={10} /> Ativo
-    </span>
-  )
 }
 
 export default async function WhmAccountsPage({ searchParams }: PageProps) {
@@ -80,7 +39,8 @@ export default async function WhmAccountsPage({ searchParams }: PageProps) {
     .select(`
       id, whm_username, primary_domain, contact_email, package_name,
       ip_address, disk_used_mb, disk_limit_mb, is_suspended, suspension_reason,
-      status, last_synced_at, profile_id, service_id, hosting_account_id,
+      status, sync_status, requires_manual_link, link_status,
+      last_synced_at, profile_id, service_id, hosting_account_id,
       profiles(id, full_name, email)
     `, { count: 'exact' })
     .order('primary_domain', { ascending: true })
@@ -90,6 +50,7 @@ export default async function WhmAccountsPage({ searchParams }: PageProps) {
   if (pkg)    q = q.eq('package_name', pkg)
   if (linked === 'true')  q = q.not('profile_id', 'is', null)
   if (linked === 'false') q = q.is('profile_id', null)
+  if (linked === 'pending') q = q.eq('sync_status', 'pending_email')
 
   const { data: rawData, count } = await q
   const rows = (rawData ?? []) as Record<string, unknown>[]
@@ -109,14 +70,15 @@ export default async function WhmAccountsPage({ searchParams }: PageProps) {
   // Summary counts
   const { data: summaryRaw } = await db
     .from('whm_accounts')
-    .select('status, is_suspended, profile_id')
-  const all = (summaryRaw ?? []) as Array<{ status: string; is_suspended: boolean; profile_id: string | null }>
+    .select('status, is_suspended, profile_id, sync_status')
+  const all = (summaryRaw ?? []) as Array<{ status: string; is_suspended: boolean; profile_id: string | null; sync_status: string }>
   const summary = {
-    total:       all.length,
-    active:      all.filter(r => !r.is_suspended && r.status === 'active').length,
-    suspended:   all.filter(r => r.is_suspended || r.status === 'suspended').length,
-    missing:     all.filter(r => r.status === 'missing_from_whm').length,
-    unlinked:    all.filter(r => !r.profile_id).length,
+    total:    all.length,
+    active:   all.filter(r => !r.is_suspended && r.status === 'active' && r.sync_status !== 'pending_email').length,
+    suspended: all.filter(r => r.is_suspended || r.status === 'suspended').length,
+    missing:  all.filter(r => r.status === 'missing_from_whm').length,
+    unlinked: all.filter(r => !r.profile_id && r.sync_status !== 'pending_email').length,
+    pending:  all.filter(r => r.sync_status === 'pending_email').length,
   }
 
   function filterUrl(extra: Record<string, string>) {
@@ -130,10 +92,32 @@ export default async function WhmAccountsPage({ searchParams }: PageProps) {
     return `/admin/servers/whm-accounts${s ? '?' + s : ''}`
   }
 
-  function fmtDate(iso: string | null | undefined) {
-    if (!iso) return '—'
-    return new Date(iso).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
-  }
+  // Normalize rows for the client table component
+  const tableRows = filtered.map(r => ({
+    id:                   String(r.id ?? ''),
+    whm_username:         String(r.whm_username ?? ''),
+    primary_domain:       String(r.primary_domain ?? ''),
+    contact_email:        r.contact_email != null ? String(r.contact_email) : null,
+    package_name:         r.package_name  != null ? String(r.package_name)  : null,
+    ip_address:           r.ip_address    != null ? String(r.ip_address)    : null,
+    disk_used_mb:         Number(r.disk_used_mb ?? 0),
+    disk_limit_mb:        r.disk_limit_mb != null ? Number(r.disk_limit_mb) : null,
+    is_suspended:         Boolean(r.is_suspended),
+    status:               String(r.status ?? 'active'),
+    sync_status:          String(r.sync_status ?? 'linked'),
+    requires_manual_link: Boolean(r.requires_manual_link),
+    last_synced_at:       r.last_synced_at != null ? String(r.last_synced_at) : null,
+    service_id:           r.service_id  != null ? String(r.service_id)  : null,
+    profile_id:           r.profile_id  != null ? String(r.profile_id)  : null,
+    profiles: (() => {
+      const prof = r.profiles as Record<string, unknown> | null
+      if (!prof) return null
+      return {
+        full_name: prof.full_name != null ? String(prof.full_name) : undefined,
+        email:     prof.email     != null ? String(prof.email)     : undefined,
+      }
+    })(),
+  }))
 
   return (
     <div className="space-y-6">
@@ -162,13 +146,14 @@ export default async function WhmAccountsPage({ searchParams }: PageProps) {
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {[
-          { label: 'Total', value: summary.total,     color: '#475569', href: filterUrl({ status: '', linked: '' }) },
-          { label: 'Ativos', value: summary.active,   color: '#059669', href: filterUrl({ status: 'active', linked: '' }) },
-          { label: 'Suspensos', value: summary.suspended, color: '#DC2626', href: filterUrl({ status: 'suspended', linked: '' }) },
-          { label: 'Sem cliente', value: summary.unlinked, color: '#D9A300', href: filterUrl({ linked: 'false', status: '' }) },
-          { label: 'Ausentes WHM', value: summary.missing, color: '#94A3B8', href: filterUrl({ status: 'missing_from_whm', linked: '' }) },
+          { label: 'Total',          value: summary.total,     color: '#475569', href: filterUrl({ status: '', linked: '' }) },
+          { label: 'Ativos',         value: summary.active,    color: '#059669', href: filterUrl({ status: 'active', linked: '' }) },
+          { label: 'Suspensos',      value: summary.suspended, color: '#DC2626', href: filterUrl({ status: 'suspended', linked: '' }) },
+          { label: 'Pendentes',      value: summary.pending,   color: '#B45309', href: filterUrl({ linked: 'pending', status: '' }) },
+          { label: 'Sem cliente',    value: summary.unlinked,  color: '#D9A300', href: filterUrl({ linked: 'false', status: '' }) },
+          { label: 'Ausentes WHM',   value: summary.missing,   color: '#94A3B8', href: filterUrl({ status: 'missing_from_whm', linked: '' }) },
         ].map(s => (
           <Link key={s.label} href={s.href} className="rounded-2xl p-4 text-center transition-all hover:shadow-md" style={card}>
             <div className="text-2xl font-black" style={{ color: s.color }}>{s.value}</div>
@@ -177,10 +162,30 @@ export default async function WhmAccountsPage({ searchParams }: PageProps) {
         ))}
       </div>
 
+      {/* Pending accounts warning box */}
+      {summary.pending > 0 && (
+        <div className="rounded-2xl p-4 flex items-start gap-3"
+          style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.30)' }}>
+          <div className="flex-1">
+            <p className="text-sm font-bold" style={{ color: '#92720A' }}>
+              {summary.pending} conta{summary.pending > 1 ? 's' : ''} aguardando associação manual
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: '#B45309' }}>
+              Estas contas foram importadas do WHM mas não possuem e-mail válido.
+              Clique em &quot;Associar&quot; na tabela abaixo para ligar cada conta a um cliente.
+            </p>
+          </div>
+          <Link href={filterUrl({ linked: 'pending', status: '' })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap"
+            style={{ background: 'rgba(245,158,11,0.15)', color: '#92720A', border: '1px solid rgba(245,158,11,0.30)' }}>
+            <ExternalLink size={12} /> Ver pendentes
+          </Link>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="rounded-2xl p-4" style={card}>
         <div className="flex flex-wrap gap-3">
-          {/* Search form */}
           <form method="get" action="/admin/servers/whm-accounts" className="flex items-center gap-2">
             {status && <input type="hidden" name="status" value={status} />}
             {linked && <input type="hidden" name="linked" value={linked} />}
@@ -203,127 +208,30 @@ export default async function WhmAccountsPage({ searchParams }: PageProps) {
 
           <div className="flex flex-wrap gap-2">
             {[
-              { label: 'Todos',       href: filterUrl({ status: '', linked: '' }) },
-              { label: 'Ativos',      href: filterUrl({ status: 'active' }) },
-              { label: 'Suspensos',   href: filterUrl({ status: 'suspended' }) },
-              { label: 'Sem cliente', href: filterUrl({ linked: 'false', status: '' }) },
-              { label: 'Com cliente', href: filterUrl({ linked: 'true',  status: '' }) },
-            ].map(f => {
-              const isActive = f.href === `/admin/servers/whm-accounts${new URLSearchParams(
-                Object.fromEntries(Object.entries({ status, linked, package: pkg, search }).filter(([,v]) => v))
-              ).toString() ? '?' + new URLSearchParams(Object.fromEntries(Object.entries({ status, linked, package: pkg, search }).filter(([,v]) => v))).toString() : ''}`
-              return (
-                <Link key={f.label} href={f.href}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-                  style={{
-                    background: isActive ? '#F5B700' : '#F1F5F9',
-                    color: isActive ? '#000' : '#64748B',
-                    border: '1px solid transparent',
-                  }}>
-                  {f.label}
-                </Link>
-              )
-            })}
+              { label: 'Todos',          href: filterUrl({ status: '', linked: '' }) },
+              { label: 'Ativos',         href: filterUrl({ status: 'active' }) },
+              { label: 'Suspensos',      href: filterUrl({ status: 'suspended' }) },
+              { label: 'Pendentes',      href: filterUrl({ linked: 'pending', status: '' }) },
+              { label: 'Sem cliente',    href: filterUrl({ linked: 'false', status: '' }) },
+              { label: 'Com cliente',    href: filterUrl({ linked: 'true',  status: '' }) },
+            ].map(f => (
+              <Link key={f.label} href={f.href}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                style={{
+                  background: '#F1F5F9',
+                  color: '#64748B',
+                  border: '1px solid transparent',
+                }}>
+                {f.label}
+              </Link>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table (client component — handles modal) */}
       <div style={card} className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                {['Domínio / Username', 'Cliente', 'E-mail', 'Pacote', 'Espaço', 'IP', 'Estado', 'Sincronizado', 'Ações'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left font-semibold" style={{ color: '#94A3B8', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="text-center py-12" style={{ color: '#94A3B8' }}>
-                    <Users size={28} className="mx-auto mb-2 opacity-30" />
-                    Nenhuma conta encontrada. Execute a sincronização primeiro.
-                  </td>
-                </tr>
-              )}
-              {filtered.map((row, idx) => {
-                const prof = row.profiles as Record<string, unknown> | null
-                return (
-                  <tr key={String(row.id)} style={{ borderBottom: idx < filtered.length - 1 ? '1px solid #F8FAFC' : 'none' }}
-                    className="hover:bg-slate-50 transition-colors">
-
-                    {/* Domain / username */}
-                    <td className="px-4 py-3">
-                      <div className="font-semibold" style={{ color: '#0B0B0D' }}>{String(row.primary_domain)}</div>
-                      <div className="text-[11px]" style={{ color: '#94A3B8' }}>{String(row.whm_username)}</div>
-                    </td>
-
-                    {/* Client */}
-                    <td className="px-4 py-3">
-                      {prof ? (
-                        <Link href={`/admin/clients`}
-                          className="font-medium text-blue-600 hover:underline text-xs">
-                          {String(prof.full_name ?? '—')}
-                        </Link>
-                      ) : (
-                        <span style={{ color: '#F59E0B' }} className="text-[11px] font-medium">Sem cliente</span>
-                      )}
-                    </td>
-
-                    {/* Email */}
-                    <td className="px-4 py-3" style={{ color: '#64748B', maxWidth: 160 }}>
-                      <span className="truncate block">{String(row.contact_email ?? '—')}</span>
-                    </td>
-
-                    {/* Package */}
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-medium"
-                        style={{ background: '#F1F5F9', color: '#475569' }}>
-                        {String(row.package_name ?? '—')}
-                      </span>
-                    </td>
-
-                    {/* Disk */}
-                    <td className="px-4 py-3">
-                      <DiskBar used={Number(row.disk_used_mb ?? 0)} limit={row.disk_limit_mb as number | null} />
-                    </td>
-
-                    {/* IP */}
-                    <td className="px-4 py-3" style={{ color: '#64748B' }}>
-                      {String(row.ip_address ?? '—')}
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-4 py-3">
-                      <StatusBadge status={String(row.status)} suspended={Boolean(row.is_suspended)} />
-                    </td>
-
-                    {/* Last synced */}
-                    <td className="px-4 py-3" style={{ color: '#94A3B8', whiteSpace: 'nowrap' }}>
-                      {fmtDate(row.last_synced_at as string)}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {!!row.service_id && (
-                          <Link href={`/admin/clients`}
-                            className="p-1.5 rounded-lg transition-colors"
-                            style={{ color: '#94A3B8' }}
-                            title="Abrir cliente">
-                            <ExternalLink size={13} />
-                          </Link>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <WhmAccountsTable rows={tableRows} />
 
         {/* Pagination */}
         {totalPages > 1 && (
@@ -354,10 +262,21 @@ export default async function WhmAccountsPage({ searchParams }: PageProps) {
       {/* Last sync info */}
       {filtered.length > 0 && (
         <p className="text-xs text-center" style={{ color: '#94A3B8' }}>
-          Última sincronização: {fmtDate(String(filtered[0]?.last_synced_at ?? ''))}
-          {' · '}
           <Link href="/admin/settings" className="underline">Sincronizar agora</Link>
+          {' · '}
+          <Link href="/admin/servers/whm-accounts" className="underline">Recarregar</Link>
         </p>
+      )}
+
+      {/* Empty state */}
+      {summary.total === 0 && (
+        <div className="text-center py-12" style={{ color: '#94A3B8' }}>
+          <Users size={32} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Nenhuma conta importada ainda.</p>
+          <Link href="/admin/settings" className="text-xs underline mt-1 inline-block" style={{ color: '#F5B700' }}>
+            Ir para Configurações e sincronizar
+          </Link>
+        </div>
       )}
     </div>
   )

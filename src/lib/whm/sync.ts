@@ -7,12 +7,14 @@ const WHM_CONFIG_NAME = '__whm_config__'
 
 export interface SyncResult {
   total: number
+  imported: number
   whmAccountsCreated: number
   whmAccountsUpdated: number
   clientsCreated: number
   clientsLinked: number
   servicesCreated: number
   servicesUpdated: number
+  pending: number
   suspended: number
   active: number
   markedMissing: number
@@ -38,14 +40,25 @@ function parseDiskLimitMb(val: string | number | undefined | null): number | nul
   return isNaN(n) ? null : Math.round(n)
 }
 
-function isValidEmail(email: string): boolean {
-  return (
-    typeof email === 'string' &&
-    email.length > 0 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
-    !email.includes('localhost') &&
-    !email.toLowerCase().startsWith('root@')
-  )
+/** Returns a normalized, valid email or null. Never returns 'unknown', 'null', etc. */
+function normalizeWhmEmail(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+
+  const email = value.trim().toLowerCase()
+
+  if (
+    !email ||
+    email === 'unknown' ||
+    email === 'null' ||
+    email === 'undefined' ||
+    email.startsWith('root@') ||
+    email.includes('localhost')
+  ) {
+    return null
+  }
+
+  const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  return isValid ? email : null
 }
 
 function provisionalName(domain: string, username: string): string {
@@ -61,12 +74,14 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
 
   const result: SyncResult = {
     total: 0,
+    imported: 0,
     whmAccountsCreated: 0,
     whmAccountsUpdated: 0,
     clientsCreated: 0,
     clientsLinked: 0,
     servicesCreated: 0,
     servicesUpdated: 0,
+    pending: 0,
     suspended: 0,
     active: 0,
     markedMissing: 0,
@@ -119,7 +134,7 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
   }
   console.log('[sync] package mappings loaded:', packageToPlan.size)
 
-  // ── 3. Load fallback plan (used when no mapping exists and plan_id is NOT NULL) ──
+  // ── 3. Load fallback plan ─────────────────────────────────────────────────
   const { data: fallbackPlanRow } = await db
     .from('plans')
     .select('id, name')
@@ -148,7 +163,8 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
     if (acct.suspended) result.suspended++
     else result.active++
 
-    console.log(`[sync][${acct.user}] processing — domain: ${acct.domain} email: ${acct.email} plan: ${acct.plan}`)
+    const email = normalizeWhmEmail(acct.email)
+    console.log(`[sync][${acct.user}] domain:${acct.domain} email_raw:"${acct.email}" email_normalized:${email ?? 'null'} plan:${acct.plan}`)
 
     try {
       const diskUsed  = parseDiskMb(acct.diskused)
@@ -157,34 +173,42 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
         ? new Date(acct.unix_startdate * 1000).toISOString()
         : null
 
-      // ── STEP A: Upsert whm_accounts (optional table — skip if not ready) ──
+      const hasPendingEmail = !email
+
+      // ── STEP A: Upsert whm_accounts (non-fatal if table doesn't exist yet) ──
       let whmAccountId: string | null = null
       try {
         const whmPayload = {
-          server_id:          serverId,
-          whm_username:       acct.user,
-          primary_domain:     acct.domain,
-          contact_email:      acct.email || null,
-          package_name:       acct.plan || null,
-          ip_address:         acct.ip || null,
-          owner:              acct.owner || null,
-          partition:          acct.partition || null,
-          disk_used_mb:       diskUsed,
-          disk_limit_mb:      diskLimit,
-          unix_startdate:     acct.unix_startdate || null,
-          account_created_at: accountCreatedAt,
-          is_suspended:       acct.suspended,
-          suspension_reason:  acct.suspendreason || null,
-          theme:              acct.theme || null,
-          php_version:        acct.phpversion || null,
-          max_pop:            acct.maxpop || null,
-          max_sub:            acct.maxsub || null,
-          max_sql:            acct.maxsql || null,
-          max_ftp:            acct.maxftp || null,
-          status:             acct.suspended ? 'suspended' : 'active',
-          raw_metadata:       { user: acct.user, domain: acct.domain, plan: acct.plan, ip: acct.ip },
-          last_synced_at:     syncedAt,
-          updated_at:         syncedAt,
+          server_id:            serverId,
+          whm_username:         acct.user,
+          primary_domain:       acct.domain,
+          contact_email:        email,
+          package_name:         acct.plan || null,
+          ip_address:           acct.ip || null,
+          owner:                acct.owner || null,
+          partition:            acct.partition || null,
+          disk_used_mb:         diskUsed,
+          disk_limit_mb:        diskLimit,
+          unix_startdate:       acct.unix_startdate || null,
+          account_created_at:   accountCreatedAt,
+          is_suspended:         acct.suspended,
+          suspension_reason:    acct.suspendreason || null,
+          theme:                acct.theme || null,
+          php_version:          acct.phpversion || null,
+          max_pop:              acct.maxpop || null,
+          max_sub:              acct.maxsub || null,
+          max_sql:              acct.maxsql || null,
+          max_ftp:              acct.maxftp || null,
+          status:               acct.suspended ? 'suspended' : 'active',
+          sync_status:          hasPendingEmail ? 'pending_email' : 'linked',
+          requires_manual_link: hasPendingEmail,
+          link_status:          hasPendingEmail ? 'unlinked' : 'linked',
+          notes:                hasPendingEmail
+            ? 'Conta importada do WHM aguardando associação manual porque não possui e-mail válido.'
+            : null,
+          raw_metadata:         { user: acct.user, domain: acct.domain, plan: acct.plan, ip: acct.ip },
+          last_synced_at:       syncedAt,
+          updated_at:           syncedAt,
         }
 
         const { data: whmAcct, error: whmErr } = await db
@@ -195,13 +219,21 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
 
         if (whmErr) {
           console.warn(`[sync][${acct.user}] whm_accounts upsert: ${whmErr.message}`)
-          // Non-fatal — continue without whmAccountId
         } else if (whmAcct) {
           whmAccountId = (whmAcct as { id: string }).id
           console.log(`[sync][${acct.user}] whm_account id: ${whmAccountId}`)
         }
       } catch (whmEx) {
         console.warn(`[sync][${acct.user}] whm_accounts exception: ${String(whmEx)}`)
+      }
+
+      result.imported++
+
+      // ── No valid email → mark pending and skip client/service creation ────
+      if (hasPendingEmail) {
+        console.log(`[sync][${acct.user}] no valid email (raw: "${acct.email}") — marked as pending_email, skipping client/service creation`)
+        result.pending++
+        continue
       }
 
       // ── STEP B: Check if hosting_account already exists ───────────────────
@@ -217,25 +249,18 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
       }
 
       if (existingHa) {
-        // ── UPDATE existing ─────────────────────────────────────────────────
         const ha = existingHa as { id: string; profile_id: string; service_id: string }
         console.log(`[sync][${acct.user}] hosting_account EXISTS id=${ha.id} — updating`)
 
-        const baseUpdate = {
-          disk_used_mb:      diskUsed,
-          status:            acct.suspended ? 'suspended' : 'active',
-          updated_at:        syncedAt,
-        }
         const { error: haUpdateErr } = await db
           .from('hosting_accounts')
-          .update(baseUpdate)
+          .update({ disk_used_mb: diskUsed, status: acct.suspended ? 'suspended' : 'active', updated_at: syncedAt })
           .eq('id', ha.id)
 
         if (haUpdateErr) {
           console.warn(`[sync][${acct.user}] hosting_accounts base update: ${haUpdateErr.message}`)
         }
 
-        // Attempt to update new columns (non-fatal if columns don't exist yet)
         const { error: haExtErr } = await db.from('hosting_accounts').update({
           disk_limit_mb:     diskLimit,
           package_name:      acct.plan || null,
@@ -248,12 +273,14 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
           console.warn(`[sync][${acct.user}] hosting_accounts extended update: ${haExtErr.message}`)
         }
 
-        // Link whm_account if we have one
         if (whmAccountId) {
           const { error: linkErr } = await db.from('whm_accounts').update({
             profile_id:         ha.profile_id,
             service_id:         ha.service_id,
             hosting_account_id: ha.id,
+            sync_status:        'linked',
+            link_status:        'linked',
+            requires_manual_link: false,
           }).eq('id', whmAccountId)
           if (linkErr) console.warn(`[sync][${acct.user}] whm_account link: ${linkErr.message}`)
         }
@@ -267,21 +294,11 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
       // ── STEP C: Find or create profile ────────────────────────────────────
       let profileId: string | null = null
 
-      if (!isValidEmail(acct.email)) {
-        console.warn(`[sync][${acct.user}] email invalid or missing ("${acct.email}") — skipping client creation`)
-        // Still update whm_account status
-        if (whmAccountId) {
-          await db.from('whm_accounts').update({ status: 'active', last_synced_at: syncedAt }).eq('id', whmAccountId)
-        }
-        result.errors.push({ username: acct.user, error: `Email inválido ou em falta: "${acct.email}"` })
-        continue
-      }
-
-      console.log(`[sync][${acct.user}] looking up profile by email: ${acct.email}`)
+      console.log(`[sync][${acct.user}] looking up profile by email: ${email}`)
       const { data: existingProfile, error: profileLookupErr } = await db
         .from('profiles')
         .select('id')
-        .eq('email', acct.email)
+        .eq('email', email)
         .maybeSingle()
 
       if (profileLookupErr) {
@@ -293,10 +310,9 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
         console.log(`[sync][${acct.user}] profile found: ${profileId}`)
         result.clientsLinked++
       } else {
-        // ── CREATE auth user ────────────────────────────────────────────────
-        console.log(`[sync][${acct.user}] creating auth user for ${acct.email}…`)
+        console.log(`[sync][${acct.user}] creating auth user for ${email}…`)
         const { data: authData, error: authErr } = await db.auth.admin.createUser({
-          email:          acct.email,
+          email,
           email_confirm:  true,
           user_metadata: {
             full_name: provisionalName(acct.domain, acct.user),
@@ -304,22 +320,17 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
           },
         })
 
-        if (authErr) {
-          throw new Error(`[auth.createUser] ${authErr.message}`)
-        }
-        if (!authData?.user) {
-          throw new Error('[auth.createUser] createUser returned no user object')
-        }
+        if (authErr) throw new Error(`[auth.createUser] ${authErr.message}`)
+        if (!authData?.user) throw new Error('[auth.createUser] createUser returned no user object')
 
         const newUserId = authData.user.id
         console.log(`[sync][${acct.user}] auth user created: ${newUserId}`)
 
-        // ── CREATE profile ──────────────────────────────────────────────────
         const { data: profileRow, error: profileErr } = await db
           .from('profiles')
           .upsert({
             id:         newUserId,
-            email:      acct.email,
+            email,
             full_name:  provisionalName(acct.domain, acct.user),
             role:       'client',
             is_active:  true,
@@ -329,17 +340,12 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
           .select('id')
           .single()
 
-        if (profileErr) {
-          throw new Error(`[profiles upsert] ${profileErr.message}`)
-        }
-        if (!profileRow) {
-          throw new Error('[profiles upsert] upsert returned null data')
-        }
+        if (profileErr) throw new Error(`[profiles upsert] ${profileErr.message}`)
+        if (!profileRow) throw new Error('[profiles upsert] upsert returned null data')
 
         profileId = (profileRow as { id: string }).id
-        console.log(`[sync][${acct.user}] profile created/confirmed: ${profileId}`)
+        console.log(`[sync][${acct.user}] profile created: ${profileId}`)
 
-        // ── CREATE client record ────────────────────────────────────────────
         const { error: clientErr } = await db.from('clients').upsert({
           profile_id: newUserId,
           notes:      'Importado via sincronização WHM',
@@ -348,28 +354,20 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
         }, { onConflict: 'profile_id' })
 
         if (clientErr) {
-          // Non-fatal: client record is optional
           console.warn(`[sync][${acct.user}] clients upsert: ${clientErr.message}`)
-        } else {
-          console.log(`[sync][${acct.user}] client record ok`)
         }
 
         result.clientsCreated++
       }
 
-      // profileId must be set here
       if (!profileId) {
-        throw new Error('[profile] profileId is null after lookup/creation — this should not happen')
+        throw new Error('[profile] profileId is null after lookup/creation')
       }
 
       // ── STEP D: Resolve plan_id ───────────────────────────────────────────
       const mappedPlanId = packageToPlan.get(acct.plan ?? '') ?? null
       const planId: string | null = mappedPlanId ?? fallbackPlanId
-      console.log(`[sync][${acct.user}] planId resolved: ${planId} (mapped: ${mappedPlanId}, fallback: ${fallbackPlanId})`)
-
-      if (!planId) {
-        console.warn(`[sync][${acct.user}] no plan available — services.plan_id will be null (requires migration)`)
-      }
+      console.log(`[sync][${acct.user}] planId: ${planId} (mapped:${mappedPlanId} fallback:${fallbackPlanId})`)
 
       // ── STEP E: Create service ────────────────────────────────────────────
       console.log(`[sync][${acct.user}] creating service…`)
@@ -391,18 +389,13 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
         .select('id')
         .single()
 
-      if (svcErr) {
-        throw new Error(`[services insert] ${svcErr.message}`)
-      }
-      if (!newService) {
-        throw new Error('[services insert] insert returned null data (no error returned by DB)')
-      }
+      if (svcErr) throw new Error(`[services insert] ${svcErr.message}`)
+      if (!newService) throw new Error('[services insert] insert returned null data')
 
       const serviceId = (newService as { id: string }).id
       console.log(`[sync][${acct.user}] service created: ${serviceId}`)
 
       // ── STEP F: Create hosting_account ────────────────────────────────────
-      // Insert with the ORIGINAL columns that definitely exist in the schema
       console.log(`[sync][${acct.user}] creating hosting_account…`)
       const { data: newHa, error: haInsertErr } = await db
         .from('hosting_accounts')
@@ -423,22 +416,17 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
         .select('id')
         .single()
 
-      if (haInsertErr) {
-        throw new Error(`[hosting_accounts insert] ${haInsertErr.message}`)
-      }
-      if (!newHa) {
-        throw new Error('[hosting_accounts insert] insert returned null data (no error returned by DB)')
-      }
+      if (haInsertErr) throw new Error(`[hosting_accounts insert] ${haInsertErr.message}`)
+      if (!newHa) throw new Error('[hosting_accounts insert] insert returned null data')
 
       const haId = (newHa as { id: string }).id
       console.log(`[sync][${acct.user}] hosting_account created: ${haId}`)
 
-      // Attempt to add new columns from migration (non-fatal)
       const { error: haExtErr2 } = await db.from('hosting_accounts').update({
-        disk_limit_mb:     diskLimit,
-        package_name:      acct.plan || null,
-        ip_address:        acct.ip || null,
-        last_synced_at:    syncedAt,
+        disk_limit_mb:  diskLimit,
+        package_name:   acct.plan || null,
+        ip_address:     acct.ip || null,
+        last_synced_at: syncedAt,
       }).eq('id', haId)
 
       if (haExtErr2) {
@@ -448,9 +436,12 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
       // ── STEP G: Link whm_account ──────────────────────────────────────────
       if (whmAccountId) {
         const { error: linkErr } = await db.from('whm_accounts').update({
-          profile_id:         profileId,
-          service_id:         serviceId,
-          hosting_account_id: haId,
+          profile_id:           profileId,
+          service_id:           serviceId,
+          hosting_account_id:   haId,
+          sync_status:          'linked',
+          link_status:          'linked',
+          requires_manual_link: false,
         }).eq('id', whmAccountId)
         if (linkErr) console.warn(`[sync][${acct.user}] whm_account final link: ${linkErr.message}`)
       }
@@ -488,12 +479,14 @@ export async function syncWhmAccounts(): Promise<SyncResult> {
   }
 
   console.log('[sync] complete:', JSON.stringify({
-    total:            result.total,
-    clientsCreated:   result.clientsCreated,
-    clientsLinked:    result.clientsLinked,
-    servicesCreated:  result.servicesCreated,
-    servicesUpdated:  result.servicesUpdated,
-    errors:           result.errors.length,
+    total:           result.total,
+    imported:        result.imported,
+    clientsCreated:  result.clientsCreated,
+    clientsLinked:   result.clientsLinked,
+    servicesCreated: result.servicesCreated,
+    servicesUpdated: result.servicesUpdated,
+    pending:         result.pending,
+    errors:          result.errors.length,
   }))
 
   return result
