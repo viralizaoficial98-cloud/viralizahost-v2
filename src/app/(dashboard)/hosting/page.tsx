@@ -1,7 +1,6 @@
 import { Metadata } from 'next'
-import { Server, HardDrive, Wifi, Shield, Cpu, Clock } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { Server, HardDrive, Wifi, Shield, Cpu, Globe, Mail, Database, RefreshCw, AlertCircle } from 'lucide-react'
+import { createAuthClient, createAdminWriteClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SSOButtons } from '@/components/hosting/SSOButtons'
 
@@ -14,45 +13,60 @@ const card = {
   boxShadow: '0 10px 30px rgba(15,23,42,0.06)',
 }
 
-async function fetchServices(userId: string) {
-  const supabase = await createClient()
-  const result = await supabase
-    .from('services')
-    .select('id, expires_at, status, plans(name, disk_gb, bandwidth_gb, php_version), hosting_accounts(primary_domain, disk_used_mb, disk_limit_mb, bandwidth_used_mb, email_count, db_count, cpanel_url, package_name, ip_address, status)')
-    .eq('profile_id', userId)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-  return (result.data ?? []) as any[]
-}
+async function fetchHostingData(userId: string) {
+  // Use service_role client to bypass RLS — security enforced by profile_id filter
+  const db = createAdminWriteClient()
 
-async function fetchHostingOrders(userId: string) {
-  const adminDb = await createAdminClient()
-  const { data } = await (adminDb as any)
-    .from('orders')
-    .select('id, status, amount, created_at, billing_cycle, order_items(service_name, service_type)')
-    .eq('user_id', userId)
+  // Get hosting accounts for this user
+  const { data: hostingAccounts, error: haErr } = await db
+    .from('hosting_accounts')
+    .select('id, service_id, cpanel_username, primary_domain, status, disk_used_mb, disk_limit_mb, bandwidth_used_mb, email_count, db_count, php_version, ssl_enabled, package_name, ip_address, suspension_reason, last_synced_at')
+    .eq('profile_id', userId)
     .order('created_at', { ascending: false })
-    .limit(50)
-  const orders: any[] = data ?? []
-  return orders.filter((o: any) => {
-    const items: any[] = o.order_items ?? []
-    return items.some((i: any) => i.service_type === 'hosting' || i.service_type === 'reseller')
-  })
+
+  if (haErr) console.error('[hosting] hosting_accounts error:', haErr.message)
+
+  const accounts = (hostingAccounts ?? []) as any[]
+
+  // Enrich with whm_accounts data (server hostname, plan details)
+  const whmData: Record<string, any> = {}
+  if (accounts.length > 0) {
+    const haIds = accounts.map((a: any) => a.id)
+    const { data: whmRows } = await db
+      .from('whm_accounts')
+      .select('hosting_account_id, whm_username, primary_domain, package_name, ip_address, php_version, max_pop, max_sub, max_sql, max_ftp, account_created_at, last_synced_at, sync_status')
+      .in('hosting_account_id', haIds)
+    for (const w of (whmRows ?? []) as any[]) {
+      if (w.hosting_account_id) whmData[w.hosting_account_id] = w
+    }
+  }
+
+  // Get plan mappings for human-readable package names
+  const { data: mappings } = await db
+    .from('whm_package_mappings')
+    .select('whm_package_name, label, plan_id, plans(name)')
+
+  const packageLabel: Record<string, string> = {}
+  for (const m of (mappings ?? []) as any[]) {
+    packageLabel[m.whm_package_name] = m.label ?? m.plans?.name ?? m.whm_package_name
+  }
+
+  // Get server info
+  const { data: serverRow } = await db
+    .from('servers')
+    .select('hostname, location')
+    .eq('name', '__whm_config__')
+    .maybeSingle()
+
+  return { accounts, whmData, packageLabel, server: serverRow }
 }
 
 export default async function HostingPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const authDb = await createAuthClient()
+  const { data: { user } } = await authDb.auth.getUser()
   if (!user) redirect('/login')
 
-  const [services, hostingOrders] = await Promise.all([
-    fetchServices(user.id),
-    fetchHostingOrders(user.id),
-  ])
-
-  const pendingHostingOrders = hostingOrders.filter((o: any) =>
-    o.status === 'aguardando_confirmacao' || o.status === 'pending'
-  )
+  const { accounts, whmData, packageLabel, server } = await fetchHostingData(user.id)
 
   return (
     <div className="space-y-7">
@@ -61,106 +75,76 @@ export default async function HostingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black" style={{ color: '#0B0B0D' }}>Hospedagem</h1>
-          <p className="text-sm mt-1" style={{ color: '#64748B' }}>Gerencie os seus planos de hospedagem</p>
+          <p className="text-sm mt-1" style={{ color: '#64748B' }}>Gerencie os seus planos de hospedagem cPanel</p>
         </div>
-        <a href="/billing" className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-black transition-all"
+        <a href="/email" className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-black transition-all"
           style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.35)' }}>
-          <Server size={16} /> Adicionar Plano
+          <Mail size={16} /> Gerir Emails
         </a>
       </div>
 
-      {/* Pedidos de hosting pendentes */}
-      {pendingHostingOrders.length > 0 && (
-        <div className="rounded-2xl p-5" style={{ background: 'rgba(245,183,0,0.05)', border: '1px solid rgba(245,183,0,0.20)' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <Clock size={15} style={{ color: '#D9A300' }} />
-            <h2 className="font-bold text-sm" style={{ color: '#0B0B0D' }}>Pedidos Aguardando Confirmação</h2>
-          </div>
-          <div className="space-y-3">
-            {pendingHostingOrders.map((order: any) => {
-              const item = (order.order_items ?? []).find((i: any) =>
-                i.service_type === 'hosting' || i.service_type === 'reseller'
-              )
-              const label = item?.service_name ?? 'Plano de Hospedagem'
-              const date  = new Date(order.created_at).toLocaleDateString('pt-AO')
-              const fmtAmt = `Kz ${Math.round(order.amount).toLocaleString('pt-AO')}`
-              return (
-                <div key={order.id} className="flex items-center justify-between py-3 px-4 rounded-xl bg-white"
-                  style={{ border: '1px solid rgba(245,183,0,0.25)' }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.20)' }}>
-                      <Server size={15} style={{ color: '#D9A300' }} />
-                    </div>
-                    <div>
-                      <div className="font-bold text-sm" style={{ color: '#0B0B0D' }}>{label}</div>
-                      <div className="text-xs" style={{ color: '#94A3B8' }}>Enviado em {date} · {order.billing_cycle}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-black text-sm" style={{ color: '#0B0B0D' }}>{fmtAmt}</span>
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-full"
-                      style={{ background: 'rgba(245,183,0,0.15)', color: '#D9A300' }}>
-                      A confirmar
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          <p className="text-xs mt-3" style={{ color: '#94A3B8' }}>
-            Pagamento a ser verificado. O plano será ativado em até 24h úteis após confirmação.
-          </p>
-        </div>
-      )}
-
-      {services.length > 0 ? (
-        <div className="space-y-5">
-          {services.map((svc: any) => {
-            const plan = svc.plans
-            const ha   = svc.hosting_accounts?.[0]
-            // Disk: prefer WHM real limit, fall back to plan's disk_gb
-            const diskUsedMb  = ha?.disk_used_mb ?? 0
-            const diskLimitMb = ha?.disk_limit_mb ?? (plan?.disk_gb ? plan.disk_gb * 1024 : 0)
-            const diskPct     = diskLimitMb > 0 ? Math.round((diskUsedMb / diskLimitMb) * 100) : 0
-            const bwGb        = plan?.bandwidth_gb ?? 0
-            const bwUsedMb    = ha?.bandwidth_used_mb ?? 0
-            const bwPct       = bwGb > 0 ? Math.round((bwUsedMb / (bwGb * 1024)) * 100) : 0
-            const expires     = svc.expires_at ? new Date(svc.expires_at).toLocaleDateString('pt-BR') : '—'
+      {accounts.length > 0 ? (
+        <div className="space-y-6">
+          {accounts.map((ha: any) => {
+            const whm         = whmData[ha.id]
+            const diskUsed    = ha.disk_used_mb ?? 0
+            const diskLimit   = ha.disk_limit_mb ?? 0
+            const diskPct     = diskLimit > 0 ? Math.min(Math.round((diskUsed / diskLimit) * 100), 100) : 0
             const diskColor   = diskPct > 80 ? '#EF4444' : '#3B82F6'
-            const bwColor     = bwPct > 80 ? '#EF4444' : '#10B981'
-            const haStatus    = ha?.status ?? svc.status
+            const bwUsed      = ha.bandwidth_used_mb ?? 0
+            const pkgRaw      = whm?.package_name ?? ha.package_name
+            const pkgName     = pkgRaw ? (packageLabel[pkgRaw] ?? pkgRaw) : 'Plano Importado do WHM'
+            const isSuspended = ha.status === 'suspended'
+            const lastSync    = ha.last_synced_at ? new Date(ha.last_synced_at) : null
+            const ipAddress   = whm?.ip_address ?? ha.ip_address
+            const emailCount  = ha.email_count ?? 0
+            const dbCount     = ha.db_count ?? 0
 
             return (
-              <div key={svc.id} style={card}>
+              <div key={ha.id} style={card}>
                 {/* Plan header */}
-                <div className="px-6 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid #F1F5F9' }}>
+                <div className="px-6 py-4 flex items-center gap-3 flex-wrap" style={{ borderBottom: '1px solid #F1F5F9' }}>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}>
-                    <Server size={18} style={{ color: '#2563EB' }} />
+                    style={{ background: isSuspended ? 'rgba(239,68,68,0.08)' : 'rgba(59,130,246,0.08)', border: `1px solid ${isSuspended ? 'rgba(239,68,68,0.20)' : 'rgba(59,130,246,0.15)'}` }}>
+                    <Server size={18} style={{ color: isSuspended ? '#DC2626' : '#2563EB' }} />
                   </div>
-                  <div className="flex-1">
-                    <div className="font-bold text-sm" style={{ color: '#0B0B0D' }}>{plan?.name ?? 'Plano'}</div>
-                    <div className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
-                      {ha?.primary_domain ?? '—'} · Expira: {expires}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-sm" style={{ color: '#0B0B0D' }}>{pkgName}</div>
+                    <div className="text-xs mt-0.5 flex items-center gap-2 flex-wrap" style={{ color: '#94A3B8' }}>
+                      <span className="flex items-center gap-1"><Globe size={10} /> {ha.primary_domain}</span>
+                      {ipAddress && <span>IP: {ipAddress}</span>}
+                      {server?.hostname && <span>Servidor: {server.hostname}</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1"
-                      style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.20)' }}>
-                      <Shield size={10} /> SSL
-                    </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {!isSuspended && (
+                      <span className="text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1"
+                        style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.20)' }}>
+                        <Shield size={10} /> SSL
+                      </span>
+                    )}
                     <span className="text-xs font-bold px-2.5 py-1 rounded-full"
-                      style={haStatus === 'suspended'
+                      style={isSuspended
                         ? { background: 'rgba(239,68,68,0.10)', color: '#DC2626', border: '1px solid rgba(239,68,68,0.25)' }
-                        : { background: 'rgba(245,183,0,0.10)', color: '#D9A300', border: '1px solid rgba(245,183,0,0.25)' }}>
-                      {haStatus === 'suspended' ? 'Suspenso' : 'Ativo'}
+                        : { background: 'rgba(16,185,129,0.10)', color: '#059669', border: '1px solid rgba(16,185,129,0.25)' }}>
+                      {isSuspended ? 'Suspenso' : 'Ativo'}
                     </span>
                   </div>
                 </div>
 
+                {/* Suspension notice */}
+                {isSuspended && ha.suspension_reason && (
+                  <div className="mx-6 mt-4 flex items-start gap-2 p-3 rounded-xl"
+                    style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                    <AlertCircle size={14} style={{ color: '#DC2626', marginTop: 1 }} />
+                    <p className="text-xs" style={{ color: '#B91C1C' }}>
+                      Motivo da suspensão: {ha.suspension_reason}
+                    </p>
+                  </div>
+                )}
+
                 {/* Metrics */}
-                <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Storage */}
                   <div>
                     <div className="flex items-center gap-1.5 mb-2">
@@ -168,59 +152,84 @@ export default async function HostingPage() {
                       <span className="text-xs font-semibold" style={{ color: '#64748B' }}>Armazenamento</span>
                     </div>
                     <div className="font-bold text-sm mb-2" style={{ color: '#0B0B0D' }}>
-                      {(diskUsedMb / 1024).toFixed(1)} GB {diskLimitMb > 0 ? `/ ${(diskLimitMb / 1024).toFixed(1)} GB` : '/ Ilimitado'}
+                      {(diskUsed / 1024).toFixed(2)} GB
+                      {diskLimit > 0 ? ` / ${(diskLimit / 1024).toFixed(2)} GB` : ' / Ilimitado'}
                     </div>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ background: '#F1F5F9' }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(diskPct, 100)}%`, background: diskColor }} />
-                    </div>
-                    <div className="text-xs mt-1 font-medium" style={{ color: '#94A3B8' }}>{diskPct}% usado</div>
+                    {diskLimit > 0 && (
+                      <>
+                        <div className="h-2 rounded-full overflow-hidden" style={{ background: '#F1F5F9' }}>
+                          <div className="h-full rounded-full transition-all" style={{ width: `${diskPct}%`, background: diskColor }} />
+                        </div>
+                        <div className="text-xs mt-1 font-medium" style={{ color: '#94A3B8' }}>{diskPct}% usado</div>
+                      </>
+                    )}
                   </div>
 
-                  {/* Bandwidth */}
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Wifi size={13} style={{ color: '#10B981' }} />
-                      <span className="text-xs font-semibold" style={{ color: '#64748B' }}>Bandwidth</span>
-                    </div>
-                    <div className="font-bold text-sm mb-2" style={{ color: '#0B0B0D' }}>
-                      {(bwUsedMb / 1024).toFixed(1)} GB / {bwGb} GB
-                    </div>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ background: '#F1F5F9' }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(bwPct, 100)}%`, background: bwColor }} />
-                    </div>
-                    <div className="text-xs mt-1 font-medium" style={{ color: '#94A3B8' }}>{bwPct}% usado</div>
-                  </div>
-
-                  {/* PHP & DB */}
+                  {/* Resources */}
                   <div>
                     <div className="flex items-center gap-1.5 mb-2">
                       <Cpu size={13} style={{ color: '#8B5CF6' }} />
-                      <span className="text-xs font-semibold" style={{ color: '#64748B' }}>PHP / Databases</span>
+                      <span className="text-xs font-semibold" style={{ color: '#64748B' }}>Recursos</span>
                     </div>
-                    <div className="font-bold text-sm" style={{ color: '#0B0B0D' }}>PHP {plan?.php_version ?? '8.2'}</div>
-                    <div className="text-xs mt-1" style={{ color: '#94A3B8' }}>
-                      {ha?.db_count ?? 0} Bases de dados · {ha?.email_count ?? 0} Emails
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 text-xs" style={{ color: '#0B0B0D' }}>
+                        <Mail size={11} style={{ color: '#94A3B8' }} />
+                        <span className="font-semibold">{emailCount}</span>
+                        <span style={{ color: '#94A3B8' }}>contas de email</span>
+                        {whm?.max_pop && whm.max_pop !== 'unlimited' && (
+                          <span style={{ color: '#94A3B8' }}>/ {whm.max_pop}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs" style={{ color: '#0B0B0D' }}>
+                        <Database size={11} style={{ color: '#94A3B8' }} />
+                        <span className="font-semibold">{dbCount}</span>
+                        <span style={{ color: '#94A3B8' }}>bases de dados</span>
+                        {whm?.max_sql && whm.max_sql !== 'unlimited' && (
+                          <span style={{ color: '#94A3B8' }}>/ {whm.max_sql}</span>
+                        )}
+                      </div>
+                      {(ha.php_version || whm?.php_version) && (
+                        <div className="flex items-center gap-2 text-xs" style={{ color: '#0B0B0D' }}>
+                          <Wifi size={11} style={{ color: '#94A3B8' }} />
+                          <span>PHP {whm?.php_version ?? ha.php_version}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* SSO Actions */}
+                  {/* Access */}
                   <div>
                     <div className="flex items-center gap-1.5 mb-2">
-                      <Cpu size={13} style={{ color: '#F5B700' }} />
+                      <Server size={13} style={{ color: '#F5B700' }} />
                       <span className="text-xs font-semibold" style={{ color: '#64748B' }}>Acesso Direto</span>
                     </div>
-                    <SSOButtons serviceId={svc.id} />
-                    {ha?.package_name && (
-                      <div className="text-[11px] mt-2" style={{ color: '#94A3B8' }}>
-                        Pacote: {ha.package_name}
-                      </div>
+                    {ha.service_id ? (
+                      <SSOButtons serviceId={ha.service_id} />
+                    ) : (
+                      <p className="text-xs" style={{ color: '#94A3B8' }}>SSO não disponível</p>
                     )}
-                    {ha?.ip_address && (
-                      <div className="text-[11px]" style={{ color: '#94A3B8' }}>
-                        IP: {ha.ip_address}
+                    {pkgRaw && pkgRaw !== pkgName && (
+                      <div className="text-[11px] mt-2" style={{ color: '#CBD5E1' }}>
+                        Pacote WHM: {pkgRaw}
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Details footer */}
+                <div className="px-6 pb-4 flex items-center gap-4 flex-wrap" style={{ borderTop: '1px solid #F8FAFC' }}>
+                  {lastSync && (
+                    <div className="flex items-center gap-1.5 pt-3 text-xs" style={{ color: '#94A3B8' }}>
+                      <RefreshCw size={11} />
+                      Sincronizado: {lastSync.toLocaleString('pt-AO', { dateStyle: 'short', timeStyle: 'short' })}
+                    </div>
+                  )}
+                  <a href="/email" className="pt-3 text-xs font-semibold flex items-center gap-1" style={{ color: '#2563EB' }}>
+                    <Mail size={11} /> Ver emails
+                  </a>
+                  <a href="/tickets" className="pt-3 text-xs font-semibold flex items-center gap-1" style={{ color: '#D9A300' }}>
+                    Abrir ticket
+                  </a>
                 </div>
               </div>
             )
@@ -233,7 +242,9 @@ export default async function HostingPage() {
             <Server size={28} style={{ color: '#2563EB' }} />
           </div>
           <p className="font-semibold text-sm mb-1" style={{ color: '#0B0B0D' }}>Nenhum plano de hospedagem ativo</p>
-          <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>Escolha um plano e comece a hospedar o seu site hoje mesmo</p>
+          <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>
+            A sua conta de hospedagem está a ser configurada ou ainda não possui um plano ativo
+          </p>
           <a href="/billing" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-black"
             style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.30)' }}>
             Ver Planos Disponíveis

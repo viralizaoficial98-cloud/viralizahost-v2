@@ -77,21 +77,23 @@ export async function handleSso(
       whmService,
     )
 
-    // ── 6. Write audit log ────────────────────────────────────────────────────
+    // ── 6. Write audit log (best-effort — never fails the SSO) ───────────────
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
       ?? req.headers.get('x-real-ip')
       ?? '0.0.0.0'
     const ua = req.headers.get('user-agent') ?? ''
 
-    await db.from('sso_audit_logs').insert({
-      profile_id:         user.id,
-      service_id:         serviceId,
-      hosting_account_id: haTyped.id,
-      access_type:        accessType,
-      ip_address:         ip,
-      user_agent:         ua,
-      success:            true,
-    })
+    try {
+      await db.from('sso_audit_logs').insert({
+        profile_id:         user.id,
+        service_id:         serviceId,
+        hosting_account_id: haTyped.id,
+        access_type:        accessType,
+        ip_address:         ip,
+        user_agent:         ua,
+        success:            true,
+      })
+    } catch { /* audit log failure is non-fatal */ }
 
     return NextResponse.json({ redirectUrl: session.url })
 
@@ -99,16 +101,16 @@ export async function handleSso(
     const msg = err instanceof Error ? err.message : String(err)
     console.error(`[sso/${accessType}]`, msg)
 
-    // Log the failure (best-effort)
+    // Log the failure (best-effort — ignore if table doesn't exist)
     try {
       await db.from('sso_audit_logs').insert({
-        profile_id:  user.id,
-        service_id:  serviceId,
-        access_type: accessType,
-        success:     false,
+        profile_id:    user.id,
+        service_id:    serviceId,
+        access_type:   accessType,
+        success:       false,
         error_message: msg,
       })
-    } catch { /* ignore log failure */ }
+    } catch { /* ignore */ }
 
     return NextResponse.json({ error: 'Falha ao gerar sessão SSO.' }, { status: 500 })
   }

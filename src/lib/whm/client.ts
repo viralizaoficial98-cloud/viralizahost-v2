@@ -297,12 +297,124 @@ export async function createUserSession(
   return { url: String(session.url), expire: Number(session.expire ?? 3600) }
 }
 
+// ── cPanel UAPI via WHM proxy ─────────────────────────────────────────────────
+// Endpoint: GET/POST https://server:2087/execute/Module/Function?user=CPANEL_USER&...
+// WHM root credentials are used; `user` param targets the cPanel account.
+
+async function cpanelUapi(
+  config: WHMConfig,
+  cpanelUser: string,
+  module: string,
+  fn: string,
+  params: Record<string, string | number> = {},
+  method: 'GET' | 'POST' = 'GET',
+): Promise<Record<string, unknown>> {
+  const baseUrl = normalizeWhmUrl(config.url)
+  const endpoint = `${baseUrl}/execute/${module}/${fn}`
+  const qs = new URLSearchParams({ user: cpanelUser, ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) })
+
+  const res = await fetch(method === 'POST' ? endpoint : `${endpoint}?${qs}`, {
+    method,
+    headers: {
+      Authorization: `whm ${config.username ?? 'root'}:${config.token}`,
+      Accept: 'application/json',
+      ...(method === 'POST' ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
+    },
+    body: method === 'POST' ? qs.toString() : undefined,
+    cache: 'no-store',
+  })
+
+  if (!res.ok) throw new Error(`cPanel UAPI error: ${res.status} ${res.statusText}`)
+  const data = await res.json() as Record<string, unknown>
+  const errors = (data.errors as string[] | null | undefined)
+  if (data.status === 0) throw new Error(errors?.[0] ?? 'cPanel API error')
+  return data
+}
+
+export interface CpanelEmailAccount {
+  email: string
+  login: string
+  domain: string
+  diskused: number
+  diskquota: number
+  humandiskused: string
+  humandiskquota: string
+  suspended_login: number
+}
+
+export async function listCpanelEmails(
+  config: WHMConfig,
+  cpanelUser: string,
+  domain: string,
+): Promise<CpanelEmailAccount[]> {
+  const data = await cpanelUapi(config, cpanelUser, 'Email', 'list_pops_with_disk', { domain })
+  const rows = (data.data as CpanelEmailAccount[] | null | undefined) ?? []
+  return rows.filter(r => r.login !== 'main')
+}
+
+export async function addCpanelEmail(
+  config: WHMConfig,
+  cpanelUser: string,
+  domain: string,
+  localpart: string,
+  password: string,
+  quotaMb = 500,
+): Promise<void> {
+  await cpanelUapi(config, cpanelUser, 'Email', 'add_pop', {
+    email: localpart,
+    domain,
+    password,
+    quota: quotaMb,
+  }, 'POST')
+}
+
+export async function deleteCpanelEmail(
+  config: WHMConfig,
+  cpanelUser: string,
+  emailAddress: string,
+): Promise<void> {
+  await cpanelUapi(config, cpanelUser, 'Email', 'delete_pop', {
+    email: emailAddress,
+  }, 'POST')
+}
+
+export async function changeCpanelEmailPassword(
+  config: WHMConfig,
+  cpanelUser: string,
+  domain: string,
+  localpart: string,
+  password: string,
+): Promise<void> {
+  await cpanelUapi(config, cpanelUser, 'Email', 'passwd_pop', {
+    email: localpart,
+    domain,
+    password,
+  }, 'POST')
+}
+
+export async function changeCpanelEmailQuota(
+  config: WHMConfig,
+  cpanelUser: string,
+  domain: string,
+  localpart: string,
+  quota: number,
+): Promise<void> {
+  await cpanelUapi(config, cpanelUser, 'Email', 'edit_pop_quota', {
+    email: localpart,
+    domain,
+    quota,
+  }, 'POST')
+}
+
 export async function createEmailAccount(config: WHMConfig, domain: string, email: string, password: string, quota = 500) {
-  // cPanel API via WHM proxy
+  // Legacy — kept for compatibility
   const cpanelUser = domain.replace(/\./g, '_').slice(0, 8)
-  const url = `${config.url.replace(/\/$/, '')}/execute/Email/add_pop`
-  const res = await fetch(`${url}?email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}&quota=${quota}&domain=${encodeURIComponent(domain)}`, {
-    headers: { Authorization: `cpanel ${cpanelUser}:${config.token}` },
+  const url = `${normalizeWhmUrl(config.url)}/execute/Email/add_pop`
+  const qs = new URLSearchParams({ user: cpanelUser, email, password, quota: String(quota), domain })
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `whm ${config.username ?? 'root'}:${config.token}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: qs.toString(),
     cache: 'no-store',
   })
   return res.json()
