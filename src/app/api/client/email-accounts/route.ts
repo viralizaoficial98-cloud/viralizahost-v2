@@ -9,7 +9,7 @@ async function getClientHostingAccount(userId: string) {
     .from('hosting_accounts')
     .select('id, cpanel_username, primary_domain, status, service_id, email_count')
     .eq('profile_id', userId)
-    .neq('status', 'missing_from_whm')
+    .in('status', ['active', 'suspended', 'pending', 'expired'])
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
