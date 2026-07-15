@@ -1,12 +1,14 @@
 import { Metadata } from 'next'
-import { Globe, Server, Mail, TicketIcon, HardDrive, RefreshCw, Clock, ExternalLink, ArrowRight, Shield } from 'lucide-react'
+import { Server, Mail, HardDrive, RefreshCw, Clock, ExternalLink, ArrowRight, Shield } from 'lucide-react'
 import { createAuthClient, createAdminWriteClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { StatCard } from '@/components/dashboard/StatCard'
+import type { StatIconKey } from '@/components/dashboard/StatCard'
 
 export const metadata: Metadata = { title: 'Dashboard — ViralizaHost' }
 
 async function fetchDashboardData(userId: string) {
+  console.info('[dashboard] fetchDashboardData start', userId.slice(0, 8))
   const db = createAdminWriteClient()
 
   const [haResult, domainsResult, ticketsResult, activityResult, profileResult] = await Promise.allSettled([
@@ -24,13 +26,19 @@ async function fetchDashboardData(userId: string) {
     db.from('profiles').select('full_name').eq('id', userId).maybeSingle(),
   ])
 
+  if (haResult.status === 'rejected')       console.error('[dashboard] hosting_accounts failed', haResult.reason)
+  if (domainsResult.status === 'rejected')  console.error('[dashboard] domains failed', domainsResult.reason)
+  if (ticketsResult.status === 'rejected')  console.error('[dashboard] tickets failed', ticketsResult.reason)
+  if (activityResult.status === 'rejected') console.error('[dashboard] sso_audit_logs failed', activityResult.reason)
+  if (profileResult.status === 'rejected')  console.error('[dashboard] profiles failed', profileResult.reason)
+
   const hostingAccounts = haResult.status === 'fulfilled' ? (haResult.value.data ?? []) : []
   const portalDomains   = domainsResult.status === 'fulfilled' ? (domainsResult.value.data ?? []) : []
   const ticketsCount    = ticketsResult.status === 'fulfilled' ? (ticketsResult.value.count ?? 0) : 0
   const ssoLogs         = activityResult.status === 'fulfilled' ? (activityResult.value.data ?? []) : []
-  const profile         = profileResult.status === 'fulfilled' ? (profileResult.value.data) : null
+  const profile         = profileResult.status === 'fulfilled' ? profileResult.value.data : null
 
-  const primaryDomainNames = new Set((hostingAccounts as any[]).map((h: any) => h.primary_domain?.toLowerCase()))
+  const primaryDomainNames  = new Set((hostingAccounts as any[]).map((h: any) => h.primary_domain?.toLowerCase()))
   const uniquePortalDomains = (portalDomains as any[]).filter((d: any) => !primaryDomainNames.has(d?.id?.toLowerCase()))
   const domainsCount  = (hostingAccounts as any[]).filter((h: any) => h.status !== 'suspended').length + uniquePortalDomains.length
   const servicesCount = (hostingAccounts as any[]).filter((h: any) => h.status !== 'suspended').length
@@ -42,22 +50,24 @@ async function fetchDashboardData(userId: string) {
     return !latest || h.last_synced_at > latest ? h.last_synced_at : latest
   }, null)
 
+  console.info('[dashboard] resolved — hosting:', hostingAccounts.length, 'domains:', domainsCount, 'emails:', emailsCount, 'tickets:', ticketsCount)
+
   return { hostingAccounts, domainsCount, servicesCount, emailsCount, ticketsCount, totalDiskUsed, totalDiskLimit, lastSyncedAt, ssoLogs, profile }
 }
 
-const statCards = [
+// All props are plain serializable values — no functions, no React components
+const statCards: Array<{ type: StatIconKey; label: string; href: string; iconBg: string; iconBorder: string; iconColor: string; shadow: string }> = [
   { type: 'domains',  label: 'Domínios Ativos',      href: '/domains',  iconBg: 'rgba(245,183,0,0.12)',  iconBorder: 'rgba(245,183,0,0.25)',  iconColor: '#D9A300', shadow: 'rgba(245,183,0,0.20)' },
   { type: 'hosting',  label: 'Planos de Hospedagem',  href: '/hosting',  iconBg: 'rgba(59,130,246,0.12)', iconBorder: 'rgba(59,130,246,0.25)', iconColor: '#2563EB', shadow: 'rgba(59,130,246,0.20)' },
   { type: 'email',    label: 'Contas de Email',        href: '/email',    iconBg: 'rgba(16,185,129,0.12)', iconBorder: 'rgba(16,185,129,0.25)', iconColor: '#059669', shadow: 'rgba(16,185,129,0.20)' },
   { type: 'tickets',  label: 'Tickets Abertos',        href: '/tickets',  iconBg: 'rgba(239,68,68,0.12)',  iconBorder: 'rgba(239,68,68,0.25)',  iconColor: '#DC2626', shadow: 'rgba(239,68,68,0.20)' },
 ]
 
-
 function ActivityIcon({ type, success }: { type: string; success: boolean }) {
-  const iconMap: Record<string, { emoji: string; bg: string; color: string }> = {
-    cpanel:  { emoji: '⚙️', bg: 'rgba(245,183,0,0.10)', color: '#D9A300' },
-    webmail: { emoji: '📧', bg: 'rgba(59,130,246,0.10)', color: '#2563EB' },
-    default: { emoji: '🔄', bg: 'rgba(16,185,129,0.10)', color: '#059669' },
+  const iconMap: Record<string, { emoji: string; bg: string }> = {
+    cpanel:  { emoji: '⚙️', bg: 'rgba(245,183,0,0.10)' },
+    webmail: { emoji: '📧', bg: 'rgba(59,130,246,0.10)' },
+    default: { emoji: '🔄', bg: 'rgba(16,185,129,0.10)' },
   }
   const cfg = iconMap[type] ?? iconMap.default
   return (
@@ -69,23 +79,35 @@ function ActivityIcon({ type, success }: { type: string; success: boolean }) {
 }
 
 export default async function DashboardPage() {
+  console.info('[dashboard] render start')
+
   const authDb = await createAuthClient()
   const { data: { user } } = await authDb.auth.getUser()
-  if (!user) redirect('/login')
+  if (!user) {
+    console.info('[dashboard] no user — redirecting to login')
+    redirect('/login')
+  }
 
-  const { hostingAccounts, domainsCount, servicesCount, emailsCount, ticketsCount, totalDiskUsed, totalDiskLimit, lastSyncedAt, ssoLogs, profile } = await fetchDashboardData(user.id)
+  console.info('[dashboard] auth ok', user.id.slice(0, 8))
 
-  const now = new Date()
-  const diskPct = totalDiskLimit > 0 ? Math.min(Math.round((totalDiskUsed / totalDiskLimit) * 100), 100) : 0
-  const diskColor = diskPct > 80 ? '#EF4444' : diskPct > 60 ? '#F5B700' : '#10B981'
-  const firstName = (profile as any)?.full_name?.split(' ')[0] ?? 'Cliente'
+  const {
+    hostingAccounts, domainsCount, servicesCount, emailsCount,
+    ticketsCount, totalDiskUsed, totalDiskLimit, lastSyncedAt, ssoLogs, profile,
+  } = await fetchDashboardData(user.id)
 
+  const now        = new Date()
+  const diskPct    = totalDiskLimit > 0 ? Math.min(Math.round((totalDiskUsed / totalDiskLimit) * 100), 100) : 0
+  const firstName  = (profile as any)?.full_name?.split(' ')[0] ?? 'Cliente'
+
+  // statsData uses only serializable values — iconKey is a string, NOT a React component
   const statsData = [
-    { ...statCards[0], value: domainsCount, Icon: Globe },
-    { ...statCards[1], value: servicesCount, Icon: Server },
-    { ...statCards[2], value: emailsCount, Icon: Mail },
-    { ...statCards[3], value: ticketsCount, Icon: TicketIcon },
+    { ...statCards[0], iconKey: 'domains'  as StatIconKey, value: domainsCount  },
+    { ...statCards[1], iconKey: 'hosting'  as StatIconKey, value: servicesCount },
+    { ...statCards[2], iconKey: 'email'    as StatIconKey, value: emailsCount   },
+    { ...statCards[3], iconKey: 'tickets'  as StatIconKey, value: ticketsCount  },
   ]
+
+  console.info('[dashboard] render ready — firstName:', firstName)
 
   return (
     <>
@@ -94,7 +116,7 @@ export default async function DashboardPage() {
           from { opacity: 0; transform: translateY(20px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .fade-in-up { animation: fadeInUp 0.4s ease both; }
+        .fade-in-up   { animation: fadeInUp 0.4s ease both; }
         .fade-in-up-1 { animation: fadeInUp 0.4s 0.05s ease both; }
         .fade-in-up-2 { animation: fadeInUp 0.4s 0.10s ease both; }
         .fade-in-up-3 { animation: fadeInUp 0.4s 0.15s ease both; }
@@ -113,17 +135,27 @@ export default async function DashboardPage() {
           {servicesCount > 0 && (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
               style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.20)' }}>
-              <div className="w-2 h-2 rounded-full bg-green-500" style={{ boxShadow: '0 0 0 3px rgba(16,185,129,0.20)', animation: 'pulse 2s infinite' }} />
+              <div className="w-2 h-2 rounded-full bg-green-500"
+                style={{ boxShadow: '0 0 0 3px rgba(16,185,129,0.20)', animation: 'pulse 2s infinite' }} />
               <span className="text-xs font-semibold" style={{ color: '#059669' }}>Todos os serviços online</span>
             </div>
           )}
         </div>
 
-        {/* Stat cards */}
+        {/* Stat cards — StatCard is 'use client', receives only serializable props */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {statsData.map((card, i) => (
             <div key={card.type} className={`fade-in-up-${i + 1}`}>
-              <StatCard {...card} />
+              <StatCard
+                label={card.label}
+                value={card.value}
+                href={card.href}
+                iconKey={card.iconKey}
+                iconBg={card.iconBg}
+                iconBorder={card.iconBorder}
+                iconColor={card.iconColor}
+                shadow={card.shadow}
+              />
             </div>
           ))}
         </div>
@@ -145,17 +177,27 @@ export default async function DashboardPage() {
                   style={{ background: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   <div className="px-5 py-4 flex items-center gap-4" style={{ borderBottom: '1px solid #F3F4F6' }}>
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: isOk ? 'rgba(59,130,246,0.10)' : 'rgba(239,68,68,0.10)', border: `1px solid ${isOk ? 'rgba(59,130,246,0.20)' : 'rgba(239,68,68,0.20)'}` }}>
+                      style={{
+                        background: isOk ? 'rgba(59,130,246,0.10)' : 'rgba(239,68,68,0.10)',
+                        border: `1px solid ${isOk ? 'rgba(59,130,246,0.20)' : 'rgba(239,68,68,0.20)'}`,
+                      }}>
                       <Server size={18} style={{ color: isOk ? '#2563EB' : '#DC2626' }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-sm" style={{ color: '#111827' }}>{ha.primary_domain ?? '—'}</span>
-                        {ha.package_name && <span className="text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: '#F3F4F6', color: '#6B7280' }}>{ha.package_name}</span>}
+                        {ha.package_name && (
+                          <span className="text-[11px] px-2 py-0.5 rounded-full font-medium"
+                            style={{ background: '#F3F4F6', color: '#6B7280' }}>
+                            {ha.package_name}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: '#9CA3AF' }}>
                         {ha.ip_address && <span>{ha.ip_address}</span>}
-                        <span className="flex items-center gap-1"><Mail size={9} /> {ha.email_count ?? 0} emails</span>
+                        <span className="flex items-center gap-1">
+                          <Mail size={9} /> {ha.email_count ?? 0} emails
+                        </span>
                         {ha.php_version && <span>PHP {ha.php_version}</span>}
                       </div>
                     </div>
@@ -217,28 +259,30 @@ export default async function DashboardPage() {
             </div>
             <p className="font-bold text-sm mb-1" style={{ color: '#111827' }}>Conta em configuração</p>
             <p className="text-xs mb-5" style={{ color: '#9CA3AF' }}>O seu plano de hospedagem está a ser ativado</p>
-            <a href="/billing" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-black"
+            <a href="/billing"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-black"
               style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.30)' }}>
               Ver Planos Disponíveis
             </a>
           </div>
         )}
 
-        {/* Bottom row: stats + activity */}
+        {/* Bottom row: account state + activity */}
         <div className="fade-in-up-4 grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Quick stats */}
+
+          {/* Account state */}
           <div className="rounded-2xl p-5"
             style={{ background: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <h2 className="text-sm font-bold mb-4 flex items-center gap-2" style={{ color: '#111827' }}>
               <Shield size={14} style={{ color: '#059669' }} /> Estado da Conta
             </h2>
             <div className="space-y-3">
-              {[
-                { label: 'Domínios ativos',     value: domainsCount,  color: '#D9A300', href: '/domains' },
-                { label: 'Planos de hospedagem', value: servicesCount, color: '#2563EB', href: '/hosting' },
-                { label: 'Contas de email',      value: emailsCount,   color: '#059669', href: '/email' },
-                { label: 'Tickets abertos',      value: ticketsCount,  color: '#DC2626', href: '/tickets' },
-              ].map(item => (
+              {([
+                { label: 'Domínios ativos',      value: domainsCount,  color: '#D9A300', href: '/domains'  },
+                { label: 'Planos de hospedagem',  value: servicesCount, color: '#2563EB', href: '/hosting'  },
+                { label: 'Contas de email',        value: emailsCount,   color: '#059669', href: '/email'    },
+                { label: 'Tickets abertos',        value: ticketsCount,  color: '#DC2626', href: '/tickets'  },
+              ] as const).map(item => (
                 <a key={item.label} href={item.href}
                   className="flex items-center justify-between py-2.5 px-3 rounded-xl transition-colors hover:bg-gray-50 group"
                   style={{ border: '1px solid transparent' }}>
@@ -271,7 +315,8 @@ export default async function DashboardPage() {
                   const time  = diff < 60 ? `${diff}m atrás` : diff < 1440 ? `${Math.round(diff / 60)}h atrás` : `${Math.round(diff / 1440)}d atrás`
                   const label = log.access_type === 'cpanel' ? 'Acesso ao cPanel' : log.access_type === 'webmail' ? 'Acesso ao Webmail' : 'Sincronização'
                   return (
-                    <div key={i} className="flex items-center gap-3 py-2.5 px-3 rounded-xl" style={{ background: i % 2 === 0 ? '#FAFAFA' : 'transparent' }}>
+                    <div key={i} className="flex items-center gap-3 py-2.5 px-3 rounded-xl"
+                      style={{ background: i % 2 === 0 ? '#FAFAFA' : 'transparent' }}>
                       <ActivityIcon type={log.access_type} success={log.success} />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold" style={{ color: '#111827' }}>{label}</div>
@@ -293,12 +338,12 @@ export default async function DashboardPage() {
 
         {/* Quick links */}
         <div className="fade-in-up-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Gerenciar Hospedagem', href: '/hosting', emoji: '🖥️', color: '#2563EB', bg: 'rgba(59,130,246,0.06)' },
+          {([
+            { label: 'Gerenciar Hospedagem', href: '/hosting', emoji: '🖥️', color: '#2563EB', bg: 'rgba(59,130,246,0.06)'  },
             { label: 'Contas de Email',       href: '/email',   emoji: '📧', color: '#059669', bg: 'rgba(16,185,129,0.06)' },
-            { label: 'Meus Domínios',         href: '/domains', emoji: '🌐', color: '#D9A300', bg: 'rgba(245,183,0,0.06)' },
-            { label: 'Abrir Ticket',          href: '/tickets', emoji: '🎫', color: '#DC2626', bg: 'rgba(239,68,68,0.06)' },
-          ].map(link => (
+            { label: 'Meus Domínios',         href: '/domains', emoji: '🌐', color: '#D9A300', bg: 'rgba(245,183,0,0.06)'  },
+            { label: 'Abrir Ticket',          href: '/tickets', emoji: '🎫', color: '#DC2626', bg: 'rgba(239,68,68,0.06)'  },
+          ] as const).map(link => (
             <a key={link.href} href={link.href}
               className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5 group"
               style={{ background: link.bg, border: `1px solid ${link.color}20` }}>

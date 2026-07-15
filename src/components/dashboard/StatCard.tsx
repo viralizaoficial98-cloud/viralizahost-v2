@@ -1,33 +1,35 @@
 'use client'
-import { ArrowRight } from 'lucide-react'
+import { Globe, Server, Mail, Ticket, ArrowRight } from 'lucide-react'
 
-interface StatCardProps {
-  label: string
-  value: number
-  href: string
-  iconBg: string
-  iconBorder: string
-  iconColor: string
-  shadow: string
-  Icon: React.ElementType
+export type StatIconKey = 'domains' | 'hosting' | 'email' | 'tickets'
+
+const iconMap: Record<StatIconKey, React.ElementType> = {
+  domains: Globe,
+  hosting: Server,
+  email:   Mail,
+  tickets: Ticket,
 }
 
-export function StatCard({ label, value, href, iconBg, iconBorder, iconColor, shadow, Icon }: StatCardProps) {
+interface StatCardProps {
+  label:       string
+  value:       number
+  href:        string
+  iconKey:     StatIconKey
+  iconBg:      string
+  iconBorder:  string
+  iconColor:   string
+  shadow:      string
+}
+
+export function StatCard({ label, value, href, iconKey, iconBg, iconBorder, iconColor, shadow }: StatCardProps) {
+  const Icon = iconMap[iconKey]
   return (
     <a href={href} className="block group">
       <div
         className="rounded-2xl p-6 transition-all duration-300 group-hover:-translate-y-1 cursor-pointer"
-        style={{
-          background: '#FFFFFF',
-          border: '1px solid #E5E7EB',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        }}
-        onMouseEnter={e => {
-          (e.currentTarget as HTMLDivElement).style.boxShadow = `0 8px 24px ${shadow}, 0 2px 8px rgba(0,0,0,0.04)`
-        }}
-        onMouseLeave={e => {
-          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)'
-        }}
+        style={{ background: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
+        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = `0 8px 24px ${shadow}, 0 2px 8px rgba(0,0,0,0.04)` }}
+        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)' }}
       >
         <div className="flex items-start justify-between mb-4">
           <div
