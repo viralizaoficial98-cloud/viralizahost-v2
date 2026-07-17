@@ -146,6 +146,7 @@ export default function EmailManager() {
   }
 
   const openWebmail = async (email: string) => {
+    console.log('[WEBMAIL CLICK]', { clickedEmail: email, hostingAccountId: hostingId })
     setWmLoad(prev => ({ ...prev, [email]: true }))
     try {
       const res = await fetch('/api/client/email-accounts/webmail-sso', {

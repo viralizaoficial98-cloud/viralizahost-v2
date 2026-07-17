@@ -298,66 +298,25 @@ export async function createUserSession(
 }
 
 // ─── Webmail SSO for a specific mailbox ──────────────────────────────────────
-
-/**
- * Primary approach (cPanel v74+): UAPI Session::create_webmail_token
- * Returns a token that authenticates directly as the email account (not the cPanel user).
- * Login URL: https://server:2096/login/?user=EMAIL&token=TOKEN
- */
-async function createWebmailToken(
-  config: WHMConfig,
-  cpanelUser: string,
-  emailAddress: string,
-): Promise<string> {
-  const data = await cpanelUapi(
-    config, cpanelUser, 'Session', 'create_webmail_token', { email: emailAddress }, 'POST',
-  )
-  const token = (data.data as Record<string, unknown> | null | undefined)?.token as string | undefined
-  if (!token) throw new Error('cPanel did not return a webmail token')
-  return token
-}
-
+// Uses WHM API 1 create_user_session with user=<full email address>.
+// This authenticates directly as that mailbox — never as the cPanel account holder.
 export async function createWebmailSessionForMailbox(
   config: WHMConfig,
-  cpanelUsername: string,
   emailAddress: string,
 ): Promise<{ url: string }> {
-  // Derive webmail base URL (port 2096) from WHM URL (port 2087)
-  const webmailBase = normalizeWhmUrl(config.url).replace(':2087', ':2096')
+  const data = await whmRequest(config, 'create_user_session', {
+    user: emailAddress,
+    service: 'webmaild',
+  })
 
-  // ── Primary: Session::create_webmail_token ────────────────────────────────
-  // Authenticates directly as the email account — NOT as the cPanel user.
-  // This is the only official method that opens the specific mailbox inbox.
-  try {
-    const token = await createWebmailToken(config, cpanelUsername, emailAddress)
-    return {
-      url: `${webmailBase}/login/?user=${encodeURIComponent(emailAddress)}&token=${encodeURIComponent(token)}`,
-    }
-  } catch (err) {
-    console.warn(
-      '[webmail-sso] Session::create_webmail_token unavailable, falling back to create_user_session:',
-      err instanceof Error ? err.message : String(err),
+  const url = data.data?.url as string | undefined
+  if (!url) {
+    throw new Error(
+      data.metadata?.reason ?? 'O WHM não devolveu uma URL de sessão para esta conta de e-mail.',
     )
   }
 
-  // ── Fallback: create_user_session + goto_uri ──────────────────────────────
-  // Creates a cPanel-user session (wwvira) and redirects to Roundcube with
-  // the _user hint. Opens webmail home if the server ignores _user.
-  const { url: sessionUrl } = await createUserSession(config, cpanelUsername, 'webmaild')
-  const rcPath = `/webmail/roundcube/?_user=${encodeURIComponent(emailAddress)}`
-
-  if (sessionUrl.includes('/login/?') || sessionUrl.includes('/login?')) {
-    const u = new URL(sessionUrl)
-    u.searchParams.set('goto_uri', rcPath)
-    return { url: u.toString() }
-  }
-
-  if (sessionUrl.includes('/cpsess')) {
-    const base = sessionUrl.replace(/\/webmail\/?$/, '').replace(/\/$/, '')
-    return { url: `${base}${rcPath}` }
-  }
-
-  return { url: sessionUrl }
+  return { url }
 }
 
 // ── cPanel UAPI / API 2 via WHM proxy ────────────────────────────────────────
