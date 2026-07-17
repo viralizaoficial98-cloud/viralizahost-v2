@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!mailboxExists) {
-      return NextResponse.json({ error: 'Conta de e-mail não encontrada no servidor.' }, { status: 404 })
+      return NextResponse.json({ error: 'Esta conta de e-mail não foi encontrada no servidor.' }, { status: 404 })
     }
 
     // Create a Webmail session pointing to the specific mailbox
@@ -79,6 +79,15 @@ export async function POST(req: NextRequest) {
       (ha as any).cpanel_username,
       email,
     )
+
+    console.log('[WEBMAIL SSO]', JSON.stringify({
+      profile_id:       user.id,
+      whm_username:     (ha as any).cpanel_username,
+      requested_mailbox: email,
+      domain:           emailDomain,
+      mailbox_exists:   mailboxExists,
+      result:           'success',
+    }))
 
     // Audit log (best-effort)
     try {
@@ -111,6 +120,6 @@ export async function POST(req: NextRequest) {
       })
     } catch { /* non-fatal */ }
 
-    return NextResponse.json({ error: 'Não foi possível criar a sessão do Webmail. Tente novamente.' }, { status: 500 })
+    return NextResponse.json({ error: 'Não foi possível criar a sessão segura do Webmail.' }, { status: 502 })
   }
 }
