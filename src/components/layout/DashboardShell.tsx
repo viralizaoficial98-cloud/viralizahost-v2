@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { Sidebar } from './Sidebar'
 import { DashboardHeader } from './DashboardHeader'
+import { PageTransition } from '@/components/ui/PageTransition'
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -50,7 +51,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          <PageTransition>{children}</PageTransition>
+        </main>
       </div>
     </div>
   )

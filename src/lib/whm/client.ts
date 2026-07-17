@@ -297,13 +297,31 @@ export async function createUserSession(
   return { url: String(session.url), expire: Number(session.expire ?? 3600) }
 }
 
+// ─── Webmail SSO for a specific mailbox ──────────────────────────────────────
+export async function createWebmailSessionForMailbox(
+  config: WHMConfig,
+  cpanelUsername: string,
+  emailAddress: string,
+): Promise<{ url: string }> {
+  const { url: sessionUrl } = await createUserSession(config, cpanelUsername, 'webmaild')
+
+  const roundcubePath = `/roundcube/?_user=${encodeURIComponent(emailAddress)}`
+
+  if (sessionUrl.includes('/login/?') || sessionUrl.includes('/login?')) {
+    const u = new URL(sessionUrl)
+    u.searchParams.set('goto_uri', roundcubePath)
+    return { url: u.toString() }
+  }
+
+  if (sessionUrl.includes('/cpsess')) {
+    const base = sessionUrl.replace(/\/(webmail\/?)?$/, '')
+    return { url: `${base}/webmail${roundcubePath}` }
+  }
+
+  return { url: sessionUrl }
+}
+
 // ── cPanel UAPI / API 2 via WHM proxy ────────────────────────────────────────
-//
-// Primary:  UAPI proxy  — https://server:2087/execute/Module/Function?user=U&...
-// Fallback: cPanel API 2 — https://server:2087/json-api/cpanel?cpanel_jsonapi_version=2&...
-//
-// Some WHM configurations (older versions, certain firewall setups) return 404
-// on /execute/ — in those cases we transparently fall back to API 2.
 
 const authHdr = (cfg: WHMConfig) => `whm ${cfg.username ?? 'root'}:${cfg.token}`
 
@@ -421,24 +439,35 @@ export interface CpanelEmailAccount {
   suspended_login: number
 }
 
+// ─── Human-readable byte formatter (server-side) ─────────────────────────────
+function formatBytesServer(n: number, fallbackUnit: 'bytes' | 'MB' = 'bytes'): string {
+  if (!isFinite(n) || n < 0) return '0 B'
+  const bytes = fallbackUnit === 'MB' && n < 100_000 ? n * 1024 * 1024 : n
+  if (bytes < 1024)      return `${bytes} B`
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1).replace(/\.0$/, '')} KB`
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(2).replace(/\.?0+$/, '')} MB`
+  if (bytes < 1024 ** 4) return `${(bytes / 1024 ** 3).toFixed(2).replace(/\.?0+$/, '')} GB`
+  return `${(bytes / 1024 ** 4).toFixed(2)} TB`
+}
+
 // ─── API 2 response normaliser for list_pops_with_disk ───────────────────────
 function normEmailRows(rows: unknown[], source: 'uapi' | 'api2', domain: string): CpanelEmailAccount[] {
   return (rows as Record<string, unknown>[])
     .filter(r => r.login !== 'main' && r.user !== 'main')
     .map(r => {
-      const login  = String(r.login ?? r.user ?? '')
-      const dom    = String(r.domain ?? domain)
-      // UAPI: diskused/diskquota  |  API 2: _diskused/_diskquota
-      const used   = Number(source === 'uapi' ? (r.diskused  ?? r._diskused  ?? 0) : (r._diskused  ?? r.diskused  ?? 0))
-      const quota  = Number(source === 'uapi' ? (r.diskquota ?? r._diskquota ?? 0) : (r._diskquota ?? r.diskquota ?? 0))
+      const login = String(r.login ?? r.user ?? '')
+      const dom   = String(r.domain ?? domain)
+      const used  = Number(source === 'uapi' ? (r.diskused  ?? r._diskused  ?? 0) : (r._diskused  ?? r.diskused  ?? 0))
+      const quota = Number(source === 'uapi' ? (r.diskquota ?? r._diskquota ?? 0) : (r._diskquota ?? r.diskquota ?? 0))
+      const unit: 'bytes' | 'MB' = source === 'uapi' ? 'bytes' : 'MB'
       return {
         email:           String(r.email ?? `${login}@${dom}`),
         login,
         domain:          dom,
         diskused:        used,
         diskquota:       quota,
-        humandiskused:   String(r.humandiskused  ?? `${used} MB`),
-        humandiskquota:  String(r.humandiskquota ?? (quota === 0 ? '∞' : `${quota} MB`)),
+        humandiskused:   String(r.humandiskused  ?? formatBytesServer(used, unit)),
+        humandiskquota:  String(r.humandiskquota ?? (quota === 0 ? '∞' : formatBytesServer(quota, unit))),
         suspended_login: Number(r.suspended_login ?? 0),
       } satisfies CpanelEmailAccount
     })
@@ -452,7 +481,7 @@ export async function listCpanelEmails(
   const { data, source } = await callCpanel(
     config, cpanelUser, 'Email', 'list_pops_with_disk', { domain }, 'GET', 'listpopswithdisk',
   )
-  const rows = Array.isArray(data) ? data : []
+  const rows = Array.isArray(data) ? data as unknown[] : []
   return normEmailRows(rows, source, domain)
 }
 
