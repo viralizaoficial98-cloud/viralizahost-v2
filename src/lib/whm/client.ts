@@ -297,10 +297,17 @@ export async function createUserSession(
   return { url: String(session.url), expire: Number(session.expire ?? 3600) }
 }
 
-// ── cPanel UAPI via WHM proxy ─────────────────────────────────────────────────
-// Endpoint: GET/POST https://server:2087/execute/Module/Function?user=CPANEL_USER&...
-// WHM root credentials are used; `user` param targets the cPanel account.
+// ── cPanel UAPI / API 2 via WHM proxy ────────────────────────────────────────
+//
+// Primary:  UAPI proxy  — https://server:2087/execute/Module/Function?user=U&...
+// Fallback: cPanel API 2 — https://server:2087/json-api/cpanel?cpanel_jsonapi_version=2&...
+//
+// Some WHM configurations (older versions, certain firewall setups) return 404
+// on /execute/ — in those cases we transparently fall back to API 2.
 
+const authHdr = (cfg: WHMConfig) => `whm ${cfg.username ?? 'root'}:${cfg.token}`
+
+// ─── UAPI proxy (modern, port 2087) ─────────────────────────────────────────
 async function cpanelUapi(
   config: WHMConfig,
   cpanelUser: string,
@@ -311,12 +318,59 @@ async function cpanelUapi(
 ): Promise<Record<string, unknown>> {
   const baseUrl = normalizeWhmUrl(config.url)
   const endpoint = `${baseUrl}/execute/${module}/${fn}`
-  const qs = new URLSearchParams({ user: cpanelUser, ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) })
 
-  const res = await fetch(method === 'POST' ? endpoint : `${endpoint}?${qs}`, {
+  // user is always a query param for the WHM proxy — even for POST
+  const urlQs = new URLSearchParams({ user: cpanelUser })
+  const bodyQs = new URLSearchParams(Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])))
+
+  const fetchUrl = method === 'POST' ? `${endpoint}?${urlQs}` : `${endpoint}?${urlQs}&${bodyQs}`
+
+  const res = await fetch(fetchUrl, {
     method,
     headers: {
-      Authorization: `whm ${config.username ?? 'root'}:${config.token}`,
+      Authorization: authHdr(config),
+      Accept: 'application/json',
+      ...(method === 'POST' ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
+    },
+    body: method === 'POST' ? bodyQs.toString() : undefined,
+    cache: 'no-store',
+  })
+
+  if (res.status === 404) throw Object.assign(new Error('UAPI_404'), { code: 'UAPI_404' })
+  if (!res.ok) throw new Error(`cPanel UAPI error: ${res.status} ${res.statusText}`)
+  const data = await res.json() as Record<string, unknown>
+  const errors = (data.errors as string[] | null | undefined)
+  if (data.status === 0) throw new Error(errors?.[0] ?? 'cPanel UAPI error')
+  return data
+}
+
+// ─── cPanel API 2 via WHM JSON API (fallback, compatible with all versions) ──
+async function cpanelApi2(
+  config: WHMConfig,
+  cpanelUser: string,
+  module: string,
+  fn: string,
+  params: Record<string, string | number> = {},
+  method: 'GET' | 'POST' = 'GET',
+): Promise<{ data: unknown }> {
+  const baseUrl = normalizeWhmUrl(config.url)
+  const base = `${baseUrl}/json-api/cpanel`
+
+  const allParams: Record<string, string> = {
+    cpanel_jsonapi_version: '2',
+    cpanel_jsonapi_user:    cpanelUser,
+    cpanel_jsonapi_module:  module,
+    cpanel_jsonapi_func:    fn,
+    ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
+  }
+
+  const qs = new URLSearchParams(allParams)
+  const fetchUrl = method === 'POST' ? base : `${base}?${qs}`
+
+  const res = await fetch(fetchUrl, {
+    method,
+    headers: {
+      Authorization: authHdr(config),
       Accept: 'application/json',
       ...(method === 'POST' ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
     },
@@ -324,11 +378,36 @@ async function cpanelUapi(
     cache: 'no-store',
   })
 
-  if (!res.ok) throw new Error(`cPanel UAPI error: ${res.status} ${res.statusText}`)
-  const data = await res.json() as Record<string, unknown>
-  const errors = (data.errors as string[] | null | undefined)
-  if (data.status === 0) throw new Error(errors?.[0] ?? 'cPanel API error')
-  return data
+  if (!res.ok) throw new Error(`cPanel API2 error: ${res.status} ${res.statusText}`)
+  const raw = await res.json() as Record<string, unknown>
+  const result = (raw.cpanelresult ?? raw) as Record<string, unknown>
+  if (result.error) throw new Error(String(result.error))
+  return { data: result.data }
+}
+
+// ─── Unified caller: UAPI → API2 fallback ───────────────────────────────────
+// api2Fn: the API 2 function name when it differs from the UAPI name
+async function callCpanel(
+  config: WHMConfig,
+  cpanelUser: string,
+  module: string,
+  uapiFn: string,
+  params: Record<string, string | number> = {},
+  method: 'GET' | 'POST' = 'GET',
+  api2Fn?: string,
+): Promise<{ data: unknown; source: 'uapi' | 'api2' }> {
+  try {
+    const data = await cpanelUapi(config, cpanelUser, module, uapiFn, params, method)
+    return { data: data.data, source: 'uapi' }
+  } catch (err: unknown) {
+    const code = (err as Record<string, unknown>)?.code
+    if (code !== 'UAPI_404') throw err
+    // UAPI not available on this server — fall back to cPanel API 2
+    console.warn(`[whm] UAPI /execute/${module}/${uapiFn} returned 404 — falling back to API 2`)
+    const fnName = api2Fn ?? uapiFn
+    const result = await cpanelApi2(config, cpanelUser, module, fnName, params, method)
+    return { data: result.data, source: 'api2' }
+  }
 }
 
 export interface CpanelEmailAccount {
@@ -342,14 +421,39 @@ export interface CpanelEmailAccount {
   suspended_login: number
 }
 
+// ─── API 2 response normaliser for list_pops_with_disk ───────────────────────
+function normEmailRows(rows: unknown[], source: 'uapi' | 'api2', domain: string): CpanelEmailAccount[] {
+  return (rows as Record<string, unknown>[])
+    .filter(r => r.login !== 'main' && r.user !== 'main')
+    .map(r => {
+      const login  = String(r.login ?? r.user ?? '')
+      const dom    = String(r.domain ?? domain)
+      // UAPI: diskused/diskquota  |  API 2: _diskused/_diskquota
+      const used   = Number(source === 'uapi' ? (r.diskused  ?? r._diskused  ?? 0) : (r._diskused  ?? r.diskused  ?? 0))
+      const quota  = Number(source === 'uapi' ? (r.diskquota ?? r._diskquota ?? 0) : (r._diskquota ?? r.diskquota ?? 0))
+      return {
+        email:           String(r.email ?? `${login}@${dom}`),
+        login,
+        domain:          dom,
+        diskused:        used,
+        diskquota:       quota,
+        humandiskused:   String(r.humandiskused  ?? `${used} MB`),
+        humandiskquota:  String(r.humandiskquota ?? (quota === 0 ? '∞' : `${quota} MB`)),
+        suspended_login: Number(r.suspended_login ?? 0),
+      } satisfies CpanelEmailAccount
+    })
+}
+
 export async function listCpanelEmails(
   config: WHMConfig,
   cpanelUser: string,
   domain: string,
 ): Promise<CpanelEmailAccount[]> {
-  const data = await cpanelUapi(config, cpanelUser, 'Email', 'list_pops_with_disk', { domain })
-  const rows = (data.data as CpanelEmailAccount[] | null | undefined) ?? []
-  return rows.filter(r => r.login !== 'main')
+  const { data, source } = await callCpanel(
+    config, cpanelUser, 'Email', 'list_pops_with_disk', { domain }, 'GET', 'listpopswithdisk',
+  )
+  const rows = Array.isArray(data) ? data : []
+  return normEmailRows(rows, source, domain)
 }
 
 export async function addCpanelEmail(
@@ -360,12 +464,9 @@ export async function addCpanelEmail(
   password: string,
   quotaMb = 500,
 ): Promise<void> {
-  await cpanelUapi(config, cpanelUser, 'Email', 'add_pop', {
-    email: localpart,
-    domain,
-    password,
-    quota: quotaMb,
-  }, 'POST')
+  await callCpanel(config, cpanelUser, 'Email', 'add_pop', {
+    email: localpart, domain, password, quota: quotaMb,
+  }, 'POST', 'addpop')
 }
 
 export async function deleteCpanelEmail(
@@ -373,9 +474,9 @@ export async function deleteCpanelEmail(
   cpanelUser: string,
   emailAddress: string,
 ): Promise<void> {
-  await cpanelUapi(config, cpanelUser, 'Email', 'delete_pop', {
+  await callCpanel(config, cpanelUser, 'Email', 'delete_pop', {
     email: emailAddress,
-  }, 'POST')
+  }, 'POST', 'delpop')
 }
 
 export async function changeCpanelEmailPassword(
@@ -385,11 +486,9 @@ export async function changeCpanelEmailPassword(
   localpart: string,
   password: string,
 ): Promise<void> {
-  await cpanelUapi(config, cpanelUser, 'Email', 'passwd_pop', {
-    email: localpart,
-    domain,
-    password,
-  }, 'POST')
+  await callCpanel(config, cpanelUser, 'Email', 'passwd_pop', {
+    email: localpart, domain, password,
+  }, 'POST', 'passwdpop')
 }
 
 export async function changeCpanelEmailQuota(
@@ -399,11 +498,9 @@ export async function changeCpanelEmailQuota(
   localpart: string,
   quota: number,
 ): Promise<void> {
-  await cpanelUapi(config, cpanelUser, 'Email', 'edit_pop_quota', {
-    email: localpart,
-    domain,
-    quota,
-  }, 'POST')
+  await callCpanel(config, cpanelUser, 'Email', 'edit_pop_quota', {
+    email: localpart, domain, quota,
+  }, 'POST', 'editquota')
 }
 
 export async function createEmailAccount(config: WHMConfig, domain: string, email: string, password: string, quota = 500) {
