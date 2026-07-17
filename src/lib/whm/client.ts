@@ -305,19 +305,23 @@ export async function createWebmailSessionForMailbox(
 ): Promise<{ url: string }> {
   const { url: sessionUrl } = await createUserSession(config, cpanelUsername, 'webmaild')
 
-  const roundcubePath = `/roundcube/?_user=${encodeURIComponent(emailAddress)}`
+  // Roundcube lives at /webmail/roundcube/ within the cPanel session path
+  const rcPath = `/webmail/roundcube/?_user=${encodeURIComponent(emailAddress)}`
 
+  // Format A: /login/?session=TOKEN  (cPanel v94+)
   if (sessionUrl.includes('/login/?') || sessionUrl.includes('/login?')) {
     const u = new URL(sessionUrl)
-    u.searchParams.set('goto_uri', roundcubePath)
+    u.searchParams.set('goto_uri', rcPath)
     return { url: u.toString() }
   }
 
+  // Format B: https://server:2096/cpsessXXX/webmail/  (older)
   if (sessionUrl.includes('/cpsess')) {
-    const base = sessionUrl.replace(/\/(webmail\/?)?$/, '')
-    return { url: `${base}/webmail${roundcubePath}` }
+    const base = sessionUrl.replace(/\/webmail\/?$/, '').replace(/\/$/, '')
+    return { url: `${base}${rcPath}` }
   }
 
+  // Fallback: return session URL as-is (opens Webmail home, no 404)
   return { url: sessionUrl }
 }
 
