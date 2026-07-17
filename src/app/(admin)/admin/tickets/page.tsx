@@ -1,42 +1,73 @@
 import { Metadata } from 'next'
-import { MessageSquare, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
+import { MessageSquare, Clock, CheckCircle2, AlertCircle, ChevronRight } from 'lucide-react'
+import { requireAdminRole } from '@/lib/api/require-admin'
+import { createAdminWriteClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 
+export const dynamic   = 'force-dynamic'
+export const revalidate = 0
 export const metadata: Metadata = { title: 'Tickets — Admin ViralizaHost' }
 
-const tickets = [
-  { id: 'TK-001', client: 'Maria Santos',  subject: 'Erro ao acessar cPanel',              dept: 'Hospedagem', priority: 'Alta',    status: 'Aberto',     date: '28 Jun 2026', waiting: '2h' },
-  { id: 'TK-002', client: 'João Silva',    subject: 'Configuração de DNS para domínio .ao', dept: 'Domínios',   priority: 'Média',   status: 'Respondido', date: '27 Jun 2026', waiting: '1d' },
-  { id: 'TK-003', client: 'Ana Costa',     subject: 'Upgrade de plano Business para Pro',   dept: 'Financeiro', priority: 'Baixa',   status: 'Fechado',    date: '25 Jun 2026', waiting: '—' },
-  { id: 'TK-004', client: 'Carlos Mendes', subject: 'Conta suspensa sem aviso',              dept: 'Técnico',    priority: 'Urgente', status: 'Aberto',     date: '28 Jun 2026', waiting: '30min' },
-]
-
-const statusStyle: Record<string, { bg: string; color: string; border: string; icon: React.ElementType }> = {
-  Aberto:     { bg: 'rgba(245,183,0,0.10)',  color: '#D9A300', border: 'rgba(245,183,0,0.20)',  icon: Clock },
-  Respondido: { bg: 'rgba(37,99,235,0.08)',  color: '#2563EB', border: 'rgba(37,99,235,0.20)',  icon: MessageSquare },
-  Fechado:    { bg: '#F1F5F9',               color: '#94A3B8', border: '#E2E8F0',               icon: CheckCircle2 },
+const STATUS_MAP: Record<string, { label: string; bg: string; color: string; border: string }> = {
+  open:        { label: 'Aberto',       bg: 'rgba(245,183,0,0.10)',   color: '#D9A300', border: 'rgba(245,183,0,0.20)' },
+  in_progress: { label: 'Em progresso', bg: 'rgba(37,99,235,0.08)',   color: '#2563EB', border: 'rgba(37,99,235,0.20)' },
+  resolved:    { label: 'Resolvido',    bg: 'rgba(16,185,129,0.08)',  color: '#059669', border: 'rgba(16,185,129,0.20)' },
+  closed:      { label: 'Fechado',      bg: '#F1F5F9',                color: '#94A3B8', border: '#E2E8F0' },
 }
 
-const priorityStyle: Record<string, { bg: string; color: string; border: string }> = {
-  Urgente: { bg: 'rgba(239,68,68,0.08)',  color: '#DC2626', border: 'rgba(239,68,68,0.20)' },
-  Alta:    { bg: 'rgba(234,88,12,0.08)',  color: '#EA580C', border: 'rgba(234,88,12,0.20)' },
-  Média:   { bg: 'rgba(245,183,0,0.10)',  color: '#D9A300', border: 'rgba(245,183,0,0.20)' },
-  Baixa:   { bg: 'rgba(16,185,129,0.08)', color: '#059669', border: 'rgba(16,185,129,0.20)' },
+const PRIORITY_MAP: Record<string, { label: string; bg: string; color: string; border: string }> = {
+  critical: { label: 'Crítica', bg: 'rgba(239,68,68,0.08)',  color: '#DC2626', border: 'rgba(239,68,68,0.20)' },
+  high:     { label: 'Alta',   bg: 'rgba(234,88,12,0.08)',  color: '#EA580C', border: 'rgba(234,88,12,0.20)' },
+  medium:   { label: 'Média',  bg: 'rgba(245,183,0,0.10)',  color: '#D9A300', border: 'rgba(245,183,0,0.20)' },
+  low:      { label: 'Baixa',  bg: 'rgba(16,185,129,0.08)', color: '#059669', border: 'rgba(16,185,129,0.20)' },
 }
-
-const statsItems = [
-  { label: 'Abertos',       value: '12', bg: 'rgba(245,183,0,0.08)',  color: '#D9A300', border: 'rgba(245,183,0,0.15)' },
-  { label: 'Respondidos',   value: '8',  bg: 'rgba(37,99,235,0.08)',  color: '#2563EB', border: 'rgba(37,99,235,0.15)' },
-  { label: 'Urgentes',      value: '2',  bg: 'rgba(239,68,68,0.08)',  color: '#DC2626', border: 'rgba(239,68,68,0.15)' },
-  { label: 'Fechados hoje', value: '5',  bg: 'rgba(16,185,129,0.08)', color: '#059669', border: 'rgba(16,185,129,0.15)' },
-]
 
 const card = { background: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: 18, boxShadow: '0 10px 30px rgba(15,23,42,0.06)', overflow: 'hidden' as const }
 
-export default function AdminTicketsPage() {
+async function fetchData() {
+  try { await requireAdminRole() } catch { redirect('/login') }
+
+  const db = createAdminWriteClient()
+  const { data } = await db
+    .from('tickets')
+    .select(`
+      id, ticket_number, subject, status, priority, department, category,
+      created_at, updated_at,
+      profiles ( full_name, email, avatar_url ),
+      ticket_messages ( count )
+    `)
+    .order('updated_at', { ascending: false })
+    .limit(500)
+
+  const tickets = (data ?? []) as any[]
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+
+  const stats = {
+    open:          tickets.filter(t => t.status === 'open').length,
+    in_progress:   tickets.filter(t => t.status === 'in_progress').length,
+    critical:      tickets.filter(t => t.priority === 'critical').length,
+    resolvedToday: tickets.filter(t => t.status === 'resolved' && t.updated_at && new Date(t.updated_at) >= todayStart).length,
+    newToday:      tickets.filter(t => new Date(t.created_at) >= todayStart).length,
+    total:         tickets.length,
+  }
+  return { tickets, stats }
+}
+
+export default async function AdminTicketsPage() {
+  const { tickets, stats } = await fetchData()
+
+  const statsItems = [
+    { label: 'Abertos',       value: stats.open,          color: '#D9A300', bg: 'rgba(245,183,0,0.08)',   border: 'rgba(245,183,0,0.15)' },
+    { label: 'Em progresso',  value: stats.in_progress,   color: '#2563EB', bg: 'rgba(37,99,235,0.08)',   border: 'rgba(37,99,235,0.15)' },
+    { label: 'Urgentes',      value: stats.critical,      color: '#DC2626', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.15)' },
+    { label: 'Resolvidos hoje', value: stats.resolvedToday, color: '#059669', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.15)' },
+  ]
+
   return (
     <div className="space-y-7">
       <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(124,58,237,0.10)', border: '1px solid rgba(124,58,237,0.20)' }}>
+        <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
+          style={{ background: 'rgba(124,58,237,0.10)', border: '1px solid rgba(124,58,237,0.20)' }}>
           <MessageSquare size={20} style={{ color: '#7C3AED' }} />
         </div>
         <div>
@@ -48,46 +79,82 @@ export default function AdminTicketsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {statsItems.map(s => (
-          <div key={s.label} style={{ ...card, padding: 20, textAlign: 'center', overflow: 'visible' }}>
+          <div key={s.label} className="rounded-2xl p-5 text-center"
+            style={{ background: s.bg, border: `1px solid ${s.border}` }}>
             <div className="text-2xl font-black" style={{ color: s.color }}>{s.value}</div>
             <div className="text-xs font-semibold mt-1" style={{ color: '#64748B' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
-      {/* List */}
+      {/* Tickets list */}
       <div style={card}>
         <div className="px-6 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid #F1F5F9' }}>
           <MessageSquare size={16} style={{ color: '#7C3AED' }} />
           <span className="font-bold text-sm" style={{ color: '#0B0B0D' }}>Todos os Tickets</span>
+          <span className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full"
+            style={{ background: '#F1F5F9', color: '#64748B' }}>
+            {tickets.length}
+          </span>
         </div>
-        <div>
-          {tickets.map((ticket, i) => {
-            const s = statusStyle[ticket.status]
-            const p = priorityStyle[ticket.priority]
-            const StatusIcon = s.icon
-            return (
-              <div key={ticket.id} className="flex items-center gap-4 px-6 py-4 cursor-pointer"
-                style={{ borderBottom: i < tickets.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
-                  <MessageSquare size={16} style={{ color: '#7C3AED' }} />
+
+        {tickets.length === 0 ? (
+          <div className="py-16 text-center">
+            <CheckCircle2 size={32} style={{ color: '#059669', margin: '0 auto 12px' }} />
+            <p className="font-semibold text-sm" style={{ color: '#0B0B0D' }}>Sem tickets</p>
+            <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>Nenhum ticket na plataforma ainda.</p>
+          </div>
+        ) : (
+          <div>
+            {tickets.map((ticket: any, i: number) => {
+              const s = STATUS_MAP[ticket.status] ?? STATUS_MAP.open
+              const p = PRIORITY_MAP[ticket.priority] ?? PRIORITY_MAP.medium
+              const replies = (ticket.ticket_messages as any)?.[0]?.count ?? 0
+              const updated = new Date(ticket.updated_at ?? ticket.created_at).toLocaleDateString('pt-PT', {
+                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+              })
+              const clientName  = (ticket.profiles as any)?.full_name ?? 'Desconhecido'
+              const clientEmail = (ticket.profiles as any)?.email ?? ''
+              return (
+                <div key={ticket.id} className="flex items-center gap-4 px-6 py-4 cursor-pointer transition-colors"
+                  style={{ borderBottom: i < tickets.length - 1 ? '1px solid #F8FAFC' : 'none' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FAFAFA' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
+                    <MessageSquare size={16} style={{ color: '#7C3AED' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm truncate" style={{ color: '#0B0B0D' }}>
+                      {ticket.ticket_number && (
+                        <span className="font-mono text-xs mr-2" style={{ color: '#94A3B8' }}>{ticket.ticket_number}</span>
+                      )}
+                      {ticket.subject}
+                    </div>
+                    <div className="text-xs mt-0.5 flex flex-wrap gap-2" style={{ color: '#94A3B8' }}>
+                      <span>{clientName}</span>
+                      {clientEmail && <span className="hidden sm:inline">{clientEmail}</span>}
+                      {(ticket.category || ticket.department) && <span>{ticket.category || ticket.department}</span>}
+                      <span><Clock size={10} className="inline" style={{ verticalAlign: 'middle' }} /> {updated}</span>
+                      {replies > 0 && <span>{replies} resp.</span>}
+                    </div>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: p.bg, color: p.color, border: `1px solid ${p.border}` }}>
+                      {p.label}
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full shrink-0"
+                    style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
+                    {s.label}
+                  </span>
+                  <ChevronRight size={14} style={{ color: '#CBD5E1' }} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-sm" style={{ color: '#0B0B0D' }}>{ticket.subject}</div>
-                  <div className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{ticket.id} · {ticket.client} · {ticket.dept} · {ticket.date}</div>
-                </div>
-                <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: p.bg, color: p.color, border: `1px solid ${p.border}` }}>{ticket.priority}</span>
-                  <span className="text-xs flex items-center gap-1" style={{ color: '#94A3B8' }}><Clock size={10} /> {ticket.waiting}</span>
-                </div>
-                <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
-                  <StatusIcon size={10} /> {ticket.status}
-                </span>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
