@@ -25,23 +25,76 @@ export async function GET() {
 
   try {
     const db = createAdminWriteClient()
+    const uid = user.id // profiles.id = auth.users.id — same UUID
 
-    // Check for purchased email services (no WHM required yet)
-    const { data: emailServices } = await db
+    // ── 1. Check services table for email-type services ──────────────────────
+    const { data: emailServices, error: svcErr } = await db
       .from('services')
       .select('id, service_name, service_type, status, created_at, order_id')
-      .eq('profile_id', user.id)
+      .eq('profile_id', uid)
       .eq('service_type', 'email')
       .order('created_at', { ascending: false })
+    if (svcErr) console.error('[email-accounts GET] services query error:', svcErr.message)
 
-    const ha = await getClientHostingAccount(user.id)
+    // ── 2. Check orders + order_items for email purchases ────────────────────
+    //    Fallback for when provision_order_services hasn't run yet.
+    //    orders.user_id = auth.users.id = profiles.id
+    const { data: orderRows, error: ordErr } = await db
+      .from('orders')
+      .select('id, status, created_at, billing_cycle, amount, order_items(id, service_name, service_type, price, quantity)')
+      .eq('user_id', uid)
+      .in('status', ['active', 'approved', 'paid', 'aguardando_confirmacao'])
+      .order('created_at', { ascending: false })
+    if (ordErr) console.error('[email-accounts GET] orders query error:', ordErr.message)
 
-    // If no hosting account and no email service → nothing to show
-    if (!ha && (!emailServices || emailServices.length === 0)) {
-      return NextResponse.json({ error: 'Nenhuma conta de hospedagem encontrada.' }, { status: 404 })
+    const emailOrderItems: any[] = (orderRows ?? []).flatMap((o: any) =>
+      (o.order_items ?? [])
+        .filter((i: any) => {
+          const t = (i.service_type ?? '').toLowerCase()
+          const n = (i.service_name ?? '').toLowerCase()
+          return t === 'email' || n.includes('email') || n.includes('e-mail') || n.includes('corporativo')
+        })
+        .map((i: any) => ({
+          id: i.id,
+          service_name: i.service_name,
+          service_type: 'email',
+          status: o.status === 'active' ? 'active' : 'pending_provisioning',
+          created_at: o.created_at,
+          order_id: o.id,
+          billing_cycle: o.billing_cycle,
+          price: i.price,
+          source: 'order',
+        }))
+    )
+
+    const hasEmailData = (emailServices ?? []).length > 0 || emailOrderItems.length > 0
+
+    // ── 3. Check WHM hosting account ─────────────────────────────────────────
+    const ha = await getClientHostingAccount(uid)
+
+    console.log('[email-accounts GET]', {
+      uid: uid.slice(0, 8),
+      emailServicesCount: (emailServices ?? []).length,
+      emailOrderItemsCount: emailOrderItems.length,
+      hasHostingAccount: !!ha,
+      hasEmailData,
+    })
+
+    // ── 4. No hosting, no email services, no email orders → empty (not error) ─
+    if (!ha && !hasEmailData) {
+      return NextResponse.json({
+        emails: [],
+        domain: null,
+        cpanel_username: null,
+        hosting_account_id: null,
+        email_services: [],
+        email_orders: [],
+        provisioning: false,
+        empty: true,
+      })
     }
 
-    // If email services purchased but no WHM account yet → return package info
+    // ── 5. Has email purchases but no WHM → provisioning state ───────────────
     if (!ha) {
       return NextResponse.json({
         emails: [],
@@ -49,28 +102,31 @@ export async function GET() {
         cpanel_username: null,
         hosting_account_id: null,
         email_services: emailServices ?? [],
+        email_orders: emailOrderItems,
         provisioning: true,
       })
     }
 
-    if (ha.status === 'suspended') return NextResponse.json({ error: 'A sua conta de hospedagem está suspensa.' }, { status: 403 })
+    if (ha.status === 'suspended') {
+      return NextResponse.json({ error: 'A sua conta de hospedagem está suspensa.' }, { status: 403 })
+    }
 
+    // ── 6. Has hosting account → try WHM ────────────────────────────────────
     const whmCfg = await loadWhmConfig()
     if (!whmCfg) {
-      // WHM not configured yet — still return package info
       return NextResponse.json({
         emails: [],
         domain: ha.primary_domain,
         cpanel_username: ha.cpanel_username,
         hosting_account_id: ha.id,
         email_services: emailServices ?? [],
+        email_orders: emailOrderItems,
         provisioning: true,
       })
     }
 
     const emails = await listCpanelEmails(whmCfg.config, ha.cpanel_username, ha.primary_domain)
 
-    // Update email_count in hosting_accounts (best-effort)
     try {
       await db.from('hosting_accounts').update({ email_count: emails.length, updated_at: new Date().toISOString() }).eq('id', ha.id)
     } catch { /* non-fatal */ }
@@ -81,6 +137,7 @@ export async function GET() {
       cpanel_username: ha.cpanel_username,
       hosting_account_id: ha.id,
       email_services: emailServices ?? [],
+      email_orders: emailOrderItems,
       provisioning: false,
     })
   } catch (err: unknown) {

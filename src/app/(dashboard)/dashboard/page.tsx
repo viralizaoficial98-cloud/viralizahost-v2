@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { Metadata } from 'next'
 import { Server, Mail, HardDrive, RefreshCw, Clock, ExternalLink, ArrowRight, Shield } from 'lucide-react'
 import { createAuthClient, createAdminWriteClient } from '@/lib/supabase/server'

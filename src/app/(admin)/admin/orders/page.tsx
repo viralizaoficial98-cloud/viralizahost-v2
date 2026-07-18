@@ -29,10 +29,12 @@ function fmtPrice(n: number) {
 }
 
 export default function AdminOrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'aguardando_confirmacao' | 'active' | 'rejected'>('aguardando_confirmacao')
-  const [acting, setActing] = useState<string | null>(null)
+  const [orders, setOrders]         = useState<Order[]>([])
+  const [loading, setLoading]       = useState(true)
+  const [filter, setFilter]         = useState<'all' | 'aguardando_confirmacao' | 'active' | 'rejected'>('aguardando_confirmacao')
+  const [acting, setActing]         = useState<string | null>(null)
+  const [reconciling, setReconciling] = useState(false)
+  const [reconcileResult, setReconcileResult] = useState<any>(null)
 
   async function load() {
     setLoading(true)
@@ -40,6 +42,20 @@ export default function AdminOrdersPage() {
     const data = await res.json()
     setOrders(data.orders ?? [])
     setLoading(false)
+  }
+
+  async function reconcile() {
+    setReconciling(true)
+    setReconcileResult(null)
+    try {
+      const res = await fetch('/api/admin/orders/reconcile', { method: 'POST' })
+      const data = await res.json()
+      setReconcileResult(data)
+    } catch (e: any) {
+      setReconcileResult({ error: e.message })
+    } finally {
+      setReconciling(false)
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -72,10 +88,41 @@ export default function AdminOrdersPage() {
           <h1 className="text-2xl font-black text-[#0A0A0A]">Pedidos</h1>
           <p className="text-sm text-[#888] mt-1">Gerir pedidos e aprovar pagamentos BIC</p>
         </div>
-        <button onClick={load} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#E8E8E8] text-sm text-[#555] hover:border-[#F5B700] transition-colors">
-          <RefreshCw size={14} /> Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={reconcile} disabled={reconciling}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
+            style={{ background: reconciling ? '#888' : '#2563EB' }}
+            title="Cria registos de serviço para pedidos aprovados que ainda não têm serviço associado">
+            {reconciling ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            Reconciliar Serviços
+          </button>
+          <button onClick={load} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#E8E8E8] text-sm text-[#555] hover:border-[#F5B700] transition-colors">
+            <RefreshCw size={14} /> Atualizar
+          </button>
+        </div>
       </div>
+
+      {/* Reconcile result */}
+      {reconcileResult && (
+        <div className="mb-4 p-4 rounded-xl text-sm"
+          style={{ background: reconcileResult.error ? '#FEF2F2' : '#F0FDF4', border: reconcileResult.error ? '1px solid #FCA5A5' : '1px solid #86EFAC' }}>
+          {reconcileResult.error ? (
+            <p className="font-semibold text-red-700">Erro: {reconcileResult.error}</p>
+          ) : (
+            <div>
+              <p className="font-bold text-green-800 mb-1">Reconciliação concluída</p>
+              <p className="text-green-700">
+                {reconcileResult.created ?? 0} serviços criados &nbsp;·&nbsp;
+                {reconcileResult.skipped ?? 0} já existiam &nbsp;·&nbsp;
+                {reconcileResult.errors ?? 0} erros
+              </p>
+              {reconcileResult.details?.filter((d: any) => d.error).map((d: any, i: number) => (
+                <p key={i} className="text-red-600 text-xs mt-1">Pedido {d.order_id}: {d.error}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-[#F5F5F5] rounded-xl p-1 mb-6 w-fit">

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { Metadata } from 'next'
 import { Server, Mail } from 'lucide-react'
 import { createAuthClient, createAdminWriteClient } from '@/lib/supabase/server'
@@ -9,7 +10,8 @@ export const metadata: Metadata = { title: 'Hospedagem — ViralizaHost' }
 async function fetchHostingData(userId: string) {
   const db = createAdminWriteClient()
 
-  const [haResult, svcResult] = await Promise.allSettled([
+  // profiles.id = auth.users.id — same UUID, so userId works for all tables
+  const [haResult, svcResult, ordResult] = await Promise.allSettled([
     db.from('hosting_accounts')
       .select('id, service_id, cpanel_username, primary_domain, status, disk_used_mb, disk_limit_mb, bandwidth_used_mb, email_count, db_count, php_version, ssl_enabled, package_name, ip_address, suspension_reason, last_synced_at')
       .eq('profile_id', userId)
@@ -19,20 +21,51 @@ async function fetchHostingData(userId: string) {
       .eq('profile_id', userId)
       .in('service_type', ['hosting', 'email'])
       .order('created_at', { ascending: false }),
+    db.from('orders')
+      .select('id, status, created_at, billing_cycle, amount, order_items(id, service_name, service_type, price)')
+      .eq('user_id', userId)
+      .in('status', ['active', 'approved', 'paid', 'aguardando_confirmacao'])
+      .order('created_at', { ascending: false }),
   ])
 
   if (haResult.status === 'rejected') console.error('[hosting] hosting_accounts error:', haResult.reason)
 
   const hostingAccounts = haResult.status === 'fulfilled' ? (haResult.value.data ?? []) : []
   const allServices    = svcResult.status === 'fulfilled' ? (svcResult.value.data ?? []) : []
+  const orderRows      = ordResult.status === 'fulfilled' ? (ordResult.value.data ?? []) : []
 
   const accounts = hostingAccounts as any[]
 
   // Services that have no corresponding hosting_account yet (awaiting WHM provisioning)
   const haServiceIds = new Set(accounts.map((a: any) => a.service_id).filter(Boolean))
-  const pendingServices = (allServices as any[]).filter(
+  const pendingSvcRows = (allServices as any[]).filter(
     (s: any) => !haServiceIds.has(s.id) && s.service_type === 'hosting'
   )
+
+  // Order items for hosting purchases (fallback when services table not yet populated)
+  const existingOrderIds = new Set((allServices as any[]).map((s: any) => s.order_id).filter(Boolean))
+  const pendingOrderItems: any[] = (orderRows as any[]).flatMap((o: any) =>
+    (o.order_items ?? [])
+      .filter((i: any) => {
+        const t = (i.service_type ?? '').toLowerCase()
+        const n = (i.service_name ?? '').toLowerCase()
+        return (t === 'hosting' || n.includes('hospedagem') || n.includes('hosting') || n.includes('wordpress') || n.includes('vps') || n.includes('dedicado')) &&
+               !existingOrderIds.has(o.id)
+      })
+      .map((i: any) => ({
+        id: o.id + '-' + i.id,
+        service_name: i.service_name,
+        service_type: 'hosting',
+        status: 'pending_provisioning',
+        created_at: o.created_at,
+        order_id: o.id,
+        billing_cycle: o.billing_cycle,
+        price: i.price,
+        source: 'order',
+      }))
+  )
+
+  const pendingServices = [...pendingSvcRows, ...pendingOrderItems]
 
   const whmData: Record<string, any> = {}
   if (accounts.length > 0) {

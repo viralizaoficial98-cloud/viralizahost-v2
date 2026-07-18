@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { Metadata } from 'next'
 import { createAuthClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'

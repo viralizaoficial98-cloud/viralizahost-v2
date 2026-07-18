@@ -25,6 +25,9 @@ interface PurchasedEmailService {
   status: string
   created_at: string
   order_id: string | null
+  billing_cycle?: string | null
+  price?: number | null
+  source?: string
 }
 
 interface ApiResponse {
@@ -33,7 +36,9 @@ interface ApiResponse {
   cpanel_username?: string | null
   hosting_account_id?: string | null
   email_services?: PurchasedEmailService[]
+  email_orders?: PurchasedEmailService[]
   provisioning?: boolean
+  empty?: boolean
   error?: string
 }
 
@@ -106,6 +111,7 @@ export default function EmailManager() {
   const [hostingId, setHostingId]         = useState('')
   const [emailServices, setEmailServices] = useState<PurchasedEmailService[]>([])
   const [provisioning, setProvisioning]   = useState(false)
+  const [isEmpty, setIsEmpty]             = useState(false)
   const [loading, setLoading]             = useState(true)
   const [error, setError]                 = useState('')
   const [modal, setModal]           = useState<{ mode: ModalMode; email?: string; quota?: number }>({ mode: null })
@@ -133,8 +139,11 @@ export default function EmailManager() {
       setEmails(data.emails ?? [])
       setDomain(data.domain ?? '')
       setHostingId(data.hosting_account_id ?? '')
-      setEmailServices(data.email_services ?? [])
+      // Merge services table rows + order_items fallback
+      const combined = [...(data.email_services ?? []), ...(data.email_orders ?? [])]
+      setEmailServices(combined)
       setProvisioning(data.provisioning ?? false)
+      setIsEmpty(data.empty ?? false)
     } catch {
       setError('Erro de comunicação com o servidor.')
     } finally {
@@ -401,6 +410,21 @@ export default function EmailManager() {
               style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)' }}>
               Tentar novamente
             </button>
+          </div>
+        ) : isEmpty ? (
+          <div className="py-16 text-center">
+            <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+              style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+              <Mail size={28} style={{ color: '#059669' }} />
+            </div>
+            <p className="font-semibold text-sm mb-1" style={{ color: '#0B0B0D' }}>Nenhum pacote de e-mail contratado</p>
+            <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>
+              Adquira um pacote de e-mail corporativo para começar.
+            </p>
+            <a href="/billing" className="px-5 py-2.5 rounded-xl text-sm font-bold text-black inline-block"
+              style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.30)' }}>
+              Ver Pacotes de E-mail
+            </a>
           </div>
         ) : emails.length > 0 ? (
           <div>
