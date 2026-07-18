@@ -530,6 +530,163 @@ export async function changeCpanelEmailQuota(
   }, 'POST', 'editquota')
 }
 
+// ─── Domain listing ──────────────────────────────────────────────────────────
+
+export interface CpanelDomainInfo {
+  domain: string
+  type: 'main' | 'addon' | 'parked' | 'subdomain'
+  document_root?: string
+  main_domain?: string
+}
+
+export async function listCpanelDomains(
+  config: WHMConfig,
+  cpanelUser: string,
+  mainDomain: string,
+): Promise<CpanelDomainInfo[]> {
+  // Try DomainInfo::domains_data first (single call, all types)
+  try {
+    const { data } = await callCpanel(config, cpanelUser, 'DomainInfo', 'domains_data', {}, 'GET', 'domaindata')
+    if (Array.isArray(data) && (data as unknown[]).length > 0) {
+      return (data as Record<string, unknown>[]).map(d => {
+        const raw = String(d.domain_type ?? d.type ?? '')
+        const type: CpanelDomainInfo['type'] =
+          raw === 'main' ? 'main' : raw === 'addon' ? 'addon' : raw === 'parked' ? 'parked' : 'subdomain'
+        return {
+          domain:        String(d.domain ?? ''),
+          type,
+          document_root: d.document_root ? String(d.document_root) : undefined,
+          main_domain:   d.main_domain   ? String(d.main_domain)   : mainDomain,
+        }
+      }).filter(d => d.domain)
+    }
+  } catch { /* fall through to separate queries */ }
+
+  // Fallback: 3 separate UAPI calls
+  const results: CpanelDomainInfo[] = [{ domain: mainDomain, type: 'main' }]
+  const [subRes, addonRes, parkedRes] = await Promise.allSettled([
+    callCpanel(config, cpanelUser, 'SubDomain',   'listsubdomains',    {}, 'GET', 'listsubdomains'),
+    callCpanel(config, cpanelUser, 'AddonDomain', 'listaddondomains',  {}, 'GET', 'listaddondomains'),
+    callCpanel(config, cpanelUser, 'Park',        'list_parked_domains', {}, 'GET', 'listparkeddomains'),
+  ])
+  if (subRes.status === 'fulfilled') {
+    for (const s of (Array.isArray(subRes.value.data) ? subRes.value.data : []) as Record<string, unknown>[]) {
+      const sub  = String(s.sub ?? s.subdomain ?? s.domain ?? '')
+      const root = String(s.rootdomain ?? s.domain ?? mainDomain)
+      if (sub && !sub.includes('.')) results.push({ domain: `${sub}.${root}`, type: 'subdomain', main_domain: root })
+      else if (sub)                  results.push({ domain: sub, type: 'subdomain', main_domain: root })
+    }
+  }
+  if (addonRes.status === 'fulfilled') {
+    for (const a of (Array.isArray(addonRes.value.data) ? addonRes.value.data : []) as Record<string, unknown>[]) {
+      const domain = String(a.domain ?? a.addondomain ?? '')
+      if (domain) results.push({ domain, type: 'addon', main_domain: mainDomain })
+    }
+  }
+  if (parkedRes.status === 'fulfilled') {
+    for (const p of (Array.isArray(parkedRes.value.data) ? parkedRes.value.data : []) as Record<string, unknown>[]) {
+      const domain = String(p.domain ?? '')
+      if (domain) results.push({ domain, type: 'parked', main_domain: mainDomain })
+    }
+  }
+  return results
+}
+
+// ─── Database listing ─────────────────────────────────────────────────────────
+
+export interface CpanelDatabase {
+  name: string
+  disk_usage_mb?: number
+}
+
+export async function listCpanelDatabases(
+  config: WHMConfig,
+  cpanelUser: string,
+): Promise<CpanelDatabase[]> {
+  try {
+    const { data } = await callCpanel(config, cpanelUser, 'Mysql', 'list_databases', {}, 'GET', 'listdbs')
+    const rows = Array.isArray(data) ? data : []
+    return (rows as Record<string, unknown>[]).map(r => ({
+      name:          String(r.database ?? r.name ?? r.db ?? ''),
+      disk_usage_mb: r.disk_usage ? Math.round(Number(r.disk_usage) / (1024 * 1024)) : undefined,
+    })).filter(r => r.name)
+  } catch { return [] }
+}
+
+// ─── FTP account listing ──────────────────────────────────────────────────────
+
+export interface CpanelFtpAccount {
+  user: string
+  homedir: string
+  quota_type: string
+  quota_bytes?: number
+}
+
+export async function listCpanelFtpAccounts(
+  config: WHMConfig,
+  cpanelUser: string,
+): Promise<CpanelFtpAccount[]> {
+  try {
+    const { data } = await callCpanel(config, cpanelUser, 'Ftp', 'list_ftp_with_disk', {}, 'GET', 'listftpwithdisk')
+    const rows = Array.isArray(data) ? data : []
+    return (rows as Record<string, unknown>[])
+      .filter(r => !['ftpuser', 'anonymous'].includes(String(r.user ?? '')))
+      .map(r => ({
+        user:        String(r.user ?? r.login ?? ''),
+        homedir:     String(r.homedir ?? r.dir ?? ''),
+        quota_type:  String(r.quotatype ?? r.type ?? 'unlimited'),
+        quota_bytes: r.diskquota ? Number(r.diskquota) : undefined,
+      }))
+  } catch { return [] }
+}
+
+// ─── SSL certificate info ─────────────────────────────────────────────────────
+
+export interface CpanelSslInfo {
+  domain: string
+  valid: boolean
+  not_after?: string
+  issuer?: string
+  is_lets_encrypt?: boolean
+}
+
+export async function getCpanelSslInfo(
+  config: WHMConfig,
+  cpanelUser: string,
+  domain: string,
+): Promise<CpanelSslInfo | null> {
+  try {
+    const { data } = await callCpanel(
+      config, cpanelUser, 'SSL', 'fetch_best_for_domain', { domain }, 'GET', 'fetchbestcert',
+    )
+    if (!data || typeof data !== 'object') return null
+    const d = data as Record<string, unknown>
+    const cert = (d.certificate ?? d) as Record<string, unknown>
+    const notAfter = String(cert.not_after ?? cert.notAfter ?? '')
+    const issuer   = String(cert.issuer ?? cert.issuer_organization ?? '')
+    return {
+      domain,
+      valid:            cert.is_self_signed ? false : !!notAfter,
+      not_after:        notAfter || undefined,
+      issuer:           issuer || undefined,
+      is_lets_encrypt:  issuer.toLowerCase().includes("let's encrypt") ||
+                        issuer.toLowerCase().includes('letsencrypt'),
+    }
+  } catch { return null }
+}
+
+// ─── Cron jobs ────────────────────────────────────────────────────────────────
+
+export async function countCpanelCrons(
+  config: WHMConfig,
+  cpanelUser: string,
+): Promise<number> {
+  try {
+    const { data } = await callCpanel(config, cpanelUser, 'Cron', 'list_cron', {}, 'GET', 'fetchcron')
+    return Array.isArray(data) ? data.length : 0
+  } catch { return 0 }
+}
+
 export async function createEmailAccount(config: WHMConfig, domain: string, email: string, password: string, quota = 500) {
   // Legacy — kept for compatibility
   const cpanelUser = domain.replace(/\./g, '_').slice(0, 8)

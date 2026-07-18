@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -151,22 +151,54 @@ function OverviewTab({ data }: { data: ClientDetail }) {
   )
 }
 
+interface WhmDetails {
+  username: string
+  domain: string
+  synced_at: string
+  elapsed_ms: number
+  account: any
+  emails: any[]
+  domains: any[]
+  databases: any[]
+  ftp: any[]
+  ssl: any
+  cron_count: number
+  counts: { emails: number; domains: number; databases: number; ftp: number; crons: number }
+  errors: Record<string, string> | null
+}
+
 function HostingTab({ data, clientId, onRefresh }: { data: ClientDetail; clientId: string; onRefresh: () => void }) {
   const ha = data.hosting[0]
   const wa = data.whm[0]
-  const [loading, setLoading] = useState<string | null>(null)
-  const [pkg, setPkg]         = useState('')
-  const [pkgList, setPkgList] = useState<any[]>([])
-  const [msg, setMsg]         = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
-  const [newPwd, setNewPwd]   = useState('')
+  const [loading, setLoading]           = useState<string | null>(null)
+  const [pkg, setPkg]                   = useState('')
+  const [pkgList, setPkgList]           = useState<any[]>([])
+  const [msg, setMsg]                   = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [newPwd, setNewPwd]             = useState('')
   const [suspendReason, setSuspendReason] = useState('')
+  const [whmDetails, setWhmDetails]     = useState<WhmDetails | null>(null)
+  const [whmLoading, setWhmLoading]     = useState(false)
+  const [whmError, setWhmError]         = useState<string | null>(null)
+
+  const fetchWhmDetails = useCallback(async () => {
+    setWhmLoading(true); setWhmError(null)
+    try {
+      const r = await fetch(`/api/admin/clients/${clientId}/whm/details`)
+      const d = await r.json()
+      if (!r.ok) { setWhmError(d.error ?? 'Erro ao carregar dados do WHM'); return }
+      setWhmDetails(d)
+    } catch { setWhmError('Erro de rede.') }
+    finally { setWhmLoading(false) }
+  }, [clientId])
 
   useEffect(() => {
     fetch(`/api/admin/clients/${clientId}/whm/change-package`)
       .then(r => r.json())
       .then(d => { if (d.packages) setPkgList(d.packages) })
       .catch(() => {})
-  }, [clientId])
+    // Auto-fetch live WHM details on mount
+    if (ha || wa) fetchWhmDetails()
+  }, [clientId, ha, wa, fetchWhmDetails])
 
   const isSuspended = ha?.status === 'suspended' || wa?.is_suspended
 
@@ -220,8 +252,10 @@ function HostingTab({ data, clientId, onRefresh }: { data: ClientDetail; clientI
             { label: 'IP',        value: ha?.ip_address       ?? wa?.ip_address      ?? '—' },
             { label: 'PHP',       value: ha?.php_version      ?? wa?.php_version     ?? '—' },
             { label: 'Disco',     value: ha ? `${ha.disk_used_mb ?? 0} MB` : '—' },
-            { label: 'E-mails',   value: ha?.email_count      ?? '—' },
-            { label: 'Sync',      value: fmt(ha?.last_synced_at ?? wa?.last_synced_at) },
+            { label: 'E-mails',   value: whmDetails ? whmDetails.counts.emails : (ha?.email_count ?? '—') },
+            { label: 'Bancos',    value: whmDetails ? whmDetails.counts.databases : (ha?.db_count ?? '—') },
+            { label: 'FTP',       value: whmDetails ? whmDetails.counts.ftp : '—' },
+            { label: 'Sync',      value: fmt(whmDetails?.synced_at ?? ha?.last_synced_at ?? wa?.last_synced_at) },
           ].map(({ label, value }) => (
             <div key={label}>
               <div className="text-xs font-medium mb-0.5" style={{ color: '#94A3B8' }}>{label}</div>
@@ -229,6 +263,211 @@ function HostingTab({ data, clientId, onRefresh }: { data: ClientDetail; clientI
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Live WHM data section */}
+      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 16, padding: 24 }}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <RefreshCw size={15} style={{ color: '#7C3AED' }} />
+            <span className="font-bold text-sm" style={{ color: '#0B0B0D' }}>Dados em Tempo Real do WHM</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {whmDetails && (
+              <span className="text-xs" style={{ color: '#94A3B8' }}>
+                {new Date(whmDetails.synced_at).toLocaleTimeString('pt-PT')} · {whmDetails.elapsed_ms}ms
+              </span>
+            )}
+            {whmLoading
+              ? <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
+                  style={{ background: 'rgba(245,183,0,0.10)', color: '#D9A300', border: '1px solid rgba(245,183,0,0.25)' }}>
+                  <Loader2 size={10} className="animate-spin" /> Atualizando
+                </span>
+              : whmError
+                ? <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
+                    style={{ background: 'rgba(239,68,68,0.08)', color: '#DC2626', border: '1px solid rgba(239,68,68,0.20)' }}>
+                    Erro
+                  </span>
+                : whmDetails
+                  ? <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
+                      style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.20)' }}>
+                      <CheckCircle2 size={10} /> Sincronizado
+                    </span>
+                  : null
+            }
+            <button
+              onClick={fetchWhmDetails}
+              disabled={whmLoading}
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl"
+              style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}>
+              <RefreshCw size={11} className={whmLoading ? 'animate-spin' : ''} />
+              Recarregar
+            </button>
+          </div>
+        </div>
+
+        {whmError && !whmDetails && (
+          <div className="rounded-xl px-4 py-3 text-sm mb-4"
+            style={{ background: 'rgba(239,68,68,0.06)', color: '#DC2626', border: '1px solid rgba(239,68,68,0.15)' }}>
+            {whmError}
+          </div>
+        )}
+
+        {whmDetails && (
+          <div className="space-y-5">
+            {/* SSL status */}
+            {whmDetails.ssl && (
+              <div className="flex items-center gap-3 rounded-xl px-4 py-3"
+                style={{ background: whmDetails.ssl.valid ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
+                         border: `1px solid ${whmDetails.ssl.valid ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}` }}>
+                <Shield size={16} style={{ color: whmDetails.ssl.valid ? '#059669' : '#DC2626', flexShrink: 0 }} />
+                <div>
+                  <span className="text-sm font-bold" style={{ color: whmDetails.ssl.valid ? '#059669' : '#DC2626' }}>
+                    SSL {whmDetails.ssl.valid ? 'Ativo' : 'Inativo'}
+                  </span>
+                  {whmDetails.ssl.issuer && (
+                    <span className="text-xs ml-2" style={{ color: '#64748B' }}>{whmDetails.ssl.issuer}</span>
+                  )}
+                  {whmDetails.ssl.not_after && (
+                    <span className="text-xs ml-2" style={{ color: '#94A3B8' }}>
+                      Expira: {new Date(whmDetails.ssl.not_after).toLocaleDateString('pt-PT')}
+                    </span>
+                  )}
+                  {whmDetails.ssl.is_lets_encrypt && (
+                    <span className="text-xs ml-2 font-bold" style={{ color: '#059669' }}>Let&apos;s Encrypt</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Domains from cPanel */}
+            {whmDetails.domains.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Globe size={14} style={{ color: '#7C3AED' }} />
+                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#94A3B8' }}>
+                    Domínios cPanel ({whmDetails.domains.length})
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {whmDetails.domains.map((d: any) => (
+                    <div key={d.domain} className="flex items-center gap-3 rounded-lg px-3 py-2"
+                      style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                      <span className="text-sm font-mono font-semibold flex-1" style={{ color: '#0B0B0D' }}>{d.domain}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                        style={{ background: d.type === 'main' ? 'rgba(124,58,237,0.08)' : '#F1F5F9',
+                                 color: d.type === 'main' ? '#7C3AED' : '#64748B' }}>
+                        {d.type === 'main' ? 'Principal' : d.type === 'addon' ? 'Addon' : d.type === 'parked' ? 'Alias' : 'Subdomínio'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Email accounts */}
+            {whmDetails.emails.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Mail size={14} style={{ color: '#7C3AED' }} />
+                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#94A3B8' }}>
+                    Contas de E-mail ({whmDetails.emails.length})
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {whmDetails.emails.map((em: any) => (
+                    <div key={em.email} className="flex items-center gap-3 rounded-lg px-3 py-2"
+                      style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                      <span className="text-sm font-mono flex-1 truncate" style={{ color: '#0B0B0D' }}>{em.email}</span>
+                      <span className="text-xs" style={{ color: '#94A3B8' }}>{em.humandiskused}</span>
+                      {em.diskquota > 0 && (
+                        <span className="text-xs" style={{ color: '#CBD5E1' }}>/ {em.humandiskquota}</span>
+                      )}
+                      {em.suspended_login === 1 && (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-bold"
+                          style={{ background: 'rgba(239,68,68,0.08)', color: '#DC2626' }}>Suspenso</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Databases */}
+            {whmDetails.databases.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <HardDrive size={14} style={{ color: '#7C3AED' }} />
+                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#94A3B8' }}>
+                    Bancos de Dados MySQL ({whmDetails.databases.length})
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {whmDetails.databases.map((db: any) => (
+                    <span key={db.name} className="text-xs font-mono px-2.5 py-1 rounded-lg"
+                      style={{ background: '#F8FAFC', border: '1px solid #F1F5F9', color: '#64748B' }}>
+                      {db.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* FTP */}
+            {whmDetails.ftp.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Download size={14} style={{ color: '#7C3AED' }} />
+                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#94A3B8' }}>
+                    Contas FTP ({whmDetails.ftp.length})
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {whmDetails.ftp.map((f: any) => (
+                    <span key={f.user} className="text-xs font-mono px-2.5 py-1 rounded-lg"
+                      style={{ background: '#F8FAFC', border: '1px solid #F1F5F9', color: '#64748B' }}>
+                      {f.user}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Cron jobs */}
+            {whmDetails.cron_count > 0 && (
+              <div className="flex items-center gap-2">
+                <Clock size={14} style={{ color: '#7C3AED' }} />
+                <span className="text-xs" style={{ color: '#64748B' }}>
+                  <span className="font-bold" style={{ color: '#0B0B0D' }}>{whmDetails.cron_count}</span> tarefa{whmDetails.cron_count !== 1 ? 's' : ''} cron agendada{whmDetails.cron_count !== 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+
+            {/* API errors (non-fatal) */}
+            {whmDetails.errors && (
+              <div className="rounded-xl px-4 py-3 text-xs"
+                style={{ background: 'rgba(245,183,0,0.06)', border: '1px solid rgba(245,183,0,0.20)', color: '#D9A300' }}>
+                <div className="font-bold mb-1">Alguns dados WHM não disponíveis:</div>
+                {Object.entries(whmDetails.errors).map(([k, v]) => (
+                  <div key={k}>{k}: {String(v)}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!whmDetails && !whmLoading && !whmError && (
+          <div className="text-sm text-center py-6" style={{ color: '#94A3B8' }}>
+            Nenhum dado WHM carregado. Clique em Recarregar.
+          </div>
+        )}
+
+        {whmLoading && !whmDetails && (
+          <div className="flex items-center justify-center py-8 gap-3">
+            <Loader2 size={18} className="animate-spin" style={{ color: '#7C3AED' }} />
+            <span className="text-sm" style={{ color: '#64748B' }}>Carregando dados do WHM…</span>
+          </div>
+        )}
       </div>
 
       {/* Actions */}
@@ -376,32 +615,101 @@ function HostingTab({ data, clientId, onRefresh }: { data: ClientDetail; clientI
   )
 }
 
-function DomainsTab({ data }: { data: ClientDetail }) {
-  if (!data.domains.length) return (
-    <div className="p-14 text-center text-sm" style={{ color: '#94A3B8' }}>Nenhum domínio registado.</div>
-  )
+function DomainsTab({ data, clientId }: { data: ClientDetail; clientId: string }) {
+  const [whmDomains, setWhmDomains] = useState<any[]>([])
+  const [loadingWhm, setLoadingWhm] = useState(false)
+  const fetched = useRef(false)
+
+  useEffect(() => {
+    if (fetched.current) return
+    fetched.current = true
+    // Only auto-fetch if no DB domains (saves a WHM call when we have registered domains)
+    setLoadingWhm(true)
+    fetch(`/api/admin/clients/${clientId}/whm/details`)
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d.domains)) setWhmDomains(d.domains) })
+      .catch(() => {})
+      .finally(() => setLoadingWhm(false))
+  }, [clientId])
+
+  const card = { background: '#fff', border: '1px solid #E5E7EB', borderRadius: 16, overflow: 'hidden' as const }
+
   return (
-    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 16, overflow: 'hidden' }}>
-      <table className="w-full">
-        <thead>
-          <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
-            {['Domínio', 'Tipo', 'Estado', 'Expira em', 'Criado'].map(h => (
-              <th key={h} className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide" style={{ color: '#94A3B8' }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.domains.map((d: any, i: number) => (
-            <tr key={d.id} style={{ borderBottom: i < data.domains.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
-              <td className="px-5 py-3 text-sm font-semibold" style={{ color: '#0B0B0D' }}>{d.domain_name}</td>
-              <td className="px-5 py-3 text-xs" style={{ color: '#64748B' }}>{d.domain_type ?? '—'}</td>
-              <td className="px-5 py-3"><StatusBadge status={d.status ?? 'active'} /></td>
-              <td className="px-5 py-3 text-xs" style={{ color: '#94A3B8' }}>{fmt(d.expires_at)}</td>
-              <td className="px-5 py-3 text-xs" style={{ color: '#94A3B8' }}>{fmt(d.created_at)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-5">
+      {/* Registered domains from DB */}
+      {data.domains.length > 0 && (
+        <div style={card}>
+          <div className="px-5 py-3 font-bold text-sm" style={{ borderBottom: '1px solid #F1F5F9', color: '#0B0B0D' }}>
+            Domínios Registados ({data.domains.length})
+          </div>
+          <table className="w-full">
+            <thead>
+              <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
+                {['Domínio', 'Tipo', 'Estado', 'Expira em', 'Criado'].map(h => (
+                  <th key={h} className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide" style={{ color: '#94A3B8' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.domains.map((d: any, i: number) => (
+                <tr key={d.id} style={{ borderBottom: i < data.domains.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
+                  <td className="px-5 py-3 text-sm font-semibold" style={{ color: '#0B0B0D' }}>{d.domain_name ?? d.full_domain ?? `${d.name}${d.extension}`}</td>
+                  <td className="px-5 py-3 text-xs" style={{ color: '#64748B' }}>{d.domain_type ?? '—'}</td>
+                  <td className="px-5 py-3"><StatusBadge status={d.status ?? 'active'} /></td>
+                  <td className="px-5 py-3 text-xs" style={{ color: '#94A3B8' }}>{fmt(d.expires_at)}</td>
+                  <td className="px-5 py-3 text-xs" style={{ color: '#94A3B8' }}>{fmt(d.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* cPanel domains from WHM (addon, parked, subdomains) */}
+      <div style={card}>
+        <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #F1F5F9' }}>
+          <span className="font-bold text-sm" style={{ color: '#0B0B0D' }}>
+            Domínios cPanel {whmDomains.length > 0 ? `(${whmDomains.length})` : ''}
+          </span>
+          {loadingWhm && <Loader2 size={14} className="animate-spin" style={{ color: '#7C3AED' }} />}
+        </div>
+
+        {loadingWhm && whmDomains.length === 0 ? (
+          <div className="py-10 text-center">
+            <Loader2 size={20} className="animate-spin mx-auto mb-2" style={{ color: '#7C3AED' }} />
+            <p className="text-xs" style={{ color: '#94A3B8' }}>Carregando do WHM…</p>
+          </div>
+        ) : whmDomains.length === 0 ? (
+          <div className="py-10 text-center text-sm" style={{ color: '#94A3B8' }}>
+            Nenhum domínio encontrado no WHM/cPanel.
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
+                {['Domínio', 'Tipo'].map(h => (
+                  <th key={h} className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide" style={{ color: '#94A3B8' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {whmDomains.map((d: any, i: number) => (
+                <tr key={d.domain} style={{ borderBottom: i < whmDomains.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
+                  <td className="px-5 py-3 text-sm font-mono font-semibold" style={{ color: '#0B0B0D' }}>{d.domain}</td>
+                  <td className="px-5 py-3">
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: d.type === 'main' ? 'rgba(124,58,237,0.08)' : '#F1F5F9',
+                               color: d.type === 'main' ? '#7C3AED' : '#64748B',
+                               border: `1px solid ${d.type === 'main' ? 'rgba(124,58,237,0.20)' : '#E2E8F0'}` }}>
+                      {d.type === 'main' ? 'Principal' : d.type === 'addon' ? 'Addon' : d.type === 'parked' ? 'Alias' : 'Subdomínio'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }
@@ -434,7 +742,7 @@ function ServicesTab({ data }: { data: ClientDetail }) {
 
 function FinancialTab({ data }: { data: ClientDetail }) {
   const totalPaid    = data.payments.filter((p: any) => p.status === 'approved').reduce((a: number, p: any) => a + (p.amount ?? 0), 0)
-  const totalPending = data.invoices.filter((i: any) => ['pending', 'overdue'].includes(i.status)).reduce((a: number, i: any) => a + (i.total_amount ?? 0), 0)
+  const totalPending = data.invoices.filter((i: any) => ['pending', 'overdue'].includes(i.status)).reduce((a: number, i: any) => a + (i.total ?? 0), 0)
 
   return (
     <div className="space-y-5">
@@ -467,7 +775,7 @@ function FinancialTab({ data }: { data: ClientDetail }) {
               {data.invoices.map((inv: any, i: number) => (
                 <tr key={inv.id} style={{ borderBottom: i < data.invoices.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
                   <td className="px-5 py-3 text-xs font-mono" style={{ color: '#64748B' }}>{inv.invoice_number ?? inv.id.slice(0, 8)}</td>
-                  <td className="px-5 py-3 text-sm font-bold" style={{ color: '#0B0B0D' }}>{fmtMoney(inv.total_amount ?? 0, inv.currency)}</td>
+                  <td className="px-5 py-3 text-sm font-bold" style={{ color: '#0B0B0D' }}>{fmtMoney(inv.total ?? 0, inv.currency)}</td>
                   <td className="px-5 py-3 text-xs" style={{ color: '#94A3B8' }}>{fmt(inv.due_date)}</td>
                   <td className="px-5 py-3"><StatusBadge status={inv.status} /></td>
                 </tr>
@@ -773,7 +1081,7 @@ export default function AdminClientDetailPage() {
           {tab === 'overview'  && <OverviewTab  data={data} />}
           {tab === 'portal'    && <PortalTab    data={data} clientId={clientId} onRefresh={load} />}
           {tab === 'hosting'   && <HostingTab   data={data} clientId={clientId} onRefresh={load} />}
-          {tab === 'domains'   && <DomainsTab   data={data} />}
+          {tab === 'domains'   && <DomainsTab   data={data} clientId={clientId} />}
           {tab === 'services'  && <ServicesTab  data={data} />}
           {tab === 'financial' && <FinancialTab data={data} />}
           {tab === 'tickets'   && <TicketsTab   data={data} />}
