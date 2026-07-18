@@ -9,15 +9,30 @@ export const metadata: Metadata = { title: 'Hospedagem — ViralizaHost' }
 async function fetchHostingData(userId: string) {
   const db = createAdminWriteClient()
 
-  const { data: hostingAccounts, error: haErr } = await db
-    .from('hosting_accounts')
-    .select('id, service_id, cpanel_username, primary_domain, status, disk_used_mb, disk_limit_mb, bandwidth_used_mb, email_count, db_count, php_version, ssl_enabled, package_name, ip_address, suspension_reason, last_synced_at')
-    .eq('profile_id', userId)
-    .order('created_at', { ascending: false })
+  const [haResult, svcResult] = await Promise.allSettled([
+    db.from('hosting_accounts')
+      .select('id, service_id, cpanel_username, primary_domain, status, disk_used_mb, disk_limit_mb, bandwidth_used_mb, email_count, db_count, php_version, ssl_enabled, package_name, ip_address, suspension_reason, last_synced_at')
+      .eq('profile_id', userId)
+      .order('created_at', { ascending: false }),
+    db.from('services')
+      .select('id, service_name, service_type, status, created_at, order_id')
+      .eq('profile_id', userId)
+      .in('service_type', ['hosting', 'email'])
+      .order('created_at', { ascending: false }),
+  ])
 
-  if (haErr) console.error('[hosting] hosting_accounts error:', haErr.message)
+  if (haResult.status === 'rejected') console.error('[hosting] hosting_accounts error:', haResult.reason)
 
-  const accounts = (hostingAccounts ?? []) as any[]
+  const hostingAccounts = haResult.status === 'fulfilled' ? (haResult.value.data ?? []) : []
+  const allServices    = svcResult.status === 'fulfilled' ? (svcResult.value.data ?? []) : []
+
+  const accounts = hostingAccounts as any[]
+
+  // Services that have no corresponding hosting_account yet (awaiting WHM provisioning)
+  const haServiceIds = new Set(accounts.map((a: any) => a.service_id).filter(Boolean))
+  const pendingServices = (allServices as any[]).filter(
+    (s: any) => !haServiceIds.has(s.id) && s.service_type === 'hosting'
+  )
 
   const whmData: Record<string, any> = {}
   if (accounts.length > 0) {
@@ -46,7 +61,7 @@ async function fetchHostingData(userId: string) {
     .eq('name', '__whm_config__')
     .maybeSingle()
 
-  return { accounts, whmData, packageLabel, server: serverRow }
+  return { accounts, whmData, packageLabel, server: serverRow, pendingServices }
 }
 
 export default async function HostingPage() {
@@ -54,7 +69,7 @@ export default async function HostingPage() {
   const { data: { user } } = await authDb.auth.getUser()
   if (!user) redirect('/login')
 
-  const { accounts, whmData, packageLabel, server } = await fetchHostingData(user.id)
+  const { accounts, whmData, packageLabel, server, pendingServices } = await fetchHostingData(user.id)
 
   return (
     <div className="space-y-7">
@@ -70,7 +85,7 @@ export default async function HostingPage() {
         </a>
       </div>
 
-      {accounts.length > 0 ? (
+      {(accounts.length > 0 || pendingServices.length > 0) ? (
         <div className="space-y-6">
           {accounts.map((ha: any, index: number) => {
             const whm    = whmData[ha.id] ?? null
@@ -87,6 +102,34 @@ export default async function HostingPage() {
               />
             )
           })}
+
+          {pendingServices.map((svc: any) => (
+            <div key={svc.id} className="rounded-2xl overflow-hidden"
+              style={{ background: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 4px 24px rgba(15,23,42,0.06)' }}>
+              <div className="px-6 py-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.20)' }}>
+                  <Server size={22} style={{ color: '#D9A300' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm" style={{ color: '#0B0B0D' }}>{svc.service_name ?? 'Plano de Hospedagem'}</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
+                    Compra confirmada em {new Date(svc.created_at).toLocaleDateString('pt-AO')}
+                  </p>
+                </div>
+                <span className="text-xs font-semibold px-3 py-1 rounded-full"
+                  style={{ background: 'rgba(245,183,0,0.12)', color: '#D9A300', border: '1px solid rgba(245,183,0,0.25)' }}>
+                  ⏳ Aguardando provisionamento
+                </span>
+              </div>
+              <div className="px-6 pb-5">
+                <p className="text-xs" style={{ color: '#64748B' }}>
+                  O seu plano de hospedagem está a ser configurado pela nossa equipa. Receberá uma notificação assim que estiver ativo.
+                  Se tiver dúvidas, <a href="/tickets" className="underline" style={{ color: '#2563EB' }}>abra um ticket de suporte</a>.
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="py-16 text-center rounded-2xl"
@@ -97,7 +140,7 @@ export default async function HostingPage() {
           </div>
           <p className="font-semibold text-sm mb-1" style={{ color: '#0B0B0D' }}>Nenhum plano de hospedagem ativo</p>
           <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>
-            A sua conta de hospedagem está a ser configurada ou ainda não possui um plano ativo
+            Ainda não possui nenhum plano de hospedagem. Escolha um plano e comece hoje.
           </p>
           <a href="/billing" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-black"
             style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.30)' }}>

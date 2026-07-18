@@ -11,7 +11,7 @@ async function fetchDashboardData(userId: string) {
   console.info('[dashboard] fetchDashboardData start', userId.slice(0, 8))
   const db = createAdminWriteClient()
 
-  const [haResult, domainsResult, ticketsResult, activityResult, profileResult] = await Promise.allSettled([
+  const [haResult, domainsResult, ticketsResult, activityResult, profileResult, svcResult] = await Promise.allSettled([
     db.from('hosting_accounts')
       .select('id, primary_domain, disk_used_mb, disk_limit_mb, email_count, status, package_name, ip_address, last_synced_at, service_id, php_version')
       .eq('profile_id', userId)
@@ -24,6 +24,10 @@ async function fetchDashboardData(userId: string) {
       .order('created_at', { ascending: false })
       .limit(5),
     db.from('profiles').select('full_name').eq('id', userId).maybeSingle(),
+    db.from('services')
+      .select('id, service_type, status')
+      .eq('profile_id', userId)
+      .in('status', ['active', 'pending_provisioning', 'pending']),
   ])
 
   if (haResult.status === 'rejected')       console.error('[dashboard] hosting_accounts failed', haResult.reason)
@@ -31,18 +35,28 @@ async function fetchDashboardData(userId: string) {
   if (ticketsResult.status === 'rejected')  console.error('[dashboard] tickets failed', ticketsResult.reason)
   if (activityResult.status === 'rejected') console.error('[dashboard] sso_audit_logs failed', activityResult.reason)
   if (profileResult.status === 'rejected')  console.error('[dashboard] profiles failed', profileResult.reason)
+  if (svcResult.status === 'rejected')      console.error('[dashboard] services failed', svcResult.reason)
 
   const hostingAccounts = haResult.status === 'fulfilled' ? (haResult.value.data ?? []) : []
   const portalDomains   = domainsResult.status === 'fulfilled' ? (domainsResult.value.data ?? []) : []
   const ticketsCount    = ticketsResult.status === 'fulfilled' ? (ticketsResult.value.count ?? 0) : 0
   const ssoLogs         = activityResult.status === 'fulfilled' ? (activityResult.value.data ?? []) : []
   const profile         = profileResult.status === 'fulfilled' ? profileResult.value.data : null
+  const allServices     = svcResult.status === 'fulfilled' ? (svcResult.value.data ?? []) : []
 
   const primaryDomainNames  = new Set((hostingAccounts as any[]).map((h: any) => h.primary_domain?.toLowerCase()))
   const uniquePortalDomains = (portalDomains as any[]).filter((d: any) => !primaryDomainNames.has(d?.id?.toLowerCase()))
   const domainsCount  = (hostingAccounts as any[]).filter((h: any) => h.status !== 'suspended').length + uniquePortalDomains.length
-  const servicesCount = (hostingAccounts as any[]).filter((h: any) => h.status !== 'suspended').length
-  const emailsCount   = (hostingAccounts as any[]).reduce((s: number, h: any) => s + (h.email_count ?? 0), 0)
+
+  // Count hosting services: WHM accounts + purchased services not yet in WHM
+  const haServiceIds   = new Set((hostingAccounts as any[]).map((h: any) => h.service_id).filter(Boolean))
+  const purchasedHosting = (allServices as any[]).filter((s: any) => s.service_type === 'hosting' && !haServiceIds.has(s.id))
+  const servicesCount  = (hostingAccounts as any[]).filter((h: any) => h.status !== 'suspended').length + purchasedHosting.length
+
+  // Count email packages: WHM email accounts + standalone purchased email services
+  const purchasedEmail = (allServices as any[]).filter((s: any) => s.service_type === 'email')
+  const emailsCount    = (hostingAccounts as any[]).reduce((s: number, h: any) => s + (h.email_count ?? 0), 0)
+  const emailPackages  = purchasedEmail.length
   const totalDiskUsed  = (hostingAccounts as any[]).reduce((s: number, h: any) => s + (h.disk_used_mb ?? 0), 0)
   const totalDiskLimit = (hostingAccounts as any[]).reduce((s: number, h: any) => s + (h.disk_limit_mb ?? 0), 0)
   const lastSyncedAt   = (hostingAccounts as any[]).reduce((latest: string | null, h: any) => {
@@ -50,9 +64,9 @@ async function fetchDashboardData(userId: string) {
     return !latest || h.last_synced_at > latest ? h.last_synced_at : latest
   }, null)
 
-  console.info('[dashboard] resolved — hosting:', hostingAccounts.length, 'domains:', domainsCount, 'emails:', emailsCount, 'tickets:', ticketsCount)
+  console.info('[dashboard] resolved — hosting:', hostingAccounts.length, 'domains:', domainsCount, 'emails:', emailsCount, 'emailPkgs:', emailPackages, 'tickets:', ticketsCount)
 
-  return { hostingAccounts, domainsCount, servicesCount, emailsCount, ticketsCount, totalDiskUsed, totalDiskLimit, lastSyncedAt, ssoLogs, profile }
+  return { hostingAccounts, domainsCount, servicesCount, emailsCount: emailsCount + emailPackages, ticketsCount, totalDiskUsed, totalDiskLimit, lastSyncedAt, ssoLogs, profile }
 }
 
 // All props are plain serializable values — no functions, no React components

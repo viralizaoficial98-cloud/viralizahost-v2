@@ -17,29 +17,72 @@ async function getClientHostingAccount(userId: string) {
   return data as { id: string; cpanel_username: string; primary_domain: string; status: string; service_id: string; email_count: number } | null
 }
 
-// GET /api/client/email-accounts — list cPanel emails
+// GET /api/client/email-accounts — list cPanel emails or purchased email packages
 export async function GET() {
   const authDb = await createAuthClient()
   const { data: { user } } = await authDb.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
 
   try {
+    const db = createAdminWriteClient()
+
+    // Check for purchased email services (no WHM required yet)
+    const { data: emailServices } = await db
+      .from('services')
+      .select('id, service_name, service_type, status, created_at, order_id')
+      .eq('profile_id', user.id)
+      .eq('service_type', 'email')
+      .order('created_at', { ascending: false })
+
     const ha = await getClientHostingAccount(user.id)
-    if (!ha) return NextResponse.json({ error: 'Nenhuma conta de hospedagem encontrada.' }, { status: 404 })
+
+    // If no hosting account and no email service → nothing to show
+    if (!ha && (!emailServices || emailServices.length === 0)) {
+      return NextResponse.json({ error: 'Nenhuma conta de hospedagem encontrada.' }, { status: 404 })
+    }
+
+    // If email services purchased but no WHM account yet → return package info
+    if (!ha) {
+      return NextResponse.json({
+        emails: [],
+        domain: null,
+        cpanel_username: null,
+        hosting_account_id: null,
+        email_services: emailServices ?? [],
+        provisioning: true,
+      })
+    }
+
     if (ha.status === 'suspended') return NextResponse.json({ error: 'A sua conta de hospedagem está suspensa.' }, { status: 403 })
 
     const whmCfg = await loadWhmConfig()
-    if (!whmCfg) return NextResponse.json({ error: 'Integração WHM não configurada.' }, { status: 503 })
+    if (!whmCfg) {
+      // WHM not configured yet — still return package info
+      return NextResponse.json({
+        emails: [],
+        domain: ha.primary_domain,
+        cpanel_username: ha.cpanel_username,
+        hosting_account_id: ha.id,
+        email_services: emailServices ?? [],
+        provisioning: true,
+      })
+    }
 
     const emails = await listCpanelEmails(whmCfg.config, ha.cpanel_username, ha.primary_domain)
 
     // Update email_count in hosting_accounts (best-effort)
     try {
-      const db = createAdminWriteClient()
       await db.from('hosting_accounts').update({ email_count: emails.length, updated_at: new Date().toISOString() }).eq('id', ha.id)
     } catch { /* non-fatal */ }
 
-    return NextResponse.json({ emails, domain: ha.primary_domain, cpanel_username: ha.cpanel_username, hosting_account_id: ha.id })
+    return NextResponse.json({
+      emails,
+      domain: ha.primary_domain,
+      cpanel_username: ha.cpanel_username,
+      hosting_account_id: ha.id,
+      email_services: emailServices ?? [],
+      provisioning: false,
+    })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[email-accounts GET]', msg)

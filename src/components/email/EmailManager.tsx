@@ -18,11 +18,22 @@ interface EmailAccount {
   suspended_login: number
 }
 
+interface PurchasedEmailService {
+  id: string
+  service_name: string | null
+  service_type: string
+  status: string
+  created_at: string
+  order_id: string | null
+}
+
 interface ApiResponse {
   emails?: EmailAccount[]
-  domain?: string
-  cpanel_username?: string
-  hosting_account_id?: string
+  domain?: string | null
+  cpanel_username?: string | null
+  hosting_account_id?: string | null
+  email_services?: PurchasedEmailService[]
+  provisioning?: boolean
   error?: string
 }
 
@@ -90,11 +101,13 @@ function StorageBar({ used, total, delay = 0 }: { used: number; total: number; d
 }
 
 export default function EmailManager() {
-  const [emails, setEmails]         = useState<EmailAccount[]>([])
-  const [domain, setDomain]         = useState('')
-  const [hostingId, setHostingId]   = useState('')
-  const [loading, setLoading]       = useState(true)
-  const [error, setError]           = useState('')
+  const [emails, setEmails]               = useState<EmailAccount[]>([])
+  const [domain, setDomain]               = useState('')
+  const [hostingId, setHostingId]         = useState('')
+  const [emailServices, setEmailServices] = useState<PurchasedEmailService[]>([])
+  const [provisioning, setProvisioning]   = useState(false)
+  const [loading, setLoading]             = useState(true)
+  const [error, setError]                 = useState('')
   const [modal, setModal]           = useState<{ mode: ModalMode; email?: string; quota?: number }>({ mode: null })
   const [actionLoading, setAction]  = useState(false)
   const [toast, setToast]           = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -120,6 +133,8 @@ export default function EmailManager() {
       setEmails(data.emails ?? [])
       setDomain(data.domain ?? '')
       setHostingId(data.hosting_account_id ?? '')
+      setEmailServices(data.email_services ?? [])
+      setProvisioning(data.provisioning ?? false)
     } catch {
       setError('Erro de comunicação com o servidor.')
     } finally {
@@ -246,9 +261,10 @@ export default function EmailManager() {
           </button>
           <button
             onClick={() => { setModal({ mode: 'create' }); setNewLocalpart(''); setNewPassword(''); setNewQuota(500) }}
-            disabled={loading || !!error}
+            disabled={loading || !!error || provisioning || !domain}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-black disabled:opacity-50 transition-all hover:opacity-90 active:scale-95"
             style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.35)' }}
+            title={provisioning ? 'Aguardando configuração do domínio' : undefined}
           >
             <Plus size={16} /> Nova Conta
           </button>
@@ -313,6 +329,35 @@ export default function EmailManager() {
           </div>
         </div>
       )}
+
+      {/* Purchased email packages awaiting provisioning */}
+      {!loading && !error && provisioning && emailServices.length > 0 && emailServices.map((svc) => (
+        <div key={svc.id} className="rounded-2xl overflow-hidden"
+          style={{ background: '#FFFBEB', border: '1px solid rgba(245,183,0,0.35)', boxShadow: '0 2px 12px rgba(245,183,0,0.08)' }}>
+          <div className="px-6 py-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(245,183,0,0.15)', border: '1px solid rgba(245,183,0,0.30)' }}>
+              <Mail size={20} style={{ color: '#D9A300' }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm" style={{ color: '#0B0B0D' }}>{svc.service_name ?? 'Pacote de E-mail Corporativo'}</p>
+              <p className="text-xs mt-0.5" style={{ color: '#92400E' }}>
+                Compra confirmada em {new Date(svc.created_at).toLocaleDateString('pt-AO')}
+              </p>
+            </div>
+            <span className="text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap"
+              style={{ background: 'rgba(245,183,0,0.15)', color: '#92400E', border: '1px solid rgba(245,183,0,0.30)' }}>
+              ⏳ Aguardando configuração
+            </span>
+          </div>
+          <div className="px-6 pb-5">
+            <p className="text-xs" style={{ color: '#78350F' }}>
+              O seu pacote de e-mail está a ser configurado. Assim que estiver pronto, as caixas de correio ficarão disponíveis aqui.
+              Se precisar de ajuda, <a href="/tickets" className="underline font-semibold">abra um ticket de suporte</a>.
+            </p>
+          </div>
+        </div>
+      ))}
 
       {/* Email list */}
       <div className="rounded-2xl overflow-hidden" style={{ background: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 4px 24px rgba(15,23,42,0.05)' }}>
