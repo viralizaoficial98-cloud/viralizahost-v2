@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminWriteClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
   try {
@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     const category    = searchParams.get('category')
     const subcategory = searchParams.get('subcategory')
 
-    const supabase = await createAdminClient()
+    const supabase = createAdminWriteClient()
     let query = (supabase as any)
       .from('products')
       .select('*, product_features(feature, included, position)')
