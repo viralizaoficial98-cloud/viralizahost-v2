@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { Currency } from '@/types'
 
-const plans = [
+// Static fallback plans shown before DB loads
+const FALLBACK_PLANS = [
   {
     id: 'starter',
     name: 'Starter Host',
@@ -29,7 +30,7 @@ const plans = [
       { text: 'Wildcard SSL', included: false },
     ],
     is_popular: false,
-    badge: null,
+    badge: null as string | null,
   },
   {
     id: 'business',
@@ -54,7 +55,7 @@ const plans = [
       { text: 'Wildcard SSL', included: false },
     ],
     is_popular: true,
-    badge: 'MAIS POPULAR',
+    badge: 'MAIS POPULAR' as string | null,
   },
   {
     id: 'pro',
@@ -79,7 +80,7 @@ const plans = [
       { text: 'Proteção DDoS Avançada', included: true },
     ],
     is_popular: false,
-    badge: 'MELHOR VALOR',
+    badge: 'MELHOR VALOR' as string | null,
   },
   {
     id: 'reseller',
@@ -104,11 +105,26 @@ const plans = [
       { text: 'Painel de Controle Revendedor', included: true },
     ],
     is_popular: false,
-    badge: 'REVENDA',
+    badge: 'REVENDA' as string | null,
   },
 ]
 
-type DbPlan = { id: string; slug: string; name: string; description: string | null; badge: string | null; price_monthly: number | null; price_1year: number | null; popular: boolean; active: boolean; position: number; cta_label: string | null }
+type ProductFeature = { feature: string; included: boolean; position: number }
+
+type DbPlan = {
+  id: string
+  slug: string
+  name: string
+  description: string | null
+  badge: string | null
+  price_monthly: number | null
+  price_1year: number | null
+  popular: boolean
+  active: boolean
+  position: number
+  cta_label: string | null
+  product_features: ProductFeature[]
+}
 
 const PLAN_ICONS = [Zap, Rocket, Crown, Users, Server]
 const PLAN_ACCENTS = ['#3B82F6', '#F5B700', '#8B5CF6', '#EF4444', '#10B981']
@@ -131,70 +147,16 @@ export function PricingSection() {
       .catch(err => console.error('[PricingSection] fetch error:', err))
   }, [])
 
-  const getPrice = (price: Record<Currency, number>) => {
+  const getStaticPrice = (price: Record<Currency, number>) => {
     const p = price[currency]
     return billing === 'annual' ? p : p * 1.4
   }
 
-  // If DB has plans, render them instead of hardcoded
-  if (dbPlans) {
-    return (
-      <section id="planos" className="py-24 bg-[#F8F8F8] relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#E8E8E8] to-transparent" />
-        <div className="container mx-auto px-4 relative">
-          <div className="text-center mb-16">
-            <span className="section-tag mb-5 inline-flex">Hospedagem Premium</span>
-            <h2 className="text-4xl lg:text-5xl font-black text-[#0A0A0A] mb-5">
-              Planos de <span className="gradient-text">Hospedagem</span>
-            </h2>
-            <p className="text-gray-500 max-w-2xl mx-auto">Escolha o plano ideal para o seu projecto com hardware NVMe de última geração.</p>
-          </div>
-          <div className={`grid gap-6 ${dbPlans.length <= 3 ? 'grid-cols-1 md:grid-cols-' + dbPlans.length : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} max-w-6xl mx-auto`}>
-            {dbPlans.map((plan, i) => {
-              const Icon    = PLAN_ICONS[i % PLAN_ICONS.length]
-              const accent  = PLAN_ACCENTS[i % PLAN_ACCENTS.length]
-              const price   = billing === 'annual' && plan.price_1year ? plan.price_1year : plan.price_monthly
-              return (
-                <div key={plan.id} className="relative rounded-3xl p-7 flex flex-col"
-                  style={{ background: plan.popular ? '#0A0A0A' : '#FFFFFF', border: plan.popular ? `2px solid ${accent}` : '1px solid #E8E8E8', boxShadow: plan.popular ? `0 20px 60px ${accent}25` : '0 4px 20px rgba(0,0,0,0.06)' }}>
-                  {plan.badge && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="text-xs font-black px-3 py-1 rounded-full" style={{ background: accent, color: plan.popular ? '#000' : '#fff' }}>{plan.badge}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${accent}20` }}>
-                      <Icon size={18} style={{ color: accent }} />
-                    </div>
-                    <div>
-                      <h3 className="font-black text-base" style={{ color: plan.popular ? '#fff' : '#0A0A0A' }}>{plan.name}</h3>
-                      {plan.description && <p className="text-xs" style={{ color: plan.popular ? 'rgba(255,255,255,0.5)' : '#94A3B8' }}>{plan.description}</p>}
-                    </div>
-                  </div>
-                  <div className="mb-5">
-                    <span className="text-3xl font-black" style={{ color: accent }}>Kz {price?.toLocaleString() ?? '—'}</span>
-                    <span className="text-sm ml-1" style={{ color: plan.popular ? 'rgba(255,255,255,0.4)' : '#94A3B8' }}>/mês</span>
-                  </div>
-                  <div className="flex-1 mb-6" />
-                  <Link href={`/checkout?plan=${plan.slug}&billing=${billing === 'annual' ? '1year' : 'monthly'}`} className="block text-center py-3 rounded-2xl font-bold text-sm transition-all"
-                    style={plan.popular ? { background: accent, color: '#000', boxShadow: `0 8px 25px ${accent}40` } : { background: '#F3F4F6', color: '#0A0A0A' }}>
-                    {plan.cta_label ?? 'Começar agora'}
-                  </Link>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  return (
+  // Shared layout — DB plans use product_features, fallback uses hardcoded features
+  const renderSection = (cards: React.ReactNode) => (
     <section id="planos" className="py-24 bg-[#F8F8F8] relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#E8E8E8] to-transparent" />
-
       <div className="container mx-auto px-4 relative">
-        {/* Header */}
         <div className="text-center mb-16">
           <span className="section-tag mb-5 inline-flex">Hospedagem Premium</span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0A0A0A] mb-5">
@@ -203,15 +165,11 @@ export function PricingSection() {
           <p className="text-gray-500 text-base sm:text-xl max-w-2xl mx-auto mb-8">
             Escolha o plano ideal para escalar o seu negócio. SSL grátis, cPanel Premium, backup e suporte 24/7.
           </p>
-
-          {/* Billing toggle */}
           <div className="inline-flex items-center gap-2 bg-white border border-[#E8E8E8] rounded-2xl p-1.5 shadow-sm">
             <button
               onClick={() => setBilling('monthly')}
               className={`px-4 sm:px-6 py-2.5 rounded-xl font-semibold text-sm transition-all ${
-                billing === 'monthly'
-                  ? 'bg-[#0A0A0A] text-white shadow-sm'
-                  : 'text-gray-500 hover:text-[#0A0A0A]'
+                billing === 'monthly' ? 'bg-[#0A0A0A] text-white shadow-sm' : 'text-gray-500 hover:text-[#0A0A0A]'
               }`}
             >
               Mensal
@@ -219,9 +177,7 @@ export function PricingSection() {
             <button
               onClick={() => setBilling('annual')}
               className={`px-4 sm:px-6 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 ${
-                billing === 'annual'
-                  ? 'bg-[#F5B700] text-[#0A0A0A] shadow-sm'
-                  : 'text-gray-500 hover:text-[#0A0A0A]'
+                billing === 'annual' ? 'bg-[#F5B700] text-[#0A0A0A] shadow-sm' : 'text-gray-500 hover:text-[#0A0A0A]'
               }`}
             >
               Anual
@@ -229,115 +185,233 @@ export function PricingSection() {
             </button>
           </div>
         </div>
-
-        {/* Plans grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          {plans.map((plan) => {
-            const Icon = plan.icon
-            return (
-              <div
-                key={plan.id}
-                className={`relative rounded-3xl overflow-hidden transition-all duration-300 hover-lift ${
-                  plan.is_popular
-                    ? 'bg-[#0A0A0A] border-2 border-[#F5B700] shadow-[0_20px_60px_rgba(0,0,0,0.15)]'
-                    : 'bg-white border border-[#E8E8E8] shadow-sm hover:border-[#F5B700]/40'
-                }`}
-              >
-                {/* Badge */}
-                {plan.badge && (
-                  <div className={`text-center py-2.5 text-xs font-black tracking-widest ${
-                    plan.is_popular
-                      ? 'bg-[#F5B700] text-[#0A0A0A]'
-                      : 'text-white text-[10px]'
-                  }`}
-                    style={!plan.is_popular ? { background: plan.accent } : {}}
-                  >
-                    ★ {plan.badge}
-                  </div>
-                )}
-
-                <div className={`p-7 ${plan.badge ? 'pt-6' : ''}`}>
-                  {/* Icon & name */}
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm"
-                      style={{
-                        background: plan.is_popular ? `${plan.accent}25` : `${plan.accent}12`,
-                        border: `1px solid ${plan.accent}30`,
-                      }}>
-                      <Icon size={20} style={{ color: plan.accent }} />
-                    </div>
-                    <div>
-                      <div className={`font-bold text-base leading-tight ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
-                        {plan.name}
-                      </div>
-                      <div className={`text-xs mt-0.5 ${plan.is_popular ? 'text-gray-400' : 'text-gray-400'}`}>
-                        {plan.tagline}
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className={`text-sm mb-6 leading-relaxed ${plan.is_popular ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {plan.description}
-                  </p>
-
-                  {/* Price */}
-                  <div className="mb-6">
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <span className={`text-3xl font-black ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
-                        {format(getPrice(plan.price))}
-                      </span>
-                      <span className={`text-sm ${plan.is_popular ? 'text-gray-500' : 'text-gray-400'}`}>/mês</span>
-                    </div>
-                    {billing === 'annual' && (
-                      <div className={`text-xs line-through ${plan.is_popular ? 'text-gray-600' : 'text-gray-400'}`}>
-                        {format(getPrice(plan.originalPrice))}/mês
-                      </div>
-                    )}
-                    {billing === 'annual' && (
-                      <div className="text-xs text-green-500 font-semibold mt-1">✓ Economize 30% no plano anual</div>
-                    )}
-                  </div>
-
-                  {/* CTA */}
-                  <Link href={`/checkout?plan=${plan.id}&billing=${billing === 'annual' ? '1year' : 'monthly'}`}
-                    className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
-                      plan.is_popular
-                        ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'
-                        : 'bg-[#0A0A0A] text-white hover:bg-[#222] shadow-sm'
-                    }`}
-                  >
-                    Começar Agora →
-                  </Link>
-
-                  {/* Divider */}
-                  <div className={`mb-6 h-px ${plan.is_popular ? 'bg-white/10' : 'bg-[#F0F0F0]'}`} />
-
-                  {/* Features */}
-                  <div className="space-y-3">
-                    {plan.features.map((f) => (
-                      <div key={f.text} className={`flex items-center gap-3 text-sm ${
-                        f.included
-                          ? (plan.is_popular ? 'text-gray-300' : 'text-gray-700')
-                          : (plan.is_popular ? 'text-gray-600' : 'text-gray-300')
-                      }`}>
-                        {f.included
-                          ? <Check size={15} className="text-green-500 flex-shrink-0" />
-                          : <X size={15} className="text-gray-300 flex-shrink-0" />
-                        }
-                        {f.text}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+          {cards}
         </div>
-
         <p className="text-center text-gray-400 text-sm mt-10">
           ✓ Sem contratos &nbsp;•&nbsp; ✓ Cancele a qualquer momento &nbsp;•&nbsp; ✓ Garantia de 30 dias
         </p>
       </div>
     </section>
+  )
+
+  // DB plans loaded — render with live product_features
+  if (dbPlans) {
+    return renderSection(
+      dbPlans.map((plan, i) => {
+        const Icon   = PLAN_ICONS[i % PLAN_ICONS.length]
+        const accent = PLAN_ACCENTS[i % PLAN_ACCENTS.length]
+        const price  = billing === 'annual' && plan.price_1year ? plan.price_1year : plan.price_monthly
+        const originalPrice = plan.price_monthly
+
+        // Sort features by position; features without position fall to end
+        const features = [...(plan.product_features ?? [])].sort((a, b) => a.position - b.position)
+
+        return (
+          <div
+            key={plan.id}
+            className={`relative rounded-3xl overflow-hidden transition-all duration-300 hover-lift ${
+              plan.popular
+                ? 'bg-[#0A0A0A] border-2 border-[#F5B700] shadow-[0_20px_60px_rgba(0,0,0,0.15)]'
+                : 'bg-white border border-[#E8E8E8] shadow-sm hover:border-[#F5B700]/40'
+            }`}
+          >
+            {plan.badge && (
+              <div
+                className={`text-center py-2.5 text-xs font-black tracking-widest ${
+                  plan.popular ? 'bg-[#F5B700] text-[#0A0A0A]' : 'text-white text-[10px]'
+                }`}
+                style={!plan.popular ? { background: accent } : {}}
+              >
+                ★ {plan.badge}
+              </div>
+            )}
+
+            <div className={`p-7 ${plan.badge ? 'pt-6' : ''}`}>
+              <div className="flex items-center gap-3 mb-5">
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm"
+                  style={{
+                    background: plan.popular ? `${accent}25` : `${accent}12`,
+                    border: `1px solid ${accent}30`,
+                  }}
+                >
+                  <Icon size={20} style={{ color: accent }} />
+                </div>
+                <div>
+                  <div className={`font-bold text-base leading-tight ${plan.popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
+                    {plan.name}
+                  </div>
+                </div>
+              </div>
+
+              {plan.description && (
+                <p className={`text-sm mb-6 leading-relaxed ${plan.popular ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {plan.description}
+                </p>
+              )}
+
+              <div className="mb-6">
+                <div className="flex items-baseline gap-2 mb-1">
+                  <span className={`text-3xl font-black ${plan.popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
+                    Kz {price?.toLocaleString() ?? '—'}
+                  </span>
+                  <span className={`text-sm ${plan.popular ? 'text-gray-500' : 'text-gray-400'}`}>/mês</span>
+                </div>
+                {billing === 'annual' && originalPrice && price && price < originalPrice && (
+                  <>
+                    <div className={`text-xs line-through ${plan.popular ? 'text-gray-600' : 'text-gray-400'}`}>
+                      Kz {originalPrice.toLocaleString()}/mês
+                    </div>
+                    <div className="text-xs text-green-500 font-semibold mt-1">✓ Economize 30% no plano anual</div>
+                  </>
+                )}
+              </div>
+
+              <Link
+                href={`/checkout?plan=${plan.slug}&billing=${billing === 'annual' ? '1year' : 'monthly'}`}
+                className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
+                  plan.popular
+                    ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'
+                    : 'bg-[#0A0A0A] text-white hover:bg-[#222] shadow-sm'
+                }`}
+              >
+                {plan.cta_label ?? 'Começar Agora →'}
+              </Link>
+
+              <div className={`mb-6 h-px ${plan.popular ? 'bg-white/10' : 'bg-[#F0F0F0]'}`} />
+
+              {features.length > 0 ? (
+                <div className="space-y-3">
+                  {features.map(f => (
+                    <div
+                      key={f.feature}
+                      className={`flex items-center gap-3 text-sm ${
+                        f.included
+                          ? plan.popular ? 'text-gray-300' : 'text-gray-700'
+                          : plan.popular ? 'text-gray-600' : 'text-gray-300'
+                      }`}
+                    >
+                      {f.included
+                        ? <Check size={15} className="text-green-500 flex-shrink-0" />
+                        : <X size={15} className="text-gray-300 flex-shrink-0" />
+                      }
+                      {f.feature}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={`text-xs ${plan.popular ? 'text-gray-500' : 'text-gray-400'}`}>
+                  Nenhuma funcionalidade cadastrada.
+                </p>
+              )}
+            </div>
+          </div>
+        )
+      })
+    )
+  }
+
+  // Static fallback — shown before DB responds
+  return renderSection(
+    FALLBACK_PLANS.map(plan => {
+      const Icon = plan.icon
+      return (
+        <div
+          key={plan.id}
+          className={`relative rounded-3xl overflow-hidden transition-all duration-300 hover-lift ${
+            plan.is_popular
+              ? 'bg-[#0A0A0A] border-2 border-[#F5B700] shadow-[0_20px_60px_rgba(0,0,0,0.15)]'
+              : 'bg-white border border-[#E8E8E8] shadow-sm hover:border-[#F5B700]/40'
+          }`}
+        >
+          {plan.badge && (
+            <div
+              className={`text-center py-2.5 text-xs font-black tracking-widest ${
+                plan.is_popular ? 'bg-[#F5B700] text-[#0A0A0A]' : 'text-white text-[10px]'
+              }`}
+              style={!plan.is_popular ? { background: plan.accent } : {}}
+            >
+              ★ {plan.badge}
+            </div>
+          )}
+
+          <div className={`p-7 ${plan.badge ? 'pt-6' : ''}`}>
+            <div className="flex items-center gap-3 mb-5">
+              <div
+                className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm"
+                style={{
+                  background: plan.is_popular ? `${plan.accent}25` : `${plan.accent}12`,
+                  border: `1px solid ${plan.accent}30`,
+                }}
+              >
+                <Icon size={20} style={{ color: plan.accent }} />
+              </div>
+              <div>
+                <div className={`font-bold text-base leading-tight ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
+                  {plan.name}
+                </div>
+                <div className={`text-xs mt-0.5 ${plan.is_popular ? 'text-gray-400' : 'text-gray-400'}`}>
+                  {plan.tagline}
+                </div>
+              </div>
+            </div>
+
+            <p className={`text-sm mb-6 leading-relaxed ${plan.is_popular ? 'text-gray-400' : 'text-gray-500'}`}>
+              {plan.description}
+            </p>
+
+            <div className="mb-6">
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className={`text-3xl font-black ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
+                  {format(getStaticPrice(plan.price))}
+                </span>
+                <span className={`text-sm ${plan.is_popular ? 'text-gray-500' : 'text-gray-400'}`}>/mês</span>
+              </div>
+              {billing === 'annual' && (
+                <div className={`text-xs line-through ${plan.is_popular ? 'text-gray-600' : 'text-gray-400'}`}>
+                  {format(getStaticPrice(plan.originalPrice))}/mês
+                </div>
+              )}
+              {billing === 'annual' && (
+                <div className="text-xs text-green-500 font-semibold mt-1">✓ Economize 30% no plano anual</div>
+              )}
+            </div>
+
+            <Link
+              href={`/checkout?plan=${plan.id}&billing=${billing === 'annual' ? '1year' : 'monthly'}`}
+              className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
+                plan.is_popular
+                  ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'
+                  : 'bg-[#0A0A0A] text-white hover:bg-[#222] shadow-sm'
+              }`}
+            >
+              Começar Agora →
+            </Link>
+
+            <div className={`mb-6 h-px ${plan.is_popular ? 'bg-white/10' : 'bg-[#F0F0F0]'}`} />
+
+            <div className="space-y-3">
+              {plan.features.map(f => (
+                <div
+                  key={f.text}
+                  className={`flex items-center gap-3 text-sm ${
+                    f.included
+                      ? plan.is_popular ? 'text-gray-300' : 'text-gray-700'
+                      : plan.is_popular ? 'text-gray-600' : 'text-gray-300'
+                  }`}
+                >
+                  {f.included
+                    ? <Check size={15} className="text-green-500 flex-shrink-0" />
+                    : <X size={15} className="text-gray-300 flex-shrink-0" />
+                  }
+                  {f.text}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
+    })
   )
 }
