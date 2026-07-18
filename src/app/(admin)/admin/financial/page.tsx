@@ -1,9 +1,17 @@
 import React from 'react'
 import { Metadata } from 'next'
-import { CreditCard, TrendingUp, Clock, CheckCircle2, AlertCircle, Package } from 'lucide-react'
+import { CreditCard, TrendingUp, Clock, CheckCircle2, AlertCircle, Package, ExternalLink } from 'lucide-react'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { createAdminWriteClient } from '@/lib/supabase/server'
+import { createClient as createStorageClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
+
+function storageAdmin() {
+  return createStorageClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export const dynamic   = 'force-dynamic'
 export const revalidate = 0
@@ -45,7 +53,7 @@ async function fetchData() {
   // invoices column is total, not amount — and invoices.profile_id → viralizahost.profiles
   const [{ data: ordersRaw }, { data: invoicesRaw }, { data: orderItemsRaw }] = await Promise.all([
     db.from('orders')
-      .select('id, amount, status, created_at, user_id')
+      .select('id, amount, status, created_at, user_id, payment_method, proof_file, transfer_ref')
       .order('created_at', { ascending: false })
       .limit(200),
     db.from('invoices')
@@ -57,7 +65,7 @@ async function fetchData() {
       .limit(1000),
   ])
 
-  const ordersRawList  = (ordersRaw ?? [])  as { id: string; amount: number; status: string; created_at: string; user_id: string | null }[]
+  const ordersRawList  = (ordersRaw ?? [])  as { id: string; amount: number; status: string; created_at: string; user_id: string | null; payment_method: string | null; proof_file: string | null; transfer_ref: string | null }[]
   const invoicesRawList = (invoicesRaw ?? []) as { id: string; total: number; status: string; due_date: string | null; created_at: string; profile_id: string }[]
   const orderItemsList  = (orderItemsRaw ?? []) as { order_id: string; service_name: string; quantity: number }[]
 
@@ -83,11 +91,25 @@ async function fetchData() {
     itemsMap.set(item.order_id, arr)
   }
 
-  const ordList = ordersRawList.map(o => ({
-    ...o,
-    profile: o.user_id ? (orderProfileMap.get(o.user_id) ?? null) : null,
-    order_items: itemsMap.get(o.id) ?? [],
-  }))
+  // Generate signed URLs for proof files
+  const storage = storageAdmin()
+  const ordList = await Promise.all(
+    ordersRawList.map(async o => {
+      let proof_url: string | null = null
+      if (o.proof_file) {
+        const { data: signed } = await storage.storage
+          .from('payment-proofs')
+          .createSignedUrl(o.proof_file, 3600)
+        proof_url = signed?.signedUrl ?? null
+      }
+      return {
+        ...o,
+        proof_url,
+        profile: o.user_id ? (orderProfileMap.get(o.user_id) ?? null) : null,
+        order_items: itemsMap.get(o.id) ?? [],
+      }
+    })
+  )
 
   const invList = invoicesRawList.map(i => ({
     ...i,
@@ -192,7 +214,7 @@ export default async function AdminFinancialPage() {
             <table className="w-full">
               <thead>
                 <tr>
-                  {['Cliente', 'Itens', 'Valor', 'Data', 'Status'].map(h => (
+                  {['Cliente', 'Itens', 'Valor', 'Data', 'Status', 'Comprovativo'].map(h => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
@@ -223,6 +245,17 @@ export default async function AdminFinancialPage() {
                           style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
                           {s.label}
                         </span>
+                      </td>
+                      <td style={{ padding: '14px 20px' }}>
+                        {order.proof_url ? (
+                          <a href={order.proof_url} target="_blank" rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold"
+                            style={{ color: '#F5B700' }}>
+                            <ExternalLink size={11} /> Ver
+                          </a>
+                        ) : (
+                          <span className="text-xs" style={{ color: '#CBD5E1' }}>—</span>
+                        )}
                       </td>
                     </tr>
                   )
