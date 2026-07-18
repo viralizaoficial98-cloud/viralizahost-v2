@@ -118,12 +118,25 @@ function MemberCard({ member, index, visible }: { member: typeof TEAM[0]; index:
 
       {/* photo */}
       <div className="relative mb-3">
-        <img
-          src={member.photo}
-          alt={member.name}
-          className="w-20 h-20 rounded-full object-cover object-top"
-          style={{ border: `2px solid ${member.color}60` }}
-        />
+        {member.photo ? (
+          <img
+            src={member.photo}
+            alt={member.name}
+            className="w-20 h-20 rounded-full object-cover object-top"
+            style={{ border: `2px solid ${member.color}60` }}
+            onError={e => {
+              e.currentTarget.style.display = 'none'
+              const next = e.currentTarget.nextElementSibling as HTMLElement | null
+              if (next) next.style.display = 'flex'
+            }}
+          />
+        ) : null}
+        <div
+          className="w-20 h-20 rounded-full items-center justify-center font-black text-2xl"
+          style={{ display: member.photo ? 'none' : 'flex', background: `${member.color}22`, color: member.color, border: `2px solid ${member.color}60` }}
+        >
+          {member.name.charAt(0).toUpperCase()}
+        </div>
         <span className="absolute -bottom-1 -right-0.5 text-sm leading-none select-none"
           style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}>
           {member.flag}
@@ -307,9 +320,23 @@ export function TeamSection() {
                   <animate attributeName="stroke-opacity" values="0.12;0;0.12" dur="2.8s" repeatCount="indefinite" />
                 </circle>
               </svg>
-              <img src={activeCEO.photo} alt={activeCEO.name}
-                className="w-24 h-24 rounded-full object-cover object-top"
-                style={{ border: '3px solid #FDBA00', boxShadow: '0 0 20px rgba(253,186,0,0.30)' }} />
+              {activeCEO.photo ? (
+                <img src={activeCEO.photo} alt={activeCEO.name}
+                  className="w-24 h-24 rounded-full object-cover object-top"
+                  style={{ border: '3px solid #FDBA00', boxShadow: '0 0 20px rgba(253,186,0,0.30)' }}
+                  onError={e => {
+                    e.currentTarget.style.display = 'none'
+                    const next = e.currentTarget.nextElementSibling as HTMLElement | null
+                    if (next) next.style.display = 'flex'
+                  }}
+                />
+              ) : null}
+              <div
+                className="w-24 h-24 rounded-full items-center justify-center font-black text-3xl"
+                style={{ display: activeCEO.photo ? 'none' : 'flex', background: 'rgba(253,186,0,0.12)', color: '#FDBA00', border: '3px solid #FDBA00', boxShadow: '0 0 20px rgba(253,186,0,0.30)' }}
+              >
+                {activeCEO.name.charAt(0).toUpperCase()}
+              </div>
               <span className="absolute bottom-0 right-0 text-xl" style={{ filter: 'drop-shadow(0 1px 3px #000)' }}>
                 {activeCEO.flag}
               </span>

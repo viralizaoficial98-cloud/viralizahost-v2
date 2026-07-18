@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Pencil, Trash2, Eye, EyeOff, Users, Crown } from 'lucide-react'
+import { Plus, Pencil, Trash2, Eye, EyeOff, Users, Crown, Upload, X, Link as LinkIcon, Loader2 } from 'lucide-react'
 import { AdminPageShell, adminCard, adminInput, adminLabel, btnPrimary, btnSecondary } from '@/components/admin/AdminPageShell'
 
 type TeamMember = {
@@ -28,14 +28,123 @@ export default function TeamPage() {
   const [form, setForm] = useState<Omit<TeamMember, 'id' | 'position'>>(empty)
   const [saving, setSaving] = useState(false)
 
-  const load = async () => { setLoading(true); const { data } = await supabase.from('site_team').select('*').order('is_ceo', { ascending: false }).order('position'); setMembers(data ?? []); setLoading(false) }
+  // photo upload state
+  const [photoMode, setPhotoMode] = useState<'upload' | 'url'>('upload')
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [pendingStoragePath, setPendingStoragePath] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const load = async () => {
+    setLoading(true)
+    const { data } = await supabase.from('site_team').select('*').order('is_ceo', { ascending: false }).order('position')
+    setMembers(data ?? [])
+    setLoading(false)
+  }
   useEffect(() => { load() }, [])
 
-  const openNew  = () => { setEditing(null); setForm(empty); setShowModal(true) }
-  const openEdit = (m: TeamMember) => { setEditing(m); setForm({ name: m.name, role: m.role, title: m.title, bio: m.bio, photo_url: m.photo_url, flag: m.flag, country: m.country, accent_color: m.accent_color, is_ceo: m.is_ceo, active: m.active }); setShowModal(true) }
-  const save     = async () => { setSaving(true); const payload = { ...form, photo_url: form.photo_url || null }; if (editing) { await supabase.from('site_team').update(payload).eq('id', editing.id) } else { const maxPos = members.reduce((m, x) => Math.max(m, x.position), -1); await supabase.from('site_team').insert({ ...payload, position: maxPos + 1 }) }; setSaving(false); setShowModal(false); load() }
-  const remove   = async (id: string) => { if (!confirm('Apagar membro?')) return; await supabase.from('site_team').delete().eq('id', id); load() }
-  const toggle   = async (m: TeamMember) => { await supabase.from('site_team').update({ active: !m.active }).eq('id', m.id); load() }
+  const openNew = () => {
+    setEditing(null)
+    setForm(empty)
+    setPhotoMode('upload')
+    setPendingStoragePath(null)
+    setUploadError(null)
+    setShowModal(true)
+  }
+
+  const openEdit = (m: TeamMember) => {
+    setEditing(m)
+    setForm({ name: m.name, role: m.role, title: m.title, bio: m.bio, photo_url: m.photo_url, flag: m.flag, country: m.country, accent_color: m.accent_color, is_ceo: m.is_ceo, active: m.active })
+    setPhotoMode(m.photo_url && m.photo_url.includes('/storage/') ? 'upload' : 'url')
+    setPendingStoragePath(null)
+    setUploadError(null)
+    setShowModal(true)
+  }
+
+  const save = async () => {
+    setSaving(true)
+    const payload = { ...form, photo_url: form.photo_url || null }
+    if (editing) {
+      await supabase.from('site_team').update(payload).eq('id', editing.id)
+    } else {
+      const maxPos = members.reduce((m, x) => Math.max(m, x.position), -1)
+      await supabase.from('site_team').insert({ ...payload, position: maxPos + 1 })
+    }
+    setPendingStoragePath(null)
+    setSaving(false)
+    setShowModal(false)
+    load()
+  }
+
+  const remove = async (id: string) => {
+    if (!confirm('Apagar membro?')) return
+    await supabase.from('site_team').delete().eq('id', id)
+    load()
+  }
+
+  const toggle = async (m: TeamMember) => {
+    await supabase.from('site_team').update({ active: !m.active }).eq('id', m.id)
+    load()
+  }
+
+  const closeModal = async () => {
+    // delete orphan upload if user cancels without saving
+    if (pendingStoragePath) {
+      await fetch('/api/admin/storage/team', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath: pendingStoragePath }),
+      }).catch(() => {})
+      setPendingStoragePath(null)
+    }
+    setShowModal(false)
+  }
+
+  const handleFileUpload = async (file: File) => {
+    setUploadError(null)
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/admin/storage/team', { method: 'POST', body: fd })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Erro no upload')
+      // if there was a previous pending upload, delete it
+      if (pendingStoragePath) {
+        await fetch('/api/admin/storage/team', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storagePath: pendingStoragePath }),
+        }).catch(() => {})
+      }
+      setPendingStoragePath(json.storagePath)
+      setForm(f => ({ ...f, photo_url: json.publicUrl }))
+    } catch (err: any) {
+      setUploadError(err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const removePhoto = async () => {
+    if (pendingStoragePath) {
+      await fetch('/api/admin/storage/team', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath: pendingStoragePath }),
+      }).catch(() => {})
+      setPendingStoragePath(null)
+    }
+    setForm(f => ({ ...f, photo_url: '' }))
+  }
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleFileUpload(file)
+  }
 
   return (
     <AdminPageShell title="Equipa" subtitle="Membros e estrutura organizacional"
@@ -61,7 +170,7 @@ export default function TeamPage() {
                 </div>
                 <div className="flex flex-col items-center text-center">
                   {m.photo_url ? (
-                    <img src={m.photo_url} alt={m.name} className="w-16 h-16 rounded-full object-cover object-top mb-3" style={{ border: `3px solid ${m.accent_color}40` }} />
+                    <img src={m.photo_url} alt={m.name} className="w-16 h-16 rounded-full object-cover object-top mb-3" style={{ border: `3px solid ${m.accent_color}40` }} onError={e => { e.currentTarget.style.display = 'none' }} />
                   ) : (
                     <div className="w-16 h-16 rounded-full mb-3 flex items-center justify-center font-black text-xl" style={{ background: `${m.accent_color}18`, color: m.accent_color, border: `3px solid ${m.accent_color}30` }}>
                       {m.name.charAt(0).toUpperCase()}
@@ -98,19 +207,115 @@ export default function TeamPage() {
               <h2 className="font-black text-lg" style={{ color: '#0B0B0D' }}>{editing ? 'Editar Membro' : 'Novo Membro'}</h2>
             </div>
             <div className="px-6 py-5 space-y-4">
-              {/* Avatar preview */}
-              <div className="flex items-center gap-4 mb-2">
-                {form.photo_url ? (
-                  <img src={form.photo_url} alt="" className="w-16 h-16 rounded-full object-cover object-top" style={{ border: `3px solid ${form.accent_color}40` }} onError={e => (e.currentTarget.style.display = 'none')} />
-                ) : (
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center font-black text-xl flex-shrink-0" style={{ background: `${form.accent_color}18`, color: form.accent_color, border: `3px solid ${form.accent_color}30` }}>
-                    {form.name ? form.name.charAt(0).toUpperCase() : '?'}
+
+              {/* Photo section */}
+              <div>
+                <label style={adminLabel}>Foto</label>
+
+                {/* Mode tabs */}
+                <div className="flex gap-1 mb-3 p-1 rounded-xl" style={{ background: '#F1F5F9' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoMode('upload')}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                    style={photoMode === 'upload' ? { background: '#fff', color: '#0B0B0D', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' } : { color: '#94A3B8' }}
+                  >
+                    <Upload size={12} /> Carregar imagem
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoMode('url')}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                    style={photoMode === 'url' ? { background: '#fff', color: '#0B0B0D', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' } : { color: '#94A3B8' }}
+                  >
+                    <LinkIcon size={12} /> Usar URL
+                  </button>
+                </div>
+
+                {/* Preview + upload/url area */}
+                <div className="flex items-start gap-4">
+                  {/* Avatar preview */}
+                  <div className="relative shrink-0">
+                    {form.photo_url ? (
+                      <>
+                        <img
+                          src={form.photo_url}
+                          alt=""
+                          className="w-16 h-16 rounded-full object-cover object-top"
+                          style={{ border: `3px solid ${form.accent_color}40` }}
+                          onError={e => { e.currentTarget.style.display = 'none' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={removePhoto}
+                          className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                          style={{ background: '#EF4444', color: '#fff' }}
+                          title="Remover foto"
+                        >
+                          <X size={10} />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center font-black text-xl flex-shrink-0" style={{ background: `${form.accent_color}18`, color: form.accent_color, border: `3px solid ${form.accent_color}30` }}>
+                        {form.name ? form.name.charAt(0).toUpperCase() : '?'}
+                      </div>
+                    )}
                   </div>
-                )}
-                <Field label="URL da Foto">
-                  <input style={adminInput} value={form.photo_url ?? ''} onChange={e => setForm(f => ({ ...f, photo_url: e.target.value }))} placeholder="/foto.jpg ou https://..." />
-                </Field>
+
+                  <div className="flex-1 min-w-0">
+                    {photoMode === 'upload' ? (
+                      <>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          className="hidden"
+                          onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }}
+                        />
+                        <div
+                          className="rounded-xl border-2 border-dashed text-center py-4 px-3 cursor-pointer transition-all"
+                          style={{
+                            borderColor: dragOver ? '#6366F1' : '#E2E8F0',
+                            background: dragOver ? 'rgba(99,102,241,0.04)' : '#FAFAFA',
+                          }}
+                          onClick={() => fileInputRef.current?.click()}
+                          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                          onDragLeave={() => setDragOver(false)}
+                          onDrop={onDrop}
+                        >
+                          {uploading ? (
+                            <div className="flex items-center justify-center gap-2 text-xs" style={{ color: '#6366F1' }}>
+                              <Loader2 size={14} className="animate-spin" /> A carregar...
+                            </div>
+                          ) : (
+                            <>
+                              <Upload size={16} className="mx-auto mb-1" style={{ color: '#94A3B8' }} />
+                              <p className="text-xs font-semibold" style={{ color: '#64748B' }}>
+                                Clique ou arraste a foto
+                              </p>
+                              <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>JPG, PNG ou WEBP · máx. 5 MB</p>
+                            </>
+                          )}
+                        </div>
+                        {uploadError && (
+                          <p className="text-xs mt-1.5 font-medium" style={{ color: '#EF4444' }}>{uploadError}</p>
+                        )}
+                        {form.photo_url && pendingStoragePath && (
+                          <p className="text-[10px] mt-1 truncate" style={{ color: '#94A3B8' }}>{form.photo_url}</p>
+                        )}
+                      </>
+                    ) : (
+                      <input
+                        style={adminInput}
+                        value={form.photo_url ?? ''}
+                        onChange={e => setForm(f => ({ ...f, photo_url: e.target.value }))}
+                        placeholder="/foto.jpg ou https://..."
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
+
               <Field label="Nome Completo"><input style={adminInput} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="ex: Manuel Muenho" /></Field>
               <Field label="Título (badge)"><input style={adminInput} value={form.title ?? ''} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="ex: CEO & Fundador" /></Field>
               <Field label="Cargo / Área"><input style={adminInput} value={form.role ?? ''} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} placeholder="ex: Tráfego Pago" /></Field>
@@ -131,8 +336,8 @@ export default function TeamPage() {
               </div>
             </div>
             <div className="px-6 py-4 flex justify-end gap-3" style={{ borderTop: '1px solid #F1F5F9' }}>
-              <button style={btnSecondary} onClick={() => setShowModal(false)}>Cancelar</button>
-              <button style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }} onClick={save} disabled={saving}>{saving ? 'A guardar...' : 'Guardar'}</button>
+              <button style={btnSecondary} onClick={closeModal}>Cancelar</button>
+              <button style={{ ...btnPrimary, opacity: saving || uploading ? 0.6 : 1 }} onClick={save} disabled={saving || uploading}>{saving ? 'A guardar...' : 'Guardar'}</button>
             </div>
           </div>
         </div>
