@@ -6,8 +6,9 @@ export const dynamic   = 'force-dynamic'
 export const revalidate = 0
 
 // ── GET /api/admin/clients ────────────────────────────────────────────────────
-// Returns all profiles (clients) joined with clients, hosting_accounts, whm_accounts,
-// open ticket count, pending invoice count.
+// Root cause of previous failure: tickets table has TWO FK refs to profiles
+// (profile_id and assigned_to), making PostgREST embedded joins AMBIGUOUS.
+// Fix: use separate parallel queries and merge in JS.
 export async function GET(req: NextRequest) {
   try { await requireAdminRole() } catch (e: unknown) {
     const err = e as { status?: number; message?: string }
@@ -22,138 +23,182 @@ export async function GET(req: NextRequest) {
 
   const db = createAdminWriteClient()
 
-  // Main profiles query with joined data
-  const { data: profiles, error } = await db
+  // ── 1. Load all profiles ───────────────────────────────────────────────────
+  const { data: profiles, error: pErr } = await db
     .from('profiles')
-    .select(`
-      id, email, full_name, phone, country, role, is_active, created_at,
-      clients ( company_name, address, city, credit_balance, currency ),
-      hosting_accounts (
-        id, cpanel_username, primary_domain, status, disk_used_mb, disk_limit_mb,
-        email_count, ip_address, package_name, last_synced_at, suspension_reason,
-        server_id
-      ),
-      whm_accounts (
-        id, whm_username, primary_domain, package_name, ip_address, is_suspended,
-        suspension_reason, disk_used_mb, disk_limit_mb, last_synced_at, status,
-        php_version, account_created_at
-      ),
-      domains ( id ),
-      services ( id, status ),
-      tickets ( id, status ),
-      invoices ( id, status, total, amount_paid )
-    `)
+    .select('id, email, full_name, phone, country, role, is_active, created_at')
     .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('[admin/clients GET]', error.message)
-    return NextResponse.json({ error: 'Erro ao carregar clientes.' }, { status: 500 })
-  }
-
-  let list = (profiles ?? []) as any[]
-
-  // Text search
-  if (q) {
-    list = list.filter(p => {
-      const ha = p.hosting_accounts?.[0]
-      const wa = p.whm_accounts?.[0]
-      return (
-        p.email?.toLowerCase().includes(q)              ||
-        p.full_name?.toLowerCase().includes(q)          ||
-        p.phone?.toLowerCase().includes(q)              ||
-        p.clients?.[0]?.company_name?.toLowerCase().includes(q) ||
-        ha?.primary_domain?.toLowerCase().includes(q)  ||
-        ha?.cpanel_username?.toLowerCase().includes(q) ||
-        wa?.primary_domain?.toLowerCase().includes(q)  ||
-        wa?.whm_username?.toLowerCase().includes(q)    ||
-        wa?.package_name?.toLowerCase().includes(q)
-      )
+  if (pErr) {
+    console.error('[ADMIN CLIENTS ERROR] profiles query failed', {
+      message: pErr.message, code: pErr.code, details: pErr.details, hint: pErr.hint,
     })
+    return NextResponse.json({ error: 'Erro ao carregar clientes.', detail: pErr.message }, { status: 500 })
   }
 
-  // Filter
+  const profileIds = (profiles ?? []).map(p => p.id)
+  if (profileIds.length === 0) {
+    return NextResponse.json({ clients: [], stats: { total:0,active:0,suspended:0,whm:0,no_association:0,pending_payment:0,open_tickets:0 }, total: 0, page, limit })
+  }
+
+  // ── 2. Parallel queries — separate tables, no ambiguous joins ─────────────
+  const [
+    { data: clients,         error: cErr  },
+    { data: hostingAccounts, error: haErr },
+    { data: whmAccounts,     error: waErr },
+    { data: domains,         error: dErr  },
+    { data: services,        error: sErr  },
+    { data: tickets,         error: tErr  },
+    { data: invoices,        error: iErr  },
+  ] = await Promise.all([
+    db.from('clients').select('profile_id, company_name, currency, credit_balance').in('profile_id', profileIds),
+    db.from('hosting_accounts').select('profile_id, id, cpanel_username, primary_domain, status, disk_used_mb, disk_limit_mb, email_count, ip_address, package_name, last_synced_at, service_id').in('profile_id', profileIds),
+    db.from('whm_accounts').select('profile_id, id, whm_username, primary_domain, package_name, ip_address, is_suspended, disk_used_mb, disk_limit_mb, last_synced_at, status, php_version').in('profile_id', profileIds),
+    db.from('domains').select('profile_id, id').in('profile_id', profileIds),
+    db.from('services').select('profile_id, id, status').in('profile_id', profileIds),
+    db.from('tickets').select('profile_id, id, status').in('profile_id', profileIds),
+    db.from('invoices').select('profile_id, id, status, total, amount_paid').in('profile_id', profileIds),
+  ])
+
+  // Log any sub-query errors but don't fail the whole request
+  if (cErr)  console.error('[ADMIN CLIENTS ERROR] clients',          { message: cErr.message,  code: cErr.code  })
+  if (haErr) console.error('[ADMIN CLIENTS ERROR] hosting_accounts', { message: haErr.message, code: haErr.code })
+  if (waErr) console.error('[ADMIN CLIENTS ERROR] whm_accounts',     { message: waErr.message, code: waErr.code })
+  if (dErr)  console.error('[ADMIN CLIENTS ERROR] domains',          { message: dErr.message,  code: dErr.code  })
+  if (sErr)  console.error('[ADMIN CLIENTS ERROR] services',         { message: sErr.message,  code: sErr.code  })
+  if (tErr)  console.error('[ADMIN CLIENTS ERROR] tickets',          { message: tErr.message,  code: tErr.code  })
+  if (iErr)  console.error('[ADMIN CLIENTS ERROR] invoices',         { message: iErr.message,  code: iErr.code  })
+
+  // ── 3. Index by profile_id ────────────────────────────────────────────────
+  function idx<T extends { profile_id: string }>(rows: T[] | null): Map<string, T[]> {
+    const m = new Map<string, T[]>()
+    for (const r of rows ?? []) {
+      const arr = m.get(r.profile_id) ?? []
+      arr.push(r)
+      m.set(r.profile_id, arr)
+    }
+    return m
+  }
+
+  const clientMap  = idx(clients  ?? [])
+  const haMap      = idx(hostingAccounts ?? [])
+  const waMap      = idx(whmAccounts ?? [])
+  const domainMap  = idx(domains  ?? [])
+  const serviceMap = idx(services ?? [])
+  const ticketMap  = idx(tickets  ?? [])
+  const invoiceMap = idx(invoices ?? [])
+
+  // ── 4. Merge ───────────────────────────────────────────────────────────────
+  let list = (profiles ?? []).map(p => {
+    const cl  = clientMap.get(p.id)?.[0]
+    const ha  = haMap.get(p.id)?.[0]
+    const wa  = waMap.get(p.id)?.[0]
+    const doms = domainMap.get(p.id)  ?? []
+    const svcs = serviceMap.get(p.id) ?? []
+    const tkts = ticketMap.get(p.id)  ?? []
+    const invs = invoiceMap.get(p.id) ?? []
+
+    const openTickets   = tkts.filter((t: { status: string }) => ['open', 'in_progress'].includes(t.status)).length
+    const pendingInvs   = invs.filter((i: { status: string }) => ['pending', 'overdue'].includes(i.status)).length
+    const pendingAmount = invs
+      .filter((i: { status: string }) => ['pending', 'overdue'].includes(i.status))
+      .reduce((s: number, i: { total?: unknown; amount_paid?: unknown }) => s + Math.max(0, Number(i.total ?? 0) - Number(i.amount_paid ?? 0)), 0)
+
+    return {
+      id:               p.id,
+      email:            p.email,
+      full_name:        p.full_name,
+      phone:            p.phone,
+      country:          p.country,
+      role:             p.role,
+      is_active:        p.is_active,
+      created_at:       p.created_at,
+      company_name:     cl?.company_name   ?? null,
+      cpanel_username:  ha?.cpanel_username ?? wa?.whm_username   ?? null,
+      primary_domain:   ha?.primary_domain  ?? wa?.primary_domain  ?? null,
+      package_name:     ha?.package_name    ?? wa?.package_name    ?? null,
+      ip_address:       ha?.ip_address      ?? wa?.ip_address      ?? null,
+      disk_used_mb:     ha?.disk_used_mb    ?? wa?.disk_used_mb    ?? 0,
+      disk_limit_mb:    ha?.disk_limit_mb   ?? wa?.disk_limit_mb   ?? null,
+      email_count:      ha?.email_count     ?? 0,
+      last_synced_at:   ha?.last_synced_at  ?? wa?.last_synced_at  ?? null,
+      hosting_status:   ha?.status          ?? (wa ? (wa.is_suspended ? 'suspended' : 'active') : null),
+      is_whm_suspended: wa?.is_suspended    ?? false,
+      has_hosting:      !!(ha || wa),
+      has_whm:          !!wa,
+      domain_count:     doms.length,
+      service_count:    svcs.length,
+      open_tickets:     openTickets,
+      pending_invoices: pendingInvs,
+      pending_amount:   pendingAmount,
+      currency:         cl?.currency ?? 'AKZ',
+    }
+  })
+
+  // ── 5. Text search ─────────────────────────────────────────────────────────
+  if (q) {
+    list = list.filter(c =>
+      c.email?.toLowerCase().includes(q)         ||
+      c.full_name?.toLowerCase().includes(q)     ||
+      c.company_name?.toLowerCase().includes(q)  ||
+      c.primary_domain?.toLowerCase().includes(q)||
+      c.cpanel_username?.toLowerCase().includes(q)||
+      c.package_name?.toLowerCase().includes(q)
+    )
+  }
+
+  // ── 6. Filter ──────────────────────────────────────────────────────────────
   switch (filter) {
     case 'active':
-      list = list.filter(p => p.is_active !== false)
+      list = list.filter(c => c.is_active !== false && !c.is_whm_suspended)
       break
     case 'suspended':
-      list = list.filter(p => p.is_active === false || p.whm_accounts?.[0]?.is_suspended)
+      list = list.filter(c => c.is_active === false || c.is_whm_suspended)
       break
     case 'whm':
-      list = list.filter(p => p.whm_accounts?.length > 0 || p.hosting_accounts?.length > 0)
+      list = list.filter(c => c.has_whm || c.has_hosting)
       break
     case 'no_hosting':
-      list = list.filter(p => !p.hosting_accounts?.length && !p.whm_accounts?.length)
+      list = list.filter(c => !c.has_hosting)
       break
     case 'pending_payment':
-      list = list.filter(p =>
-        p.invoices?.some((i: any) => ['pending', 'overdue', 'under_review'].includes(i.status))
-      )
+      list = list.filter(c => c.pending_invoices > 0)
       break
     case 'open_tickets':
-      list = list.filter(p =>
-        p.tickets?.some((t: any) => ['open', 'in_progress'].includes(t.status))
-      )
+      list = list.filter(c => c.open_tickets > 0)
       break
   }
 
-  // Stats (from full unfiltered list)
-  const all = (profiles ?? []) as any[]
+  // ── 7. Stats (from full merged list, before filter) ───────────────────────
+  const all = (profiles ?? []).map(p => {
+    const ha = haMap.get(p.id)?.[0]
+    const wa = waMap.get(p.id)?.[0]
+    const invs = invoiceMap.get(p.id) ?? []
+    const tkts = ticketMap.get(p.id)  ?? []
+    return {
+      is_active:       p.is_active,
+      is_whm_suspended: wa?.is_suspended ?? false,
+      has_hosting:     !!(ha || wa),
+      has_whm:         !!wa,
+      pending_invoices: invs.filter((i: { status: string }) => ['pending', 'overdue'].includes(i.status)).length,
+      open_tickets:    tkts.filter((t: { status: string }) => ['open', 'in_progress'].includes(t.status)).length,
+    }
+  })
+
   const stats = {
     total:           all.length,
-    active:          all.filter(p => p.is_active !== false && !p.whm_accounts?.[0]?.is_suspended).length,
-    suspended:       all.filter(p => p.is_active === false || p.whm_accounts?.[0]?.is_suspended).length,
-    whm:             all.filter(p => p.whm_accounts?.length > 0).length,
-    no_association:  all.filter(p => !p.hosting_accounts?.length && !p.whm_accounts?.length).length,
-    pending_payment: all.filter(p => p.invoices?.some((i: any) => ['pending', 'overdue'].includes(i.status))).length,
-    open_tickets:    all.filter(p => p.tickets?.some((t: any) => ['open', 'in_progress'].includes(t.status))).length,
+    active:          all.filter(c => c.is_active !== false && !c.is_whm_suspended).length,
+    suspended:       all.filter(c => c.is_active === false || c.is_whm_suspended).length,
+    whm:             all.filter(c => c.has_whm).length,
+    no_association:  all.filter(c => !c.has_hosting).length,
+    pending_payment: all.filter(c => c.pending_invoices > 0).length,
+    open_tickets:    all.filter(c => c.open_tickets > 0).length,
   }
 
-  // Paginate
+  // ── 8. Paginate ────────────────────────────────────────────────────────────
   const total    = list.length
   const offset   = (page - 1) * limit
   const paginated = list.slice(offset, offset + limit)
 
-  // Simplify each client record
-  const clients = paginated.map(p => {
-    const ha = p.hosting_accounts?.[0]
-    const wa = p.whm_accounts?.[0]
-    const openTickets   = p.tickets?.filter((t: any) => ['open', 'in_progress'].includes(t.status)).length ?? 0
-    const pendingInvs   = p.invoices?.filter((i: any) => ['pending', 'overdue'].includes(i.status)).length ?? 0
-    const pendingAmount = p.invoices
-      ?.filter((i: any) => ['pending', 'overdue'].includes(i.status))
-      .reduce((s: number, i: any) => s + Math.max(0, Number(i.total) - Number(i.amount_paid ?? 0)), 0) ?? 0
-    return {
-      id:              p.id,
-      email:           p.email,
-      full_name:       p.full_name,
-      phone:           p.phone,
-      country:         p.country,
-      role:            p.role,
-      is_active:       p.is_active,
-      created_at:      p.created_at,
-      company_name:    p.clients?.[0]?.company_name ?? null,
-      // Hosting
-      cpanel_username: ha?.cpanel_username ?? wa?.whm_username ?? null,
-      primary_domain:  ha?.primary_domain  ?? wa?.primary_domain ?? null,
-      package_name:    ha?.package_name    ?? wa?.package_name   ?? null,
-      ip_address:      ha?.ip_address      ?? wa?.ip_address     ?? null,
-      disk_used_mb:    ha?.disk_used_mb    ?? wa?.disk_used_mb   ?? 0,
-      disk_limit_mb:   ha?.disk_limit_mb   ?? wa?.disk_limit_mb  ?? null,
-      email_count:     ha?.email_count     ?? 0,
-      last_synced_at:  ha?.last_synced_at  ?? wa?.last_synced_at ?? null,
-      hosting_status:  ha?.status          ?? (wa ? (wa.is_suspended ? 'suspended' : 'active') : null),
-      is_whm_suspended: wa?.is_suspended   ?? false,
-      has_hosting:     !!(ha || wa),
-      has_whm:         !!wa,
-      domain_count:    p.domains?.length   ?? 0,
-      service_count:   p.services?.length  ?? 0,
-      open_tickets:    openTickets,
-      pending_invoices: pendingInvs,
-      pending_amount:  pendingAmount,
-      currency:        p.clients?.[0]?.currency ?? 'AKZ',
-    }
-  })
-
-  return NextResponse.json({ clients, stats, total, page, limit })
+  return NextResponse.json({ clients: paginated, stats, total, page, limit })
 }
