@@ -28,18 +28,35 @@ async function fetchData() {
   try { await requireAdminRole() } catch { redirect('/login') }
 
   const db = createAdminWriteClient()
-  const { data } = await db
+
+  // Load tickets WITHOUT profiles join — tickets has two FKs to profiles (profile_id + assigned_to) → PGRST201
+  const { data: ticketsRaw, error: tErr } = await db
     .from('tickets')
-    .select(`
-      id, ticket_number, subject, status, priority, department, category,
-      created_at, updated_at,
-      profiles ( full_name, email, avatar_url ),
-      ticket_messages ( count )
-    `)
+    .select('id, ticket_number, subject, status, priority, department, category, profile_id, created_at, updated_at, ticket_messages(count)')
     .order('updated_at', { ascending: false })
     .limit(500)
 
-  const tickets = (data ?? []) as any[]
+  if (tErr) console.error('[ADMIN TICKETS] tickets query failed', tErr.message)
+
+  const ticketList = (ticketsRaw ?? []) as {
+    id: string; ticket_number: string | null; subject: string; status: string; priority: string;
+    department: string | null; category: string | null; profile_id: string; created_at: string;
+    updated_at: string | null; ticket_messages: { count: number }[]
+  }[]
+
+  // Collect unique profile IDs and fetch profiles separately
+  const profileIds = [...new Set(ticketList.map(t => t.profile_id).filter(Boolean))]
+  const { data: profilesRaw } = profileIds.length > 0
+    ? await db.from('profiles').select('id, full_name, email, avatar_url').in('id', profileIds)
+    : { data: [] }
+
+  const profileMap = new Map((profilesRaw ?? []).map(p => [p.id, p]))
+
+  const tickets = ticketList.map(t => ({
+    ...t,
+    profile: profileMap.get(t.profile_id) ?? null,
+  }))
+
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
 
   const stats = {
@@ -106,15 +123,15 @@ export default async function AdminTicketsPage() {
           </div>
         ) : (
           <div>
-            {tickets.map((ticket: any, i: number) => {
+            {tickets.map((ticket, i) => {
               const s = STATUS_MAP[ticket.status] ?? STATUS_MAP.open
               const p = PRIORITY_MAP[ticket.priority] ?? PRIORITY_MAP.medium
-              const replies = (ticket.ticket_messages as any)?.[0]?.count ?? 0
+              const replies = ticket.ticket_messages?.[0]?.count ?? 0
               const updated = new Date(ticket.updated_at ?? ticket.created_at).toLocaleDateString('pt-PT', {
                 day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
               })
-              const clientName  = (ticket.profiles as any)?.full_name ?? 'Desconhecido'
-              const clientEmail = (ticket.profiles as any)?.email ?? ''
+              const clientName  = ticket.profile?.full_name ?? 'Desconhecido'
+              const clientEmail = ticket.profile?.email ?? ''
               return (
                 <div key={ticket.id} className="flex items-center gap-4 px-6 py-4 cursor-pointer transition-colors"
                   style={{ borderBottom: i < tickets.length - 1 ? '1px solid #F8FAFC' : 'none' }}

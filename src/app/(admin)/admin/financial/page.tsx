@@ -1,3 +1,4 @@
+import React from 'react'
 import { Metadata } from 'next'
 import { CreditCard, TrendingUp, Clock, CheckCircle2, AlertCircle, Package } from 'lucide-react'
 import { requireAdminRole } from '@/lib/api/require-admin'
@@ -39,27 +40,67 @@ async function fetchData() {
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  const [{ data: orders }, { data: invoices }] = await Promise.all([
+  // orders.user_id → auth.users(id), NOT viralizahost.profiles — no embedded profiles join
+  // order_items column is service_name, not name
+  // invoices column is total, not amount — and invoices.profile_id → viralizahost.profiles
+  const [{ data: ordersRaw }, { data: invoicesRaw }, { data: orderItemsRaw }] = await Promise.all([
     db.from('orders')
-      .select('id, amount, status, created_at, profiles(full_name, email), order_items(name, quantity)')
+      .select('id, amount, status, created_at, user_id')
       .order('created_at', { ascending: false })
       .limit(200),
     db.from('invoices')
-      .select('id, amount, status, due_date, created_at, profiles(full_name, email)')
+      .select('id, total, status, due_date, created_at, profile_id')
       .order('created_at', { ascending: false })
       .limit(200),
+    db.from('order_items')
+      .select('order_id, service_name, quantity')
+      .limit(1000),
   ])
 
-  const ordList = (orders ?? []) as any[]
-  const invList = (invoices ?? []) as any[]
+  const ordersRawList  = (ordersRaw ?? [])  as { id: string; amount: number; status: string; created_at: string; user_id: string | null }[]
+  const invoicesRawList = (invoicesRaw ?? []) as { id: string; total: number; status: string; due_date: string | null; created_at: string; profile_id: string }[]
+  const orderItemsList  = (orderItemsRaw ?? []) as { order_id: string; service_name: string; quantity: number }[]
+
+  // Fetch profiles for orders by user_id (profiles.id = auth.users.id in Supabase)
+  const orderUserIds = [...new Set(ordersRawList.map(o => o.user_id).filter(Boolean) as string[])]
+  const { data: orderProfilesRaw } = orderUserIds.length > 0
+    ? await db.from('profiles').select('id, full_name, email').in('id', orderUserIds)
+    : { data: [] }
+  const orderProfileMap = new Map((orderProfilesRaw ?? []).map(p => [p.id, p]))
+
+  // Fetch profiles for invoices by profile_id
+  const invProfileIds = [...new Set(invoicesRawList.map(i => i.profile_id).filter(Boolean))]
+  const { data: invProfilesRaw } = invProfileIds.length > 0
+    ? await db.from('profiles').select('id, full_name, email').in('id', invProfileIds)
+    : { data: [] }
+  const invProfileMap = new Map((invProfilesRaw ?? []).map(p => [p.id, p]))
+
+  // Build items map
+  const itemsMap = new Map<string, { service_name: string; quantity: number }[]>()
+  for (const item of orderItemsList) {
+    const arr = itemsMap.get(item.order_id) ?? []
+    arr.push(item)
+    itemsMap.set(item.order_id, arr)
+  }
+
+  const ordList = ordersRawList.map(o => ({
+    ...o,
+    profile: o.user_id ? (orderProfileMap.get(o.user_id) ?? null) : null,
+    order_items: itemsMap.get(o.id) ?? [],
+  }))
+
+  const invList = invoicesRawList.map(i => ({
+    ...i,
+    profile: invProfileMap.get(i.profile_id) ?? null,
+  }))
 
   const paidOrders   = ordList.filter(o => ['paid', 'aprovado'].includes(o.status))
   const pendOrders   = ordList.filter(o => ['pending', 'aguardando_confirmacao', 'under_review'].includes(o.status))
   const monthRevenue = paidOrders
     .filter(o => new Date(o.created_at) >= monthStart)
-    .reduce((s: number, o: any) => s + Number(o.amount ?? 0), 0)
-  const totalRevenue = paidOrders.reduce((s: number, o: any) => s + Number(o.amount ?? 0), 0)
-  const pendingAmount = pendOrders.reduce((s: number, o: any) => s + Number(o.amount ?? 0), 0)
+    .reduce((s, o) => s + Number(o.amount ?? 0), 0)
+  const totalRevenue = paidOrders.reduce((s, o) => s + Number(o.amount ?? 0), 0)
+  const pendingAmount = pendOrders.reduce((s, o) => s + Number(o.amount ?? 0), 0)
 
   const invPending = invList.filter(i => i.status === 'pending').length
   const invOverdue = invList.filter(i => i.status === 'overdue').length
@@ -83,7 +124,7 @@ export default async function AdminFinancialPage() {
     {
       label: 'Pedidos pendentes',
       value: fmtKz(stats.pendingAmount),
-      sub: `${ordList.filter((o: any) => ['pending', 'aguardando_confirmacao', 'under_review'].includes(o.status)).length} pedidos aguardando`,
+      sub: `${ordList.filter(o => ['pending', 'aguardando_confirmacao', 'under_review'].includes(o.status)).length} pedidos aguardando`,
       subColor: '#94A3B8',
       Icon: Clock,
       iconColor: '#D9A300',
@@ -157,18 +198,16 @@ export default async function AdminFinancialPage() {
                 </tr>
               </thead>
               <tbody>
-                {ordList.slice(0, 50).map((order: any, i: number) => {
+                {ordList.slice(0, 50).map((order, i) => {
                   const s = ORDER_STATUS[order.status] ?? { label: order.status, bg: '#F1F5F9', color: '#94A3B8', border: '#E2E8F0' }
-                  const profile   = order.profiles as any
-                  const items     = (order.order_items as any[]) ?? []
-                  const itemLabel = items.length > 0
-                    ? items.map((it: any) => `${it.name}${it.quantity > 1 ? ` ×${it.quantity}` : ''}`).join(', ')
+                  const itemLabel = order.order_items.length > 0
+                    ? order.order_items.map(it => `${it.service_name}${it.quantity > 1 ? ` ×${it.quantity}` : ''}`).join(', ')
                     : '—'
                   return (
                     <tr key={order.id} style={{ borderBottom: i < Math.min(ordList.length, 50) - 1 ? '1px solid #F8FAFC' : 'none' }}>
                       <td style={{ padding: '14px 20px' }}>
-                        <div className="font-semibold text-sm" style={{ color: '#0B0B0D' }}>{profile?.full_name ?? '—'}</div>
-                        {profile?.email && <div className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{profile.email}</div>}
+                        <div className="font-semibold text-sm" style={{ color: '#0B0B0D' }}>{order.profile?.full_name ?? '—'}</div>
+                        {order.profile?.email && <div className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{order.profile.email}</div>}
                       </td>
                       <td style={{ padding: '14px 20px', fontSize: 12, color: '#64748B', maxWidth: 200 }}>
                         <span className="line-clamp-1">{itemLabel}</span>
@@ -215,22 +254,21 @@ export default async function AdminFinancialPage() {
                 </tr>
               </thead>
               <tbody>
-                {invList.slice(0, 50).map((inv: any, i: number) => {
-                  const invStatusMap: Record<string, { label: string; bg: string; color: string; border: string; Icon: any }> = {
+                {invList.slice(0, 50).map((inv, i) => {
+                  const invStatusMap: Record<string, { label: string; bg: string; color: string; border: string; Icon: React.ElementType }> = {
                     paid:    { label: 'Pago',     bg: 'rgba(16,185,129,0.08)',  color: '#059669', border: 'rgba(16,185,129,0.20)', Icon: CheckCircle2 },
                     pending: { label: 'Pendente', bg: 'rgba(245,183,0,0.10)',   color: '#D9A300', border: 'rgba(245,183,0,0.20)', Icon: Clock },
                     overdue: { label: 'Vencido',  bg: 'rgba(239,68,68,0.08)',   color: '#DC2626', border: 'rgba(239,68,68,0.20)', Icon: AlertCircle },
                   }
                   const s = invStatusMap[inv.status] ?? invStatusMap.pending
-                  const profile = inv.profiles as any
                   return (
                     <tr key={inv.id} style={{ borderBottom: i < Math.min(invList.length, 50) - 1 ? '1px solid #F8FAFC' : 'none' }}>
                       <td style={{ padding: '14px 20px' }}>
-                        <div className="font-semibold text-sm" style={{ color: '#0B0B0D' }}>{profile?.full_name ?? '—'}</div>
-                        {profile?.email && <div className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{profile.email}</div>}
+                        <div className="font-semibold text-sm" style={{ color: '#0B0B0D' }}>{inv.profile?.full_name ?? '—'}</div>
+                        {inv.profile?.email && <div className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{inv.profile.email}</div>}
                       </td>
                       <td style={{ padding: '14px 20px', fontWeight: 700, fontSize: 14, color: '#0B0B0D' }}>
-                        {fmtKz(Number(inv.amount ?? 0))}
+                        {fmtKz(Number(inv.total ?? 0))}
                       </td>
                       <td style={{ padding: '14px 20px', fontSize: 12, color: '#94A3B8' }}>
                         {inv.due_date ? new Date(inv.due_date).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
