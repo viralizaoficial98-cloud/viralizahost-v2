@@ -194,6 +194,12 @@ export function EmailCorpSection() {
                           ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'
                           : 'bg-[#0A0A0A] text-white hover:bg-[#222] shadow-sm'
                       }`}
+                      onClick={() => console.log('[EMAIL PLAN CLICKED]', {
+                        id: plan.id, slug: plan.slug, name: plan.name,
+                        price_monthly: plan.price_monthly, price_annual: plan.price_annual,
+                        planKey, billing,
+                        url: `/checkout?plan=${planKey}&billing=${billing === 'annual' ? '1year' : 'monthly'}`,
+                      })}
                     >
                       Começar Agora →
                     </Link>

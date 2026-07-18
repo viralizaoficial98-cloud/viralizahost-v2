@@ -949,6 +949,8 @@ function CheckoutContent() {
 
     const supabase = createClient()
 
+    console.log('[CHECKOUT PARAMS]', { planId, tldParam, domainParam, billingParam })
+
     ;(async () => {
       try {
         // ── Domain via TLD param ──────────────────────────────────────────────
@@ -1018,10 +1020,48 @@ function CheckoutContent() {
           catalog[p.slug] = { id: p.slug, name: p.name, type, price, currency: 'AOA', quantity: 1 }
         })
 
+        // ── Email prices: site_email_plans is the single source of truth ─────
+        // The admin panel edits site_email_plans only, so we override whatever
+        // came from the products table to prevent price divergence.
+        const { data: emailPlanRows, error: emailPlanError } = await (supabase as any)
+          .from('site_email_plans')
+          .select('slug, name, price_monthly, price_annual, active')
+          .eq('active', true)
+
+        if (emailPlanError) {
+          console.warn('[checkout] site_email_plans fetch error:', emailPlanError.message)
+        }
+        console.log('[CHECKOUT EMAIL PLANS FROM DB]', emailPlanRows?.map((e: any) => ({
+          slug: e.slug, name: e.name, price_monthly: e.price_monthly,
+        })))
+
+        emailPlanRows?.forEach((ep: any) => {
+          if (!ep.slug || ep.price_monthly == null) return
+          catalog[ep.slug] = {
+            id: ep.slug,
+            name: ep.name,
+            type: 'email',
+            price: ep.price_monthly,
+            currency: 'AOA',
+            quantity: 1,
+          }
+        })
+
         if (planId) {
           const plan = catalog[planId]
+          console.log('[CHECKOUT PRODUCT FROM DATABASE]', {
+            planId,
+            found: !!plan,
+            name: plan?.name,
+            price: plan?.price,
+            type: plan?.type,
+          })
           if (plan && plan.price > 0) {
             const name = domainParam ? `Domínio ${domainParam}` : plan.name
+            console.log('[CHECKOUT CALCULATED PRICE]', {
+              planId, price: plan.price, billingParam,
+              item: { ...plan, name },
+            })
             setItems([{ ...plan, name, quantity: 1 }])
             if (plan.type === 'domain' && domainParam) {
               useCheckoutStore.getState().setDomainName(domainParam)
