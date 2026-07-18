@@ -25,7 +25,7 @@ type DbEmailPlan = {
 const fmt = (v: number) => `Kz ${v.toLocaleString('pt-AO')}`
 
 export function EmailCorpSection() {
-  const [billing, setBilling] = useState<'monthly' | 'annual'>('annual')
+  const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
   const [plans, setPlans] = useState<DbEmailPlan[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)

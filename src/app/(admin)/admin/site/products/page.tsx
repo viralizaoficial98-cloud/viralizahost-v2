@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { Loader2, Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronUp, GripVertical, Database, AlertTriangle, Copy, Search } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronUp, GripVertical, Database, AlertTriangle, Copy, Search, ArrowUp, ArrowDown } from 'lucide-react'
 
 type Feature = { id?: string; feature: string; included: boolean; position: number }
 
@@ -80,11 +80,34 @@ function ProductForm({ initial, onSave, onCancel }: {
   }
 
   function removeFeature(i: number) {
-    setForm(f => ({ ...f, product_features: (f.product_features ?? []).filter((_, j) => j !== i) }))
+    setForm(f => ({
+      ...f,
+      product_features: (f.product_features ?? [])
+        .filter((_, j) => j !== i)
+        .map((feat, idx) => ({ ...feat, position: idx })),
+    }))
   }
 
   function toggleIncluded(i: number) {
     setForm(f => ({ ...f, product_features: (f.product_features ?? []).map((feat, j) => j === i ? { ...feat, included: !feat.included } : feat) }))
+  }
+
+  function moveFeatureUp(i: number) {
+    if (i <= 0) return
+    setForm(f => {
+      const arr = [...(f.product_features ?? [])]
+      ;[arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]
+      return { ...f, product_features: arr.map((feat, idx) => ({ ...feat, position: idx })) }
+    })
+  }
+
+  function moveFeatureDown(i: number) {
+    setForm(f => {
+      const arr = [...(f.product_features ?? [])]
+      if (i >= arr.length - 1) return f
+      ;[arr[i], arr[i + 1]] = [arr[i + 1], arr[i]]
+      return { ...f, product_features: arr.map((feat, idx) => ({ ...feat, position: idx })) }
+    })
   }
 
   async function submit() {
@@ -173,9 +196,27 @@ function ProductForm({ initial, onSave, onCancel }: {
                 {f.included ? <Check size={11} /> : <X size={11} />}
               </button>
               <span className="flex-1 text-sm text-[#444]">{f.feature}</span>
-              <button onClick={() => removeFeature(i)} className="text-[#CCC] hover:text-red-500 transition-colors">
-                <Trash2 size={13} />
-              </button>
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button
+                  onClick={() => moveFeatureUp(i)}
+                  disabled={i === 0}
+                  title="Mover para cima"
+                  className="p-1 text-[#CCC] hover:text-[#0A0A0A] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                >
+                  <ArrowUp size={13} />
+                </button>
+                <button
+                  onClick={() => moveFeatureDown(i)}
+                  disabled={i === features.length - 1}
+                  title="Mover para baixo"
+                  className="p-1 text-[#CCC] hover:text-[#0A0A0A] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                >
+                  <ArrowDown size={13} />
+                </button>
+                <button onClick={() => removeFeature(i)} title="Eliminar" className="p-1 text-[#CCC] hover:text-red-500 transition-colors ml-0.5">
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
