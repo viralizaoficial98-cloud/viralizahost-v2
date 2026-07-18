@@ -359,8 +359,8 @@ export default function AdminProductsPage() {
       })
       const json = await res.json()
       if (!res.ok || !json.success) {
-        console.error('[products] update error:', json.message)
-        throw new Error('Não foi possível guardar as alterações. Tente novamente.')
+        console.error('[products] update error:', json)
+        throw new Error(json.message ?? 'Não foi possível guardar as alterações.')
       }
       flash('Produto actualizado com sucesso.')
     } else {
@@ -371,8 +371,8 @@ export default function AdminProductsPage() {
       })
       const json = await res.json()
       if (!res.ok || !json.success) {
-        console.error('[products] create error:', json.message)
-        throw new Error('Não foi possível criar o produto. Tente novamente.')
+        console.error('[products] create error:', json)
+        throw new Error(json.message ?? 'Não foi possível criar o produto.')
       }
       flash('Produto criado com sucesso.')
     }
