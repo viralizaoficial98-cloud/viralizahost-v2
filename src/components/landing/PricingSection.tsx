@@ -131,7 +131,7 @@ const PLAN_ACCENTS = ['#3B82F6', '#F5B700', '#8B5CF6', '#EF4444', '#10B981']
 
 export function PricingSection() {
   const { format, currency } = useCurrency()
-  const [billing, setBilling] = useState<'monthly' | 'annual'>('annual')
+  const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
   const [dbPlans, setDbPlans] = useState<DbPlan[] | null>(null)
 
   useEffect(() => {
