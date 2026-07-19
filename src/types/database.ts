@@ -410,6 +410,11 @@ export interface Database {
           photo_url: string | null
           flag: string | null
           country: string | null
+          country_code: string | null
+          specialty: string | null
+          secondary_flag: string | null
+          secondary_country_code: string | null
+          secondary_country_name: string | null
           accent_color: string
           position: number
           active: boolean
@@ -424,6 +429,11 @@ export interface Database {
           photo_url?: string | null
           flag?: string | null
           country?: string | null
+          country_code?: string | null
+          specialty?: string | null
+          secondary_flag?: string | null
+          secondary_country_code?: string | null
+          secondary_country_name?: string | null
           accent_color?: string
           position?: number
           active?: boolean
@@ -437,6 +447,11 @@ export interface Database {
           photo_url?: string | null
           flag?: string | null
           country?: string | null
+          country_code?: string | null
+          specialty?: string | null
+          secondary_flag?: string | null
+          secondary_country_code?: string | null
+          secondary_country_name?: string | null
           accent_color?: string
           position?: number
           active?: boolean
