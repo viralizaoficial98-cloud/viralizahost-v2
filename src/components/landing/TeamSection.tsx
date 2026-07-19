@@ -108,36 +108,35 @@ function StatCard({ icon: Icon, value, label, sub, active, delay }: {
   )
 }
 
-/* ─── Spinning dashed ring ───────────────────────────────────── */
-function SpinningRing({ size, color }: { size: number; color: string }) {
-  const r = size / 2 - 4
+/* ─── Spinning dashed ring — uses viewBox so CSS can resize it ── */
+function SpinningRing({ vb, color }: { vb: number; color: string }) {
+  const r = vb / 2 - 4
   return (
-    <svg className="absolute inset-0 pointer-events-none" width={size} height={size}
-      viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color}
+    <svg className="absolute inset-0 w-full h-full pointer-events-none"
+      viewBox={`0 0 ${vb} ${vb}`} preserveAspectRatio="xMidYMid meet">
+      <circle cx={vb/2} cy={vb/2} r={r} fill="none" stroke={color}
         strokeWidth="1.5" strokeDasharray="8 5" strokeOpacity="0.65"
-        style={{ animation: 'spinRing 12s linear infinite', transformOrigin: `${size/2}px ${size/2}px` }} />
+        style={{ animation: 'spinRing 12s linear infinite', transformOrigin: `${vb/2}px ${vb/2}px` }} />
     </svg>
   )
 }
 
-/* ─── Member card ─── photo 100px, outer ring 128px ─────────── */
+/* ─── Member card ─── responsive photo via CSS class vh-member-* */
 function MemberCard({ member, index, visible }: { member: MemberData; index: number; visible: boolean }) {
   const Icon = specialtyIcon(member.role)
   const [hovered, setHovered] = useState(false)
 
   return (
     <div
-      className="group relative flex flex-col items-center text-center rounded-2xl p-5 transition-all duration-300 cursor-default"
+      className="vh-member-card group relative flex flex-col items-center text-center rounded-2xl transition-all duration-300 cursor-default"
       style={{
+        padding: '28px 22px',
         background: CARD_BG,
         border: `1px solid ${hovered ? GOLD : GOLD_BORDER}`,
         boxShadow: hovered ? `0 8px 40px ${GOLD_GLOW}` : '0 4px 24px rgba(0,0,0,0.40)',
         transitionDelay: `${index * 60}ms`,
         opacity: visible ? 1 : 0,
         transform: visible ? (hovered ? 'translateY(-8px) scale(1.03)' : 'translateY(0)') : 'translateY(24px)',
-        /* equal card heights via flex + min-height */
-        minHeight: 340,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -148,14 +147,14 @@ function MemberCard({ member, index, visible }: { member: MemberData; index: num
 
       {/* flag — top-right */}
       {member.flag && (
-        <span className="absolute top-3 right-3 text-lg leading-none select-none"
+        <span className="absolute top-3 right-3 text-xl leading-none select-none"
           style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }}>
           {member.flag}
         </span>
       )}
 
       {/* specialty badge */}
-      <div className="flex items-center gap-1.5 mb-4 self-start mt-1">
+      <div className="flex items-center gap-1.5 self-start mb-5">
         <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
           style={{ background: GOLD_DIM, border: `1px solid ${GOLD_BORDER}` }}>
           <Icon size={11} color={GOLD} />
@@ -165,10 +164,10 @@ function MemberCard({ member, index, visible }: { member: MemberData; index: num
         </span>
       </div>
 
-      {/* photo — 100px inside 128px ring container */}
-      <div className="relative mb-3 shrink-0" style={{ width: 128, height: 128 }}>
-        <SpinningRing size={128} color={GOLD} />
-        {/* outer glow ring */}
+      {/* photo wrapper — size controlled by CSS .vh-member-wrap */}
+      <div className="vh-member-wrap relative shrink-0 mx-auto mb-5">
+        <SpinningRing vb={168} color={GOLD} />
+        {/* glow halo */}
         <div className="absolute inset-0 rounded-full pointer-events-none"
           style={{
             background: `radial-gradient(circle, ${GOLD_GLOW} 0%, transparent 70%)`,
@@ -179,11 +178,10 @@ function MemberCard({ member, index, visible }: { member: MemberData; index: num
           <img
             src={member.photo}
             alt={member.name}
-            className="absolute inset-0 m-auto rounded-full object-cover object-top"
+            className="vh-member-photo absolute inset-0 m-auto rounded-full object-cover object-top"
             style={{
-              width: 100, height: 100,
               border: `2.5px solid ${GOLD}`,
-              boxShadow: `0 0 16px ${GOLD_GLOW}, 0 0 4px ${GOLD}60`,
+              boxShadow: `0 0 20px ${GOLD_GLOW}, 0 0 5px ${GOLD}55`,
             }}
             onError={e => {
               e.currentTarget.style.display = 'none'
@@ -193,21 +191,20 @@ function MemberCard({ member, index, visible }: { member: MemberData; index: num
           />
         ) : null}
         <div
-          className="absolute inset-0 m-auto rounded-full items-center justify-center font-black text-2xl"
+          className="vh-member-photo absolute inset-0 m-auto rounded-full items-center justify-center font-black text-3xl"
           style={{
-            width: 100, height: 100,
             display: member.photo ? 'none' : 'flex',
             background: GOLD_DIM, color: GOLD,
             border: `2.5px solid ${GOLD}`,
-            boxShadow: `0 0 16px ${GOLD_GLOW}`,
+            boxShadow: `0 0 20px ${GOLD_GLOW}`,
           }}
         >
           {member.name.charAt(0).toUpperCase()}
         </div>
       </div>
 
-      <div className="font-black text-white text-sm leading-tight mb-1">{member.name}</div>
-      <div className="text-xs font-semibold mb-3" style={{ color: `${GOLD}BB` }}>Especialista</div>
+      <div className="font-black text-white text-base leading-tight mb-1">{member.name}</div>
+      <div className="text-xs font-semibold mb-4" style={{ color: `${GOLD}BB` }}>Especialista</div>
       <p className="text-xs leading-relaxed flex-1" style={{ color: '#94A3B8' }}>{member.bio}</p>
     </div>
   )
@@ -247,16 +244,15 @@ function ConnectorLines({ count }: { count: number }) {
   )
 }
 
-/* ─── CEO card — photo 132px inside 178px ring ───────────────── */
+/* ─── CEO card — photo/ring sized via CSS .vh-ceo-* classes ─────── */
 function CeoCard({ ceo, visible }: { ceo: CeoData; visible: boolean }) {
-  /* outer SVG ring size */
-  const RING = 178
-  const PHOTO = 132
-  const r1 = RING / 2 - 5   // dashed ring radius
-  const r2 = RING / 2 - 1   // pulse ring radius
+  /* Fixed viewBox for the SVG — CSS scales the container */
+  const VB = 240
+  const r1 = VB / 2 - 6   // dashed ring radius
+  const r2 = VB / 2 - 1   // pulse ring radius
 
   return (
-    <div className={`flex-1 rounded-3xl p-7 md:p-9 border relative overflow-hidden flex flex-col md:flex-row gap-7 items-center md:items-start transition-all duration-700 delay-100 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+    <div className={`flex-1 rounded-3xl p-7 md:p-9 border relative overflow-hidden flex flex-col md:flex-row gap-8 items-center md:items-start transition-all duration-700 delay-100 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
       style={{
         background: CARD_BG,
         borderColor: GOLD_BORDER,
@@ -264,34 +260,34 @@ function CeoCard({ ceo, visible }: { ceo: CeoData; visible: boolean }) {
       }}>
 
       {/* corner glow */}
-      <div className="absolute top-0 right-0 w-56 h-56 pointer-events-none"
+      <div className="absolute top-0 right-0 w-64 h-64 pointer-events-none"
         style={{ background: `radial-gradient(circle at top right, ${GOLD_DIM}, transparent 70%)` }} />
 
-      {/* avatar section */}
-      <div className="relative shrink-0 flex items-center justify-center" style={{ width: RING, height: RING }}>
+      {/* avatar — size driven by CSS .vh-ceo-wrap */}
+      <div className="vh-ceo-wrap relative shrink-0 flex items-center justify-center mx-auto md:mx-0">
 
-        {/* dashed spinning ring */}
-        <svg className="absolute inset-0" width={RING} height={RING} viewBox={`0 0 ${RING} ${RING}`}>
-          <circle cx={RING/2} cy={RING/2} r={r1} fill="none" stroke={GOLD} strokeWidth="1.8"
+        {/* dashed spinning ring — fills container via viewBox */}
+        <svg className="absolute inset-0 w-full h-full"
+          viewBox={`0 0 ${VB} ${VB}`} preserveAspectRatio="xMidYMid meet">
+          <circle cx={VB/2} cy={VB/2} r={r1} fill="none" stroke={GOLD} strokeWidth="1.8"
             strokeDasharray="10 6" strokeOpacity="0.55"
-            style={{ animation: 'spinRing 14s linear infinite', transformOrigin: `${RING/2}px ${RING/2}px` }} />
-          <circle cx={RING/2} cy={RING/2} r={r2} fill="none" stroke={GOLD} strokeWidth="1" strokeOpacity="0.12">
-            <animate attributeName="r" values={`${r2};${r2+7};${r2}`} dur="2.8s" repeatCount="indefinite" />
+            style={{ animation: 'spinRing 14s linear infinite', transformOrigin: `${VB/2}px ${VB/2}px` }} />
+          <circle cx={VB/2} cy={VB/2} r={r2} fill="none" stroke={GOLD} strokeWidth="1" strokeOpacity="0.12">
+            <animate attributeName="r" values={`${r2};${r2+9};${r2}`} dur="2.8s" repeatCount="indefinite" />
             <animate attributeName="stroke-opacity" values="0.12;0;0.12" dur="2.8s" repeatCount="indefinite" />
           </circle>
         </svg>
 
         {/* glow halo */}
         <div className="absolute inset-0 rounded-full pointer-events-none"
-          style={{ background: `radial-gradient(circle, ${GOLD_GLOW} 0%, transparent 65%)`, opacity: 0.32 }} />
+          style={{ background: `radial-gradient(circle, ${GOLD_GLOW} 0%, transparent 65%)`, opacity: 0.35 }} />
 
         {ceo.photo ? (
           <img src={ceo.photo} alt={ceo.name}
-            className="rounded-full object-cover object-top relative z-10"
+            className="vh-ceo-photo rounded-full object-cover object-top relative z-10"
             style={{
-              width: PHOTO, height: PHOTO,
               border: `3px solid ${GOLD}`,
-              boxShadow: `0 0 28px ${GOLD_GLOW}, 0 0 6px ${GOLD}50`,
+              boxShadow: `0 0 36px ${GOLD_GLOW}, 0 0 8px ${GOLD}55`,
             }}
             onError={e => {
               e.currentTarget.style.display = 'none'
@@ -301,23 +297,22 @@ function CeoCard({ ceo, visible }: { ceo: CeoData; visible: boolean }) {
           />
         ) : null}
         <div
-          className="rounded-full items-center justify-center font-black text-4xl relative z-10"
+          className="vh-ceo-photo rounded-full items-center justify-center font-black text-5xl relative z-10"
           style={{
-            width: PHOTO, height: PHOTO,
             display: ceo.photo ? 'none' : 'flex',
             background: GOLD_DIM, color: GOLD,
             border: `3px solid ${GOLD}`,
-            boxShadow: `0 0 28px ${GOLD_GLOW}`,
+            boxShadow: `0 0 36px ${GOLD_GLOW}`,
           }}
         >
           {ceo.name.charAt(0).toUpperCase()}
         </div>
 
-        {/* two flags — bottom-right of avatar */}
+        {/* two flags — bottom-right */}
         <div className="absolute bottom-1 right-1 flex items-center gap-0.5 z-20"
           style={{ filter: 'drop-shadow(0 1px 3px #000)' }}>
-          <span className="text-xl leading-none">{ceo.flag}</span>
-          <span className="text-xl leading-none">{ceo.secondary_flag}</span>
+          <span className="text-2xl leading-none">{ceo.flag}</span>
+          <span className="text-2xl leading-none">{ceo.secondary_flag}</span>
         </div>
       </div>
 
@@ -492,11 +487,39 @@ export function TeamSection() {
 
       </div>
 
-      {/* keyframes */}
+      {/* keyframes + responsive photo sizing */}
       <style>{`
         @keyframes spinRing  { to { transform: rotate(360deg); } }
         @keyframes nodePulse { 0%,100%{ opacity:1; transform:translateX(-50%) scale(1); } 50%{ opacity:.45; transform:translateX(-50%) scale(1.6); } }
         @keyframes dashMove  { to { background-position: 14px 0; } }
+
+        /* ── CEO photo sizing ── */
+        .vh-ceo-wrap  { width:240px; height:240px; }
+        .vh-ceo-photo { width:196px; height:196px; }
+
+        /* ── Member ring + photo sizing ── */
+        .vh-member-wrap  { width:168px; height:168px; }
+        .vh-member-photo { width:140px; height:140px; }
+        .vh-member-card  { min-height:430px; }
+
+        /* tablet (≤ 1024px) */
+        @media (max-width:1024px) {
+          .vh-ceo-wrap  { width:195px; height:195px; }
+          .vh-ceo-photo { width:158px; height:158px; }
+          .vh-member-wrap  { width:148px; height:148px; }
+          .vh-member-photo { width:122px; height:122px; }
+          .vh-member-card  { min-height:400px; }
+        }
+
+        /* mobile (≤ 640px) */
+        @media (max-width:640px) {
+          .vh-ceo-wrap  { width:160px; height:160px; }
+          .vh-ceo-photo { width:128px; height:128px; }
+          .vh-member-wrap  { width:132px; height:132px; }
+          .vh-member-photo { width:108px; height:108px; }
+          .vh-member-card  { min-height:370px; }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           [style*="animation"] { animation: none !important; }
         }
