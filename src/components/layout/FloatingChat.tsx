@@ -203,7 +203,7 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
         >
           {/* Header */}
           <div className="bg-[#0A0A0A] px-4 py-2.5 flex items-center gap-3 shrink-0">
-            <AvatarIA size={44} showBadge={false} showOnline={true} className="shrink-0" />
+            <AvatarIA size={52} showBadge={false} showOnline={true} className="shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-white font-bold text-sm leading-tight">CIZESA</p>
               <p className={`text-[11px] mt-0.5 ${streaming ? 'text-[#F5B700]' : 'text-green-400'}`}>
@@ -352,7 +352,7 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
             onClick={handleOpen}
             style={{ animation: badge ? 'fabLabelPulse 2.5s ease-in-out infinite' : 'none' }}
           >
-            Fale com a IA
+            Olá! Eu sou a Cizesa. Como posso te ajudar?
           </div>
         )}
         <button
@@ -366,7 +366,7 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
               <X size={22} className="text-white" />
             </div>
           ) : (
-            <AvatarIA size={56} showBadge={badge} showOnline={true} />
+            <AvatarIA size={72} showBadge={badge} showOnline={true} />
           )}
         </button>
       </div>
