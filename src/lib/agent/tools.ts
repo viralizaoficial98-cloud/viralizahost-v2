@@ -8,142 +8,440 @@ export interface AgentContext {
   profileId?: string
 }
 
-export function buildTools(ctx: AgentContext) {
+// ── Simple in-memory cache (per request, cleared after each invocation) ───────
+const cache = new Map<string, { data: unknown; ts: number }>()
+function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+  const hit = cache.get(key)
+  if (hit && Date.now() - hit.ts < ttlMs) return Promise.resolve(hit.data as T)
+  return fn().then(data => { cache.set(key, { data, ts: Date.now() }); return data })
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function buildTools(ctx: AgentContext): Record<string, any> {
   const db = createAdminWriteClient()
 
-  // ── Public tools (all levels) ─────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+  // PUBLIC TOOLS — available to all levels
+  // ═══════════════════════════════════════════════════════════════
 
+  /** List hosting plans with full detail */
   const getPlans = tool({
-    description: 'Lista os planos de hospedagem disponíveis com preços e características.',
+    description: 'Lista todos os planos de hospedagem disponíveis com preços em AKZ, BRL e USD, espaço em disco, largura de banda e funcionalidades. Usar sempre que o utilizador perguntar sobre planos, preços ou hospedagem.',
     inputSchema: z.object({
-      type: z.enum(['shared', 'vps', 'dedicated', 'reseller', 'all']).optional(),
+      type: z.enum(['shared', 'vps', 'dedicated', 'reseller', 'all']).optional().describe('Tipo de plano. Omitir para listar todos.'),
     }),
     execute: async (input) => {
       const type = input.type ?? 'all'
-      let query = db.from('plans').select('id, slug, name, type, price_akz, price_brl, price_usd, disk_gb, bandwidth_gb')
-      if (type !== 'all') query = query.eq('type', type)
-      const { data, error } = await query.order('price_akz', { ascending: true })
-      if (error) return { error: 'Não foi possível carregar os planos.' }
-      return { plans: data }
+      return cached(`plans:${type}`, 60_000, async () => {
+        let q = db.from('plans').select('id, slug, name, type, description, price_akz, price_brl, price_usd, disk_gb, bandwidth_gb, email_accounts, max_domains, max_subdomains, max_databases, features, is_popular, is_active')
+        if (type !== 'all') q = q.eq('type', type)
+        const { data, error } = await q.eq('is_active', true).order('sort_order', { ascending: true })
+        if (error) return { error: 'Não foi possível carregar os planos de momento.' }
+        return { plans: data, count: data?.length ?? 0 }
+      })
     },
   })
 
+  /** Search product catalogue */
   const getProducts = tool({
-    description: 'Pesquisa produtos no catálogo (domínios, e-mail, hospedagem, etc.).',
+    description: 'Pesquisa produtos no catálogo ViralizaHost: hosting, email, domínios, SSL, VPS, Cloud, CDN, backup, Microsoft 365, etc. Usar quando o utilizador pergunta sobre produtos específicos ou quer comparar.',
     inputSchema: z.object({
-      category: z.string().optional().describe('Categoria: hosting, email, domain, ssl, etc.'),
-      search: z.string().optional().describe('Termo de pesquisa pelo nome do produto'),
+      category: z.string().optional().describe('Categoria do produto: hosting, email, domain, ssl, vps, dedicated, reseller, cloud, cdn, backup, microsoft365'),
+      search: z.string().optional().describe('Termo livre para pesquisar no nome do produto'),
     }),
     execute: async ({ category, search }) => {
-      let query = db.from('products').select('id, slug, name, category, subcategory, price_monthly, price_6m, price_1y, meta')
-      if (category) query = query.eq('category', category)
-      if (search) query = query.ilike('name', `%${search}%`)
-      const { data, error } = await query.limit(10)
-      if (error) return { error: 'Não foi possível pesquisar produtos.' }
-      return { products: data }
+      return cached(`products:${category}:${search}`, 60_000, async () => {
+        let q = db.from('products').select('id, slug, name, category, subcategory, price_monthly, price_6m, price_1y, price_2y, price_3y, meta')
+        if (category) q = q.eq('category', category)
+        if (search) q = q.ilike('name', `%${search}%`)
+        const { data, error } = await q.order('price_monthly', { ascending: true }).limit(15)
+        if (error) return { error: 'Erro ao pesquisar produtos.' }
+        return { products: data, count: data?.length ?? 0 }
+      })
     },
   })
 
+  /** List all product categories */
+  const getProductCategories = tool({
+    description: 'Lista todas as categorias de produtos disponíveis na ViralizaHost. Usar para dar uma visão geral do que é oferecido.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      return cached('product_categories', 120_000, async () => {
+        const { data, error } = await db.from('products').select('category, subcategory').order('category')
+        if (error) return { error: 'Erro ao carregar categorias.' }
+        const cats = [...new Set(data?.map(p => p.category) ?? [])]
+        const byCat: Record<string, string[]> = {}
+        data?.forEach(p => {
+          if (!byCat[p.category]) byCat[p.category] = []
+          if (p.subcategory && !byCat[p.category].includes(p.subcategory)) byCat[p.category].push(p.subcategory)
+        })
+        return { categories: cats, details: byCat }
+      })
+    },
+  })
+
+  /** Domain availability check */
   const checkDomainAvailability = tool({
-    description: 'Verifica se um domínio está disponível para registo e mostra o preço.',
+    description: 'Verifica disponibilidade de um domínio e mostra o preço de registo. Usar sempre que o utilizador menciona um domínio e quer saber se está disponível.',
     inputSchema: z.object({
-      domain: z.string().describe('Nome do domínio a verificar, ex: meusite.ao'),
+      domain: z.string().describe('Nome completo do domínio, ex: minhavista.ao ou empresa.com'),
     }),
     execute: async ({ domain }) => {
-      const ext = domain.split('.').slice(1).join('.')
+      const clean = domain.toLowerCase().trim()
+      const parts = clean.split('.')
+      const ext = parts.length >= 2 ? parts.slice(1).join('.') : ''
+
+      // Get pricing
       const { data: pricing } = await db
         .from('site_domains')
         .select('extension, price_monthly, price_annual')
         .eq('extension', ext)
-        .single()
+        .maybeSingle()
 
+      // Try domain check API
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_APP_URL}/api/checkout/domain-check?domain=${encodeURIComponent(domain)}`,
-        { cache: 'no-store' }
+        `${baseUrl}/api/checkout/domain-check?domain=${encodeURIComponent(clean)}`,
+        { cache: 'no-store', signal: AbortSignal.timeout(5000) }
       ).catch(() => null)
 
       const availability = res?.ok ? await res.json().catch(() => null) : null
 
       return {
-        domain,
+        domain: clean,
         extension: ext,
         pricing: pricing ?? null,
-        availability: availability ?? { checked: false, message: 'Verificação não disponível de momento.' },
+        availability: availability ?? { checked: false, note: 'Verificação em tempo real não disponível neste momento.' },
       }
     },
   })
 
-  // ── Client tools (requires auth) ──────────────────────────────
-
-  const getMyServices = tool({
-    description: 'Lista os serviços de hospedagem activos do cliente autenticado.',
-    inputSchema: z.object({}),
-    execute: async () => {
-      if (!ctx.profileId) return { error: 'Autenticação necessária.' }
-      const { data, error } = await db
-        .from('services')
-        .select('id, status, billing_cycle, price, currency, expires_at, plan:plans(name, type), hosting_accounts(primary_domain, cpanel_username, status, disk_used_mb)')
-        .eq('profile_id', ctx.profileId)
-        .order('created_at', { ascending: false })
-      if (error) return { error: 'Não foi possível carregar os seus serviços.' }
-      return { services: data }
+  /** List domain extension prices */
+  const getDomainPrices = tool({
+    description: 'Lista os preços de registo de domínios por extensão (.ao, .co.ao, .com, etc.). Usar quando o utilizador quer saber quanto custa registar um domínio.',
+    inputSchema: z.object({
+      extension: z.string().optional().describe('Extensão específica, ex: ao, com, net. Omitir para listar todas.'),
+    }),
+    execute: async ({ extension }) => {
+      return cached(`domain_prices:${extension}`, 120_000, async () => {
+        let q = db.from('site_domains').select('extension, price_monthly, price_annual').order('extension')
+        if (extension) q = q.eq('extension', extension)
+        const { data, error } = await q
+        if (error) return { error: 'Erro ao carregar preços de domínios.' }
+        return { domain_prices: data }
+      })
     },
   })
 
+  /** Get email plans */
+  const getEmailPlans = tool({
+    description: 'Lista os planos de e-mail corporativo e Microsoft 365 disponíveis com preços. Usar quando o utilizador pergunta sobre e-mail profissional.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      return cached('email_plans', 120_000, async () => {
+        const { data, error } = await db.from('site_email_plans').select('*').order('price_monthly', { ascending: true })
+        if (error) return { error: 'Erro ao carregar planos de e-mail.' }
+        return { email_plans: data }
+      })
+    },
+  })
+
+  // ═══════════════════════════════════════════════════════════════
+  // CLIENT TOOLS — requires authentication
+  // ═══════════════════════════════════════════════════════════════
+
+  /** Client profile */
+  const getMyProfile = tool({
+    description: 'Retorna o perfil completo do cliente autenticado: nome, email, telefone, país, plano, estado da conta.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
+      const { data, error } = await db
+        .from('profiles')
+        .select('id, full_name, email, phone, country, currency, role, is_active, created_at')
+        .eq('id', ctx.profileId)
+        .single()
+      if (error || !data) return { error: 'Não foi possível carregar o seu perfil.' }
+      return { profile: data }
+    },
+  })
+
+  /** Active services */
+  const getMyServices = tool({
+    description: 'Lista todos os serviços de hospedagem do cliente (activos, pendentes, suspensos). Inclui plano, preço, data de expiração e domínio principal.',
+    inputSchema: z.object({
+      status: z.enum(['active', 'pending', 'suspended', 'cancelled', 'all']).optional().describe('Filtrar por estado. Omitir para todos.'),
+    }),
+    execute: async (input) => {
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
+      const status = input.status ?? 'all'
+      let q = db
+        .from('services')
+        .select(`
+          id, status, billing_cycle, price, currency, expires_at, auto_renew, started_at,
+          plan:plans(name, type, disk_gb, bandwidth_gb, email_accounts),
+          hosting_accounts(id, primary_domain, cpanel_username, status, disk_used_mb, bandwidth_used_mb, email_count, php_version, ssl_enabled)
+        `)
+        .eq('profile_id', ctx.profileId)
+        .order('created_at', { ascending: false })
+      if (status !== 'all') q = q.eq('status', status)
+      const { data, error } = await q
+      if (error) return { error: 'Não foi possível carregar os seus serviços.' }
+      return { services: data, count: data?.length ?? 0 }
+    },
+  })
+
+  /** Hosting accounts with cPanel info */
+  const getMyHosting = tool({
+    description: 'Detalha as contas de hospedagem cPanel do cliente: domínio, utilizador cPanel, uso de disco, número de e-mails, PHP, SSL.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
+      const { data, error } = await db
+        .from('hosting_accounts')
+        .select('id, service_id, primary_domain, cpanel_username, status, disk_used_mb, bandwidth_used_mb, email_count, db_count, php_version, ssl_enabled, created_at')
+        .eq('profile_id', ctx.profileId)
+        .order('created_at', { ascending: false })
+      if (error) return { error: 'Não foi possível carregar as hospedagens.' }
+
+      const enriched = data?.map(h => ({
+        ...h,
+        cpanel_url: `https://portal.viralizahost.com/portal`,
+        webmail_url: `https://webmail.${h.primary_domain}`,
+        cpanel_note: `Para aceder ao cPanel de ${h.primary_domain}: aceda ao portal do cliente e clique em "Aceder ao cPanel"`,
+      }))
+
+      return { hosting_accounts: enriched, count: enriched?.length ?? 0 }
+    },
+  })
+
+  /** cPanel and Webmail access instructions */
+  const getCpanelAccess = tool({
+    description: 'Fornece instruções de acesso ao cPanel e Webmail para um domínio específico do cliente.',
+    inputSchema: z.object({
+      domain: z.string().optional().describe('Domínio específico. Omitir para listar todos com instruções.'),
+    }),
+    execute: async ({ domain }) => {
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
+      let q = db
+        .from('hosting_accounts')
+        .select('id, service_id, primary_domain, cpanel_username, status')
+        .eq('profile_id', ctx.profileId)
+      if (domain) q = q.eq('primary_domain', domain)
+      const { data, error } = await q
+
+      if (error || !data?.length) return { error: domain ? `Hospedagem para ${domain} não encontrada na sua conta.` : 'Nenhuma hospedagem encontrada.' }
+
+      return {
+        accounts: data.map(h => ({
+          domain: h.primary_domain,
+          cpanel_username: h.cpanel_username,
+          status: h.status,
+          access: {
+            cpanel: `Aceda ao portal ViralizaHost → clique em "cPanel" na sua hospedagem ${h.primary_domain}`,
+            webmail: `https://webmail.${h.primary_domain} (ou aceder pelo cPanel → E-mail → Webmail)`,
+            direct_cpanel: `https://${h.primary_domain}:2083`,
+          },
+        })),
+      }
+    },
+  })
+
+  /** Client domains with DNS info */
+  const getMyDomains = tool({
+    description: 'Lista os domínios registados pelo cliente com estado, data de expiração, nameservers e DNS.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
+      const { data, error } = await db
+        .from('domains')
+        .select('id, full_domain, name, extension, status, registrar, nameservers, expires_at, auto_renew, is_locked, whois_privacy, registered_at')
+        .eq('profile_id', ctx.profileId)
+        .order('expires_at', { ascending: true })
+      if (error) return { error: 'Não foi possível carregar os domínios.' }
+
+      const today = new Date()
+      const enriched = data?.map(d => {
+        const exp = d.expires_at ? new Date(d.expires_at) : null
+        const daysLeft = exp ? Math.ceil((exp.getTime() - today.getTime()) / 86400000) : null
+        return {
+          ...d,
+          days_until_expiry: daysLeft,
+          expires_soon: daysLeft !== null && daysLeft <= 30,
+          viralizahost_nameservers: ['ns1.viralizahost.com', 'ns2.viralizahost.com'],
+        }
+      })
+
+      return { domains: enriched, count: enriched?.length ?? 0 }
+    },
+  })
+
+  /** Client email accounts */
+  const getMyEmails = tool({
+    description: 'Lista as contas de e-mail corporativo do cliente com quota e uso.',
+    inputSchema: z.object({
+      hosting_domain: z.string().optional().describe('Filtrar por domínio da hospedagem'),
+    }),
+    execute: async ({ hosting_domain }) => {
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
+
+      // Get hosting IDs for the client (filtered by domain if provided)
+      let hq = db.from('hosting_accounts').select('id, primary_domain').eq('profile_id', ctx.profileId)
+      if (hosting_domain) hq = hq.eq('primary_domain', hosting_domain)
+      const { data: hostings } = await hq
+
+      if (!hostings?.length) return { emails: [], note: 'Nenhuma hospedagem encontrada para listar e-mails.' }
+
+      const hostingIds = hostings.map(h => h.id)
+      const { data, error } = await db
+        .from('emails')
+        .select('id, email_address, display_name, quota_mb, used_mb, status, hosting_id')
+        .in('hosting_id', hostingIds)
+        .eq('profile_id', ctx.profileId)
+        .order('email_address')
+
+      if (error) return { error: 'Não foi possível carregar as contas de e-mail.' }
+
+      // Group by hosting/domain
+      const grouped: Record<string, unknown[]> = {}
+      data?.forEach(em => {
+        const h = hostings.find(hh => hh.id === em.hosting_id)
+        const domain = h?.primary_domain ?? 'unknown'
+        if (!grouped[domain]) grouped[domain] = []
+        grouped[domain].push({
+          ...em,
+          quota_gb: (em.quota_mb / 1024).toFixed(2),
+          used_gb: (em.used_mb / 1024).toFixed(2),
+          usage_pct: em.quota_mb > 0 ? Math.round((em.used_mb / em.quota_mb) * 100) : 0,
+          webmail_url: `https://webmail.${domain}`,
+        })
+      })
+
+      return { emails_by_domain: grouped, total: data?.length ?? 0 }
+    },
+  })
+
+  /** Client invoices */
   const getMyInvoices = tool({
-    description: 'Lista as facturas do cliente, com estado de pagamento.',
+    description: 'Lista as facturas do cliente com estado de pagamento, valores e datas de vencimento.',
     inputSchema: z.object({
       status: z.enum(['pending', 'paid', 'overdue', 'cancelled', 'all']).optional(),
       limit: z.number().min(1).max(20).optional(),
     }),
     execute: async (input) => {
-      if (!ctx.profileId) return { error: 'Autenticação necessária.' }
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
       const status = input.status ?? 'all'
-      const limit = input.limit ?? 5
-      let query = db
+      const limit = input.limit ?? 10
+
+      let q = db
         .from('invoices')
-        .select('id, invoice_number, status, currency, total, due_date, created_at')
+        .select('id, invoice_number, status, currency, subtotal, total, due_date, created_at, items')
         .eq('profile_id', ctx.profileId)
         .order('created_at', { ascending: false })
         .limit(limit)
-      if (status !== 'all') query = query.eq('status', status)
-      const { data, error } = await query
+      if (status !== 'all') q = q.eq('status', status)
+
+      const { data, error } = await q
       if (error) return { error: 'Não foi possível carregar as facturas.' }
-      return { invoices: data }
+
+      const today = new Date()
+      const enriched = data?.map(inv => ({
+        ...inv,
+        items: undefined, // don't expose raw JSON items
+        is_overdue: inv.status === 'pending' && inv.due_date && new Date(inv.due_date) < today,
+      }))
+
+      return { invoices: enriched, count: enriched?.length ?? 0 }
     },
   })
 
+  /** Client payments */
+  const getMyPayments = tool({
+    description: 'Lista os pagamentos efectuados pelo cliente com método, valor e estado.',
+    inputSchema: z.object({
+      limit: z.number().min(1).max(20).optional(),
+    }),
+    execute: async (input) => {
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
+      const limit = input.limit ?? 10
+
+      const { data, error } = await db
+        .from('payments')
+        .select('id, method, amount, currency, status, paid_at, created_at')
+        .eq('profile_id', ctx.profileId)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+      if (error) return { error: 'Não foi possível carregar os pagamentos.' }
+      return { payments: data, count: data?.length ?? 0 }
+    },
+  })
+
+  /** Client tickets */
   const getMyTickets = tool({
-    description: 'Lista os tickets de suporte do cliente.',
+    description: 'Lista os tickets de suporte do cliente com estado, prioridade e última actualização.',
     inputSchema: z.object({
       status: z.enum(['open', 'in_progress', 'resolved', 'closed', 'all']).optional(),
     }),
     execute: async (input) => {
-      if (!ctx.profileId) return { error: 'Autenticação necessária.' }
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
       const status = input.status ?? 'all'
-      let query = db
+      let q = db
         .from('tickets')
-        .select('id, subject, status, priority, department, created_at, updated_at')
+        .select('id, subject, status, priority, department, category, created_at, updated_at')
         .eq('profile_id', ctx.profileId)
-        .order('created_at', { ascending: false })
-        .limit(10)
-      if (status !== 'all') query = query.eq('status', status)
-      const { data, error } = await query
+        .order('updated_at', { ascending: false })
+        .limit(15)
+      if (status !== 'all') q = q.eq('status', status)
+      const { data, error } = await q
       if (error) return { error: 'Não foi possível carregar os tickets.' }
-      return { tickets: data }
+      return { tickets: data, count: data?.length ?? 0 }
     },
   })
 
-  const createTicket = tool({
-    description: 'Cria um ticket de suporte em nome do cliente autenticado.',
+  /** Get single ticket with messages */
+  const getTicketMessages = tool({
+    description: 'Lê o conteúdo de um ticket específico, incluindo todas as mensagens trocadas.',
     inputSchema: z.object({
-      subject: z.string().min(5).max(200).describe('Assunto do ticket'),
-      message: z.string().min(10).describe('Descrição detalhada do problema'),
-      department: z.enum(['suporte', 'financeiro', 'comercial', 'tecnico']).optional(),
-      priority: z.enum(['low', 'medium', 'high']).optional(),
+      ticket_id: z.string().uuid().describe('ID do ticket a consultar'),
     }),
-    execute: async ({ subject, message, department, priority }) => {
-      if (!ctx.profileId || ctx.userLevel === 'visitor') return { error: 'Autenticação necessária para criar ticket.' }
+    execute: async ({ ticket_id }) => {
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
+
+      // Verify ticket belongs to client
+      const { data: ticket, error: tErr } = await db
+        .from('tickets')
+        .select('id, subject, status, priority, department, created_at')
+        .eq('id', ticket_id)
+        .eq('profile_id', ctx.profileId)
+        .single()
+
+      if (tErr || !ticket) return { error: 'Ticket não encontrado na sua conta.' }
+
+      const { data: messages } = await db
+        .from('ticket_messages')
+        .select('id, message, is_staff, is_internal, created_at')
+        .eq('ticket_id', ticket_id)
+        .eq('is_internal', false) // clients don't see internal notes
+        .order('created_at', { ascending: true })
+        .limit(50)
+
+      return { ticket, messages: messages ?? [] }
+    },
+  })
+
+  /** Create support ticket */
+  const createTicket = tool({
+    description: 'Cria um novo ticket de suporte para o cliente autenticado. Usar quando o cliente tem um problema ou pedido que precisa de acompanhamento.',
+    inputSchema: z.object({
+      subject: z.string().min(5).max(200).describe('Assunto resumido do problema ou pedido'),
+      message: z.string().min(20).describe('Descrição detalhada do problema, incluindo passos para reproduzir se for técnico'),
+      department: z.enum(['suporte', 'financeiro', 'comercial', 'tecnico']).optional().describe('Departamento: suporte (geral), financeiro, comercial (vendas), tecnico (problemas técnicos)'),
+      priority: z.enum(['low', 'medium', 'high']).optional().describe('Prioridade: low (baixa), medium (normal), high (urgente)'),
+      category: z.string().optional().describe('Categoria do problema, ex: email, dominio, hospedagem, faturacao'),
+    }),
+    execute: async ({ subject, message, department, priority, category }) => {
+      if (!ctx.profileId || ctx.userLevel === 'visitor') return { error: 'Precisa de estar autenticado para criar um ticket.' }
 
       const { data: ticket, error: tErr } = await db
         .from('tickets')
@@ -153,14 +451,14 @@ export function buildTools(ctx: AgentContext) {
           status: 'open',
           priority: priority ?? 'medium',
           department: department ?? 'suporte',
-          category: 'geral',
+          category: category ?? 'geral',
         })
-        .select('id, subject, status')
+        .select('id, subject, status, priority')
         .single()
 
-      if (tErr || !ticket) return { error: 'Erro ao criar ticket.' }
+      if (tErr || !ticket) return { error: `Erro ao criar ticket: ${tErr?.message ?? 'desconhecido'}` }
 
-      await db.from('ticket_messages').insert({
+      const { error: mErr } = await db.from('ticket_messages').insert({
         ticket_id: ticket.id,
         profile_id: ctx.profileId,
         message,
@@ -168,118 +466,219 @@ export function buildTools(ctx: AgentContext) {
         is_internal: false,
       })
 
+      if (mErr) return { error: 'Ticket criado mas erro ao adicionar mensagem. Por favor, abra o ticket e adicione a descrição.' }
+
       return {
         success: true,
         ticket_id: ticket.id,
+        reference: `#${ticket.id.slice(0, 8).toUpperCase()}`,
         subject: ticket.subject,
-        message: `Ticket criado com sucesso. Referência: #${ticket.id.slice(0, 8).toUpperCase()}`,
+        priority: ticket.priority,
+        note: `O seu ticket foi criado com sucesso (ref. ${ticket.id.slice(0, 8).toUpperCase()}). A nossa equipa irá responder em breve.`,
       }
     },
   })
 
-  const getMyDomains = tool({
-    description: 'Lista os domínios registados pelo cliente.',
-    inputSchema: z.object({}),
-    execute: async () => {
-      if (!ctx.profileId) return { error: 'Autenticação necessária.' }
-      const { data, error } = await db
-        .from('domains')
-        .select('id, full_domain, status, expires_at, registrar')
-        .eq('profile_id', ctx.profileId)
-        .order('expires_at', { ascending: true })
-      if (error) return { error: 'Não foi possível carregar os domínios.' }
-      return { domains: data }
-    },
-  })
-
-  const getCpanelLink = tool({
-    description: 'Fornece instruções para aceder ao cPanel de um serviço do cliente.',
+  /** Reply to existing ticket */
+  const replyToTicket = tool({
+    description: 'Envia uma resposta ou mensagem adicional num ticket existente do cliente.',
     inputSchema: z.object({
-      service_id: z.string().uuid().describe('ID do serviço para o qual gerar o acesso cPanel'),
+      ticket_id: z.string().uuid().describe('ID do ticket onde responder'),
+      message: z.string().min(5).describe('Texto da resposta'),
     }),
-    execute: async ({ service_id }) => {
-      if (!ctx.profileId) return { error: 'Autenticação necessária.' }
+    execute: async ({ ticket_id, message }) => {
+      if (!ctx.profileId || ctx.userLevel === 'visitor') return { error: 'Autenticação necessária.' }
 
-      const { data: hosting } = await db
-        .from('hosting_accounts')
-        .select('id, primary_domain, cpanel_username, service_id')
-        .eq('service_id', service_id)
+      // Verify ownership
+      const { data: ticket } = await db
+        .from('tickets')
+        .select('id, status')
+        .eq('id', ticket_id)
         .eq('profile_id', ctx.profileId)
         .single()
 
-      if (!hosting) return { error: 'Serviço não encontrado ou sem permissão.' }
+      if (!ticket) return { error: 'Ticket não encontrado na sua conta.' }
+      if (ticket.status === 'closed') return { error: 'Este ticket está fechado. Abra um novo ticket se precisar de mais ajuda.' }
 
-      return {
-        note: `Para aceder ao cPanel do domínio "${hosting.primary_domain}", aceda ao painel do cliente em https://viralizahost.com/portal e clique em "Aceder ao cPanel".`,
-        cpanel_username: hosting.cpanel_username,
-        primary_domain: hosting.primary_domain,
+      const { error } = await db.from('ticket_messages').insert({
+        ticket_id,
+        profile_id: ctx.profileId,
+        message,
+        is_staff: false,
+        is_internal: false,
+      })
+
+      if (error) return { error: 'Erro ao enviar resposta no ticket.' }
+
+      // Update ticket to in_progress if it was open
+      if (ticket.status === 'open') {
+        await db.from('tickets').update({ status: 'in_progress' }).eq('id', ticket_id)
       }
+
+      return { success: true, note: 'A sua mensagem foi adicionada ao ticket com sucesso.' }
     },
   })
 
-  // ── Admin tools ───────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+  // ADMIN TOOLS — requires admin role
+  // ═══════════════════════════════════════════════════════════════
 
-  const searchClient = tool({
-    description: '[Admin] Procura um cliente por nome ou e-mail.',
+  /** Search client */
+  const adminSearchClient = tool({
+    description: '[Admin] Pesquisa um cliente pelo nome, e-mail ou ID. Retorna perfil e resumo de serviços.',
     inputSchema: z.object({
-      query: z.string().min(2).describe('Nome ou e-mail a pesquisar'),
+      query: z.string().min(2).describe('Nome, e-mail ou UUID do cliente'),
     }),
     execute: async ({ query }) => {
-      if (ctx.userLevel !== 'admin') return { error: 'Acesso negado.' }
+      if (ctx.userLevel !== 'admin') return { error: 'Acesso restrito a administradores.' }
+
       const { data, error } = await db
         .from('profiles')
-        .select('id, full_name, email, role, is_active, created_at')
-        .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
+        .select('id, full_name, email, phone, country, role, is_active, currency, created_at')
+        .or(`full_name.ilike.%${query}%,email.ilike.%${query}%,id.eq.${query.length === 36 ? query : '00000000-0000-0000-0000-000000000000'}`)
         .limit(5)
-      if (error) return { error: 'Erro na pesquisa.' }
-      return { clients: data }
+
+      if (error) return { error: 'Erro na pesquisa de clientes.' }
+      return { clients: data, count: data?.length ?? 0 }
     },
   })
 
-  const getTicketStats = tool({
-    description: '[Admin] Retorna estatísticas gerais dos tickets de suporte.',
+  /** Admin ticket stats */
+  const adminGetTicketStats = tool({
+    description: '[Admin] Retorna estatísticas globais dos tickets de suporte.',
     inputSchema: z.object({}),
     execute: async () => {
-      if (ctx.userLevel !== 'admin') return { error: 'Acesso negado.' }
-      const { data, error } = await db.from('tickets').select('status, priority')
+      if (ctx.userLevel !== 'admin') return { error: 'Acesso restrito a administradores.' }
+      const { data, error } = await db.from('tickets').select('status, priority, created_at')
       if (error) return { error: 'Erro ao carregar estatísticas.' }
 
+      const today = new Date().toISOString().slice(0, 10)
       return {
         stats: {
           total: data.length,
           open: data.filter(t => t.status === 'open').length,
           in_progress: data.filter(t => t.status === 'in_progress').length,
           resolved: data.filter(t => t.status === 'resolved').length,
+          closed: data.filter(t => t.status === 'closed').length,
           critical: data.filter(t => t.priority === 'critical').length,
+          high: data.filter(t => t.priority === 'high').length,
+          new_today: data.filter(t => t.created_at?.startsWith(today)).length,
         },
       }
     },
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allTools: Record<string, any> = {
+  /** Admin list recent conversations */
+  const adminGetConversations = tool({
+    description: '[Admin] Lista as conversas recentes com o agente IA, com estatísticas por nível de utilizador.',
+    inputSchema: z.object({
+      limit: z.number().min(1).max(50).optional(),
+    }),
+    execute: async (input) => {
+      if (ctx.userLevel !== 'admin') return { error: 'Acesso restrito a administradores.' }
+      const limit = input.limit ?? 20
+      const { data, error } = await db
+        .from('ai_conversations')
+        .select('id, title, user_level, status, profile_id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(limit)
+      if (error) return { error: 'Erro ao carregar conversas.' }
+
+      const stats = {
+        total: data.length,
+        visitors: data.filter(c => c.user_level === 'visitor').length,
+        clients: data.filter(c => c.user_level === 'client').length,
+        active: data.filter(c => c.status === 'active').length,
+      }
+
+      return { conversations: data, stats }
+    },
+  })
+
+  /** Admin get client services */
+  const adminGetClientServices = tool({
+    description: '[Admin] Consulta os serviços de um cliente específico por profile_id.',
+    inputSchema: z.object({
+      profile_id: z.string().uuid().describe('UUID do cliente'),
+    }),
+    execute: async ({ profile_id }) => {
+      if (ctx.userLevel !== 'admin') return { error: 'Acesso restrito a administradores.' }
+      const { data, error } = await db
+        .from('services')
+        .select('id, status, billing_cycle, price, currency, expires_at, plan:plans(name, type), hosting_accounts(primary_domain, status)')
+        .eq('profile_id', profile_id)
+        .order('created_at', { ascending: false })
+      if (error) return { error: 'Erro ao carregar serviços do cliente.' }
+      return { services: data, count: data?.length ?? 0 }
+    },
+  })
+
+  /** Admin financial summary */
+  const adminGetFinancialSummary = tool({
+    description: '[Admin] Retorna resumo financeiro: total facturado, pago, pendente.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      if (ctx.userLevel !== 'admin') return { error: 'Acesso restrito a administradores.' }
+      const { data, error } = await db.from('invoices').select('status, currency, total')
+      if (error) return { error: 'Erro ao carregar dados financeiros.' }
+
+      const byStatus: Record<string, number> = {}
+      data?.forEach(inv => {
+        if (!byStatus[inv.status]) byStatus[inv.status] = 0
+        byStatus[inv.status] += inv.total ?? 0
+      })
+
+      return {
+        total_invoices: data?.length ?? 0,
+        by_status: byStatus,
+        paid: byStatus['paid'] ?? 0,
+        pending: byStatus['pending'] ?? 0,
+        overdue: byStatus['overdue'] ?? 0,
+      }
+    },
+  })
+
+  // ═══════════════════════════════════════════════════════════════
+  // Assemble tools by permission level
+  // ═══════════════════════════════════════════════════════════════
+
+  const publicTools = {
     getPlans,
     getProducts,
+    getProductCategories,
     checkDomainAvailability,
+    getDomainPrices,
+    getEmailPlans,
   }
 
-  if (ctx.userLevel === 'client' || ctx.userLevel === 'admin') {
-    Object.assign(allTools, {
-      getMyServices,
-      getMyInvoices,
-      getMyTickets,
-      createTicket,
-      getMyDomains,
-      getCpanelLink,
-    })
+  const clientTools = {
+    getMyProfile,
+    getMyServices,
+    getMyHosting,
+    getCpanelAccess,
+    getMyDomains,
+    getMyEmails,
+    getMyInvoices,
+    getMyPayments,
+    getMyTickets,
+    getTicketMessages,
+    createTicket,
+    replyToTicket,
+  }
+
+  const adminTools = {
+    adminSearchClient,
+    adminGetTicketStats,
+    adminGetConversations,
+    adminGetClientServices,
+    adminGetFinancialSummary,
   }
 
   if (ctx.userLevel === 'admin') {
-    Object.assign(allTools, {
-      searchClient,
-      getTicketStats,
-    })
+    return { ...publicTools, ...clientTools, ...adminTools }
   }
-
-  return allTools
+  if (ctx.userLevel === 'client') {
+    return { ...publicTools, ...clientTools }
+  }
+  return publicTools
 }
