@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { X, Send, Loader2, RefreshCw, Minimize2 } from 'lucide-react'
+import { X, Send, Loader2, RefreshCw, Minimize2, CheckCircle2, AlertTriangle, Download, FileText, ExternalLink } from 'lucide-react'
 import { AvatarIA } from './AvatarIA'
 
 interface Message {
@@ -77,6 +77,106 @@ function inlineFormat(text: string): React.ReactNode {
     }
     return part
   })
+}
+
+/**
+ * Detect invoice result patterns in agent messages and extract card data.
+ * The agent outputs lines like:
+ *   ✅ Factura VH-2026-000001 enviada com sucesso para cliente@email.com
+ *   ⚠️ A sua factura foi criada, mas não foi possível enviá-la por e-mail
+ */
+interface InvoiceCard {
+  success: boolean
+  invoiceNumber?: string
+  sentTo?: string
+  downloadUrl?: string
+  errorMsg?: string
+}
+
+function extractInvoiceCard(text: string): InvoiceCard | null {
+  // Success pattern
+  const successMatch = text.match(/✅[^\n]*[Ff]actura?\s+([A-Z0-9\-]+)\s+enviada?\s+com\s+sucesso\s+para\s+([^\s\n.]+)/i)
+  if (successMatch) {
+    const urlMatch = text.match(/https?:\/\/[^\s\n]+(?:pdf|invoice|fatura)[^\s\n]*/i)
+    return {
+      success: true,
+      invoiceNumber: successMatch[1],
+      sentTo: successMatch[2].replace(/[.,;]$/, ''),
+      downloadUrl: urlMatch?.[0],
+    }
+  }
+
+  // Failure pattern
+  if (text.includes('⚠️') && (text.toLowerCase().includes('fatura') || text.toLowerCase().includes('factura'))) {
+    const numMatch = text.match(/[A-Z]{2,}-\d{4}-\d+/)
+    const errMatch = text.match(/[Mm]otivo[:\s]+([^\n.]+)/)
+    return {
+      success: false,
+      invoiceNumber: numMatch?.[0],
+      errorMsg: errMatch?.[1]?.trim(),
+    }
+  }
+
+  return null
+}
+
+function InvoiceCardBlock({ card }: { card: InvoiceCard }) {
+  return (
+    <div style={{
+      border: `1px solid ${card.success ? '#BBF7D0' : '#FECACA'}`,
+      background: card.success ? '#F0FDF4' : '#FFF5F5',
+      borderRadius: 12,
+      padding: '12px 14px',
+      marginTop: 8,
+      fontSize: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        {card.success
+          ? <CheckCircle2 size={15} style={{ color: '#059669' }} />
+          : <AlertTriangle size={15} style={{ color: '#DC2626' }} />}
+        <span style={{ fontWeight: 800, color: card.success ? '#059669' : '#DC2626' }}>
+          {card.success ? 'Fatura enviada com sucesso' : 'Fatura criada — falha no envio'}
+        </span>
+      </div>
+      {card.invoiceNumber && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #E5E7EB' }}>
+          <span style={{ color: '#64748B' }}>Nº Fatura</span>
+          <span style={{ fontWeight: 700 }}>{card.invoiceNumber}</span>
+        </div>
+      )}
+      {card.sentTo && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #E5E7EB' }}>
+          <span style={{ color: '#64748B' }}>Enviada para</span>
+          <span style={{ fontWeight: 600 }}>{card.sentTo}</span>
+        </div>
+      )}
+      {card.errorMsg && (
+        <div style={{ padding: '4px 0', color: '#DC2626', fontSize: 11 }}>
+          Motivo: {card.errorMsg}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' as const }}>
+        {card.downloadUrl && (
+          <a href={card.downloadUrl} target="_blank" rel="noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#0A0A0A', color: '#F5B700', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>
+            <Download size={11} />PDF
+          </a>
+        )}
+        {card.invoiceNumber && (
+          <a href="/billing/invoices"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#F5B700', color: '#0A0A0A', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>
+            <FileText size={11} />Ver fatura
+          </a>
+        )}
+        {!card.success && (
+          <a href="/billing/invoices"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#EFF6FF', color: '#3B82F6', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>
+            <ExternalLink size={11} />Minhas faturas
+          </a>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
@@ -246,7 +346,10 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
                   }`}
                 >
                   {msg.role === 'assistant' && msg.content
-                    ? renderMarkdown(msg.content)
+                    ? <>
+                        {renderMarkdown(msg.content)}
+                        {(() => { const card = extractInvoiceCard(msg.content); return card ? <InvoiceCardBlock card={card} /> : null })()}
+                      </>
                     : msg.content}
                   {msg.role === 'assistant' && !msg.content && streaming && (
                     <span className="inline-flex gap-1 py-0.5">

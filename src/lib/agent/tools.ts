@@ -83,7 +83,7 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
 
   /** Domain availability check */
   const checkDomainAvailability = tool({
-    description: 'Verifica disponibilidade de um domínio e mostra o preço de registo. Usar sempre que o utilizador menciona um domínio e quer saber se está disponível.',
+    description: 'Verifica disponibilidade de um domínio e mostra o preço de registo. Usar SEMPRE que o utilizador menciona um domínio. Se pricing=null, usar all_available_prices para mostrar alternativas e seguir as instruções da nota.',
     inputSchema: z.object({
       domain: z.string().describe('Nome completo do domínio, ex: minhavista.ao ou empresa.com'),
     }),
@@ -92,12 +92,30 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
       const parts = clean.split('.')
       const ext = parts.length >= 2 ? parts.slice(1).join('.') : ''
 
-      // Get pricing
+      // Get pricing for this specific extension
       const { data: pricing } = await db
         .from('site_domains')
-        .select('extension, price_monthly, price_annual')
+        .select('extension, price_monthly, price_annual, price_2y, price_3y')
         .eq('extension', ext)
         .maybeSingle()
+
+      // When pricing for this extension is not found, get ALL available prices
+      let allAvailablePrices: unknown[] = []
+      let agentNote = ''
+
+      if (!pricing) {
+        const { data: allPrices } = await db
+          .from('site_domains')
+          .select('extension, price_monthly, price_annual')
+          .order('extension')
+        allAvailablePrices = allPrices ?? []
+
+        if (allAvailablePrices.length > 0) {
+          agentNote = `NOTA PARA AGENTE: O preço para a extensão .${ext} não está cadastrado individualmente na base de dados. Mostrar ao cliente os preços das extensões disponíveis (all_available_prices) e perguntar se pretende uma extensão alternativa. NÃO dizer "não tenho acesso" — o sistema consultou e simplesmente não tem este TLD cadastrado.`
+        } else {
+          agentNote = `NOTA PARA AGENTE: Nenhum preço de domínio está cadastrado no sistema. Dizer ao cliente que os preços não estão disponíveis online neste momento e usar createTicket com department='comercial' para registar o pedido de informação de preço. NÃO dizer "não tenho acesso" — criar o ticket imediatamente.`
+        }
+      }
 
       // Try domain check API
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
@@ -112,6 +130,8 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
         domain: clean,
         extension: ext,
         pricing: pricing ?? null,
+        all_available_prices: allAvailablePrices,
+        agent_note: agentNote || null,
         availability: availability ?? { checked: false, note: 'Verificação em tempo real não disponível neste momento.' },
       }
     },
@@ -130,6 +150,57 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
         const { data, error } = await q
         if (error) return { error: 'Erro ao carregar preços de domínios.' }
         return { domain_prices: data }
+      })
+    },
+  })
+
+  /** Get company contact info */
+  const getCompanyInfo = tool({
+    description: 'Retorna informações de contacto da ViralizaHost: e-mail, telefone, website, endereço. Usar quando o cliente pergunta como contactar a empresa.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      return cached('company_info', 300_000, async () => {
+        const { data } = await db
+          .from('company_billing_settings')
+          .select('company_name, email, website, phone, address, footer_text')
+          .eq('active', true)
+          .maybeSingle()
+        return {
+          company_name: data?.company_name ?? 'ViralizaHost',
+          email: data?.email ?? 'comercial@viralizahost.com',
+          support_email: 'suporte@viralizahost.com',
+          website: data?.website ?? 'viralizahost.com',
+          phone: data?.phone ?? '951 008 653',
+          address: data?.address ?? null,
+          social: { instagram: '@viralizahost', facebook: 'ViralizaHost' },
+        }
+      })
+    },
+  })
+
+  /** Get payment methods */
+  const getPaymentMethods = tool({
+    description: 'Lista os métodos de pagamento aceites pela ViralizaHost. Usar quando o cliente pergunta como pode pagar.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      return cached('payment_methods', 300_000, async () => {
+        const { data } = await db
+          .from('company_billing_settings')
+          .select('payment_methods, bank_name, account_holder, account_number, iban, swift, payment_instructions')
+          .eq('active', true)
+          .maybeSingle()
+        return {
+          methods: data?.payment_methods ?? ['Transferência Bancária', 'Multicaixa Express', 'PayPal'],
+          bank_details: data?.bank_name ? {
+            bank: data.bank_name,
+            holder: data.account_holder,
+            account: data.account_number,
+            iban: data.iban,
+            swift: data.swift,
+          } : null,
+          instructions: data?.payment_instructions ?? 'Após efectuar o pagamento, envie o comprovativo para comercial@viralizahost.com com a referência do pedido.',
+          note: 'Para instruções detalhadas use a ferramenta getPaymentInstructions.',
+        }
       })
     },
   })
@@ -960,6 +1031,8 @@ Após executar, usar o resultado real para confirmar ou reportar erro ao cliente
     checkDomainAvailability,
     getDomainPrices,
     getEmailPlans,
+    getCompanyInfo,
+    getPaymentMethods,
   }
 
   const clientTools = {
