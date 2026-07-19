@@ -7,12 +7,13 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-/* ─── Theme ─────────────────────────────────────────────────── */
-const BLUE = '#3B82F6'
-const BLUE_DIM = 'rgba(59,130,246,0.18)'
-const BLUE_BORDER = 'rgba(59,130,246,0.28)'
-const BLUE_GLOW = 'rgba(59,130,246,0.45)'
-const GOLD = '#FDBA00'
+/* ─── Theme — black & gold ───────────────────────────────────── */
+const GOLD        = '#FDBA00'
+const GOLD_DIM    = 'rgba(253,186,0,0.10)'
+const GOLD_BORDER = 'rgba(253,186,0,0.22)'
+const GOLD_GLOW   = 'rgba(253,186,0,0.38)'
+const CARD_BG     = 'linear-gradient(145deg,#131313 0%,#0E0E0E 100%)'
+const SECTION_BG  = '#080808'
 
 /* ─── Static fallback data ──────────────────────────────────── */
 const CEO_DEFAULT = {
@@ -41,11 +42,11 @@ function specialtyIcon(role: string): React.ElementType {
 }
 
 const TEAM_DEFAULT = [
-  { name: 'Lucas Marcelino',     role: 'Tráfego Pago',              photo: '/Lucas Marcelino.jpeg',    flag: '🇧🇷', bio: 'Especialista em Meta Ads, Google Ads e estratégias de conversão e crescimento digital.' },
-  { name: 'Jacob Pessela',       role: 'Design Gráfico',             photo: '/Jacobe Pessela.jpeg',     flag: '🇦🇴', bio: 'Especialista em branding, identidade visual e comunicação criativa empresarial.' },
-  { name: 'Vladmiro Francisco',  role: 'Hosting & Infraestrutura',   photo: '/Valdmiro Macedo.jpeg',    flag: '🇦🇴', bio: 'Especialista em servidores web, cloud hosting, e-mails corporativos, redes e infraestrutura tecnológica.' },
-  { name: 'Israel Soares',       role: 'Crescimento Digital',        photo: '/Israel Soares.png',       flag: '🇧🇷', bio: 'Especialista em crescimento digital, estratégias para redes sociais, posicionamento online e aquisição de clientes.' },
-  { name: 'Arnaldo Eduardo',     role: 'Audiovisual',                photo: '/Arnaldo Eduardo.jpeg',    flag: '🇦🇴', bio: 'Especialista em produção audiovisual, vídeos publicitários, motion graphics e conteúdos digitais premium.' },
+  { name: 'Lucas Marcelino',    role: 'Tráfego Pago',            photo: '/Lucas Marcelino.jpeg',   flag: '🇧🇷', bio: 'Especialista em Meta Ads, Google Ads e estratégias de conversão e crescimento digital.' },
+  { name: 'Jacob Pessela',      role: 'Design Gráfico',           photo: '/Jacobe Pessela.jpeg',    flag: '🇦🇴', bio: 'Especialista em branding, identidade visual e comunicação criativa empresarial.' },
+  { name: 'Vladmiro Francisco', role: 'Hosting & Infraestrutura', photo: '/Valdmiro Macedo.jpeg',   flag: '🇦🇴', bio: 'Especialista em servidores web, cloud hosting, e-mails corporativos, redes e infraestrutura tecnológica.' },
+  { name: 'Israel Soares',      role: 'Crescimento Digital',      photo: '/Israel Soares.png',      flag: '🇧🇷', bio: 'Especialista em crescimento digital, estratégias para redes sociais, posicionamento online e aquisição de clientes.' },
+  { name: 'Arnaldo Eduardo',    role: 'Audiovisual',              photo: '/Arnaldo Eduardo.jpeg',   flag: '🇦🇴', bio: 'Especialista em produção audiovisual, vídeos publicitários, motion graphics e conteúdos digitais premium.' },
 ]
 
 const STATS = [
@@ -63,24 +64,12 @@ const VALUES = [
 
 /* ─── DB type ───────────────────────────────────────────────── */
 type DbTeamMember = {
-  id: string
-  is_ceo: boolean
-  name: string
-  role: string | null
-  title: string | null
-  bio: string | null
-  photo_url: string | null
-  flag: string | null
-  country: string | null
-  country_code: string | null
-  secondary_flag: string | null
-  secondary_country_name: string | null
-  specialty: string | null
-  accent_color: string
-  position: number
+  id: string; is_ceo: boolean; name: string; role: string | null; title: string | null
+  bio: string | null; photo_url: string | null; flag: string | null; country: string | null
+  country_code: string | null; secondary_flag: string | null; secondary_country_name: string | null
+  specialty: string | null; accent_color: string; position: number
 }
-
-type CeoData = typeof CEO_DEFAULT
+type CeoData    = typeof CEO_DEFAULT
 type MemberData = typeof TEAM_DEFAULT[0]
 
 /* ─── Counter ───────────────────────────────────────────────── */
@@ -105,10 +94,10 @@ function StatCard({ icon: Icon, value, label, sub, active, delay }: {
 }) {
   const num = useCountUp(value, active, 900 + delay * 150)
   return (
-    <div className="flex items-start gap-3 py-4 border-b border-white/5 last:border-0">
+    <div className="flex items-start gap-3 py-4 border-b last:border-0" style={{ borderColor: GOLD_BORDER }}>
       <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: BLUE_DIM, border: `1px solid ${BLUE_BORDER}` }}>
-        <Icon size={16} color={BLUE} />
+        style={{ background: GOLD_DIM, border: `1px solid ${GOLD_BORDER}` }}>
+        <Icon size={16} color={GOLD} />
       </div>
       <div>
         <div className="text-2xl font-black text-white tabular-nums leading-none mb-0.5">{num}</div>
@@ -121,17 +110,18 @@ function StatCard({ icon: Icon, value, label, sub, active, delay }: {
 
 /* ─── Spinning dashed ring ───────────────────────────────────── */
 function SpinningRing({ size, color }: { size: number; color: string }) {
-  const r = size / 2 - 3
+  const r = size / 2 - 4
   return (
-    <svg className="absolute inset-0 pointer-events-none" width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth="1.5"
-        strokeDasharray="8 5" strokeOpacity="0.6"
+    <svg className="absolute inset-0 pointer-events-none" width={size} height={size}
+      viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color}
+        strokeWidth="1.5" strokeDasharray="8 5" strokeOpacity="0.65"
         style={{ animation: 'spinRing 12s linear infinite', transformOrigin: `${size/2}px ${size/2}px` }} />
     </svg>
   )
 }
 
-/* ─── Member card ───────────────────────────────────────────── */
+/* ─── Member card ─── photo 100px, outer ring 128px ─────────── */
 function MemberCard({ member, index, visible }: { member: MemberData; index: number; visible: boolean }) {
   const Icon = specialtyIcon(member.role)
   const [hovered, setHovered] = useState(false)
@@ -140,24 +130,26 @@ function MemberCard({ member, index, visible }: { member: MemberData; index: num
     <div
       className="group relative flex flex-col items-center text-center rounded-2xl p-5 transition-all duration-300 cursor-default"
       style={{
-        background: 'linear-gradient(145deg, #0D1B2E 0%, #0A1628 100%)',
-        border: `1px solid ${hovered ? BLUE : BLUE_BORDER}`,
-        boxShadow: hovered ? `0 8px 40px ${BLUE_GLOW}` : '0 4px 24px rgba(0,0,0,0.30)',
+        background: CARD_BG,
+        border: `1px solid ${hovered ? GOLD : GOLD_BORDER}`,
+        boxShadow: hovered ? `0 8px 40px ${GOLD_GLOW}` : '0 4px 24px rgba(0,0,0,0.40)',
         transitionDelay: `${index * 60}ms`,
         opacity: visible ? 1 : 0,
         transform: visible ? (hovered ? 'translateY(-8px) scale(1.03)' : 'translateY(0)') : 'translateY(24px)',
+        /* equal card heights via flex + min-height */
+        minHeight: 340,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* top blue line */}
+      {/* top gold accent line */}
       <div className="absolute top-0 left-4 right-4 h-px rounded-full"
-        style={{ background: `linear-gradient(90deg, transparent, ${BLUE}, transparent)`, opacity: 0.7 }} />
+        style={{ background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)`, opacity: 0.5 }} />
 
       {/* flag — top-right */}
       {member.flag && (
         <span className="absolute top-3 right-3 text-lg leading-none select-none"
-          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.7))' }}>
+          style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }}>
           {member.flag}
         </span>
       )}
@@ -165,23 +157,34 @@ function MemberCard({ member, index, visible }: { member: MemberData; index: num
       {/* specialty badge */}
       <div className="flex items-center gap-1.5 mb-4 self-start mt-1">
         <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
-          style={{ background: BLUE_DIM, border: `1px solid ${BLUE_BORDER}` }}>
-          <Icon size={11} color={BLUE} />
+          style={{ background: GOLD_DIM, border: `1px solid ${GOLD_BORDER}` }}>
+          <Icon size={11} color={GOLD} />
         </div>
-        <span className="text-[9px] font-black tracking-widest uppercase" style={{ color: BLUE }}>
+        <span className="text-[9px] font-black tracking-widest uppercase" style={{ color: GOLD }}>
           {member.role}
         </span>
       </div>
 
-      {/* photo with spinning ring */}
-      <div className="relative mb-3" style={{ width: 88, height: 88 }}>
-        <SpinningRing size={88} color={BLUE} />
+      {/* photo — 100px inside 128px ring container */}
+      <div className="relative mb-3 shrink-0" style={{ width: 128, height: 128 }}>
+        <SpinningRing size={128} color={GOLD} />
+        {/* outer glow ring */}
+        <div className="absolute inset-0 rounded-full pointer-events-none"
+          style={{
+            background: `radial-gradient(circle, ${GOLD_GLOW} 0%, transparent 70%)`,
+            opacity: hovered ? 0.55 : 0.28,
+            transition: 'opacity 0.3s',
+          }} />
         {member.photo ? (
           <img
             src={member.photo}
             alt={member.name}
-            className="absolute inset-0 m-auto w-[72px] h-[72px] rounded-full object-cover object-top"
-            style={{ border: `2px solid ${BLUE}80`, boxShadow: `0 0 12px ${BLUE_GLOW}` }}
+            className="absolute inset-0 m-auto rounded-full object-cover object-top"
+            style={{
+              width: 100, height: 100,
+              border: `2.5px solid ${GOLD}`,
+              boxShadow: `0 0 16px ${GOLD_GLOW}, 0 0 4px ${GOLD}60`,
+            }}
             onError={e => {
               e.currentTarget.style.display = 'none'
               const next = e.currentTarget.nextElementSibling as HTMLElement | null
@@ -190,55 +193,52 @@ function MemberCard({ member, index, visible }: { member: MemberData; index: num
           />
         ) : null}
         <div
-          className="absolute inset-0 m-auto w-[72px] h-[72px] rounded-full items-center justify-center font-black text-2xl"
-          style={{ display: member.photo ? 'none' : 'flex', background: BLUE_DIM, color: BLUE, border: `2px solid ${BLUE}80` }}
+          className="absolute inset-0 m-auto rounded-full items-center justify-center font-black text-2xl"
+          style={{
+            width: 100, height: 100,
+            display: member.photo ? 'none' : 'flex',
+            background: GOLD_DIM, color: GOLD,
+            border: `2.5px solid ${GOLD}`,
+            boxShadow: `0 0 16px ${GOLD_GLOW}`,
+          }}
         >
           {member.name.charAt(0).toUpperCase()}
         </div>
       </div>
 
-      <div className="font-black text-white text-sm leading-tight mb-0.5">{member.name}</div>
-      <div className="text-xs font-semibold mb-3" style={{ color: '#60A5FA' }}>Especialista</div>
-      <p className="text-xs leading-relaxed" style={{ color: '#94A3B8' }}>{member.bio}</p>
+      <div className="font-black text-white text-sm leading-tight mb-1">{member.name}</div>
+      <div className="text-xs font-semibold mb-3" style={{ color: `${GOLD}BB` }}>Especialista</div>
+      <p className="text-xs leading-relaxed flex-1" style={{ color: '#94A3B8' }}>{member.bio}</p>
     </div>
   )
 }
 
-/* ─── Animated blue connector lines ─────────────────────────── */
+/* ─── Connector lines — gold ─────────────────────────────────── */
 function ConnectorLines({ count }: { count: number }) {
   const offsets = ['10%', '27.5%', '50%', '72.5%', '90%']
   return (
     <div className="hidden lg:block relative w-full h-14 my-0" aria-hidden="true" style={{ overflow: 'visible' }}>
-      {/* vertical from CEO to rail */}
       <div className="absolute left-1/2 -translate-x-px top-0 h-6 w-px"
-        style={{ borderLeft: `2px dashed ${BLUE}`, opacity: 0.7 }} />
-      {/* glow node at junction */}
+        style={{ borderLeft: `2px dashed ${GOLD}`, opacity: 0.7 }} />
       <div className="absolute left-1/2 -translate-x-1/2 top-6 w-2.5 h-2.5 rounded-full z-10"
-        style={{
-          background: BLUE,
-          boxShadow: `0 0 8px 3px ${BLUE_GLOW}`,
-          animation: 'nodePulse 2s ease-in-out infinite',
-        }} />
-      {/* horizontal rail */}
+        style={{ background: GOLD, boxShadow: `0 0 8px 3px ${GOLD_GLOW}`, animation: 'nodePulse 2s ease-in-out infinite' }} />
       <div className="absolute top-6 h-px"
         style={{
           left: offsets[0], right: `calc(100% - ${offsets[count - 1]})`,
-          borderTop: `2px dashed ${BLUE}`,
+          borderTop: `2px dashed ${GOLD}`,
           opacity: 0.6,
-          backgroundImage: `linear-gradient(90deg, ${BLUE} 40%, transparent 40%)`,
+          backgroundImage: `linear-gradient(90deg, ${GOLD} 40%, transparent 40%)`,
           backgroundSize: '14px 2px',
           animation: 'dashMove 1.2s linear infinite',
         }} />
-      {/* verticals + nodes per member */}
       {offsets.slice(0, count).map((x, i) => (
         <div key={i}>
           <div className="absolute top-6 h-8 w-px"
-            style={{ left: x, transform: 'translateX(-50%)', borderLeft: `2px dashed ${BLUE}`, opacity: 0.65 }} />
+            style={{ left: x, transform: 'translateX(-50%)', borderLeft: `2px dashed ${GOLD}`, opacity: 0.65 }} />
           <div className="absolute w-2 h-2 rounded-full z-10"
             style={{
               left: x, transform: 'translateX(-50%)', top: '3.25rem',
-              background: BLUE,
-              boxShadow: `0 0 6px 2px ${BLUE_GLOW}`,
+              background: GOLD, boxShadow: `0 0 6px 2px ${GOLD_GLOW}`,
               animation: `nodePulse 2s ease-in-out ${i * 0.18}s infinite`,
             }} />
         </div>
@@ -247,34 +247,52 @@ function ConnectorLines({ count }: { count: number }) {
   )
 }
 
-/* ─── CEO card ───────────────────────────────────────────────── */
+/* ─── CEO card — photo 132px inside 178px ring ───────────────── */
 function CeoCard({ ceo, visible }: { ceo: CeoData; visible: boolean }) {
+  /* outer SVG ring size */
+  const RING = 178
+  const PHOTO = 132
+  const r1 = RING / 2 - 5   // dashed ring radius
+  const r2 = RING / 2 - 1   // pulse ring radius
+
   return (
     <div className={`flex-1 rounded-3xl p-7 md:p-9 border relative overflow-hidden flex flex-col md:flex-row gap-7 items-center md:items-start transition-all duration-700 delay-100 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
       style={{
-        background: 'linear-gradient(135deg, #0D1B2E 0%, #0A1628 100%)',
-        borderColor: BLUE_BORDER,
-        boxShadow: `0 0 60px ${BLUE_DIM}`,
+        background: CARD_BG,
+        borderColor: GOLD_BORDER,
+        boxShadow: `0 0 60px ${GOLD_DIM}`,
       }}>
-      {/* corner glow */}
-      <div className="absolute top-0 right-0 w-48 h-48 pointer-events-none"
-        style={{ background: `radial-gradient(circle at top right, ${BLUE_DIM}, transparent 70%)` }} />
 
-      {/* avatar with spinning ring */}
-      <div className="relative shrink-0 flex items-center justify-center" style={{ width: 128, height: 128 }}>
-        <svg className="absolute inset-0" width="128" height="128" viewBox="0 0 128 128">
-          <circle cx="64" cy="64" r="58" fill="none" stroke={BLUE} strokeWidth="1.8"
+      {/* corner glow */}
+      <div className="absolute top-0 right-0 w-56 h-56 pointer-events-none"
+        style={{ background: `radial-gradient(circle at top right, ${GOLD_DIM}, transparent 70%)` }} />
+
+      {/* avatar section */}
+      <div className="relative shrink-0 flex items-center justify-center" style={{ width: RING, height: RING }}>
+
+        {/* dashed spinning ring */}
+        <svg className="absolute inset-0" width={RING} height={RING} viewBox={`0 0 ${RING} ${RING}`}>
+          <circle cx={RING/2} cy={RING/2} r={r1} fill="none" stroke={GOLD} strokeWidth="1.8"
             strokeDasharray="10 6" strokeOpacity="0.55"
-            style={{ animation: 'spinRing 14s linear infinite', transformOrigin: '64px 64px' }} />
-          <circle cx="64" cy="64" r="61" fill="none" stroke={BLUE} strokeWidth="1" strokeOpacity="0.12">
-            <animate attributeName="r" values="61;67;61" dur="2.8s" repeatCount="indefinite" />
+            style={{ animation: 'spinRing 14s linear infinite', transformOrigin: `${RING/2}px ${RING/2}px` }} />
+          <circle cx={RING/2} cy={RING/2} r={r2} fill="none" stroke={GOLD} strokeWidth="1" strokeOpacity="0.12">
+            <animate attributeName="r" values={`${r2};${r2+7};${r2}`} dur="2.8s" repeatCount="indefinite" />
             <animate attributeName="stroke-opacity" values="0.12;0;0.12" dur="2.8s" repeatCount="indefinite" />
           </circle>
         </svg>
+
+        {/* glow halo */}
+        <div className="absolute inset-0 rounded-full pointer-events-none"
+          style={{ background: `radial-gradient(circle, ${GOLD_GLOW} 0%, transparent 65%)`, opacity: 0.32 }} />
+
         {ceo.photo ? (
           <img src={ceo.photo} alt={ceo.name}
-            className="w-24 h-24 rounded-full object-cover object-top"
-            style={{ border: `3px solid ${BLUE}`, boxShadow: `0 0 20px ${BLUE_GLOW}` }}
+            className="rounded-full object-cover object-top relative z-10"
+            style={{
+              width: PHOTO, height: PHOTO,
+              border: `3px solid ${GOLD}`,
+              boxShadow: `0 0 28px ${GOLD_GLOW}, 0 0 6px ${GOLD}50`,
+            }}
             onError={e => {
               e.currentTarget.style.display = 'none'
               const next = e.currentTarget.nextElementSibling as HTMLElement | null
@@ -283,30 +301,36 @@ function CeoCard({ ceo, visible }: { ceo: CeoData; visible: boolean }) {
           />
         ) : null}
         <div
-          className="w-24 h-24 rounded-full items-center justify-center font-black text-3xl"
-          style={{ display: ceo.photo ? 'none' : 'flex', background: BLUE_DIM, color: BLUE, border: `3px solid ${BLUE}`, boxShadow: `0 0 20px ${BLUE_GLOW}` }}
+          className="rounded-full items-center justify-center font-black text-4xl relative z-10"
+          style={{
+            width: PHOTO, height: PHOTO,
+            display: ceo.photo ? 'none' : 'flex',
+            background: GOLD_DIM, color: GOLD,
+            border: `3px solid ${GOLD}`,
+            boxShadow: `0 0 28px ${GOLD_GLOW}`,
+          }}
         >
           {ceo.name.charAt(0).toUpperCase()}
         </div>
 
-        {/* two flags for CEO — overlapping bottom-right */}
-        <div className="absolute bottom-0 right-0 flex items-center gap-0.5"
+        {/* two flags — bottom-right of avatar */}
+        <div className="absolute bottom-1 right-1 flex items-center gap-0.5 z-20"
           style={{ filter: 'drop-shadow(0 1px 3px #000)' }}>
-          <span className="text-lg leading-none">{ceo.flag}</span>
-          <span className="text-lg leading-none">{ceo.secondary_flag}</span>
+          <span className="text-xl leading-none">{ceo.flag}</span>
+          <span className="text-xl leading-none">{ceo.secondary_flag}</span>
         </div>
       </div>
 
       <div className="flex-1 text-center md:text-left">
         <span className="inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full mb-3"
-          style={{ background: BLUE_DIM, border: `1px solid ${BLUE_BORDER}`, color: BLUE }}>
+          style={{ background: GOLD_DIM, border: `1px solid ${GOLD_BORDER}`, color: GOLD }}>
           👑 {ceo.title}
         </span>
         <h3 className="text-3xl font-black text-white leading-tight mb-1">{ceo.name}</h3>
-        <p className="text-sm font-semibold mb-4" style={{ color: '#60A5FA' }}>{ceo.role}</p>
+        <p className="text-sm font-semibold mb-4" style={{ color: `${GOLD}CC` }}>{ceo.role}</p>
         <p className="text-white/55 text-sm leading-relaxed mb-5 max-w-md">{ceo.bio}</p>
         <div className="inline-flex items-center gap-2 text-xs text-white/35">
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: BLUE }} />
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: GOLD }} />
           Expansão —{' '}
           <strong style={{ color: '#F59E0B' }}>Angola</strong>
           {' '}&{' '}
@@ -324,7 +348,7 @@ function CeoCard({ ceo, visible }: { ceo: CeoData; visible: boolean }) {
 export function TeamSection() {
   const ref = useRef<HTMLElement>(null)
   const [visible, setVisible] = useState(false)
-  const [ceo, setCeo] = useState<CeoData>(CEO_DEFAULT)
+  const [ceo, setCeo]   = useState<CeoData>(CEO_DEFAULT)
   const [team, setTeam] = useState<MemberData[]>(TEAM_DEFAULT)
 
   useEffect(() => {
@@ -337,7 +361,7 @@ export function TeamSection() {
       .then(({ data }) => {
         if (!data || data.length === 0) return
         const members = data as DbTeamMember[]
-        const ceoData = members.find(m => m.is_ceo)
+        const ceoData  = members.find(m => m.is_ceo)
         const teamData = members.filter(m => !m.is_ceo)
 
         if (ceoData) {
@@ -355,11 +379,11 @@ export function TeamSection() {
 
         if (teamData.length > 0) {
           setTeam(teamData.map(m => ({
-            name: m.name,
-            role: m.specialty ?? m.role ?? '',
+            name:  m.name,
+            role:  m.specialty ?? m.role ?? '',
             photo: m.photo_url ?? '',
-            flag: m.flag ?? '',
-            bio: m.bio ?? '',
+            flag:  m.flag ?? '',
+            bio:   m.bio ?? '',
           })))
         }
       })
@@ -372,30 +396,31 @@ export function TeamSection() {
   }, [])
 
   return (
-    <section ref={ref} className="relative py-24 overflow-hidden" style={{ background: '#070F1A' }}>
+    <section ref={ref} className="relative py-24 overflow-hidden" style={{ background: SECTION_BG }}>
 
-      {/* bg grid */}
+      {/* subtle grid */}
       <div className="absolute inset-0 pointer-events-none"
         style={{
-          backgroundImage: `linear-gradient(${BLUE_DIM} 1px, transparent 1px),linear-gradient(90deg,${BLUE_DIM} 1px,transparent 1px)`,
-          backgroundSize: '60px 60px',
+          backgroundImage: `linear-gradient(${GOLD_DIM} 1px,transparent 1px),linear-gradient(90deg,${GOLD_DIM} 1px,transparent 1px)`,
+          backgroundSize: '64px 64px',
         }} />
+
       {/* top glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-64 pointer-events-none"
-        style={{ background: `radial-gradient(ellipse at top, ${BLUE_DIM}, transparent 70%)` }} />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-72 pointer-events-none"
+        style={{ background: `radial-gradient(ellipse at top, ${GOLD_DIM}, transparent 70%)` }} />
 
       <div className="container mx-auto px-4 lg:px-8 relative z-10">
 
         {/* header */}
         <div className={`text-center mb-16 transition-all duration-700 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           <span className="inline-flex items-center gap-2 text-[11px] font-black tracking-widest uppercase px-4 py-2 rounded-full mb-5"
-            style={{ background: BLUE_DIM, border: `1px solid ${BLUE_BORDER}`, color: BLUE }}>
+            style={{ background: GOLD_DIM, border: `1px solid ${GOLD_BORDER}`, color: GOLD }}>
             <Users size={12} />
             Estrutura Organizacional
           </span>
           <h2 className="text-4xl md:text-5xl font-black text-white leading-tight mb-4">
             Liderança que move o{' '}
-            <span style={{ color: BLUE }}>futuro.</span>
+            <span style={{ color: GOLD }}>futuro.</span>
           </h2>
           <p className="text-white/50 text-lg max-w-xl mx-auto">
             Uma equipa especializada, focada em inovação, performance e resultados reais para empresas em{' '}
@@ -405,18 +430,14 @@ export function TeamSection() {
           </p>
         </div>
 
-        {/* ─ CEO + Stats row ─ */}
+        {/* ─ CEO + Stats ─ */}
         <div className={`flex flex-col lg:flex-row gap-6 max-w-5xl mx-auto mb-0 transition-all duration-700 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           <CeoCard ceo={ceo} visible={visible} />
 
-          {/* Stats card */}
           <div className="rounded-3xl p-7 border flex flex-col justify-center gap-0 lg:min-w-[220px]"
-            style={{
-              background: 'linear-gradient(135deg, #0D1B2E 0%, #0A1628 100%)',
-              borderColor: BLUE_BORDER,
-            }}>
+            style={{ background: CARD_BG, borderColor: GOLD_BORDER }}>
             <div className="text-[10px] font-black tracking-widest uppercase mb-4"
-              style={{ color: `${BLUE}99` }}>
+              style={{ color: `${GOLD}88` }}>
               Nossa Equipa
             </div>
             {STATS.map((s, i) => (
@@ -433,36 +454,33 @@ export function TeamSection() {
           <ConnectorLines count={team.length} />
         </div>
 
-        {/* ─ Team grid ─ */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 max-w-5xl mx-auto">
+        {/* ─ Team grid — equal-height cards ─ */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 max-w-5xl mx-auto items-stretch">
           {team.map((m, i) => (
             <MemberCard key={m.name} member={m} index={i} visible={visible} />
           ))}
         </div>
 
-        {/* ─ Values row ─ */}
+        {/* ─ Values ─ */}
         <div className={`mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-5xl mx-auto transition-all duration-700 delay-300 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           {VALUES.map(({ icon: Icon, label, text }) => (
             <div key={label}
               className="group flex flex-col gap-4 rounded-2xl p-6 border transition-all duration-300"
-              style={{
-                background: 'linear-gradient(145deg, #0D1B2E 0%, #0A1628 100%)',
-                borderColor: BLUE_BORDER,
-              }}
+              style={{ background: CARD_BG, borderColor: GOLD_BORDER }}
               onMouseEnter={e => {
                 const el = e.currentTarget as HTMLElement
-                el.style.borderColor = BLUE
-                el.style.boxShadow = `0 0 30px ${BLUE_DIM}`
+                el.style.borderColor = GOLD
+                el.style.boxShadow = `0 0 30px ${GOLD_DIM}`
               }}
               onMouseLeave={e => {
                 const el = e.currentTarget as HTMLElement
-                el.style.borderColor = BLUE_BORDER
+                el.style.borderColor = GOLD_BORDER
                 el.style.boxShadow = 'none'
               }}
             >
               <div className="w-11 h-11 rounded-xl flex items-center justify-center"
-                style={{ background: BLUE_DIM, border: `1px solid ${BLUE_BORDER}` }}>
-                <Icon size={20} color={BLUE} />
+                style={{ background: GOLD_DIM, border: `1px solid ${GOLD_BORDER}` }}>
+                <Icon size={20} color={GOLD} />
               </div>
               <div>
                 <div className="font-bold text-white text-sm mb-1.5">{label}</div>
@@ -471,12 +489,13 @@ export function TeamSection() {
             </div>
           ))}
         </div>
+
       </div>
 
-      {/* keyframes — respects prefers-reduced-motion */}
+      {/* keyframes */}
       <style>{`
         @keyframes spinRing  { to { transform: rotate(360deg); } }
-        @keyframes nodePulse { 0%,100%{ opacity:1; transform:translateX(-50%) scale(1); } 50%{ opacity:.5; transform:translateX(-50%) scale(1.5); } }
+        @keyframes nodePulse { 0%,100%{ opacity:1; transform:translateX(-50%) scale(1); } 50%{ opacity:.45; transform:translateX(-50%) scale(1.6); } }
         @keyframes dashMove  { to { background-position: 14px 0; } }
         @media (prefers-reduced-motion: reduce) {
           [style*="animation"] { animation: none !important; }
