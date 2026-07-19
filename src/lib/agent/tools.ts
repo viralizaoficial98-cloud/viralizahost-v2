@@ -1,6 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { createAdminWriteClient } from '@/lib/supabase/server'
+import { sendInvoiceEmail } from '@/lib/invoice/send-invoice-email'
 import type { UserLevel } from './system-prompt'
 
 export interface AgentContext {
@@ -679,6 +680,156 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
     },
   })
 
+  /**
+   * sendInvoiceToCustomer — ferramenta central de envio de facturas.
+   * O agente DEVE chamar esta ferramenta (não apenas dizer que vai enviar).
+   * O e-mail do cliente é sempre lido do perfil autenticado — nunca do input.
+   */
+  const sendInvoiceToCustomer = tool({
+    description: `Gera a fatura em PDF e envia por e-mail ao cliente autenticado.
+IMPORTANTE: Chamar SEMPRE que o cliente pedir que seja enviada uma fatura. Nunca dizer "receberá uma fatura" sem ter executado esta ferramenta.
+Após executar, usar o resultado real para confirmar ou reportar erro ao cliente.`,
+    inputSchema: z.object({
+      order_id: z.string().uuid().optional().describe('UUID do pedido a facturar (preferencial)'),
+      invoice_id: z.string().uuid().optional().describe('UUID de fatura existente a reenviar'),
+      ticket_id: z.string().uuid().optional().describe('UUID do ticket relacionado (opcional)'),
+      force_resend: z.boolean().optional().describe('true apenas quando o cliente pede explicitamente para reenviar uma fatura já enviada'),
+    }),
+    execute: async ({ order_id, invoice_id, ticket_id, force_resend }) => {
+      if (!ctx.profileId || ctx.userLevel === 'visitor') {
+        return { success: false, code: 'UNAUTHORIZED', message: 'Precisa de estar autenticado para receber facturas.' }
+      }
+
+      let targetInvoiceId = invoice_id
+
+      // Se só temos order_id, procurar ou criar fatura
+      if (!targetInvoiceId && order_id) {
+        // Verificar se o pedido pertence ao cliente
+        const { data: order } = await db
+          .from('orders')
+          .select('id, amount, billing_cycle, domain_name, status, user_id')
+          .eq('id', order_id)
+          .eq('user_id', ctx.profileId)
+          .maybeSingle()
+
+        if (!order) {
+          return { success: false, code: 'ORDER_NOT_FOUND', message: 'Pedido não encontrado na sua conta.' }
+        }
+
+        // Verificar se já existe fatura para este pedido
+        const { data: existingInv } = await db
+          .from('invoices')
+          .select('id, invoice_number, email_status, email_to')
+          .eq('order_id', order_id)
+          .eq('profile_id', ctx.profileId)
+          .maybeSingle()
+
+        if (existingInv) {
+          targetInvoiceId = existingInv.id
+        } else {
+          // Buscar itens do pedido
+          const { data: orderItems } = await db
+            .from('order_items')
+            .select('service_name, service_type, price, quantity')
+            .eq('order_id', order_id)
+
+          // Criar fatura nova
+          const dueDate = new Date()
+          dueDate.setDate(dueDate.getDate() + 7)
+
+          const { data: newInv, error: createErr } = await db
+            .from('invoices')
+            .insert({
+              profile_id:     ctx.profileId,
+              order_id:       order_id,
+              ticket_id:      ticket_id ?? null,
+              status:         'pending',
+              currency:       'USD',
+              subtotal:       order.amount,
+              discount:       0,
+              tax:            0,
+              total:          order.amount,
+              due_date:       dueDate.toISOString(),
+              issue_date:     new Date().toISOString().slice(0, 10),
+              items:          JSON.stringify(orderItems ?? []),
+              notes:          order.domain_name ? `Pedido relativo ao domínio ${order.domain_name}` : null,
+            })
+            .select('id, invoice_number')
+            .single()
+
+          if (createErr || !newInv) {
+            return { success: false, code: 'INVOICE_CREATE_FAILED', message: 'Erro ao criar a fatura. Por favor tente novamente.' }
+          }
+
+          targetInvoiceId = newInv.id
+
+          // Criar itens de fatura
+          if (orderItems?.length) {
+            await db.from('invoice_items').insert(
+              orderItems.map((item, idx) => ({
+                invoice_id:  newInv.id,
+                description: item.service_name,
+                quantity:    item.quantity ?? 1,
+                unit_price:  item.price ?? 0,
+                subtotal:    (item.price ?? 0) * (item.quantity ?? 1),
+                position:    idx,
+              }))
+            )
+          } else {
+            // Fallback: item genérico
+            await db.from('invoice_items').insert({
+              invoice_id:  newInv.id,
+              description: order.domain_name ? `Serviço ViralizaHost — ${order.domain_name}` : `Serviço ViralizaHost — Pedido #${String(order_id).slice(0, 8).toUpperCase()}`,
+              quantity:    1,
+              unit_price:  order.amount,
+              subtotal:    order.amount,
+              position:    0,
+            })
+          }
+        }
+      }
+
+      if (!targetInvoiceId) {
+        return {
+          success: false,
+          code: 'NO_INVOICE_REF',
+          message: 'Por favor indica o número do pedido ou da fatura que pretende enviar.',
+        }
+      }
+
+      // Chamar o serviço central de envio
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await sendInvoiceEmail({
+        invoiceId:         targetInvoiceId,
+        customerId:        ctx.profileId,
+        db: db as any,
+        initiatedByAgent:  true,
+        orderId:           order_id,
+        ticketId:          ticket_id,
+        forceResend:       force_resend ?? false,
+      })
+
+      if (result.success) {
+        return {
+          success: true,
+          invoice_number: result.invoiceNumber,
+          sent_to:        result.sentTo,
+          download_url:   result.downloadUrl,
+          provider_id:    result.providerMessageId,
+          message:        `✅ Fatura ${result.invoiceNumber} enviada com sucesso para ${result.sentTo}.${result.downloadUrl ? ' Disponível para download.' : ''}`,
+        }
+      }
+
+      return {
+        success:  false,
+        code:     result.code,
+        message:  result.message ?? 'Não foi possível enviar a fatura neste momento.',
+        details:  result.details,
+        note:     'O erro foi registado. A equipa técnica será notificada.',
+      }
+    },
+  })
+
   // ═══════════════════════════════════════════════════════════════
   // ADMIN TOOLS — requires admin role
   // ═══════════════════════════════════════════════════════════════
@@ -829,6 +980,7 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
     closeTicket,
     reopenTicket,
     getPaymentInstructions,
+    sendInvoiceToCustomer,
   }
 
   const adminTools = {
