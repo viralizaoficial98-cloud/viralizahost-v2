@@ -11,9 +11,10 @@ export const maxDuration = 60
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { messages, conversationId } = body as {
+    const { messages, conversationId, pageContext } = body as {
       messages: Array<{ role: 'user' | 'assistant'; content: string }>
       conversationId?: string
+      pageContext?: string
     }
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -100,6 +101,7 @@ export async function POST(req: NextRequest) {
       userLevel,
       userName,
       userEmail,
+      pageContext,
       currentDate: new Date().toLocaleDateString('pt-PT', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       }),

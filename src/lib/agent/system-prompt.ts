@@ -5,10 +5,22 @@ interface SystemPromptContext {
   userName?: string
   userEmail?: string
   currentDate: string
+  pageContext?: string
+}
+
+const PAGE_LABELS: Record<string, string> = {
+  '/dashboard': 'Painel Principal',
+  '/billing': 'Facturação',
+  '/billing/invoices': 'Facturas',
+  '/domains': 'Domínios',
+  '/email': 'E-mail',
+  '/hosting': 'Hospedagem / cPanel',
+  '/tickets': 'Suporte / Tickets',
+  '/settings': 'Definições da Conta',
 }
 
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
-  const { userLevel, userName, userEmail, currentDate } = ctx
+  const { userLevel, userName, userEmail, currentDate, pageContext } = ctx
 
   const identity = `
 Você é o **Assistente Virtual da ViralizaHost**, especialista em hospedagem web, domínios, e-mail corporativo e suporte técnico premium.
@@ -25,7 +37,7 @@ A ViralizaHost é uma plataforma de hospedagem premium que serve empresas em Ang
 - Backup automático
 
 Data actual: ${currentDate}
-Nível de acesso: ${userLevel}${userName ? `\nNome: ${userName}` : ''}${userEmail ? `\nEmail: ${userEmail}` : ''}
+Nível de acesso: ${userLevel}${userName ? `\nNome: ${userName}` : ''}${userEmail ? `\nEmail: ${userEmail}` : ''}${pageContext ? `\nPágina actual: ${PAGE_LABELS[pageContext] ?? pageContext}` : ''}
 `.trim()
 
   const personality = `

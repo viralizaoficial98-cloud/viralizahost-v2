@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { Sidebar } from './Sidebar'
 import { DashboardHeader } from './DashboardHeader'
 import { PageTransition } from '@/components/ui/PageTransition'
+import { FloatingChat } from './FloatingChat'
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -55,6 +56,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <PageTransition>{children}</PageTransition>
         </main>
       </div>
+
+      <FloatingChat pageContext={pathname} />
     </div>
   )
 }

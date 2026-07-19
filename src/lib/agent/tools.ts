@@ -519,6 +519,166 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
     },
   })
 
+  /** Client orders */
+  const getMyOrders = tool({
+    description: 'Lista os pedidos/encomendas do cliente: serviços contratados, registo de domínios, estado e método de pagamento.',
+    inputSchema: z.object({
+      status: z.enum(['pending', 'processing', 'completed', 'cancelled', 'all']).optional(),
+      limit: z.number().min(1).max(20).optional(),
+    }),
+    execute: async (input) => {
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
+      const status = input.status ?? 'all'
+      const limit = input.limit ?? 10
+
+      let q = db
+        .from('orders')
+        .select('id, status, amount, billing_cycle, payment_method, domain_name, domain_action, notes, created_at')
+        .eq('user_id', ctx.profileId)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+      if (status !== 'all') q = q.eq('status', status)
+
+      const { data, error } = await q
+      if (error) return { error: 'Não foi possível carregar os pedidos.' }
+      return { orders: data, count: data?.length ?? 0 }
+    },
+  })
+
+  /** Single invoice details with items */
+  const getInvoiceDetails = tool({
+    description: 'Retorna o detalhe completo de uma factura específica incluindo os itens de linha, valores e instruções de pagamento.',
+    inputSchema: z.object({
+      invoice_id: z.string().describe('ID ou número da factura (UUID ou invoice_number)'),
+    }),
+    execute: async ({ invoice_id }) => {
+      if (!ctx.profileId) return { error: 'Sessão expirada. Por favor, faça login novamente.' }
+
+      const isUuid = /^[0-9a-f-]{36}$/i.test(invoice_id)
+      let q = db
+        .from('invoices')
+        .select('id, invoice_number, status, currency, subtotal, discount, tax, total, due_date, issue_date, paid_at, notes, pdf_storage_path, created_at')
+        .eq('profile_id', ctx.profileId)
+
+      if (isUuid) q = q.eq('id', invoice_id)
+      else q = q.eq('invoice_number', invoice_id)
+
+      const { data: inv, error: invErr } = await q.maybeSingle()
+      if (invErr || !inv) return { error: 'Factura não encontrada na sua conta.' }
+
+      // Get items from invoice_items table (may not have rows if using old JSON items field)
+      const { data: items } = await db
+        .from('invoice_items')
+        .select('description, quantity, unit_price, subtotal, position')
+        .eq('invoice_id', inv.id)
+        .order('position')
+
+      return { invoice: inv, items: items ?? [], has_pdf: !!inv.pdf_storage_path }
+    },
+  })
+
+  /** Close a ticket */
+  const closeTicket = tool({
+    description: 'Fecha um ticket de suporte quando o problema foi resolvido. Pedir confirmação ao cliente antes de executar.',
+    inputSchema: z.object({
+      ticket_id: z.string().uuid().describe('ID do ticket a fechar'),
+      reason: z.string().optional().describe('Motivo ou comentário de fecho (opcional)'),
+    }),
+    execute: async ({ ticket_id, reason }) => {
+      if (!ctx.profileId || ctx.userLevel === 'visitor') return { error: 'Autenticação necessária.' }
+
+      const { data: ticket } = await db
+        .from('tickets')
+        .select('id, status, subject')
+        .eq('id', ticket_id)
+        .eq('profile_id', ctx.profileId)
+        .single()
+
+      if (!ticket) return { error: 'Ticket não encontrado na sua conta.' }
+      if (ticket.status === 'closed') return { success: true, note: 'Este ticket já se encontra fechado.' }
+
+      if (reason) {
+        await db.from('ticket_messages').insert({
+          ticket_id,
+          profile_id: ctx.profileId,
+          message: `[Ticket fechado pelo cliente] ${reason}`,
+          is_staff: false,
+          is_internal: false,
+        })
+      }
+
+      const { error } = await db.from('tickets').update({ status: 'closed' }).eq('id', ticket_id)
+      if (error) return { error: 'Erro ao fechar o ticket.' }
+
+      return { success: true, note: `Ticket "${ticket.subject}" fechado com sucesso.` }
+    },
+  })
+
+  /** Reopen a closed ticket */
+  const reopenTicket = tool({
+    description: 'Reabre um ticket de suporte previamente fechado quando o problema resurge.',
+    inputSchema: z.object({
+      ticket_id: z.string().uuid().describe('ID do ticket a reabrir'),
+      message: z.string().min(10).describe('Mensagem explicando porque o ticket está a ser reaberto'),
+    }),
+    execute: async ({ ticket_id, message }) => {
+      if (!ctx.profileId || ctx.userLevel === 'visitor') return { error: 'Autenticação necessária.' }
+
+      const { data: ticket } = await db
+        .from('tickets')
+        .select('id, status, subject')
+        .eq('id', ticket_id)
+        .eq('profile_id', ctx.profileId)
+        .single()
+
+      if (!ticket) return { error: 'Ticket não encontrado na sua conta.' }
+      if (ticket.status !== 'closed' && ticket.status !== 'resolved') {
+        return { error: `O ticket já está aberto (estado: ${ticket.status}).` }
+      }
+
+      await db.from('tickets').update({ status: 'open' }).eq('id', ticket_id)
+      await db.from('ticket_messages').insert({
+        ticket_id,
+        profile_id: ctx.profileId,
+        message,
+        is_staff: false,
+        is_internal: false,
+      })
+
+      return { success: true, note: `Ticket "${ticket.subject}" reaberto com sucesso. A nossa equipa irá responder em breve.` }
+    },
+  })
+
+  /** Get payment instructions from company billing settings */
+  const getPaymentInstructions = tool({
+    description: 'Retorna as instruções de pagamento por transferência bancária da ViralizaHost (dados bancários, IBAN, referências). Usar quando o cliente perguntar como pagar.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      return cached('payment_instructions', 300_000, async () => {
+        const { data } = await db
+          .from('company_billing_settings')
+          .select('bank_name, account_holder, account_number, iban, swift, payment_instructions')
+          .eq('active', true)
+          .maybeSingle()
+
+        if (!data) {
+          return {
+            instructions: 'Para obter as instruções de pagamento, por favor contacte comercial@viralizahost.com ou abra um ticket de suporte.',
+          }
+        }
+
+        return {
+          bank_name: data.bank_name,
+          account_holder: data.account_holder,
+          account_number: data.account_number,
+          iban: data.iban,
+          swift: data.swift,
+          payment_instructions: data.payment_instructions ?? 'Após efectuar a transferência, envie o comprovativo por e-mail para comercial@viralizahost.com indicando o número da factura.',
+        }
+      })
+    },
+  })
+
   // ═══════════════════════════════════════════════════════════════
   // ADMIN TOOLS — requires admin role
   // ═══════════════════════════════════════════════════════════════
@@ -664,6 +824,11 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
     getTicketMessages,
     createTicket,
     replyToTicket,
+    getMyOrders,
+    getInvoiceDetails,
+    closeTicket,
+    reopenTicket,
+    getPaymentInstructions,
   }
 
   const adminTools = {
