@@ -78,7 +78,7 @@ function inlineFormat(text: string): React.ReactNode {
   })
 }
 
-export function FloatingChat() {
+export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
   const [open, setOpen] = useState(false)
   const [badge, setBadge] = useState(true)
   const [messages, setMessages] = useState<Message[]>([WELCOME])
@@ -123,7 +123,7 @@ export function FloatingChat() {
       const res = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: historyForApi, conversationId }),
+        body: JSON.stringify({ messages: historyForApi, conversationId, pageContext }),
         signal: abortRef.current.signal,
       })
 
