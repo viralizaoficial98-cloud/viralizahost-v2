@@ -316,6 +316,15 @@ body{font-family:Arial,Helvetica,sans-serif;background:#F2F4F7;color:#1A1A1A}
       await logAttempt(db, { invoiceId, customerId, orderId, ticketId, recipient: toEmail,
         initiatedByUserId, initiatedByAgent, status: 'failed', error: errMsg })
 
+      void db.from('email_logs').insert({
+        profile_id: customerId, invoice_id: invoiceId, order_id: orderId ?? null,
+        recipient: toEmail, sender: fromField, subject, provider: 'resend',
+        status: 'failed', error_message: errMsg,
+        attempts: (inv.email_attempts ?? 0) + 1,
+        initiated_by_agent: initiatedByAgent, initiated_by: initiatedByUserId ?? null,
+        failed_at: new Date().toISOString(),
+      })
+
       if (isDomainErr) {
         return { success: false, invoiceId, ...ERR.DOMAIN_NOT_VERIFIED, details: errMsg }
       }
@@ -338,6 +347,24 @@ body{font-family:Arial,Helvetica,sans-serif;background:#F2F4F7;color:#1A1A1A}
       invoiceId, customerId, orderId, ticketId, recipient: toEmail,
       initiatedByUserId, initiatedByAgent, status: 'sent',
       providerMessageId,
+    })
+    void logId // used by ticket attachment if needed
+
+    // Also write to email_logs table
+    void db.from('email_logs').insert({
+      profile_id:          customerId,
+      invoice_id:          invoiceId,
+      order_id:            orderId ?? null,
+      recipient:           toEmail,
+      sender:              fromField,
+      subject,
+      provider:            'resend',
+      provider_message_id: providerMessageId ?? null,
+      status:              'sent',
+      attempts:            (inv.email_attempts ?? 0) + 1,
+      initiated_by_agent:  initiatedByAgent,
+      initiated_by:        initiatedByUserId ?? null,
+      sent_at:             new Date().toISOString(),
     })
 
     // ── 12. Associar ao ticket se existir ─────────────────
