@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { X, Send, Bot, Loader2, ChevronDown, RefreshCw, Minimize2 } from 'lucide-react'
+import { X, Send, Loader2, RefreshCw, Minimize2 } from 'lucide-react'
+import { AvatarIA } from './AvatarIA'
 
 interface Message {
   id: string
@@ -201,30 +202,25 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
           style={{ maxHeight: 'calc(100dvh - 100px)', animation: 'slideUp 0.2s ease' }}
         >
           {/* Header */}
-          <div className="bg-[#0A0A0A] px-4 py-3 flex items-center gap-3 shrink-0">
-            <div className="relative shrink-0">
-              <div className="w-9 h-9 rounded-full bg-[#F5B700] flex items-center justify-center">
-                <Bot size={18} className="text-black" />
-              </div>
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 border-2 border-[#0A0A0A] rounded-full" />
-            </div>
+          <div className="bg-[#0A0A0A] px-4 py-2.5 flex items-center gap-3 shrink-0">
+            <AvatarIA size={44} showBadge={false} showOnline={true} className="shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-white font-bold text-sm">Assistente ViralizaHost</p>
-              <p className="text-green-400 text-[11px]">
-                {streaming ? 'A escrever...' : 'IA · Disponível 24/7'}
+              <p className="text-white font-bold text-sm leading-tight">Assistente ViralizaHost</p>
+              <p className={`text-[11px] mt-0.5 ${streaming ? 'text-[#F5B700]' : 'text-green-400'}`}>
+                {streaming ? '● A escrever...' : '● IA · Disponível 24/7'}
               </p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={handleReset}
                 title="Nova conversa"
-                className="text-gray-600 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
+                className="text-gray-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
               >
                 <RefreshCw size={14} />
               </button>
               <button
                 onClick={() => setOpen(false)}
-                className="text-gray-600 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
+                className="text-gray-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
                 aria-label="Minimizar"
               >
                 <Minimize2 size={14} />
@@ -240,9 +236,7 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}>
                 {msg.role === 'assistant' && (
-                  <div className="w-6 h-6 rounded-full bg-[#F5B700]/20 border border-[#F5B700]/40 flex items-center justify-center shrink-0">
-                    <Bot size={12} className="text-[#A07000]" />
-                  </div>
+                  <AvatarIA size={24} showBadge={false} showOnline={false} className="shrink-0" />
                 )}
                 <div
                   className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed break-words ${
@@ -267,9 +261,7 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
 
             {isLoading && !streaming && (
               <div className="flex items-end gap-2">
-                <div className="w-6 h-6 rounded-full bg-[#F5B700]/20 border border-[#F5B700]/40 flex items-center justify-center shrink-0">
-                  <Bot size={12} className="text-[#A07000]" />
-                </div>
+                <AvatarIA size={24} showBadge={false} showOnline={false} className="shrink-0" />
                 <div className="bg-white border border-[#E4E4E4] rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
                   <span className="inline-flex gap-1">
                     <span className="w-1.5 h-1.5 bg-[#F5B700] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -354,27 +346,27 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
 
       {/* FAB trigger */}
       <div className="flex items-center gap-3">
-        {!open && !isLoading && (
+        {!open && (
           <div
-            className="bg-white border border-[#E8E8E8] rounded-2xl px-3.5 py-2 shadow-lg text-[11px] font-semibold text-[#0A0A0A] cursor-pointer"
+            className="bg-white border border-[#E8E8E8] rounded-2xl px-3.5 py-2 shadow-lg text-[11px] font-semibold text-[#0A0A0A] cursor-pointer hover:border-[#2F80ED] hover:shadow-[0_4px_20px_rgba(47,128,237,0.18)] transition-all"
             onClick={handleOpen}
+            style={{ animation: badge ? 'fabLabelPulse 2.5s ease-in-out infinite' : 'none' }}
           >
             Fale com a IA
           </div>
         )}
         <button
           onClick={open ? () => setOpen(false) : handleOpen}
-          className="relative w-14 h-14 bg-[#0A0A0A] hover:bg-[#1C1C1C] rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.32)] flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+          className="relative transition-all active:scale-95"
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
           aria-label={open ? 'Fechar assistente' : 'Abrir assistente virtual'}
         >
-          {open
-            ? <X size={20} className="text-white" />
-            : <Bot size={22} className="text-[#F5B700]" />
-          }
-          {badge && !open && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#F5B700] rounded-full text-black text-[9px] font-black flex items-center justify-center leading-none">
-              IA
-            </span>
+          {open ? (
+            <div className="w-14 h-14 bg-[#0A0A0A] hover:bg-[#1A1A1A] rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center transition-colors">
+              <X size={22} className="text-white" />
+            </div>
+          ) : (
+            <AvatarIA size={56} showBadge={badge} showOnline={true} />
           )}
         </button>
       </div>
@@ -383,6 +375,10 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
         @keyframes slideUp {
           from { opacity: 0; transform: translateY(16px) scale(0.97); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes fabLabelPulse {
+          0%,100% { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+          50%      { box-shadow: 0 4px 20px rgba(47,128,237,0.22); }
         }
       `}</style>
     </div>
