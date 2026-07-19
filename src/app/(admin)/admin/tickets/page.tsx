@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import Link from 'next/link'
 import { MessageSquare, Clock, CheckCircle2, AlertCircle, ChevronRight } from 'lucide-react'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { createAdminWriteClient } from '@/lib/supabase/server'
@@ -133,8 +134,8 @@ export default async function AdminTicketsPage() {
               const clientName  = ticket.profile?.full_name ?? 'Desconhecido'
               const clientEmail = ticket.profile?.email ?? ''
               return (
-                <div key={ticket.id} className="flex items-center gap-4 px-6 py-4 cursor-pointer transition-colors"
-                  style={{ borderBottom: i < tickets.length - 1 ? '1px solid #F8FAFC' : 'none' }}
+                <Link key={ticket.id} href={`/admin/tickets/${ticket.id}`} className="flex items-center gap-4 px-6 py-4 cursor-pointer transition-colors no-underline"
+                  style={{ borderBottom: i < tickets.length - 1 ? '1px solid #F8FAFC' : 'none', color: 'inherit' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FAFAFA' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -167,7 +168,7 @@ export default async function AdminTicketsPage() {
                     {s.label}
                   </span>
                   <ChevronRight size={14} style={{ color: '#CBD5E1' }} />
-                </div>
+                </Link>
               )
             })}
           </div>

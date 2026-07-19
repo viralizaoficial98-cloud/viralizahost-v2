@@ -187,13 +187,16 @@ export interface Database {
           status: TicketStatus
           priority: TicketPriority
           department: string
+          category: string | null
+          ticket_number: string | null
+          domain_id: string | null
           assigned_to: string | null
           service_id: string | null
           closed_at: string | null
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['viralizahost']['Tables']['tickets']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<Database['viralizahost']['Tables']['tickets']['Row'], 'id' | 'ticket_number' | 'created_at' | 'updated_at'>
         Update: Partial<Database['viralizahost']['Tables']['tickets']['Insert']>
       }
       ticket_messages: {
@@ -203,6 +206,7 @@ export interface Database {
           profile_id: string
           message: string
           is_staff: boolean
+          is_internal: boolean
           attachments: Json
           created_at: string
         }

@@ -48,6 +48,8 @@ export async function POST(req: NextRequest) {
   if (!validPriorities.includes(priority))
     return NextResponse.json({ error: 'Prioridade inválida.' }, { status: 400 })
 
+  console.info('[TICKET_CREATE_START]', { userId: user.id, subject, category, priority })
+
   const db = createAdminWriteClient()
 
   // Create ticket (trigger will set ticket_number)
@@ -66,8 +68,17 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (ticketErr || !ticket) {
-    console.error('[client/tickets POST] create ticket:', ticketErr?.message)
-    return NextResponse.json({ error: 'Erro ao criar ticket.' }, { status: 500 })
+    console.error('[TICKET_CREATE_ERROR] ticket insert failed', {
+      userId: user.id,
+      subject,
+      category,
+      priority,
+      code:    ticketErr?.code,
+      message: ticketErr?.message,
+      details: ticketErr?.details,
+      hint:    ticketErr?.hint,
+    })
+    return NextResponse.json({ error: 'Erro ao criar ticket.', code: 'TICKET_CREATE_FAILED' }, { status: 500 })
   }
 
   // Insert first message (the description)
@@ -82,7 +93,13 @@ export async function POST(req: NextRequest) {
     })
 
   if (msgErr) {
-    console.error('[client/tickets POST] create message:', msgErr.message)
+    console.error('[TICKET_MESSAGE_INSERT_ERROR]', {
+      ticketId: ticket.id,
+      code:    msgErr.code,
+      message: msgErr.message,
+      details: msgErr.details,
+      hint:    msgErr.hint,
+    })
     // Ticket was created — don't fail entirely, but log
   }
 
