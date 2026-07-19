@@ -12,7 +12,7 @@ interface Message {
 const WELCOME: Message = {
   id: 'welcome',
   role: 'assistant',
-  content: 'Olá! 👋 Sou o assistente virtual da **ViralizaHost**.\n\nPosso ajudar com:\n- Planos de hospedagem e preços\n- Domínios e DNS\n- E-mail corporativo\n- Suporte técnico\n- Acesso ao cPanel\n\nComo posso ajudar hoje?',
+  content: 'Olá! Eu sou a Cizesa. Como posso te ajudar?',
 }
 
 /** Very light markdown: bold, inline code, lists, line breaks */
@@ -205,7 +205,7 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
           <div className="bg-[#0A0A0A] px-4 py-2.5 flex items-center gap-3 shrink-0">
             <AvatarIA size={44} showBadge={false} showOnline={true} className="shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-white font-bold text-sm leading-tight">Assistente ViralizaHost</p>
+              <p className="text-white font-bold text-sm leading-tight">CIZESA</p>
               <p className={`text-[11px] mt-0.5 ${streaming ? 'text-[#F5B700]' : 'text-green-400'}`}>
                 {streaming ? '● A escrever...' : '● IA · Disponível 24/7'}
               </p>

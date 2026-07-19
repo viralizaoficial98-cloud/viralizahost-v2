@@ -20,7 +20,7 @@ export function AvatarIA({ size = 56, showBadge = true, showOnline = true, class
         width={size}
         height={size}
         style={{ display: 'block', filter: 'drop-shadow(0 4px 12px rgba(47,128,237,0.35))' }}
-        aria-label="Assistente Virtual ViralizaHost"
+        aria-label="CIZESA"
       >
         <defs>
           <clipPath id="avatar-clip">
