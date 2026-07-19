@@ -119,6 +119,11 @@ interface BillingData {
   footer_text: string | null
 }
 
+interface OrderData {
+  billing_cycle?: string | null
+  domain_name?: string | null
+}
+
 function fmt(amount: number | null | undefined, currency: string): string {
   if (amount == null) return `${currency} 0,00`
   return `${currency} ${amount.toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -140,6 +145,9 @@ const STATUS_LABELS: Record<string, string> = {
   pending: 'PENDENTE',
   overdue: 'VENCIDA',
   cancelled: 'CANCELADA',
+  sent: 'ENVIADA',
+  draft: 'RASCUNHO',
+  failed: 'FALHA',
 }
 
 interface InvoicePDFProps {
@@ -147,9 +155,10 @@ interface InvoicePDFProps {
   items: InvoiceItem[]
   profile: ProfileData
   billing: BillingData
+  order?: OrderData
 }
 
-export function InvoicePDF({ invoice, items, profile, billing }: InvoicePDFProps) {
+export function InvoicePDF({ invoice, items, profile, billing, order }: InvoicePDFProps) {
   const statusColor = STATUS_COLORS[invoice.status] ?? '#6B7280'
   const hasBank = !!(billing.bank_name || billing.iban || billing.account_number)
 
@@ -209,6 +218,24 @@ export function InvoicePDF({ invoice, items, profile, billing }: InvoicePDFProps
             </Text>
           </View>
         </View>
+
+        {/* Order / domain info */}
+        {order && (order.domain_name || order.billing_cycle) && (
+          <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16 }}>
+            {order.domain_name && (
+              <View style={styles.dateBlock}>
+                <Text style={styles.dateLabel}>Domínio / Serviço</Text>
+                <Text style={styles.dateValue}>{order.domain_name}</Text>
+              </View>
+            )}
+            {order.billing_cycle && (
+              <View style={styles.dateBlock}>
+                <Text style={styles.dateLabel}>Período</Text>
+                <Text style={styles.dateValue}>{order.billing_cycle}</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Dates */}
         <View style={styles.datesRow}>
