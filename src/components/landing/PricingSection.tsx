@@ -3,7 +3,11 @@ import Link from 'next/link'
 import { Check, X, Zap, Crown, Rocket, Users, Server } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useLocale } from '@/hooks/useLocale'
 import { Currency } from '@/types'
+
+// AOA base conversion rates
+const AOA_RATES: Record<Currency, number> = { AKZ: 1, BRL: 0.0042, USD: 0.00109 }
 
 // Static fallback plans shown before DB loads
 const FALLBACK_PLANS = [
@@ -131,7 +135,14 @@ const PLAN_ACCENTS = ['#3B82F6', '#F5B700', '#8B5CF6', '#EF4444', '#10B981']
 
 export function PricingSection() {
   const { format, currency } = useCurrency()
+  const { t, formatCurrency } = useLocale()
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
+
+  // Convert AOA price to selected currency
+  const convertFromAOA = (aoa: number | null) => {
+    if (aoa == null) return null
+    return aoa * AOA_RATES[currency]
+  }
   const [dbPlans, setDbPlans] = useState<DbPlan[] | null>(null)
 
   useEffect(() => {
@@ -158,12 +169,12 @@ export function PricingSection() {
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#E8E8E8] to-transparent" />
       <div className="container mx-auto px-4 relative">
         <div className="text-center mb-16">
-          <span className="section-tag mb-5 inline-flex">Hospedagem Premium</span>
+          <span className="section-tag mb-5 inline-flex">{t('plans.ssl')} · {t('plans.cpanel')} · {t('plans.backup')}</span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0A0A0A] mb-5">
-            Planos de <span className="gradient-text">Hospedagem</span>
+            {t('hosting.title') !== 'hosting.title' ? t('hosting.title') : 'Hospedagem'} <span className="gradient-text">Premium</span>
           </h2>
           <p className="text-gray-500 text-base sm:text-xl max-w-2xl mx-auto mb-8">
-            Escolha o plano ideal para escalar o seu negócio. SSL grátis, cPanel Premium, backup e suporte 24/7.
+            {t('plans.ssl')}, {t('plans.cpanel')}, {t('plans.backup')}, {t('plans.support247')}.
           </p>
           <div className="inline-flex items-center gap-2 bg-white border border-[#E8E8E8] rounded-2xl p-1.5 shadow-sm">
             <button
@@ -172,7 +183,7 @@ export function PricingSection() {
                 billing === 'monthly' ? 'bg-[#0A0A0A] text-white shadow-sm' : 'text-gray-500 hover:text-[#0A0A0A]'
               }`}
             >
-              Mensal
+              {t('billing.monthly')}
             </button>
             <button
               onClick={() => setBilling('annual')}
@@ -180,7 +191,7 @@ export function PricingSection() {
                 billing === 'annual' ? 'bg-[#F5B700] text-[#0A0A0A] shadow-sm' : 'text-gray-500 hover:text-[#0A0A0A]'
               }`}
             >
-              Anual
+              {t('billing.annual')}
               <span className="bg-[#0A0A0A] text-white text-xs px-2 py-0.5 rounded-full font-bold">-30%</span>
             </button>
           </div>
@@ -189,7 +200,7 @@ export function PricingSection() {
           {cards}
         </div>
         <p className="text-center text-gray-400 text-sm mt-10">
-          ✓ Sem contratos &nbsp;•&nbsp; ✓ Cancele a qualquer momento &nbsp;•&nbsp; ✓ Garantia de 30 dias
+          ✓ {t('plans.noContracts')} &nbsp;•&nbsp; ✓ {t('plans.cancelAnytime')} &nbsp;•&nbsp; ✓ {t('plans.moneyBack')}
         </p>
       </div>
     </section>
@@ -201,8 +212,10 @@ export function PricingSection() {
       dbPlans.map((plan, i) => {
         const Icon   = PLAN_ICONS[i % PLAN_ICONS.length]
         const accent = PLAN_ACCENTS[i % PLAN_ACCENTS.length]
-        const price  = billing === 'annual' && plan.price_1year ? plan.price_1year : plan.price_monthly
-        const originalPrice = plan.price_monthly
+        const rawPrice  = billing === 'annual' && plan.price_1year ? plan.price_1year : plan.price_monthly
+        const rawOriginalPrice = plan.price_monthly
+        const price = convertFromAOA(rawPrice)
+        const originalPrice = convertFromAOA(rawOriginalPrice)
 
         // Sort features by position; features without position fall to end
         const features = [...(plan.product_features ?? [])].sort((a, b) => a.position - b.position)
@@ -254,16 +267,16 @@ export function PricingSection() {
               <div className="mb-6">
                 <div className="flex items-baseline gap-2 mb-1">
                   <span className={`text-3xl font-black ${plan.popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
-                    Kz {price?.toLocaleString() ?? '—'}
+                    {price != null ? formatCurrency(price) : '—'}
                   </span>
-                  <span className={`text-sm ${plan.popular ? 'text-gray-500' : 'text-gray-400'}`}>/mês</span>
+                  <span className={`text-sm ${plan.popular ? 'text-gray-500' : 'text-gray-400'}`}>{t('billing.perMonth')}</span>
                 </div>
                 {billing === 'annual' && originalPrice && price && price < originalPrice && (
                   <>
                     <div className={`text-xs line-through ${plan.popular ? 'text-gray-600' : 'text-gray-400'}`}>
-                      Kz {originalPrice.toLocaleString()}/mês
+                      {formatCurrency(originalPrice)}{t('billing.perMonth')}
                     </div>
-                    <div className="text-xs text-green-500 font-semibold mt-1">✓ Economize 30% no plano anual</div>
+                    <div className="text-xs text-green-500 font-semibold mt-1">✓ {t('billing.save')} 30%</div>
                   </>
                 )}
               </div>
@@ -276,7 +289,7 @@ export function PricingSection() {
                     : 'bg-[#0A0A0A] text-white hover:bg-[#222] shadow-sm'
                 }`}
               >
-                {plan.cta_label ?? 'Começar Agora →'}
+                {plan.cta_label ?? t('cta.start') + ' →'}
               </Link>
 
               <div className={`mb-6 h-px ${plan.popular ? 'bg-white/10' : 'bg-[#F0F0F0]'}`} />
@@ -302,7 +315,7 @@ export function PricingSection() {
                 </div>
               ) : (
                 <p className={`text-xs ${plan.popular ? 'text-gray-500' : 'text-gray-400'}`}>
-                  Nenhuma funcionalidade cadastrada.
+                  {t('plans.features')}
                 </p>
               )}
             </div>
@@ -366,15 +379,15 @@ export function PricingSection() {
                 <span className={`text-3xl font-black ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
                   {format(getStaticPrice(plan.price))}
                 </span>
-                <span className={`text-sm ${plan.is_popular ? 'text-gray-500' : 'text-gray-400'}`}>/mês</span>
+                <span className={`text-sm ${plan.is_popular ? 'text-gray-500' : 'text-gray-400'}`}>{t('billing.perMonth')}</span>
               </div>
               {billing === 'annual' && (
                 <div className={`text-xs line-through ${plan.is_popular ? 'text-gray-600' : 'text-gray-400'}`}>
-                  {format(getStaticPrice(plan.originalPrice))}/mês
+                  {format(getStaticPrice(plan.originalPrice))}{t('billing.perMonth')}
                 </div>
               )}
               {billing === 'annual' && (
-                <div className="text-xs text-green-500 font-semibold mt-1">✓ Economize 30% no plano anual</div>
+                <div className="text-xs text-green-500 font-semibold mt-1">✓ {t('billing.save')} 30%</div>
               )}
             </div>
 
@@ -386,7 +399,7 @@ export function PricingSection() {
                   : 'bg-[#0A0A0A] text-white hover:bg-[#222] shadow-sm'
               }`}
             >
-              Começar Agora →
+              {t('cta.start')} →
             </Link>
 
             <div className={`mb-6 h-px ${plan.is_popular ? 'bg-white/10' : 'bg-[#F0F0F0]'}`} />

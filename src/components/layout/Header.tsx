@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect, useRef } from 'react'
+import { useLocale } from '@/hooks/useLocale'
 import {
   Menu, X, ChevronDown, ChevronRight, Server, Globe, Users, Bot, Code, Cpu,
   Workflow, Shield, MessageCircle, HardDrive, Monitor, Zap, Mail, Lock,
@@ -261,6 +262,7 @@ function DarkMegaFooter({ onClose }: { onClose: () => void }) {
 }
 
 export function Header() {
+  const { t } = useLocale()
   const [mobileOpen,          setMobileOpen]          = useState(false)
   const [mobileHostingOpen,   setMobileHostingOpen]   = useState(false)
   const [mobileServicesOpen,  setMobileServicesOpen]  = useState(false)
@@ -269,6 +271,14 @@ export function Header() {
   const [scrolled,            setScrolled]            = useState(false)
   const [megaOpen,            setMegaOpen]            = useState<MegaType>(null)
   const megaTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const i18nNavLinks = [
+    { label: t('nav.hosting'),  href: '/hospedagem-de-sites', mega: 'hosting'  as MegaType },
+    { label: t('nav.domains'),  href: '/dominios',            mega: 'domains'  as MegaType },
+    { label: t('services.products') !== 'services.products' ? t('nav.services') : 'Serviços', href: '/servicos', mega: 'services' as MegaType },
+    { label: t('nav.email'),    href: '/email-corporativo',   mega: 'email'    as MegaType },
+    { label: t('nav.support'),  href: '/suporte',             mega: null },
+  ]
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -297,7 +307,7 @@ export function Header() {
 
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-0.5 flex-1 justify-center max-w-2xl mx-auto">
-            {navLinks.map((link) =>
+            {i18nNavLinks.map((link) =>
               link.mega ? (
                 <div key={link.label} className="relative"
                   onMouseEnter={() => openMega(link.mega)}
@@ -322,11 +332,11 @@ export function Header() {
           <div className="hidden lg:flex items-center gap-2.5 shrink-0">
             <CurrencySelector />
             <Link href="/login" className="text-[#3D3D3D] hover:text-[#0A0A0A] px-4 py-2 rounded-xl text-sm font-medium transition-all hover:bg-[#F5F5F5]">
-              Entrar
+              {t('nav.login')}
             </Link>
             <Link href="/register"
               className="btn-shimmer btn-primary px-5 py-2.5 text-sm rounded-xl shadow-[0_4px_12px_rgba(245,183,0,0.28)] hover:shadow-[0_6px_20px_rgba(245,183,0,0.38)]">
-              Começar Grátis →
+              {t('cta.start')} →
             </Link>
           </div>
 
