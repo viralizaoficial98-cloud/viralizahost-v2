@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Check, Mail, Shield, Database, Globe, Lock, Star, Phone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useLocale } from '@/hooks/useLocale'
+import { convertFromAOA } from '@/lib/currency'
 
 type DbEmailPlan = { id: string; slug: string | null; name: string; price_monthly: number | null; storage_gb: number; accounts: number; features: string[] | null; active: boolean; popular: boolean; color: string; position: number }
 
@@ -12,7 +14,7 @@ const emailPlans = [
     name: 'Starter Mail',
     tagline: 'Para começar',
     description: 'E-mail profissional para pequenas empresas e empreendedores.',
-    priceAKZ: '25.000',
+    priceAKZ: '25.000', priceAOA: 25000,
     features: [
       { text: '5 caixas de e-mail', included: true },
       { text: '10 GB por caixa', included: true },
@@ -34,7 +36,7 @@ const emailPlans = [
     name: 'Business Mail',
     tagline: 'Mais popular',
     description: 'Solução completa para equipas e empresas em crescimento.',
-    priceAKZ: '45.000',
+    priceAKZ: '45.000', priceAOA: 45000,
     features: [
       { text: '10 caixas de e-mail', included: true },
       { text: '25 GB por caixa', included: true },
@@ -56,7 +58,7 @@ const emailPlans = [
     name: 'Enterprise Mail',
     tagline: 'Alta segurança',
     description: 'Para empresas que exigem segurança máxima e alta disponibilidade.',
-    priceAKZ: '95.000',
+    priceAKZ: '95.000', priceAOA: 95000,
     features: [
       { text: '25 caixas de e-mail', included: true },
       { text: '50 GB por caixa', included: true },
@@ -101,6 +103,8 @@ const PLAN_ICONS = [Mail, Shield, Lock, Star, Database]
 const PLAN_ACCENTS = ['#3B82F6', '#F5B700', '#8B5CF6', '#0A0A0A', '#10B981']
 
 export function EmailPricingSection() {
+  const { formatCurrency, currency, t } = useLocale()
+  const fmt = (n: number) => formatCurrency(convertFromAOA(n, currency))
   const [dbPlans, setDbPlans] = useState<DbEmailPlan[] | null>(null)
 
   useEffect(() => {
@@ -156,14 +160,13 @@ export function EmailPricingSection() {
                     <div className="mb-8">
                       {price ? (
                         <div className="flex items-baseline gap-1">
-                          <span className={`text-sm font-bold ${isPopular ? 'text-gray-400' : 'text-gray-500'}`}>Kz</span>
                           <span className={`text-4xl font-black ${isPopular ? 'text-white' : 'text-[#0A0A0A]'}`}>
-                            {price.toLocaleString('pt-AO')}
+                            {fmt(price)}
                           </span>
-                          <span className={`text-sm ${isPopular ? 'text-gray-400' : 'text-gray-500'}`}>/mês</span>
+                          <span className={`text-sm ${isPopular ? 'text-gray-400' : 'text-gray-500'}`}>{t('billing.perMonth')}</span>
                         </div>
                       ) : (
-                        <div className={`text-2xl font-black ${isPopular ? 'text-white' : 'text-[#0A0A0A]'}`}>Consultar</div>
+                        <div className={`text-2xl font-black ${isPopular ? 'text-white' : 'text-[#0A0A0A]'}`}>{t('cta.talkSales')}</div>
                       )}
                     </div>
                     <ul className="space-y-3 mb-8">
@@ -181,7 +184,7 @@ export function EmailPricingSection() {
                         ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300]'
                         : 'border border-[#E8E8E8] text-[#0A0A0A] hover:border-[#F5B700] hover:bg-[#F5B700]/5'
                     }`}>
-                      Começar Agora
+                      {t('cta.start')}
                     </Link>
                   </div>
                 </div>
@@ -267,14 +270,14 @@ export function EmailPricingSection() {
 
                   {/* Price */}
                   <div className="mb-6">
-                    {plan.priceAKZ ? (
+                    {(plan as any).priceAOA ? (
                       <>
                         <div className="flex items-baseline gap-2">
                           <span className={`text-3xl font-black ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
-                            {plan.priceAKZ} Kz
+                            {fmt((plan as any).priceAOA)}
                           </span>
                         </div>
-                        <div className={`text-xs mt-1 ${plan.is_popular ? 'text-gray-500' : 'text-gray-400'}`}>/mês</div>
+                        <div className={`text-xs mt-1 ${plan.is_popular ? 'text-gray-500' : 'text-gray-400'}`}>{t('billing.perMonth')}</div>
                       </>
                     ) : (
                       <div>
@@ -289,7 +292,7 @@ export function EmailPricingSection() {
                   </div>
 
                   {/* CTA */}
-                  {plan.priceAKZ ? (
+                  {(plan as any).priceAOA ? (
                     <Link href={`/checkout?plan=${plan.id}`}
                       className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
                         plan.is_popular
@@ -297,7 +300,7 @@ export function EmailPricingSection() {
                           : 'bg-[#0A0A0A] text-white hover:bg-[#222] shadow-sm'
                       }`}
                     >
-                      Contratar Agora →
+                      {t('cta.start')} →
                     </Link>
                   ) : (
                     <Link href="/tickets"

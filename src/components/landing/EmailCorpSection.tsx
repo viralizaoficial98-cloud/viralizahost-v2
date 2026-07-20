@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { Check, X, Mail, Loader2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useLocale } from '@/hooks/useLocale'
+import { convertFromAOA } from '@/lib/currency'
 
 type DbEmailPlan = {
   id: string
@@ -22,9 +24,9 @@ type DbEmailPlan = {
   position: number
 }
 
-const fmt = (v: number) => `Kz ${v.toLocaleString('pt-AO')}`
-
 export function EmailCorpSection() {
+  const { formatCurrency, currency, t } = useLocale()
+  const fmt = (v: number) => formatCurrency(convertFromAOA(v, currency))
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
   const [plans, setPlans] = useState<DbEmailPlan[]>([])
   const [loading, setLoading] = useState(true)
@@ -84,7 +86,7 @@ export function EmailCorpSection() {
                   : 'text-gray-500 hover:text-[#0A0A0A]'
               }`}
             >
-              Mensal
+              {t('billing.monthly')}
             </button>
             <button
               onClick={() => setBilling('annual')}
@@ -94,7 +96,7 @@ export function EmailCorpSection() {
                   : 'text-gray-500 hover:text-[#0A0A0A]'
               }`}
             >
-              Anual
+              {t('billing.1year')}
               <span className="bg-[#0A0A0A] text-white text-xs px-2 py-0.5 rounded-full font-bold">-20%</span>
             </button>
           </div>

@@ -18,7 +18,7 @@ const plans: PricingPlan[] = [
   {
     id: 'vps-nvme2',
     name: 'VPS NVMe 2',
-    price: 'Kz 45.000',
+    price: 'Kz 45.000', priceAOA: 45000,
     period: '/mês',
     description: 'Para projectos iniciais',
     features: ['2 vCPU', '4 GB RAM DDR5', '60 GB NVMe SSD', 'IP dedicado', 'Transferência ilimitada', 'Root access', 'Migração grátis', 'Suporte 24/7'],
@@ -28,7 +28,7 @@ const plans: PricingPlan[] = [
   {
     id: 'vps-nvme4',
     name: 'VPS NVMe 4',
-    price: 'Kz 85.000',
+    price: 'Kz 85.000', priceAOA: 85000,
     period: '/mês',
     description: 'Para aplicações e e-commerce',
     popular: true,
@@ -39,7 +39,7 @@ const plans: PricingPlan[] = [
   {
     id: 'vps-nvme8',
     name: 'VPS NVMe 8',
-    price: 'Kz 159.000',
+    price: 'Kz 159.000', priceAOA: 159000,
     period: '/mês',
     description: 'Para alta demanda e escala',
     badge: 'MELHOR VALOR',

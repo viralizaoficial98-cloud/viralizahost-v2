@@ -13,6 +13,8 @@ import {
   type BillingCycle, type CheckoutItem, type ServiceType,
 } from '@/store/checkoutStore'
 import { createClient, createAuthClient, createStorageClient } from '@/lib/supabase/client'
+import { useLocale } from '@/hooks/useLocale'
+import { convertFromAOA } from '@/lib/currency'
 
 // ─── constants ─────────────────────────────────────────────────────────────
 
@@ -105,10 +107,6 @@ const PLAN_CATALOG: Record<string, CheckoutItem> = {
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
-function fmtPrice(n: number) {
-  return `Kz ${n.toLocaleString('pt-AO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-}
-
 /** Ensures TLD always has a leading dot: 'ao' → '.ao', '.ao' → '.ao' */
 function normalizeTld(value: string): string {
   const clean = value.trim().toLowerCase()
@@ -173,13 +171,15 @@ function StepBar({ current }: { current: number }) {
 }
 
 function OrderSummary({ items, cycle }: { items: CheckoutItem[]; cycle: BillingCycle }) {
+  const { formatCurrency, currency, t } = useLocale()
+  const fmt = (n: number) => formatCurrency(convertFromAOA(n, currency))
   const total    = items.reduce((acc, i) => acc + calcItemTotal(i, cycle), 0)
   const baseTotal = items.reduce((acc, i) => acc + calcItemBase(i, cycle), 0)
   const hasDiscount = baseTotal > total
 
   return (
     <div className="bg-white border border-[#E8E8E8] rounded-2xl p-5 shadow-sm">
-      <p className="text-xs font-black text-[#999] uppercase tracking-widest mb-4">Resumo do Pedido</p>
+      <p className="text-xs font-black text-[#999] uppercase tracking-widest mb-4">{t('checkout.summary')}</p>
       {items.length === 0 ? (
         <p className="text-sm text-[#AAA]">Nenhum serviço selecionado.</p>
       ) : (
@@ -201,7 +201,7 @@ function OrderSummary({ items, cycle }: { items: CheckoutItem[]; cycle: BillingC
                   <p className="text-xs text-[#888]">{label}</p>
                 </div>
                 <p className="text-sm font-bold text-[#0A0A0A] whitespace-nowrap">
-                  {fmtPrice(calcItemTotal(item, cycle))}
+                  {fmt(calcItemTotal(item, cycle))}
                 </p>
               </div>
             )
@@ -210,16 +210,16 @@ function OrderSummary({ items, cycle }: { items: CheckoutItem[]; cycle: BillingC
             {hasDiscount && (
               <>
                 <div className="flex justify-between text-sm text-[#888]">
-                  <span>Subtotal</span><span>{fmtPrice(baseTotal)}</span>
+                  <span>{t('checkout.subtotal')}</span><span>{fmt(baseTotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-green-600 font-semibold">
-                  <span>Desconto</span>
-                  <span>-{fmtPrice(baseTotal - total)}</span>
+                  <span>{t('checkout.discount')}</span>
+                  <span>-{fmt(baseTotal - total)}</span>
                 </div>
               </>
             )}
             <div className="flex justify-between font-black text-base text-[#0A0A0A] pt-1">
-              <span>Total</span><span className="text-[#F5B700]">{fmtPrice(total)}</span>
+              <span>{t('checkout.total')}</span><span className="text-[#F5B700]">{fmt(total)}</span>
             </div>
           </div>
         </>
@@ -286,6 +286,8 @@ function Step1Cycle({ onNext }: { onNext: () => void }) {
 
 function Step2Cart({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   const { items, billingCycle, removeItem, updateQuantity, addItem } = useCheckoutStore()
+  const { formatCurrency, currency } = useLocale()
+  const fmt = (n: number) => formatCurrency(convertFromAOA(n, currency))
   const [showAdd, setShowAdd] = useState(false)
 
   const extras: CheckoutItem[] = Object.values(PLAN_CATALOG).filter(p => !items.find(i => i.id === p.id))
@@ -312,7 +314,7 @@ function Step2Cart({ onNext, onBack }: { onNext: () => void; onBack: () => void 
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-[#0A0A0A] text-sm">{item.name}</p>
-                <p className="text-xs text-[#888]">{fmtPrice(item.price)}{item.type === 'domain' ? '/ano' : '/mês'}</p>
+                <p className="text-xs text-[#888]">{fmt(item.price)}{item.type === 'domain' ? '/ano' : '/mês'}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-6 h-6 rounded-md border border-[#E8E8E8] flex items-center justify-center hover:border-[#F5B700] transition-colors">
@@ -324,7 +326,7 @@ function Step2Cart({ onNext, onBack }: { onNext: () => void; onBack: () => void 
                 </button>
               </div>
               <p className="text-sm font-black text-[#0A0A0A] w-24 text-right">
-                {fmtPrice(calcItemTotal(item, billingCycle))}
+                {fmt(calcItemTotal(item, billingCycle))}
               </p>
               <button onClick={() => removeItem(item.id)} className="text-[#CCC] hover:text-red-500 transition-colors ml-1">
                 <Trash2 size={15} />
@@ -350,7 +352,7 @@ function Step2Cart({ onNext, onBack }: { onNext: () => void; onBack: () => void 
               className="w-full flex items-center justify-between p-3 bg-white border border-[#E8E8E8] rounded-lg hover:border-[#F5B700] transition-colors text-left"
             >
               <span className="text-sm font-semibold text-[#0A0A0A]">{p.name}</span>
-              <span className="text-xs text-[#888]">{fmtPrice(p.price)}/mês</span>
+              <span className="text-xs text-[#888]">{fmt(p.price)}/mês</span>
             </button>
           ))}
         </div>
@@ -824,6 +826,8 @@ function Step5Payment({ onSubmit, onBack, submitting, error }: { onSubmit: () =>
 
 function StepConfirmation({ orderId }: { orderId: string }) {
   const { items, billingCycle, domainName, paymentMethod, getTotal, clear } = useCheckoutStore()
+  const { formatCurrency, currency } = useLocale()
+  const fmt = (n: number) => formatCurrency(convertFromAOA(n, currency))
   const router = useRouter()
   const isPending = paymentMethod === 'bic_transfer'
 
@@ -859,7 +863,7 @@ function StepConfirmation({ orderId }: { orderId: string }) {
         {items.map(i => (
           <div key={i.id} className="flex justify-between text-sm">
             <span className="text-[#0A0A0A]">{i.name}</span>
-            <span className="font-bold">{fmtPrice(calcItemTotal(i, billingCycle))}</span>
+            <span className="font-bold">{fmt(calcItemTotal(i, billingCycle))}</span>
           </div>
         ))}
         <div className="border-t border-[#E8E8E8] pt-3 flex justify-between text-sm font-bold">
@@ -875,7 +879,7 @@ function StepConfirmation({ orderId }: { orderId: string }) {
           <span className="font-bold capitalize">{paymentMethod?.replace('_', ' ')}</span>
         </div>
         <div className="flex justify-between font-black text-base border-t border-[#E8E8E8] pt-3">
-          <span>Total pago</span><span className="text-[#F5B700]">{fmtPrice(getTotal())}</span>
+          <span>Total pago</span><span className="text-[#F5B700]">{fmt(getTotal())}</span>
         </div>
         {orderId && (
           <div className="flex justify-between text-xs text-[#AAA]">

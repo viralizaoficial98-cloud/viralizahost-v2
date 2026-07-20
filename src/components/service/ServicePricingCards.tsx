@@ -1,10 +1,14 @@
+'use client'
 import Link from 'next/link'
 import { Check, X, Star } from 'lucide-react'
+import { useLocale } from '@/hooks/useLocale'
+import { convertFromAOA } from '@/lib/currency'
 
 export interface PricingPlan {
   id: string
   name: string
   price: string
+  priceAOA?: number
   period?: string
   description?: string
   popular?: boolean
@@ -32,10 +36,18 @@ const BADGE_COLORS: Record<string, string> = {
 
 export function ServicePricingCards({
   plans,
-  title = 'Escolha o plano ideal',
-  subtitle = 'Todos os planos incluem suporte técnico especializado e garantia de 30 dias.',
+  title,
+  subtitle,
   cols = 3,
 }: ServicePricingCardsProps) {
+  const { t, formatCurrency, currency } = useLocale()
+  const fmtAOA = (aoa: number) => formatCurrency(convertFromAOA(aoa, currency))
+
+  const resolvedTitle = title ?? (t('home.plansTitle') !== 'home.plansTitle' ? t('home.plansTitle') : 'Escolha o plano ideal')
+  const resolvedSubtitle = subtitle ?? (t('plans.support247') !== 'plans.support247'
+    ? `${t('plans.ssl')} · ${t('plans.backup')} · ${t('plans.moneyBack')}`
+    : 'Todos os planos incluem suporte técnico especializado e garantia de 30 dias.')
+
   const gridClass: Record<number, string> = {
     2: 'md:grid-cols-2',
     3: 'md:grid-cols-3',
@@ -46,9 +58,9 @@ export function ServicePricingCards({
     <section id="planos" className="bg-[#F8F8F8] py-20">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <span className="section-tag">Planos e Preços</span>
-          <h2 className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3 mb-3">{title}</h2>
-          <p className="text-[#666] max-w-xl mx-auto text-sm md:text-base">{subtitle}</p>
+          <span className="section-tag">{t('billing.bestValue') !== 'billing.bestValue' ? t('billing.bestValue') : 'Planos e Preços'}</span>
+          <h2 className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3 mb-3">{resolvedTitle}</h2>
+          <p className="text-[#666] max-w-xl mx-auto text-sm md:text-base">{resolvedSubtitle}</p>
         </div>
 
         <div className={`grid grid-cols-1 ${gridClass[cols]} gap-6 max-w-6xl mx-auto`}>
@@ -80,10 +92,10 @@ export function ServicePricingCards({
 
                 <div className="mb-6">
                   <span className={`text-3xl font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>
-                    {plan.price}
+                    {plan.priceAOA != null ? fmtAOA(plan.priceAOA) : plan.price}
                   </span>
                   {plan.period && (
-                    <span className={`text-sm ml-1 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{plan.period}</span>
+                    <span className={`text-sm ml-1 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{t('billing.perMonth')}</span>
                   )}
                 </div>
 
@@ -112,7 +124,7 @@ export function ServicePricingCards({
                       : 'bg-[#0A0A0A] text-white hover:bg-[#1A1A1A]'
                   }`}
                 >
-                  {plan.cta ?? 'Começar Agora'}
+                  {plan.cta ?? t('cta.start')}
                 </Link>
               </div>
             </div>

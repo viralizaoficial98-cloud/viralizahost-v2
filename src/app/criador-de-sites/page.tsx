@@ -18,7 +18,7 @@ const plans: PricingPlan[] = [
   {
     id: 'ia-starter',
     name: 'IA Starter',
-    price: 'Kz 14.900',
+    price: 'Kz 14.900', priceAOA: 14900,
     period: '/mês',
     description: 'Para começar com IA',
     features: ['1 site criado com IA', '10 GB de armazenamento', 'SSL grátis', 'Domínio gratuito 1 ano', 'Templates IA ilimitados', 'Suporte 24/7'],
@@ -28,7 +28,7 @@ const plans: PricingPlan[] = [
   {
     id: 'ia-pro',
     name: 'IA Pro',
-    price: 'Kz 29.900',
+    price: 'Kz 29.900', priceAOA: 29900,
     period: '/mês',
     description: 'Para empresas e profissionais',
     popular: true,
@@ -39,7 +39,7 @@ const plans: PricingPlan[] = [
   {
     id: 'ia-business',
     name: 'IA Business',
-    price: 'Kz 59.900',
+    price: 'Kz 59.900', priceAOA: 59900,
     period: '/mês',
     description: 'Para lojas e alto tráfego',
     badge: 'MELHOR VALOR',

@@ -18,7 +18,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-ai-cloud-start',
     name: 'AI Cloud Start',
-    price: 'Kz 89.000',
+    price: 'Kz 89.000', priceAOA: 89000,
     period: '/mês',
     description: 'Para começar com agentes de IA',
     features: ['Agente de IA pré-instalado', '2 vCPU', '4 GB RAM', '60 GB NVMe SSD', 'Integração WhatsApp', 'Integração Gmail', 'SSL grátis', 'Backup semanal', 'Suporte 24/7'],
@@ -28,7 +28,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-ai-cloud-pro',
     name: 'AI Cloud Pro',
-    price: 'Kz 169.000',
+    price: 'Kz 169.000', priceAOA: 169000,
     period: '/mês',
     description: 'Para empresas e equipas',
     popular: true,
@@ -39,7 +39,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-ai-cloud-enterprise',
     name: 'AI Cloud Enterprise',
-    price: 'Kz 349.000',
+    price: 'Kz 349.000', priceAOA: 349000,
     period: '/mês',
     description: 'Para grandes operações com IA',
     badge: 'ENTERPRISE',

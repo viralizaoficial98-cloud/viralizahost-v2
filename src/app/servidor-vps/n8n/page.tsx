@@ -18,7 +18,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-n8n-start',
     name: 'n8n Start',
-    price: 'Kz 55.000',
+    price: 'Kz 55.000', priceAOA: 55000,
     period: '/mês',
     description: 'Para começar com automações',
     features: ['n8n pré-instalado', '2 vCPU', '4 GB RAM', '60 GB NVMe SSD', 'Fluxos ilimitados', 'SSL grátis', 'Backup semanal', 'Suporte 24/7'],
@@ -28,7 +28,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-n8n-pro',
     name: 'n8n Pro',
-    price: 'Kz 99.000',
+    price: 'Kz 99.000', priceAOA: 99000,
     period: '/mês',
     description: 'Para agências e equipas',
     popular: true,
@@ -39,7 +39,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-n8n-scale',
     name: 'n8n Scale',
-    price: 'Kz 179.000',
+    price: 'Kz 179.000', priceAOA: 179000,
     period: '/mês',
     description: 'Para alta demanda e múltiplas equipas',
     badge: 'MELHOR VALOR',
