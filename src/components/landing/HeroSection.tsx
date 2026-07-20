@@ -142,7 +142,7 @@ function useBreakpoint() {
 function sectionHeight(bp: 'mobile' | 'tablet' | 'desktop'): string {
   if (bp === 'mobile')  return `${460 + HEADER_H}px`
   if (bp === 'tablet')  return `${560 + HEADER_H}px`
-  return `clamp(${600 + HEADER_H}px, calc(76vh + ${HEADER_H}px), ${880 + HEADER_H}px)`
+  return `clamp(${640 + HEADER_H}px, calc(85vh + ${HEADER_H}px), ${960 + HEADER_H}px)`
 }
 
 /* ─── Component ──────────────────────────────────────────────── */
@@ -307,8 +307,8 @@ export function HeroSection() {
                   </div>
 
                   {/* Layer 2 — sharp main image
-                      Mobile: contain — full artwork visible, blur fills letterbox gaps
-                      Tablet/Desktop: cover — fills the full section width/height */}
+                      All breakpoints: contain — full artwork visible, blur fills any gaps.
+                      This prevents desktop cropping on wide landscape banners. */}
                   <img
                     src={s.bgImage}
                     alt=""
@@ -317,8 +317,8 @@ export function HeroSection() {
                     style={{
                       top: HEADER_H,
                       height: `calc(100% - ${HEADER_H}px)`,
-                      objectFit: bp === 'mobile' ? 'contain' : 'cover',
-                      objectPosition: bp === 'mobile' ? 'center center' : objPos,
+                      objectFit: 'contain',
+                      objectPosition: 'center center',
                       transform: scale !== '1' ? `scale(${scale})` : undefined,
                       transformOrigin: 'center center',
                     }}
