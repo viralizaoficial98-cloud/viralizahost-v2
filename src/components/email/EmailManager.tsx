@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Mail, Plus, HardDrive, ExternalLink, Loader2, Trash2, Key,
-  Settings, AlertCircle, CheckCircle2, X, RefreshCw,
+  Settings, AlertCircle, CheckCircle2, X, RefreshCw, Search, Copy, ChevronUp, ChevronDown, Filter,
 } from 'lucide-react'
 import { formatBytes, usagePct, usageColor } from '@/lib/format'
 
@@ -118,6 +118,11 @@ export default function EmailManager() {
   const [actionLoading, setAction]  = useState(false)
   const [toast, setToast]           = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [webmailLoading, setWmLoad] = useState<Record<string, boolean>>({})
+  const [search,   setSearch]   = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'suspended'>('all')
+  const [sortBy,   setSortBy]   = useState<'email' | 'usage'>('email')
+  const [sortDir,  setSortDir]  = useState<'asc' | 'desc'>('asc')
+  const [copied,   setCopied]   = useState<string | null>(null)
 
   // Form state
   const [newLocalpart, setNewLocalpart] = useState('')
@@ -235,12 +240,37 @@ export default function EmailManager() {
     }
   }
 
+  const copyEmail = (email: string) => {
+    navigator.clipboard.writeText(email).then(() => {
+      setCopied(email)
+      setTimeout(() => setCopied(null), 2000)
+    })
+  }
+
+  const toggleSort = (field: 'email' | 'usage') => {
+    if (sortBy === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortBy(field); setSortDir('asc') }
+  }
+
   // Storage totals — diskused/diskquota values are in bytes (UAPI normalises to bytes)
   const totalUsedBytes  = emails.reduce((s, e) => s + (e.diskused  ?? 0), 0)
   const totalQuotaBytes = emails.reduce((s, e) => s + (e.diskquota ?? 0), 0)
   const active          = emails.filter(e => e.suspended_login !== 1).length
   const freePct         = totalQuotaBytes > 0 ? 100 - usagePct(totalUsedBytes, totalQuotaBytes) : 100
   const freeBytes       = Math.max(0, totalQuotaBytes - totalUsedBytes)
+
+  const filteredEmails = emails
+    .filter(e => {
+      const matchSearch = e.email.toLowerCase().includes(search.toLowerCase())
+      const matchStatus = statusFilter === 'all' || (statusFilter === 'active' ? e.suspended_login !== 1 : e.suspended_login === 1)
+      return matchSearch && matchStatus
+    })
+    .sort((a, b) => {
+      let cmp = 0
+      if (sortBy === 'email') cmp = a.email.localeCompare(b.email)
+      else cmp = usagePct(a.diskused, a.diskquota) - usagePct(b.diskused, b.diskquota)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
 
   return (
     <div className="space-y-7">
@@ -370,19 +400,81 @@ export default function EmailManager() {
 
       {/* Email list */}
       <div className="rounded-2xl overflow-hidden" style={{ background: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 4px 24px rgba(15,23,42,0.05)' }}>
-        <div className="px-6 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid #F1F5F9' }}>
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
-            <Mail size={15} style={{ color: '#059669' }} />
+        <div className="px-6 py-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+              <Mail size={15} style={{ color: '#059669' }} />
+            </div>
+            <h2 className="font-bold text-sm" style={{ color: '#0B0B0D' }}>
+              {loading ? 'Carregando…' : `Contas de Email${domain ? ` @${domain}` : ''}`}
+            </h2>
+            {!loading && !error && emails.length > 0 && (
+              <span className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full"
+                style={{ background: '#F1F5F9', color: '#64748B' }}>
+                {filteredEmails.length !== emails.length
+                  ? `${filteredEmails.length} de ${emails.length}`
+                  : `${emails.length} conta${emails.length !== 1 ? 's' : ''}`}
+              </span>
+            )}
           </div>
-          <h2 className="font-bold text-sm" style={{ color: '#0B0B0D' }}>
-            {loading ? 'Carregando…' : `Contas de Email${domain ? ` @${domain}` : ''}`}
-          </h2>
-          {!loading && !error && (
-            <span className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full"
-              style={{ background: '#F1F5F9', color: '#64748B' }}>
-              {emails.length} conta{emails.length !== 1 ? 's' : ''}
-            </span>
+          {!loading && !error && emails.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {/* Search */}
+              <div className="flex items-center gap-2 flex-1 min-w-[180px] border rounded-xl px-3 py-2"
+                style={{ borderColor: '#E5E7EB', background: '#F9FAFB' }}>
+                <Search size={13} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Pesquisar email…"
+                  className="flex-1 text-xs outline-none bg-transparent"
+                  style={{ color: '#374151' }}
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} aria-label="Limpar pesquisa">
+                    <X size={12} style={{ color: '#94A3B8' }} />
+                  </button>
+                )}
+              </div>
+              {/* Status filter */}
+              <div className="relative">
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'suspended')}
+                  className="appearance-none text-xs font-semibold border rounded-xl px-3 py-2 pr-7 outline-none cursor-pointer"
+                  style={{ borderColor: '#E5E7EB', background: '#F9FAFB', color: '#374151' }}
+                >
+                  <option value="all">Todos</option>
+                  <option value="active">Ativos</option>
+                  <option value="suspended">Suspensos</option>
+                </select>
+                <Filter size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#94A3B8' }} />
+              </div>
+              {/* Sort */}
+              <button
+                onClick={() => toggleSort('email')}
+                className="flex items-center gap-1.5 text-xs font-semibold border rounded-xl px-3 py-2 transition-colors"
+                style={{
+                  borderColor: sortBy === 'email' ? '#2563EB' : '#E5E7EB',
+                  background: sortBy === 'email' ? 'rgba(59,130,246,0.06)' : '#F9FAFB',
+                  color: sortBy === 'email' ? '#2563EB' : '#374151',
+                }}
+              >
+                A–Z {sortBy === 'email' && (sortDir === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
+              </button>
+              <button
+                onClick={() => toggleSort('usage')}
+                className="flex items-center gap-1.5 text-xs font-semibold border rounded-xl px-3 py-2 transition-colors"
+                style={{
+                  borderColor: sortBy === 'usage' ? '#2563EB' : '#E5E7EB',
+                  background: sortBy === 'usage' ? 'rgba(59,130,246,0.06)' : '#F9FAFB',
+                  color: sortBy === 'usage' ? '#2563EB' : '#374151',
+                }}
+              >
+                <HardDrive size={11} /> Uso {sortBy === 'usage' && (sortDir === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
+              </button>
+            </div>
           )}
         </div>
 
@@ -428,11 +520,21 @@ export default function EmailManager() {
           </div>
         ) : emails.length > 0 ? (
           <div>
-            {emails.map((em, i) => {
-              const pct      = usagePct(em.diskused, em.diskquota)
-              const barColor = usageColor(pct)
+            {filteredEmails.length === 0 ? (
+              <div className="py-12 text-center">
+                <Search size={24} className="mx-auto mb-3" style={{ color: '#CBD5E1' }} />
+                <p className="text-sm font-semibold" style={{ color: '#64748B' }}>Nenhum resultado encontrado</p>
+                <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>Tente outro termo ou remova os filtros</p>
+                <button onClick={() => { setSearch(''); setStatusFilter('all') }}
+                  className="mt-3 text-xs font-bold px-3 py-1.5 rounded-lg"
+                  style={{ background: '#F1F5F9', color: '#374151' }}>
+                  Limpar filtros
+                </button>
+              </div>
+            ) : filteredEmails.map((em, i) => {
               const isActive = em.suspended_login !== 1
               const wmLoading = webmailLoading[em.email] ?? false
+              const isCopied = copied === em.email
 
               return (
                 <motion.div
@@ -441,7 +543,7 @@ export default function EmailManager() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.04, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                   className="px-6 py-4 flex items-start gap-4 group transition-colors duration-200"
-                  style={{ borderBottom: i < emails.length - 1 ? '1px solid #F8FAFC' : 'none' }}
+                  style={{ borderBottom: i < filteredEmails.length - 1 ? '1px solid #F8FAFC' : 'none' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FAFAFA' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 >
@@ -451,7 +553,18 @@ export default function EmailManager() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm truncate" style={{ color: '#0B0B0D' }}>{em.email}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-sm truncate" style={{ color: '#0B0B0D' }}>{em.email}</span>
+                      <button
+                        onClick={() => copyEmail(em.email)}
+                        title="Copiar email"
+                        aria-label={`Copiar ${em.email}`}
+                        className="shrink-0 w-5 h-5 rounded flex items-center justify-center transition-all hover:opacity-70 active:scale-90"
+                        style={{ color: isCopied ? '#059669' : '#CBD5E1' }}
+                      >
+                        {isCopied ? <CheckCircle2 size={13} /> : <Copy size={12} />}
+                      </button>
+                    </div>
                     <div className="mt-2 flex items-center gap-2">
                       <StorageBar used={em.diskused} total={em.diskquota} delay={i * 0.04} />
                       <span className="text-xs shrink-0 font-medium flex items-center gap-1" style={{ color: '#94A3B8' }}>
