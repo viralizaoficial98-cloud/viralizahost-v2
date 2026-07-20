@@ -399,6 +399,7 @@ export default function ClientsManager() {
   const [toast, setToast]       = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [modal, setModal]       = useState<{ type: string; client: Client } | null>(null)
   const [busy, setBusy]         = useState<string | null>(null)
+  const [pendingWhm, setPendingWhm] = useState(0)
 
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg }); setTimeout(() => setToast(null), 5000)
@@ -420,7 +421,13 @@ export default function ClientsManager() {
     } finally { setLoading(false) }
   }, [page, q, filter])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    fetch('/api/admin/whm/accounts?linked=pending&limit=1', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => setPendingWhm(d.total ?? 0))
+      .catch(() => {})
+  }, [load])
 
   const handleSearch = (v: string) => { setQ(v); setPage(1); setTimeout(() => load(1, v, filter), 300) }
   const handleFilter = (f: string) => { setFilter(f); setPage(1); load(1, q, f) }
@@ -508,6 +515,28 @@ export default function ClientsManager() {
           <StatCard label="Sem hospedagem"  value={stats.no_association}  color="#D9A300" bg="rgba(245,183,0,0.06)"  border="rgba(245,183,0,0.15)"  Icon={AlertTriangle} />
           <StatCard label="Pagt. pendente"  value={stats.pending_payment} color="#EA580C" bg="rgba(234,88,12,0.06)"  border="rgba(234,88,12,0.15)"  Icon={Clock} />
           <StatCard label="Tickets abertos" value={stats.open_tickets}    color="#7C3AED" bg="rgba(139,92,246,0.06)" border="rgba(139,92,246,0.15)" Icon={ShieldCheck} />
+        </div>
+      )}
+
+      {/* Pending WHM accounts banner */}
+      {pendingWhm > 0 && (
+        <div className="flex items-start gap-3 rounded-2xl px-5 py-4"
+          style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.30)' }}>
+          <AlertTriangle size={17} style={{ color: '#D9A300', flexShrink: 0, marginTop: 1 }} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold" style={{ color: '#92720A' }}>
+              {pendingWhm} conta{pendingWhm > 1 ? 's' : ''} WHM aguarda{pendingWhm === 1 ? '' : 'm'} associação manual
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: '#B45309' }}>
+              Estas contas foram importadas do WHM mas não têm e-mail válido e não aparecem na lista de clientes.
+              Aceda a Servidores → Contas WHM para as associar a um cliente.
+            </p>
+          </div>
+          <a href="/admin/servers/whm-accounts?linked=pending"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0"
+            style={{ background: 'rgba(245,158,11,0.15)', color: '#92720A', border: '1px solid rgba(245,158,11,0.30)' }}>
+            <ExternalLink size={12} /> Ver pendentes
+          </a>
         </div>
       )}
 
