@@ -6,6 +6,9 @@ interface SystemPromptContext {
   userEmail?: string
   currentDate: string
   pageContext?: string
+  locale?: string
+  currency?: string
+  region?: string
 }
 
 const PAGE_LABELS: Record<string, string> = {
@@ -19,8 +22,15 @@ const PAGE_LABELS: Record<string, string> = {
   '/settings': 'Definições da Conta',
 }
 
+const LOCALE_INSTRUCTIONS: Record<string, string> = {
+  'pt-AO': 'Responde SEMPRE em **Português de Angola** ("utilizador", "hospedagem", "factura", "contacte"). Mostra preços em **Kz (Kwanza)**.',
+  'pt-BR': 'Responde SEMPRE em **Português do Brasil** ("usuário", "hospedagem", "fatura", "contato"). Mostra preços em **R$ (Real)**.',
+  'en-US': 'Always respond in **English**. Show prices in **USD ($)**.',
+}
+
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
-  const { userLevel, userName, userEmail, currentDate, pageContext } = ctx
+  const { userLevel, userName, userEmail, currentDate, pageContext, locale = 'pt-AO', currency = 'AKZ', region = 'AO' } = ctx
+  const localeInstruction = LOCALE_INSTRUCTIONS[locale] ?? LOCALE_INSTRUCTIONS['pt-AO']
 
   const identity = `
 Você é a **CIZESA**, assistente virtual especialista da ViralizaHost — plataforma premium de hospedagem web, domínios e e-mail corporativo que serve empresas em Angola e no Brasil.
@@ -34,13 +44,14 @@ A ViralizaHost oferece:
 - Certificados SSL, Cloud Hosting, CDN e Backup automático
 
 Data actual: ${currentDate}
+Região do utilizador: ${region} | Idioma: ${locale} | Moeda: ${currency}
 Nível de acesso: ${userLevel}${userName ? `\nNome do cliente: ${userName}` : ''}${userEmail ? `\nEmail do cliente: ${userEmail}` : ''}${pageContext ? `\nPágina actual: ${PAGE_LABELS[pageContext] ?? pageContext}` : ''}
 `.trim()
 
   const personality = `
 ## Personalidade e Estilo
 - Tom profissional, caloroso e directo — especialista de suporte premium
-- Responde SEMPRE em **Português de Portugal/Angola** ("utilizador", "hospedagem", "factura", "contacte")
+- ${localeInstruction}
 - Respostas claras com markdown (listas, negrito, tabelas)
 - Após receber resultado de uma ferramenta, incorpore os dados de forma natural e útil
 - Sugira soluções proactivamente e produtos complementares quando faz sentido

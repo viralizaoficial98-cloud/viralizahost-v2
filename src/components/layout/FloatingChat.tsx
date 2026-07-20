@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { X, Send, Loader2, RefreshCw, Minimize2, CheckCircle2, AlertTriangle, Download, FileText, ExternalLink } from 'lucide-react'
 import { AvatarIA } from './AvatarIA'
+import { useLocale } from '@/hooks/useLocale'
 
 interface Message {
   id: string
@@ -180,9 +181,11 @@ function InvoiceCardBlock({ card }: { card: InvoiceCard }) {
 }
 
 export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
+  const { t, locale, currency, region } = useLocale()
   const [open, setOpen] = useState(false)
   const [badge, setBadge] = useState(true)
-  const [messages, setMessages] = useState<Message[]>([WELCOME])
+  const welcomeMsg: Message = { id: 'welcome', role: 'assistant', content: t('agent.greeting') }
+  const [messages, setMessages] = useState<Message[]>([welcomeMsg])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -224,7 +227,7 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
       const res = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: historyForApi, conversationId, pageContext }),
+        body: JSON.stringify({ messages: historyForApi, conversationId, pageContext, locale, currency, region }),
         signal: abortRef.current.signal,
       })
 
@@ -423,7 +426,7 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
                     sendMessage(input)
                   }
                 }}
-                placeholder="Escreva a sua mensagem..."
+                placeholder={t('agent.placeholder')}
                 disabled={isLoading}
                 maxLength={2000}
                 className="flex-1 text-[13px] px-3.5 py-2.5 rounded-xl border border-[#E0E0E0] outline-none focus:border-[#F5B700] focus:ring-2 focus:ring-[#F5B700]/10 transition-all text-[#0A0A0A] placeholder:text-[#BBB] disabled:opacity-60 bg-[#FAFAFA]"
@@ -441,7 +444,7 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
               </button>
             </div>
             <p className="text-center text-[10px] text-gray-300 mt-1.5">
-              ViralizaHost IA · Respostas podem conter erros
+              {t('agent.poweredBy')} · {t('agent.disclaimer')}
             </p>
           </div>
         </div>

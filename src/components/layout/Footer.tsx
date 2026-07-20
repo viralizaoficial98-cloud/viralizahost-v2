@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { Logo } from '@/components/shared/Logo'
+import { useLocale } from '@/hooks/useLocale'
 import {
   Mail, Phone, MapPin, MessageCircle, Globe2, Play, Briefcase, Users,
   Server, Cpu, Globe, Bot, BookOpen, Headphones, Building2,
@@ -287,6 +288,7 @@ function TransferBadge() {
 }
 
 export function Footer() {
+  const { t } = useLocale()
   return (
     <footer className="bg-[#F5F5F5] border-t border-[#E8E8E8]">
       {/* Top yellow accent */}
@@ -298,7 +300,9 @@ export function Footer() {
           <div className="lg:w-72 shrink-0 space-y-5">
             <Logo variant="dark" size="sm" />
             <p className="text-[#555] text-sm leading-relaxed">
-              Hospedagem web premium com LiteSpeed, NVMe SSD e suporte 24/7. Servindo Angola, Brasil e o mundo.
+              {t('home.heroSubtitle') !== 'home.heroSubtitle'
+                ? t('home.heroSubtitle')
+                : 'Premium web hosting with LiteSpeed, NVMe SSD and 24/7 support.'}
             </p>
             <div className="space-y-2 text-sm">
               {[
@@ -372,7 +376,7 @@ export function Footer() {
         <div className="mb-8 pb-8 border-b border-[#E0E0E0]">
           <div className="flex items-center justify-center gap-2 mb-4">
             <ArrowRightLeft size={13} className="text-[#F5B700]" />
-            <p className="text-xs text-[#999] font-semibold uppercase tracking-wider">Métodos de Pagamento Aceites</p>
+            <p className="text-xs text-[#999] font-semibold uppercase tracking-wider">{t('footer.paymentMethods')}</p>
           </div>
           <div className="flex flex-wrap justify-center gap-4">
             <VisaBadge />
@@ -386,7 +390,7 @@ export function Footer() {
 
         {/* Bottom bar */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#999]">
-          <p>© {new Date().getFullYear()} ViralizaHost. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} ViralizaHost. {t('footer.rights')}</p>
           <div className="flex flex-wrap justify-center gap-4">
             {['Termos de Serviço', 'Política de Privacidade', 'Política de Cookies', 'LGPD'].map(l => (
               <Link key={l} href="#" className="hover:text-[#0A0A0A] transition-colors">{l}</Link>
@@ -397,7 +401,7 @@ export function Footer() {
             <span>🇧🇷 Brasil</span>
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse" />
-              <span className="text-green-600">Sistemas operacionais</span>
+              <span className="text-green-600">{t('status.success') !== 'status.success' ? 'Online' : 'Online'}</span>
             </span>
           </div>
         </div>

@@ -1,7 +1,6 @@
 'use client'
-import { useCurrency } from '@/hooks/useCurrency'
+import { useLocaleStore, Region } from '@/store/localeStore'
 import { CURRENCIES } from '@/lib/constants'
-import { Currency } from '@/types'
 
 /* Inline SVG flags — no external dependency, renders on all OS including Windows */
 function FlagIcon({ code }: { code: string }) {
@@ -46,14 +45,16 @@ const ARIA_LABELS: Record<string, string> = {
   USD: 'Selecionar moeda Dólar americano',
 }
 
+const CODE_TO_REGION: Record<string, Region> = { AKZ: 'AO', BRL: 'BR', USD: 'US' }
+
 export function CurrencySelector() {
-  const { currency, setCurrency } = useCurrency()
+  const { currency, changeRegion } = useLocaleStore()
   return (
     <div className="flex items-center gap-1 bg-[#1A1A1A] border border-[#333] rounded-xl p-1">
       {CURRENCIES.map((c) => (
         <button
           key={c.code}
-          onClick={() => setCurrency(c.code as Currency)}
+          onClick={() => changeRegion(CODE_TO_REGION[c.code] ?? 'AO')}
           aria-label={ARIA_LABELS[c.code] ?? c.label}
           aria-pressed={currency === c.code}
           title={c.label}

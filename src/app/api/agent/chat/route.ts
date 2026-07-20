@@ -11,10 +11,13 @@ export const maxDuration = 60
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { messages, conversationId, pageContext } = body as {
+    const { messages, conversationId, pageContext, locale, currency, region } = body as {
       messages: Array<{ role: 'user' | 'assistant'; content: string }>
       conversationId?: string
       pageContext?: string
+      locale?: string
+      currency?: string
+      region?: string
     }
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -97,12 +100,16 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Build system prompt and tools ─────────────────────────────
+    const agentLocale = locale ?? 'pt-AO'
     const systemPrompt = buildSystemPrompt({
       userLevel,
       userName,
       userEmail,
       pageContext,
-      currentDate: new Date().toLocaleDateString('pt-PT', {
+      locale: agentLocale,
+      currency: currency ?? 'AKZ',
+      region: region ?? 'AO',
+      currentDate: new Date().toLocaleDateString(agentLocale, {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       }),
     })
