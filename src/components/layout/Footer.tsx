@@ -307,7 +307,7 @@ export function Footer() {
             <div className="space-y-2 text-sm">
               {[
                 { Icon: Mail,    text: 'suporte@viralizahost.com' },
-                { Icon: Phone,   text: '+244 923 000 000' },
+                { Icon: Phone,   text: '+244 951 008 653' },
                 { Icon: MapPin,  text: 'Luanda, Angola · São Paulo, Brasil' },
               ].map(({ Icon, text }) => (
                 <div key={text} className="flex items-center gap-2.5 text-[#555] hover:text-[#0A0A0A] transition-colors">
