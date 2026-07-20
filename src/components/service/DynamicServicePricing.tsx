@@ -2,7 +2,9 @@
 import { useEffect, useState } from 'react'
 import { Check, X, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import { getPriceForCycle, formatKz, type BillingCycle, type Product } from '@/lib/products'
+import { getPriceForCycle, type BillingCycle, type Product } from '@/lib/products'
+import { useLocale } from '@/hooks/useLocale'
+import { convertFromAOA } from '@/lib/currency'
 
 const BADGE_COLORS: Record<string, string> = {
   'MAIS POPULAR': 'bg-[#F5B700] text-black',
@@ -16,6 +18,22 @@ type ProductWithFeatures = Product & {
   product_features: { feature: string; included: boolean; position: number }[]
 }
 
+/** Numeric AOA price supported alongside legacy string price */
+export interface FallbackPlan {
+  id: string
+  name: string
+  price: string
+  priceAOA?: number
+  period?: string
+  description?: string
+  popular?: boolean
+  badge?: string
+  features: string[]
+  notIncluded?: string[]
+  cta?: string
+  href?: string
+}
+
 interface Props {
   category: string
   subcategory?: string
@@ -23,33 +41,41 @@ interface Props {
   subtitle?: string
   cols?: 2 | 3 | 4
   showBillingToggle?: boolean
-  fallbackPlans?: { id: string; name: string; price: string; period?: string; description?: string; popular?: boolean; badge?: string; features: string[]; notIncluded?: string[]; cta?: string; href?: string }[]
+  fallbackPlans?: FallbackPlan[]
 }
 
-const CYCLE_LABELS: Record<BillingCycle, string> = {
-  monthly: 'Mensal', '6months': '6 Meses', '1year': 'Anual', '2years': '2 Anos', '3years': '3 Anos',
-}
+const CYCLE_KEYS: BillingCycle[] = ['monthly', '6months', '1year', '2years', '3years']
 const CYCLE_DISCOUNTS: Record<BillingCycle, number> = {
   monthly: 0, '6months': 15, '1year': 30, '2years': 45, '3years': 55,
 }
 
-export function DynamicServicePricing({ category, subcategory, title = 'Escolha o plano ideal', subtitle = 'Todos os planos incluem suporte técnico especializado e garantia de 30 dias.', cols = 3, showBillingToggle = false, fallbackPlans }: Props) {
+export function DynamicServicePricing({ category, subcategory, title, subtitle, cols = 3, showBillingToggle = false, fallbackPlans }: Props) {
+  const { t, formatCurrency, currency } = useLocale()
   const [plans, setPlans] = useState<ProductWithFeatures[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [billing, setBilling] = useState<BillingCycle>('monthly')
+
+  const defaultTitle = t('plans.features') !== 'plans.features' ? t('cta.viewPlans') : 'Escolha o plano ideal'
+  const defaultSubtitle = t('plans.support247') !== 'plans.support247'
+    ? `${t('plans.ssl')} · ${t('plans.backup')} · ${t('plans.moneyBack')}`
+    : 'Todos os planos incluem suporte técnico especializado e garantia de 30 dias.'
+
+  const CYCLE_LABELS: Record<BillingCycle, string> = {
+    monthly:   t('billing.monthly'),
+    '6months': t('billing.6months'),
+    '1year':   t('billing.1year'),
+    '2years':  t('billing.2years'),
+    '3years':  t('billing.3years'),
+  }
 
   useEffect(() => {
     const params = new URLSearchParams({ category })
     if (subcategory) params.set('subcategory', subcategory)
-
     fetch(`/api/products?${params}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(json => {
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
           setPlans(json.data as ProductWithFeatures[])
-        } else if (!json.success) {
-          console.error('[DynamicServicePricing] API error:', json.message, json.details)
         }
       })
       .catch(err => console.error('[DynamicServicePricing] fetch error:', err))
@@ -62,15 +88,17 @@ export function DynamicServicePricing({ category, subcategory, title = 'Escolha 
     4: 'sm:grid-cols-2 xl:grid-cols-4',
   }
 
+  const fmtAOA = (aoa: number) => formatCurrency(convertFromAOA(aoa, currency))
+
   // Fallback to static plans if DB empty
   if (!loading && plans.length === 0 && fallbackPlans) {
     return (
       <section id="planos" className="bg-[#F8F8F8] py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <span className="section-tag">Planos e Preços</span>
-            <h2 className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3 mb-3">{title}</h2>
-            <p className="text-[#666] max-w-xl mx-auto text-sm md:text-base">{subtitle}</p>
+            <span className="section-tag">{t('billing.bestValue') !== 'billing.bestValue' ? t('billing.bestValue') : 'Planos e Preços'}</span>
+            <h2 className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3 mb-3">{title ?? defaultTitle}</h2>
+            <p className="text-[#666] max-w-xl mx-auto text-sm md:text-base">{subtitle ?? defaultSubtitle}</p>
           </div>
           <div className={`grid grid-cols-1 ${gridClass[cols]} gap-6 max-w-6xl mx-auto`}>
             {fallbackPlans.map(plan => (
@@ -84,8 +112,10 @@ export function DynamicServicePricing({ category, subcategory, title = 'Escolha 
                   <h3 className={`font-bold text-base mb-1 ${plan.popular ? 'text-white' : 'text-[#0A0A0A]'}`}>{plan.name}</h3>
                   {plan.description && <p className={`text-xs mb-4 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{plan.description}</p>}
                   <div className="mb-6">
-                    <span className={`text-3xl font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>{plan.price}</span>
-                    {plan.period && <span className={`text-sm ml-1 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{plan.period}</span>}
+                    <span className={`text-3xl font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>
+                      {plan.priceAOA != null ? fmtAOA(plan.priceAOA) : plan.price}
+                    </span>
+                    {plan.period && <span className={`text-sm ml-1 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{t('billing.perMonth')}</span>}
                   </div>
                   <ul className="space-y-2.5">
                     {plan.features.map(f => <li key={f} className="flex items-start gap-2.5 text-sm"><Check size={14} className={`mt-0.5 shrink-0 ${plan.popular ? 'text-[#F5B700]' : 'text-green-500'}`} /><span className={plan.popular ? 'text-gray-300' : 'text-[#444]'}>{f}</span></li>)}
@@ -93,7 +123,9 @@ export function DynamicServicePricing({ category, subcategory, title = 'Escolha 
                   </ul>
                 </div>
                 <div className="px-7 pb-7">
-                  <Link href={plan.href ?? `/checkout?plan=${plan.id}`} className={`block w-full text-center py-3 rounded-xl text-sm font-bold transition-all ${plan.popular ? 'btn-primary btn-shimmer' : 'bg-[#0A0A0A] text-white hover:bg-[#1A1A1A]'}`}>{plan.cta ?? 'Começar Agora'}</Link>
+                  <Link href={plan.href ?? `/checkout?plan=${plan.id}`} className={`block w-full text-center py-3 rounded-xl text-sm font-bold transition-all ${plan.popular ? 'btn-primary btn-shimmer' : 'bg-[#0A0A0A] text-white hover:bg-[#1A1A1A]'}`}>
+                    {plan.cta ?? t('cta.start')}
+                  </Link>
                 </div>
               </div>
             ))}
@@ -107,14 +139,14 @@ export function DynamicServicePricing({ category, subcategory, title = 'Escolha 
     <section id="planos" className="bg-[#F8F8F8] py-20">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <span className="section-tag">Planos e Preços</span>
-          <h2 className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3 mb-3">{title}</h2>
-          <p className="text-[#666] max-w-xl mx-auto text-sm md:text-base">{subtitle}</p>
+          <span className="section-tag">{t('billing.bestValue') !== 'billing.bestValue' ? t('billing.bestValue') : 'Planos e Preços'}</span>
+          <h2 className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3 mb-3">{title ?? defaultTitle}</h2>
+          <p className="text-[#666] max-w-xl mx-auto text-sm md:text-base">{subtitle ?? defaultSubtitle}</p>
 
           {showBillingToggle && (
             <div className="flex justify-center mt-6">
               <div className="flex items-center gap-1 bg-white border border-[#E8E8E8] rounded-2xl p-1.5 shadow-sm overflow-x-auto max-w-full" style={{ scrollbarWidth: 'none' }}>
-                {(Object.keys(CYCLE_LABELS) as BillingCycle[]).map(c => (
+                {CYCLE_KEYS.map(c => (
                   <button
                     key={c}
                     onClick={() => setBilling(c)}
@@ -166,17 +198,19 @@ export function DynamicServicePricing({ category, subcategory, title = 'Escolha 
                       {price != null ? (
                         <>
                           <span className={`text-3xl font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>
-                            {formatKz(price)}
+                            {fmtAOA(price)}
                           </span>
-                          <span className={`text-sm ml-1 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>/mês</span>
+                          <span className={`text-sm ml-1 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{t('billing.perMonth')}</span>
                           {showBillingToggle && billing !== 'monthly' && monthlyPrice && price < monthlyPrice && (
                             <div className="text-xs text-green-500 font-semibold mt-1">
-                              ✓ Poupa {formatKz(monthlyPrice - price)}/mês
+                              ✓ {t('billing.save')} {fmtAOA(monthlyPrice - price)}{t('billing.perMonth')}
                             </div>
                           )}
                         </>
                       ) : (
-                        <span className={`text-2xl font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>Sob consulta</span>
+                        <span className={`text-2xl font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>
+                          {t('cta.talkSales')}
+                        </span>
                       )}
                     </div>
 
@@ -205,7 +239,7 @@ export function DynamicServicePricing({ category, subcategory, title = 'Escolha 
                           : 'bg-[#0A0A0A] text-white hover:bg-[#1A1A1A]'
                       }`}
                     >
-                      {(plan as any).cta_label ?? 'Começar Agora'}
+                      {(plan as any).cta_label ?? t('cta.start')}
                     </Link>
                   </div>
                 </div>

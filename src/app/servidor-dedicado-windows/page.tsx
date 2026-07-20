@@ -18,7 +18,7 @@ const plans: PricingPlan[] = [
   {
     id: 'win-black',
     name: 'Black',
-    price: 'Kz 299.000',
+    price: 'Kz 299.000', priceAOA: 299000,
     period: '/mês',
     description: 'Para projectos iniciais Windows',
     features: ['16 vCPU dedicadas', '32 GB RAM DDR5', '480 GB NVMe SSD', 'Windows Server 2022', 'Plesk incluído', 'ASP.NET', 'MS SQL Express', 'Remote Desktop (RDP)', 'SSL grátis', 'Suporte 24/7'],
@@ -28,7 +28,7 @@ const plans: PricingPlan[] = [
   {
     id: 'win-sapphire',
     name: 'Sapphire',
-    price: 'Kz 549.000',
+    price: 'Kz 549.000', priceAOA: 549000,
     period: '/mês',
     description: 'Para sistemas empresariais',
     popular: true,
@@ -39,7 +39,7 @@ const plans: PricingPlan[] = [
   {
     id: 'win-diamond',
     name: 'Diamond',
-    price: 'Kz 999.000',
+    price: 'Kz 999.000', priceAOA: 999000,
     period: '/mês',
     description: 'Máxima performance para MS SQL',
     badge: 'MELHOR VALOR',

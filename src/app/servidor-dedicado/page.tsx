@@ -18,7 +18,7 @@ const plans: PricingPlan[] = [
   {
     id: 'ded-16',
     name: 'Dedicado NVMe 16',
-    price: 'Kz 249.000',
+    price: 'Kz 249.000', priceAOA: 249000,
     period: '/mês',
     description: 'Para sistemas e aplicações de médio porte',
     features: ['16 vCPU dedicadas', '32 GB RAM DDR5', '480 GB NVMe SSD', '2 IPs dedicados', 'cPanel/WHM opcional', 'SSL grátis', 'Migração gratuita', 'Suporte técnico 24/7'],
@@ -28,7 +28,7 @@ const plans: PricingPlan[] = [
   {
     id: 'ded-32',
     name: 'Dedicado NVMe 32',
-    price: 'Kz 449.000',
+    price: 'Kz 449.000', priceAOA: 449000,
     period: '/mês',
     description: 'Para projectos de alta demanda',
     popular: true,
@@ -39,7 +39,7 @@ const plans: PricingPlan[] = [
   {
     id: 'ded-64',
     name: 'Dedicado NVMe 64',
-    price: 'Kz 799.000',
+    price: 'Kz 799.000', priceAOA: 799000,
     period: '/mês',
     description: 'Para infra-estruturas empresariais',
     badge: 'MELHOR VALOR',

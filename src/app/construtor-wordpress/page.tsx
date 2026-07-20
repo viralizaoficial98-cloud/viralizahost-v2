@@ -17,7 +17,7 @@ const plans: PricingPlan[] = [
   {
     id: 'wp-builder-start',
     name: 'Builder Start',
-    price: 'Kz 29.900',
+    price: 'Kz 29.900', priceAOA: 29900,
     period: '/mês',
     description: 'Para começar com WordPress',
     features: ['1 site WordPress', 'Builder visual incluído', '20 GB NVMe SSD', 'SSL grátis', 'Plugins premium básicos', 'Backup semanal', 'Suporte 24/7'],
@@ -27,7 +27,7 @@ const plans: PricingPlan[] = [
   {
     id: 'wp-builder-pro',
     name: 'Builder Pro',
-    price: 'Kz 59.900',
+    price: 'Kz 59.900', priceAOA: 59900,
     period: '/mês',
     description: 'Para lojas e empresas',
     popular: true,
@@ -38,7 +38,7 @@ const plans: PricingPlan[] = [
   {
     id: 'wp-builder-turbo',
     name: 'Builder Turbo',
-    price: 'Kz 119.900',
+    price: 'Kz 119.900', priceAOA: 119900,
     period: '/mês',
     description: 'Máxima performance e flexibilidade',
     badge: 'MELHOR VALOR',

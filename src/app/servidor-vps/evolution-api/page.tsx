@@ -18,7 +18,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-evolution-start',
     name: 'Evolution Start',
-    price: 'Kz 69.000',
+    price: 'Kz 69.000', priceAOA: 69000,
     period: '/mês',
     description: 'Para começar com WhatsApp API',
     features: ['Evolution API pré-instalada', '2 vCPU', '4 GB RAM', '60 GB NVMe SSD', 'Até 5 números WhatsApp', 'Webhooks incluídos', 'SSL grátis', 'Backup semanal', 'Suporte 24/7'],
@@ -28,7 +28,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-evolution-pro',
     name: 'Evolution Pro',
-    price: 'Kz 129.000',
+    price: 'Kz 129.000', priceAOA: 129000,
     period: '/mês',
     description: 'Para empresas e agências',
     popular: true,
@@ -39,7 +39,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-evolution-scale',
     name: 'Evolution Scale',
-    price: 'Kz 249.000',
+    price: 'Kz 249.000', priceAOA: 249000,
     period: '/mês',
     description: 'Para alto volume e múltiplas empresas',
     badge: 'MELHOR VALOR',

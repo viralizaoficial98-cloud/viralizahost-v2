@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Shield, Zap, Headphones, Lock, Globe, RefreshCw, Check, X, Loader2, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useLocale } from '@/hooks/useLocale'
+import { convertFromAOA } from '@/lib/currency'
 
 type ExtItem = { tld: string; label: string; price: string; priceNum: number; currency: string; popular: boolean }
 
@@ -37,6 +39,8 @@ const trustItems = [
 ]
 
 export function DomainSearchBar() {
+  const { formatCurrency, currency } = useLocale()
+  const fmtAOA = (n: number) => formatCurrency(convertFromAOA(n, currency))
   const [query, setQuery] = useState('')
   const [extensions, setExtensions] = useState<ExtItem[]>(defaultExtensions)
   const [results, setResults] = useState<CheckResult[]>([])
@@ -56,7 +60,7 @@ export function DomainSearchBar() {
             return {
               tld: d.extension,
               label: d.label || d.extension,
-              price: `${sym} ${priceNum.toLocaleString('pt-AO')}/ano`,
+              price: `${fmtAOA(priceNum)}/ano`,
               priceNum,
               currency: d.currency,
               popular: d.popular ?? false,
@@ -286,7 +290,7 @@ export function DomainSearchBar() {
                         <span className="font-black text-[#0A0A0A] text-sm md:text-base truncate">{r.domain}</span>
                         {isLoading
                           ? <span className="skeleton-bar h-4 w-20 inline-block" />
-                          : <span className="text-[#AAA] text-xs font-medium hidden sm:inline">{ext.price}</span>
+                          : <span className="text-[#AAA] text-xs font-medium hidden sm:inline">{fmtAOA(ext.priceNum)}/ano</span>
                         }
                       </div>
 

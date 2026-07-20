@@ -18,7 +18,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-openclaw-start',
     name: 'OpenClaw Start',
-    price: 'Kz 65.000',
+    price: 'Kz 65.000', priceAOA: 65000,
     period: '/mês',
     description: 'Para experimentar agentes de IA',
     features: ['OpenClaw pré-instalado', '2 vCPU', '4 GB RAM', '60 GB NVMe SSD', '3 agentes de IA simultâneos', 'SSL grátis', 'Backup semanal', 'Suporte 24/7'],
@@ -28,7 +28,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-openclaw-pro',
     name: 'OpenClaw Pro',
-    price: 'Kz 119.000',
+    price: 'Kz 119.000', priceAOA: 119000,
     period: '/mês',
     description: 'Para equipas e empresas',
     popular: true,
@@ -39,7 +39,7 @@ const fallbackPlans: PricingPlan[] = [
   {
     id: 'vps-openclaw-scale',
     name: 'OpenClaw Scale',
-    price: 'Kz 219.000',
+    price: 'Kz 219.000', priceAOA: 219000,
     period: '/mês',
     description: 'Para operações de larga escala',
     badge: 'MELHOR VALOR',

@@ -18,7 +18,7 @@ const plans: PricingPlan[] = [
   {
     id: 'revenda-start',
     name: 'Revenda Start',
-    price: 'Kz 59.900',
+    price: 'Kz 59.900', priceAOA: 59900,
     period: '/mês',
     description: 'Para começar no mercado de revenda',
     features: ['20 contas cPanel', '50 GB NVMe SSD', 'WHM incluído', 'DNS privado', 'SSL grátis por conta', 'Migração gratuita', 'Suporte ao revendedor 24/7'],
@@ -28,7 +28,7 @@ const plans: PricingPlan[] = [
   {
     id: 'revenda-growth',
     name: 'Revenda Growth',
-    price: 'Kz 99.900',
+    price: 'Kz 99.900', priceAOA: 99900,
     period: '/mês',
     description: 'Para agências em crescimento',
     popular: true,
@@ -39,7 +39,7 @@ const plans: PricingPlan[] = [
   {
     id: 'revenda-business',
     name: 'Revenda Business',
-    price: 'Kz 179.900',
+    price: 'Kz 179.900', priceAOA: 179900,
     period: '/mês',
     description: 'Para empresas estabelecidas',
     features: ['100 contas cPanel', '300 GB NVMe SSD', 'WHM incluído', 'DNS privado Whitelabel', 'SSL grátis por conta', 'E-mail corporativo ilimitado', 'IP dedicado', 'Migração gratuita', 'Suporte premium 24/7'],
@@ -48,7 +48,7 @@ const plans: PricingPlan[] = [
   {
     id: 'revenda-enterprise',
     name: 'Revenda Enterprise',
-    price: 'Kz 349.900',
+    price: 'Kz 349.900', priceAOA: 349900,
     period: '/mês',
     description: 'Infraestrutura sem limites',
     features: ['Contas cPanel ilimitadas', '600 GB NVMe SSD', 'WHM incluído', 'DNS privado Whitelabel', 'SSL grátis por conta', 'E-mail corporativo ilimitado', 'IPs dedicados', 'Migração gratuita', 'Gerente de conta dedicado', 'SLA premium'],
