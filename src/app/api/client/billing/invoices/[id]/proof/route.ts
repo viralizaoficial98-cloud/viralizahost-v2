@@ -11,8 +11,10 @@ function storageAdmin() {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params
+
   const auth = await createAuthClient()
   const { data: { user } } = await auth.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -21,7 +23,7 @@ export async function GET(
   const { data: inv, error } = await db
     .from('invoices')
     .select('id, profile_id, proof_file')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('profile_id', user.id)
     .maybeSingle()
 
