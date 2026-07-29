@@ -57,6 +57,13 @@ interface CheckoutState {
   domainAction: 'register' | 'existing' | null
   domainName: string
 
+  // Nameservers
+  useDefaultNs: boolean
+  ns1: string
+  ns2: string
+  ns3: string
+  ns4: string
+
   // Identification
   userData: UserData
 
@@ -74,6 +81,8 @@ interface CheckoutState {
   setBillingCycle: (cycle: BillingCycle) => void
   setDomainAction: (action: 'register' | 'existing' | null) => void
   setDomainName: (name: string) => void
+  setUseDefaultNs: (v: boolean) => void
+  setNs: (field: 'ns1' | 'ns2' | 'ns3' | 'ns4', value: string) => void
   setUserData: (data: Partial<UserData>) => void
   setPaymentMethod: (method: CheckoutState['paymentMethod']) => void
   setProofFileUrl: (url: string | null) => void
@@ -92,6 +101,11 @@ export const useCheckoutStore = create<CheckoutState>()(
       billingCycle: '1year',
       domainAction: null,
       domainName: '',
+      useDefaultNs: true,
+      ns1: 'ns1.viralizahost.com',
+      ns2: 'ns2.viralizahost.com',
+      ns3: '',
+      ns4: '',
       userData: defaultUserData,
       paymentMethod: null,
       proofFileUrl: null,
@@ -111,6 +125,8 @@ export const useCheckoutStore = create<CheckoutState>()(
       setBillingCycle: (billingCycle) => set({ billingCycle }),
       setDomainAction: (domainAction) => set({ domainAction }),
       setDomainName: (domainName) => set({ domainName }),
+      setUseDefaultNs: (useDefaultNs) => set({ useDefaultNs }),
+      setNs: (field, value) => set({ [field]: value }),
       setUserData: (data) => set((s) => ({ userData: { ...s.userData, ...data } })),
       setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
       setProofFileUrl: (proofFileUrl) => set({ proofFileUrl }),
@@ -118,6 +134,8 @@ export const useCheckoutStore = create<CheckoutState>()(
       clear: () => set({
         step: 1, items: [], billingCycle: '1year',
         domainAction: null, domainName: '',
+        useDefaultNs: true,
+        ns1: 'ns1.viralizahost.com', ns2: 'ns2.viralizahost.com', ns3: '', ns4: '',
         userData: defaultUserData, paymentMethod: null,
         proofFileUrl: null, transferRef: '',
       }),

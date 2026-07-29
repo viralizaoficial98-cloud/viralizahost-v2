@@ -18,7 +18,7 @@ import { convertFromAOA } from '@/lib/currency'
 
 // ─── constants ─────────────────────────────────────────────────────────────
 
-const STEPS = ['Ciclo', 'Carrinho', 'Domínio', 'Identificação', 'Pagamento']
+const STEPS = ['Ciclo', 'Carrinho', 'Domínio', 'Nameservers', 'Identificação', 'Pagamento']
 
 const SERVICE_ICONS: Record<ServiceType, React.ElementType> = {
   hosting: Server, email: Mail, domain: Globe,
@@ -497,7 +497,147 @@ function Step3Domain({ onNext, onBack }: { onNext: () => void; onBack: () => voi
   )
 }
 
-// ─── Step 4: Identification ─────────────────────────────────────────────────
+// ─── Step 4: Nameservers ────────────────────────────────────────────────────
+
+const NS_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
+
+function validateNs(value: string): boolean {
+  if (!value.trim()) return false
+  if (/https?:\/\//i.test(value)) return false
+  if (/\s/.test(value)) return false
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(value)) return false
+  return NS_REGEX.test(value.trim())
+}
+
+function Step4Nameservers({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+  const { useDefaultNs, ns1, ns2, ns3, ns4, setUseDefaultNs, setNs } = useCheckoutStore()
+
+  const ns1Valid = validateNs(ns1)
+  const ns2Valid = validateNs(ns2)
+  const ns3Valid = !ns3.trim() || validateNs(ns3)
+  const ns4Valid = !ns4.trim() || validateNs(ns4)
+  const canProceed = useDefaultNs || (ns1Valid && ns2Valid && ns3Valid && ns4Valid)
+
+  const inputCls = (valid: boolean, touched: boolean) =>
+    `w-full border rounded-xl px-4 py-3 text-sm outline-none transition-colors ${
+      touched && !valid ? 'border-red-400 focus:border-red-500' : 'border-[#E8E8E8] focus:border-[#F5B700]'
+    }`
+
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const touch = (f: string) => setTouched(t => ({ ...t, [f]: true }))
+
+  return (
+    <div>
+      <h2 className="text-2xl font-black text-[#0A0A0A] mb-1">Configuração dos Nameservers</h2>
+      <p className="text-[#888] text-sm mb-6">Escolha onde pretende apontar o seu domínio.</p>
+
+      {/* Option 1 — ViralizaHost */}
+      <button
+        onClick={() => setUseDefaultNs(true)}
+        className={`w-full p-5 rounded-2xl border-2 text-left transition-all mb-3 ${
+          useDefaultNs ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#E8E8E8] bg-white hover:border-[#F5B700]/40'
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+            useDefaultNs ? 'border-[#F5B700] bg-[#F5B700]' : 'border-[#CCC]'
+          }`}>
+            {useDefaultNs && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-black text-[#0A0A0A] text-sm mb-1 flex items-center gap-2">
+              Utilizar os servidores DNS da ViralizaHost
+              <span className="text-[10px] font-black px-2 py-0.5 bg-[#F5B700] text-[#0A0A0A] rounded-full">Recomendado</span>
+            </p>
+            <p className="text-xs text-[#888] mb-3">
+              O domínio será automaticamente configurado para utilizar os servidores da ViralizaHost.
+              Ideal para clientes que irão utilizar Hospedagem, E-mail Corporativo ou VPS da ViralizaHost.
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {['ns1.viralizahost.com', 'ns2.viralizahost.com'].map(ns => (
+                <div key={ns} className="flex items-center gap-2 px-3 py-2 bg-white border border-[#E8E8E8] rounded-xl">
+                  <Globe size={12} className="text-[#F5B700] flex-shrink-0" />
+                  <span className="text-xs font-mono font-bold text-[#0A0A0A]">{ns}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </button>
+
+      {/* Option 2 — Custom */}
+      <button
+        onClick={() => setUseDefaultNs(false)}
+        className={`w-full p-5 rounded-2xl border-2 text-left transition-all ${
+          !useDefaultNs ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#E8E8E8] bg-white hover:border-[#F5B700]/40'
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+            !useDefaultNs ? 'border-[#F5B700] bg-[#F5B700]' : 'border-[#CCC]'
+          }`}>
+            {!useDefaultNs && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-black text-[#0A0A0A] text-sm mb-1">Utilizar Nameservers personalizados</p>
+            <p className="text-xs text-[#888]">Indique os servidores DNS do seu fornecedor.</p>
+          </div>
+        </div>
+      </button>
+
+      {/* Custom NS fields */}
+      {!useDefaultNs && (
+        <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+          {([
+            { field: 'ns1', label: 'Nameserver 1', required: true, placeholder: 'ns1.meudns.com' },
+            { field: 'ns2', label: 'Nameserver 2', required: true, placeholder: 'ns2.meudns.com' },
+            { field: 'ns3', label: 'Nameserver 3', required: false, placeholder: 'ns3.meudns.com (Opcional)' },
+            { field: 'ns4', label: 'Nameserver 4', required: false, placeholder: 'ns4.meudns.com (Opcional)' },
+          ] as const).map(({ field, label, required, placeholder }) => {
+            const val = { ns1, ns2, ns3, ns4 }[field]
+            const valid = required ? validateNs(val) : (!val.trim() || validateNs(val))
+            const showErr = touched[field] && !valid
+            return (
+              <div key={field}>
+                <label className="block text-xs font-bold text-[#555] mb-1">
+                  {label} {required && <span className="text-red-500">*</span>}
+                </label>
+                <input
+                  type="text"
+                  value={val}
+                  placeholder={placeholder}
+                  onBlur={() => touch(field)}
+                  onChange={e => setNs(field, e.target.value)}
+                  className={inputCls(valid, !!touched[field])}
+                />
+                {showErr && (
+                  <p className="text-[11px] text-red-500 mt-1 flex items-center gap-1">
+                    <AlertCircle size={11} /> Formato inválido. Use ex: ns1.exemplo.com
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div className="flex gap-3 mt-6">
+        <button onClick={onBack} className="flex-1 py-4 border-2 border-[#E8E8E8] text-[#666] font-bold rounded-xl flex items-center justify-center gap-2 hover:border-[#CCC] transition-colors">
+          <ChevronLeft size={18} /> Voltar
+        </button>
+        <button
+          onClick={onNext}
+          disabled={!canProceed}
+          className="flex-[2] py-4 bg-[#F5B700] text-[#0A0A0A] font-black rounded-xl flex items-center justify-center gap-2 hover:bg-[#D9A300] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Continuar <ChevronRight size={18} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Step 5: Identification ─────────────────────────────────────────────────
 
 function Step4Ident({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   const { userData, setUserData } = useCheckoutStore()
@@ -1112,6 +1252,11 @@ function CheckoutContent() {
           billingCycle:  state.billingCycle,
           domainName:    state.domainName,
           domainAction:  state.domainAction,
+          useDefaultNs:  state.useDefaultNs,
+          ns1:           state.ns1,
+          ns2:           state.ns2,
+          ns3:           state.ns3 || null,
+          ns4:           state.ns4 || null,
           paymentMethod: state.paymentMethod,
           proofFileUrl:  state.proofFileUrl,
           transferRef:   state.transferRef,
@@ -1147,8 +1292,9 @@ function CheckoutContent() {
               {step === 1 && <Step1Cycle onNext={() => setStep(2)} />}
               {step === 2 && <Step2Cart onNext={() => setStep(isDomainCheckout ? 4 : 3)} onBack={() => setStep(1)} />}
               {step === 3 && <Step3Domain onNext={() => setStep(4)} onBack={() => setStep(2)} />}
-              {step === 4 && <Step4Ident onNext={() => setStep(5)} onBack={() => setStep(isDomainCheckout ? 2 : 3)} />}
-              {step === 5 && <Step5Payment onSubmit={handleSubmit} onBack={() => setStep(4)} submitting={submitting} error={submitError} />}
+              {step === 4 && <Step4Nameservers onNext={() => setStep(5)} onBack={() => setStep(isDomainCheckout ? 2 : 3)} />}
+              {step === 5 && <Step4Ident onNext={() => setStep(6)} onBack={() => setStep(4)} />}
+              {step === 6 && <Step5Payment onSubmit={handleSubmit} onBack={() => setStep(5)} submitting={submitting} error={submitError} />}
             </>
           )}
         </div>

@@ -6,6 +6,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const {
       items, billingCycle, domainName, domainAction,
+      useDefaultNs, ns1, ns2, ns3, ns4,
       paymentMethod, proofFileUrl, transferRef,
       userData, amount,
     } = body
@@ -141,6 +142,11 @@ export async function POST(req: NextRequest) {
       p_billing_cycle:  billingCycle  ?? 'monthly',
       p_domain_name:    domainName    ?? '',
       p_domain_action:  domainAction  ?? '',
+      p_use_default_ns: useDefaultNs  ?? true,
+      p_ns1:            ns1           ?? 'ns1.viralizahost.com',
+      p_ns2:            ns2           ?? 'ns2.viralizahost.com',
+      p_ns3:            ns3           ?? null,
+      p_ns4:            ns4           ?? null,
       p_payment_method: dbPayment,
       p_amount:         serverAmount,
       p_proof_file:     proofFileUrl  ?? '',
