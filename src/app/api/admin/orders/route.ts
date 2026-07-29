@@ -118,6 +118,8 @@ export async function POST(req: NextRequest) {
     }
     await db.from('services').update({ status: 'active', updated_at: new Date().toISOString() }).eq('order_id', orderId)
     await db.from('domains').update({ status: 'active', registered_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('order_id', orderId)
+    const { data: inv } = await db.from('invoices').select('total').eq('order_id', orderId).maybeSingle()
+    if (inv) await db.from('invoices').update({ status: 'paid', amount_paid: inv.total, paid_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('order_id', orderId)
     await ensureServicesExist(db, orderId)
     console.log('[admin/orders] APPROVED inline', orderId)
     return NextResponse.json({ ok: true, status: 'active' })
@@ -130,6 +132,7 @@ export async function POST(req: NextRequest) {
     // Inline fallback
     await db.from('orders').update({ status: 'rejected', notes: notes ?? null, updated_at: new Date().toISOString() }).eq('id', orderId)
     await db.from('services').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('order_id', orderId)
+    await db.from('invoices').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('order_id', orderId)
   }
   console.log('[admin/orders] REJECTED', orderId)
   return NextResponse.json(data ?? { ok: true })

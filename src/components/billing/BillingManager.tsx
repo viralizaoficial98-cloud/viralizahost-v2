@@ -25,6 +25,7 @@ interface Invoice {
   created_at: string
   notes: string | null
   items: any[]
+  proof_file?: string | null
   profiles?: { full_name: string; email: string }
 }
 
@@ -355,7 +356,7 @@ export default function BillingManager({
             <table className="w-full">
               <thead>
                 <tr style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
-                  {['Nº Fatura', 'Vencimento', 'Valor', 'Em aberto', 'Estado', 'Ações'].map(h => (
+                  {['Nº Fatura', 'Serviço', 'Domínio', 'Vencimento', 'Valor', 'Em aberto', 'Estado', 'Ações'].map(h => (
                     <th key={h} className="px-5 py-3 text-left text-xs font-semibold" style={{ color: '#94A3B8' }}>{h}</th>
                   ))}
                 </tr>
@@ -372,7 +373,18 @@ export default function BillingManager({
                         <div className="font-mono font-bold text-xs" style={{ color: '#D9A300' }}>
                           {inv.invoice_number}
                         </div>
-                        {inv.notes && <div className="text-xs mt-0.5 truncate max-w-[140px]" style={{ color: '#94A3B8' }}>{inv.notes}</div>}
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="text-xs font-semibold truncate max-w-[140px]" style={{ color: '#374151' }}>
+                          {Array.isArray(inv.items) && inv.items.length > 0
+                            ? inv.items.map((it: any) => it.name ?? it.description ?? 'Serviço').join(', ')
+                            : '—'}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="text-xs font-mono truncate max-w-[120px]" style={{ color: '#6B7280' }}>
+                          {inv.notes?.replace(/^Domínio:\s*/i, '') ?? '—'}
+                        </div>
                       </td>
                       <td className="px-5 py-4 text-xs" style={{ color: over ? '#DC2626' : '#94A3B8' }}>
                         {over && <AlertTriangle size={11} className="inline mr-1" style={{ verticalAlign: 'middle' }} />}
@@ -400,11 +412,22 @@ export default function BillingManager({
                               Pagar
                             </button>
                           )}
-                          <button title="Descarregar PDF"
-                            className="p-1.5 rounded-lg transition-colors hover:opacity-70"
-                            style={{ background: '#F3F4F6', border: '1px solid #E5E7EB' }}>
-                            <Download size={13} style={{ color: '#6B7280' }} />
-                          </button>
+                          {inv.proof_file && (
+                            <button
+                              title="Ver Comprovativo"
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(`/api/client/billing/invoices/${inv.id}/proof`, { credentials: 'include' })
+                                  const data = await res.json()
+                                  if (data.url) window.open(data.url, '_blank')
+                                  else showToast('error', data.error ?? 'Erro ao abrir comprovativo.')
+                                } catch { showToast('error', 'Erro ao abrir comprovativo.') }
+                              }}
+                              className="p-1.5 rounded-lg transition-colors hover:opacity-70"
+                              style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.20)' }}>
+                              <Eye size={13} style={{ color: '#2563EB' }} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -14,7 +14,7 @@ async function fetchBillingData(userId: string) {
 
   const [{ data: invoicesRaw }, { data: profile }] = await Promise.all([
     db.from('invoices')
-      .select('id, invoice_number, order_id, status, currency, subtotal, discount, tax, total, amount_paid, due_date, created_at, notes, items')
+      .select('id, invoice_number, order_id, status, currency, subtotal, discount, tax, total, amount_paid, due_date, created_at, notes, items, proof_file')
       .eq('profile_id', userId)
       .order('created_at', { ascending: false }),
     db.from('profiles').select('currency').eq('id', userId).single(),
