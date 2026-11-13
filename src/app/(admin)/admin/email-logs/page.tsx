@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-export const metadata: Metadata = { title: 'Logs de E-mail — Admin ViralizaHost' }
+export const metadata: Metadata = { title: 'Logs de E-mail — Admin' }
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string; icon: React.ReactNode }> = {
   sent:       { bg: '#ECFDF5', color: '#059669', label: 'Enviado',    icon: <CheckCircle2 size={12} /> },

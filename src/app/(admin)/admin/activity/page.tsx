@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 import { Activity, User, Globe, CreditCard, Server, Lock } from 'lucide-react'
 
-export const metadata: Metadata = { title: 'Atividade — Admin ViralizaHost' }
+export const metadata: Metadata = { title: 'Atividade — Admin' }
 
 const logs = [
   { icon: User,       color: '#D9A300', bg: 'rgba(245,183,0,0.10)',  border: 'rgba(245,183,0,0.20)',  event: 'Novo cliente registado',       detail: 'maria@email.com',              time: 'Há 5 min',  type: 'auth' },

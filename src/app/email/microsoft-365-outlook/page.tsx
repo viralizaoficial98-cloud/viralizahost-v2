@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Monitor, Users, Globe, HardDrive, Calendar, Smartphone, Shield, Lock, Zap } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Microsoft 365 Outlook — ViralizaHost',
+  title: 'Microsoft 365 Outlook',
   description: 'Outlook, Teams, OneDrive 1TB e todos os apps Microsoft para a sua empresa.',
 }
 

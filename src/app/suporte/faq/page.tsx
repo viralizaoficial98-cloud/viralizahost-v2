@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Search, BookOpen, Globe, Shield, Zap, RefreshCw, Lock, Activity, Headphones } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'FAQ — Perguntas Frequentes — ViralizaHost',
+  title: 'FAQ — Perguntas Frequentes',
   description: 'As respostas para as dúvidas mais comuns sobre os nossos serviços.',
 }
 

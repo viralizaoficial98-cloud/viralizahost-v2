@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Headphones, MessageCircle, BookOpen, Activity, Globe, Shield, Zap, RefreshCw, Users } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Central de Suporte — ViralizaHost',
+  title: 'Central de Suporte',
   description: 'Estamos disponíveis 24 horas por dia, 7 dias por semana para ajudar o seu negócio.',
 }
 

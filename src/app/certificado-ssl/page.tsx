@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Lock, Shield, Zap, Globe, Search, RefreshCw, Server, Gauge } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Certificado SSL Grátis — ViralizaHost',
+  title: 'Certificado SSL Grátis',
   description: 'Proteja o seu site com HTTPS e ganhe mais confiança dos seus visitantes.',
 }
 

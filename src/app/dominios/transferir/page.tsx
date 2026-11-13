@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { MoveRight, Shield, RefreshCw, Clock, Globe, Zap, Lock, Database, Headphones } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Transferir Domínio | ViralizaHost',
+  title: 'Transferir Domínio',
   description: 'Transfira o seu domínio para a ViralizaHost com segurança e sem perda de dados.',
 }
 

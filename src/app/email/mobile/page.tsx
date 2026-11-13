@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Smartphone, Mail, RefreshCw, Globe, Shield, Zap, Lock, Calendar, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'E-mail no Mobile — ViralizaHost',
+  title: 'E-mail no Mobile',
   description: 'Sincronize o seu e-mail em iOS e Android com IMAP e ActiveSync.',
 }
 

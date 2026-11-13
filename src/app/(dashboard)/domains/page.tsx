@@ -3,7 +3,7 @@ import { Globe, Plus, RefreshCw, Lock, Shield, Server } from 'lucide-react'
 import { createAuthClient, createAdminWriteClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
-export const metadata: Metadata = { title: 'Domínios — ViralizaHost' }
+export const metadata: Metadata = { title: 'Domínios' }
 
 const card = {
   background: '#FFFFFF',

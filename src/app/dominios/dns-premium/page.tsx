@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { Zap, Globe, Shield, Gauge, Database, RefreshCw, Layers, Lock, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'DNS Premium | ViralizaHost',
+  title: 'DNS Premium',
   description: 'Propagação ultrarrápida, fiável e segura para todos os seus domínios.',
 }
 

@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Shield, Lock, Globe, Zap, ShieldCheck, Activity, RefreshCw, Database, Server } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'SPF / DKIM / DMARC — ViralizaHost',
+  title: 'SPF / DKIM / DMARC',
   description: 'Autenticação profissional de e-mail para evitar phishing e melhorar entregabilidade.',
 }
 

@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { Globe, Shield, Lock, Zap, Database, Search, RefreshCw, Gauge, Layers } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Registar Domínio .com.br | ViralizaHost',
+  title: 'Registar Domínio .com.br',
   description: 'O domínio oficial do Brasil para empresas e profissionais brasileiros.',
 }
 

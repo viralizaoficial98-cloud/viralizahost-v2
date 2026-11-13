@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { BookOpen, Search, Globe, Shield, Zap, Server, Lock, RefreshCw, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Base de Conhecimento — ViralizaHost',
+  title: 'Base de Conhecimento',
   description: 'Tutoriais passo-a-passo, guias técnicos e FAQs organizados por categoria.',
 }
 

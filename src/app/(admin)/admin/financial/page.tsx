@@ -15,7 +15,7 @@ function storageAdmin() {
 
 export const dynamic   = 'force-dynamic'
 export const revalidate = 0
-export const metadata: Metadata = { title: 'Financeiro — Admin ViralizaHost' }
+export const metadata: Metadata = { title: 'Financeiro — Admin' }
 
 const thStyle = {
   padding: '12px 20px', textAlign: 'left' as const, fontSize: 11, fontWeight: 700,

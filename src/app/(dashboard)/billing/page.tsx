@@ -5,7 +5,7 @@ import BillingManager from '@/components/billing/BillingManager'
 
 export const dynamic   = 'force-dynamic'
 export const revalidate = 0
-export const metadata: Metadata = { title: 'Financeiro — ViralizaHost' }
+export const metadata: Metadata = { title: 'Financeiro' }
 
 export default async function BillingPage() {
   const auth = await createAuthClient()

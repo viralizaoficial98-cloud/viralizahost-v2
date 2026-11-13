@@ -7,7 +7,7 @@ import Link from 'next/link'
 import WhmAccountsTable from '@/components/admin/WhmAccountsTable'
 import WhmMigrateButton from '@/components/admin/WhmMigrateButton'
 
-export const metadata: Metadata = { title: 'Contas WHM — Admin ViralizaHost' }
+export const metadata: Metadata = { title: 'Contas WHM — Admin' }
 
 const card = {
   background: '#FFFFFF', border: '1px solid #E5E7EB',

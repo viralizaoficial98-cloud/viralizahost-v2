@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { Search, Globe, Zap, Shield, Lock, Gauge } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Pesquisar Domínio | ViralizaHost',
+  title: 'Pesquisar Domínio',
   description: 'Verifique instantaneamente a disponibilidade do seu domínio e registe agora.',
 }
 

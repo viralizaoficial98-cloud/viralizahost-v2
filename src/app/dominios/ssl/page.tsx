@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { Lock, Shield, Zap, Globe, RefreshCw, Gauge, Database, Layers, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Certificado SSL para Domínios | ViralizaHost',
+  title: 'Certificado SSL para Domínios',
   description: 'HTTPS gratuito e automático para todos os seus domínios registados na ViralizaHost.',
 }
 

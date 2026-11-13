@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { MoveRight, Archive, Shield, Zap, RefreshCw, Globe, Lock, Database, Headphones } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Migração de E-mails — ViralizaHost',
+  title: 'Migração de E-mails',
   description: 'Migre todos os seus e-mails para a ViralizaHost sem perder dados.',
 }
 

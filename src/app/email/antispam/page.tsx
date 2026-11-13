@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { AlertTriangle, Shield, Lock, Zap, RefreshCw, Globe, Activity, Database, Search } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'AntiSpam Premium — ViralizaHost',
+  title: 'AntiSpam Premium',
   description: 'Bloqueio avançado de spam com IA para manter a sua caixa de entrada limpa.',
 }
 

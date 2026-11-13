@@ -9,7 +9,7 @@ import { DominiosListing } from '@/components/landing/DominiosListing'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Domínios — Todos os preços | ViralizaHost',
+  title: 'Domínios — Todos os preços',
   description: 'Veja todos os domínios disponíveis e registe o seu com o melhor preço em Angola.',
 }
 

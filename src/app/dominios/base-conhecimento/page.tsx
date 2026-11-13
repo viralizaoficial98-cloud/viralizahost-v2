@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { BookOpen, Search, Globe, Shield, Database, Zap, RefreshCw, Layers, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Base de Conhecimento Domínios | ViralizaHost',
+  title: 'Base de Conhecimento Domínios',
   description: 'Guias, tutoriais e respostas para todas as suas dúvidas sobre domínios.',
 }
 

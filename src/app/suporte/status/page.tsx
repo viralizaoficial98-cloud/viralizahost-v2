@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Activity, Server, Globe, Shield, Zap, Gauge, Database, Lock, RefreshCw } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Status do Sistema — ViralizaHost',
+  title: 'Status do Sistema',
   description: 'Monitorize em tempo real o estado de todos os nossos serviços e infraestrutura.',
 }
 

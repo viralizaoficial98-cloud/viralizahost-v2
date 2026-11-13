@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { MessageCircle, Mail, Headphones, Globe, Shield, Clock, Users, Zap, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Contactar — ViralizaHost',
+  title: 'Contactar',
   description: 'Fale diretamente com a nossa equipa por chat, ticket ou telefone.',
 }
 

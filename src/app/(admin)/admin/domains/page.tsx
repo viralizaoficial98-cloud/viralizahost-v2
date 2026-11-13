@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 import { Globe } from 'lucide-react'
 
-export const metadata: Metadata = { title: 'Domínios — Admin ViralizaHost' }
+export const metadata: Metadata = { title: 'Domínios — Admin' }
 
 const domains = [
   { name: 'meusite.com',  client: 'Maria Santos', status: 'Ativo',    expiry: '15 Jul 2026', ns: 'ViralizaHost', tld: '.com' },

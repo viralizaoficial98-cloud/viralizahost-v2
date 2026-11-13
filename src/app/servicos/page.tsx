@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Server, Globe, Users, Cpu, HardDrive, Mail, Code, Lock, Shield, Zap, RefreshCw, Gauge } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Serviços — ViralizaHost',
+  title: 'Serviços',
   description: 'Da hospedagem ao e-mail corporativo, temos tudo que o seu negócio precisa.',
 }
 

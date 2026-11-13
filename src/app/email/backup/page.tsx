@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Archive, Shield, RefreshCw, Zap, HardDrive, Database, Lock, Clock, Globe } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Backup de E-mails — ViralizaHost',
+  title: 'Backup de E-mails',
   description: 'Cópias de segurança diárias automáticas para nunca perder os seus e-mails.',
 }
 

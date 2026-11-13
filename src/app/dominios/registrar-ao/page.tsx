@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { Globe, Shield, Lock, Zap, Database, Search, RefreshCw, Gauge, Layers } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Registar Domínio .ao | ViralizaHost',
+  title: 'Registar Domínio .ao',
   description: 'Registe o seu domínio oficial de Angola e fortaleça a presença digital local.',
 }
 

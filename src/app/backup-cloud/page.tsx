@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Archive, Shield, RefreshCw, Zap, HardDrive, Database, Lock, Clock, Globe } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Backup Cloud Automático — ViralizaHost',
+  title: 'Backup Cloud Automático',
   description: 'Cópias de segurança diárias automáticas para proteger os seus dados.',
 }
 

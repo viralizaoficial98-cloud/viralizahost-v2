@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { MoveRight, Globe, Zap, Shield, Lock, RefreshCw, Gauge, Database, Layers } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Redirecionamento de Domínios | ViralizaHost',
+  title: 'Redirecionamento de Domínios',
   description: 'Redirecione domínios com facilidade para qualquer URL com configuração simples.',
 }
 

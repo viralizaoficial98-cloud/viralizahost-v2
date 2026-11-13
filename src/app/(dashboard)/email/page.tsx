@@ -4,7 +4,7 @@ import { createAuthClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import EmailManager from '@/components/email/EmailManager'
 
-export const metadata: Metadata = { title: 'Emails — ViralizaHost' }
+export const metadata: Metadata = { title: 'Emails' }
 
 export default async function EmailPage() {
   const authDb = await createAuthClient()

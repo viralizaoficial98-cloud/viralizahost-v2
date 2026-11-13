@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { StatCard } from '@/components/dashboard/StatCard'
 import type { StatIconKey } from '@/components/dashboard/StatCard'
 
-export const metadata: Metadata = { title: 'Dashboard — ViralizaHost' }
+export const metadata: Metadata = { title: 'Dashboard' }
 
 async function fetchDashboardData(userId: string) {
   console.info('[dashboard] fetchDashboardData start', userId.slice(0, 8))

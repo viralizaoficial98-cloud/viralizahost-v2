@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Globe, Shield, Zap, RefreshCw, Server, Lock, Database, Gauge, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Torne-se nosso Parceiro | ViralizaHost',
+  title: 'Torne-se nosso Parceiro',
   description: 'Ganhe comissões recorrentes ao indicar a ViralizaHost para os seus clientes.',
 }
 

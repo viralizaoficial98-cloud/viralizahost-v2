@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Globe, Shield, Zap, RefreshCw, Server, Lock, Database, Gauge, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Ferramentas Gratuitas | ViralizaHost',
+  title: 'Ferramentas Gratuitas',
   description: 'Utilitários e ferramentas para facilitar a gestão do seu domínio e hospedagem.',
 }
 

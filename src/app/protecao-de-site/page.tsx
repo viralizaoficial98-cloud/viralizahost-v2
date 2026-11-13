@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Shield, Zap, Lock, AlertTriangle, Search, Activity, Globe, RefreshCw, Server } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Proteção Avançada do Site — ViralizaHost',
+  title: 'Proteção Avançada do Site',
   description: 'Anti-malware, firewall e proteção DDoS para manter o seu site seguro.',
 }
 

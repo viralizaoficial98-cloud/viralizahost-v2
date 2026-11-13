@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Mail, Shield, Lock, Globe, Zap, Archive, Smartphone, Gauge, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'E-mail Starter — 5 Contas | ViralizaHost',
+  title: 'E-mail Starter — 5 Contas',
   description: 'Plano de e-mail profissional com 5 contas, webmail premium, SSL e suporte 24/7.',
 }
 

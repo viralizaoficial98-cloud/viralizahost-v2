@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { Headphones, Zap, Shield, Clock, Globe, Database, RefreshCw, Lock, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Suporte para Domínios | ViralizaHost',
+  title: 'Suporte para Domínios',
   description: 'Equipa técnica especializada em domínios disponível 24/7 para si.',
 }
 

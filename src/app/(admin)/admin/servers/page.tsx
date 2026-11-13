@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 import { Server, Cpu, HardDrive, Activity, CheckCircle2 } from 'lucide-react'
 
-export const metadata: Metadata = { title: 'Servidores — Admin ViralizaHost' }
+export const metadata: Metadata = { title: 'Servidores — Admin' }
 
 const servers = [
   { name: 'Servidor Principal AO-1', ip: '197.221.45.12',  location: '🇦🇴 Luanda',    cpu: 42, ram: 68, disk: 55, status: 'Online', uptime: '99.98%', accounts: 847 },

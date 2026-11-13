@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { RefreshCw, Shield, Bell, Zap, Globe, Lock } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Renovar Domínio | ViralizaHost',
+  title: 'Renovar Domínio',
   description: 'Renove o seu domínio antes do prazo e garanta a continuidade da sua presença online.',
 }
 

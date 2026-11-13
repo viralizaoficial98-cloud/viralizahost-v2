@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { Search, Shield, Lock, Globe, Database, RefreshCw, Layers, Zap, AlertCircle } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Consulta e Proteção WHOIS | ViralizaHost',
+  title: 'Consulta e Proteção WHOIS',
   description: 'Consulte dados de qualquer domínio e proteja a sua privacidade online.',
 }
 

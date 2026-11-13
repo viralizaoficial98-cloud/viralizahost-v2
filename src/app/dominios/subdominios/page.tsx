@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { Layers, Globe, Zap, Shield, Lock, Database, RefreshCw, Gauge, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Subdomínios Ilimitados | ViralizaHost',
+  title: 'Subdomínios Ilimitados',
   description: 'Crie subdomínios ilimitados para organizar os seus serviços e aplicações.',
 }
 

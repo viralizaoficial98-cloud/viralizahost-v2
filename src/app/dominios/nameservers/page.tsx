@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { Database, Globe, Shield, Zap, Lock, RefreshCw, Gauge, Layers, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Gestão de Nameservers | ViralizaHost',
+  title: 'Gestão de Nameservers',
   description: 'Controle total dos nameservers para gerir o seu domínio como um profissional.',
 }
 

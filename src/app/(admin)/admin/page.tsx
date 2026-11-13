@@ -4,7 +4,7 @@ import { StatsCard } from '@/components/dashboard/StatsCard'
 import { createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
-export const metadata: Metadata = { title: 'Admin Dashboard — ViralizaHost' }
+export const metadata: Metadata = { title: 'Admin Dashboard' }
 
 const card = {
   background: '#FFFFFF',

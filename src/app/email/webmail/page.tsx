@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Globe, Mail, Smartphone, Calendar, Shield, Zap, Lock, Search, RefreshCw } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Webmail Profissional — ViralizaHost',
+  title: 'Webmail Profissional',
   description: 'Aceda ao seu e-mail em qualquer browser com interface moderna e intuitiva.',
 }
 

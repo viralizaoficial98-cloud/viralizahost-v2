@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Monitor, Mail, Calendar, Users, Globe, Shield, Smartphone, Zap, Lock } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Outlook 365 — ViralizaHost',
+  title: 'Outlook 365',
   description: 'O cliente de e-mail premium da Microsoft para desktop, disponível com os nossos planos.',
 }
 

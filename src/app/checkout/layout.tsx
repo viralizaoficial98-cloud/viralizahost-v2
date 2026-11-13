@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { ShieldCheck } from 'lucide-react'
 import { CheckoutLogo } from './CheckoutLogo'
 
-export const metadata: Metadata = { title: 'Checkout — ViralizaHost' }
+export const metadata: Metadata = { title: 'Checkout' }
 
 export default function CheckoutLayout({ children }: { children: React.ReactNode }) {
   return (

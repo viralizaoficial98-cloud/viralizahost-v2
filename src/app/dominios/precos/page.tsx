@@ -3,7 +3,7 @@ import { PageTemplate } from '@/components/shared/PageTemplate'
 import { Globe, Zap, Shield, RefreshCw, Lock, Database, Layers, Gauge, Search } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Preços de Domínios | ViralizaHost',
+  title: 'Preços de Domínios',
   description: 'Tabela completa de preços para todos os tipos de domínios disponíveis.',
 }
 

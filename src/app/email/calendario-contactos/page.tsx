@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Calendar, Users, Smartphone, Globe, RefreshCw, Shield, Zap, Lock, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Calendário e Contactos — ViralizaHost',
+  title: 'Calendário e Contactos',
   description: 'Agenda partilhada e contactos sincronizados com todos os seus dispositivos.',
 }
 

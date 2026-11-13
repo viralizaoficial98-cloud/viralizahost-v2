@@ -6,7 +6,7 @@ import InvoiceDetail from '@/components/billing/InvoiceDetail'
 export const dynamic   = 'force-dynamic'
 export const revalidate = 0
 
-export const metadata: Metadata = { title: 'Factura — ViralizaHost' }
+export const metadata: Metadata = { title: 'Factura' }
 
 export default async function InvoicePage({
   params,

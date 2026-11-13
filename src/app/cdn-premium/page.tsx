@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Gauge, Globe, Zap, Shield, Server, RefreshCw, Lock, Activity, Database } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'CDN Premium Global — ViralizaHost',
+  title: 'CDN Premium Global',
   description: 'Velocidade global com distribuição de conteúdo em mais de 50 pontos de presença.',
 }
 

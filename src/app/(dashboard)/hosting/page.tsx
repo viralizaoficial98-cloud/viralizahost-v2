@@ -5,7 +5,7 @@ import { createAuthClient, createAdminWriteClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { HostingCard } from '@/components/hosting/HostingCard'
 
-export const metadata: Metadata = { title: 'Hospedagem — ViralizaHost' }
+export const metadata: Metadata = { title: 'Hospedagem' }
 
 async function fetchHostingData(userId: string) {
   const db = createAdminWriteClient()

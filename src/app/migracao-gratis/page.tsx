@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { MoveRight, Shield, Zap, RefreshCw, Server, Globe, Lock, Database, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Migração Gratuita e Segura | ViralizaHost',
+  title: 'Migração Gratuita e Segura',
   description: 'Migramos o seu site para a ViralizaHost sem custos e sem tempo de inatividade.',
 }
 
