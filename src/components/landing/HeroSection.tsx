@@ -228,6 +228,12 @@ export function HeroSection() {
       style={{ background: '#000', minHeight: sectionHeight(bp) }}
       aria-label="Hero Slideshow"
     >
+      {/* Page heading for SEO/screen readers — the visible slide titles change
+          with the carousel and image-only slides have none. */}
+      <h1 className="sr-only">
+        ViralizaHost — Hospedagem de sites, domínios, e-mail corporativo e servidores VPS em Angola e no Brasil
+      </h1>
+
       {/* ── Slide layers (absolutely stacked) ──────────────────── */}
       {activeSlides.map((s, i) => {
         const active = i === current
@@ -381,7 +387,7 @@ export function HeroSection() {
                 </span>
               </div>
 
-              <h1
+              <h2
                 key={`title-${current}`}
                 className={`font-black text-white leading-[1.05] animate-fade-in-up delay-100 transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'} ${bp === 'mobile' ? 'text-3xl mb-3' : 'text-4xl sm:text-5xl lg:text-6xl xl:text-7xl mb-6'}`}
               >
@@ -390,7 +396,7 @@ export function HeroSection() {
                     {i === 0 ? line : (<><br /><span style={{ color: slide.accentColor }}>{line}</span></>)}
                   </span>
                 ))}
-              </h1>
+              </h2>
 
               <p
                 key={`sub-${current}`}
