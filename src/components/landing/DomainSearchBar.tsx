@@ -208,7 +208,7 @@ export function DomainSearchBar() {
               <div className="h-px w-16 bg-gradient-to-l from-transparent to-[#F5B700]" />
             </div>
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-[#0A0A0A] leading-tight mb-4">
-              Encontre o{' '}<span className="text-[#F5B700]">domínio ideal</span>{' '}para<br className="hidden md:block" /> o seu negócio
+              Encontra o{' '}<span className="text-[#F5B700]">domínio ideal</span>{' '}para<br className="hidden md:block" /> o seu negócio
             </h2>
             <p className="text-[#666] text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
               Pesquise, registe e proteja o nome da sua marca com rapidez,<br className="hidden md:block" /> segurança e o melhor preço.
