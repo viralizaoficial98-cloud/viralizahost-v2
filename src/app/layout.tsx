@@ -64,6 +64,11 @@ export const metadata: Metadata = {
   },
 
   /* ── Robots ─────────────────────────────────────────────────── */
+  /* ── Search engine ownership verification ──────────────────── */
+  verification: {
+    google: '3wEzwvwDGdOhM8lmeGYdlBbHlvzRgwFdYXu091mCdFQ',
+  },
+
   robots: {
     index: true, follow: true,
     googleBot: { index: true, follow: true },
