@@ -1,16 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// RDAP bootstrap — map TLD suffix to the right RDAP base URL
-function rdapUrl(domain: string): string {
-  const lower = domain.toLowerCase()
-  if (lower.endsWith('.com') || lower.endsWith('.net'))
-    return `https://rdap.verisign.com/com/v1/domain/${domain}`
-  if (lower.endsWith('.org'))
-    return `https://rdap.publicinterestregistry.org/rdap/domain/${domain}`
-  if (lower.endsWith('.io'))
-    return `https://rdap.iana.org/domain/${domain}`
-  // .ao, .com.br and other ccTLDs — use IANA bootstrap (may 404 if not in registry)
-  return `https://rdap.iana.org/domain/${domain}`
+// Domain availability via RDAP.
+//
+// The RDAP server for each TLD comes from the official IANA bootstrap file
+// (https://data.iana.org/rdap/dns.json). A registry answers 404 when the
+// domain is not registered and 200 when it is.
+//
+// Some ccTLDs (e.g. .ao) publish no RDAP service. For those — and whenever the
+// lookup fails — we answer `verified: false` instead of guessing: the UI shows
+// the domain as "a confirmar" and the team checks it manually after the order.
+// `available` stays true in that case so the customer can still order it.
+
+const BOOTSTRAP_URL = 'https://data.iana.org/rdap/dns.json'
+const BOOTSTRAP_TTL_MS = 24 * 60 * 60 * 1000
+
+let bootstrapCache: { map: Map<string, string>; fetchedAt: number } | null = null
+
+async function loadBootstrap(): Promise<Map<string, string> | null> {
+  if (bootstrapCache && Date.now() - bootstrapCache.fetchedAt < BOOTSTRAP_TTL_MS) {
+    return bootstrapCache.map
+  }
+  try {
+    const res = await fetch(BOOTSTRAP_URL, { signal: AbortSignal.timeout(5000) })
+    if (!res.ok) return bootstrapCache?.map ?? null
+    const json = (await res.json()) as { services: [string[], string[]][] }
+    const map = new Map<string, string>()
+    for (const [tlds, urls] of json.services) {
+      const base = urls.find(u => u.startsWith('https://')) ?? urls[0]
+      if (!base) continue
+      for (const tld of tlds) map.set(tld.toLowerCase(), base.endsWith('/') ? base : `${base}/`)
+    }
+    bootstrapCache = { map, fetchedAt: Date.now() }
+    return map
+  } catch {
+    return bootstrapCache?.map ?? null
+  }
+}
+
+/** Finds the RDAP base URL for the longest matching suffix (e.g. "com.br" before "br"). */
+function rdapBaseFor(domain: string, map: Map<string, string>): string | null {
+  const labels = domain.split('.')
+  for (let i = 1; i < labels.length; i++) {
+    const base = map.get(labels.slice(i).join('.'))
+    if (base) return base
+  }
+  return null
 }
 
 export async function GET(req: NextRequest) {
@@ -20,22 +54,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ available: false, error: 'Formato inválido' }, { status: 400 })
   }
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 6000)
+  const unverified = (note: string) =>
+    NextResponse.json({ domain, available: true, verified: false, note })
+
+  const map = await loadBootstrap()
+  if (!map) return unverified('bootstrap_unavailable')
+
+  const base = rdapBaseFor(domain, map)
+  if (!base) return unverified('no_rdap_for_tld')
 
   try {
-    const res = await fetch(rdapUrl(domain), {
-      signal: controller.signal,
+    const res = await fetch(`${base}domain/${encodeURIComponent(domain)}`, {
+      signal: AbortSignal.timeout(6000),
       headers: { 'User-Agent': 'ViralizaHost/1.0', Accept: 'application/rdap+json' },
+      redirect: 'follow',
     })
-    clearTimeout(timeout)
-    // 200 = domain found (taken), 404 = available
-    const available = res.status === 404
-    return NextResponse.json({ domain, available })
+    if (res.status === 404) return NextResponse.json({ domain, available: true, verified: true })
+    if (res.ok) return NextResponse.json({ domain, available: false, verified: true })
+    return unverified(`rdap_status_${res.status}`)
   } catch {
-    clearTimeout(timeout)
-    // Timeout or network error — for .ao and ccTLDs we cannot reliably check;
-    // return available=true with a flag so the UI can show a note.
-    return NextResponse.json({ domain, available: true, note: 'lookup_timeout' })
+    return unverified('lookup_timeout')
   }
 }

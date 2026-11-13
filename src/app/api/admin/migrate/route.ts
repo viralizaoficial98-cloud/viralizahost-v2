@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { adminGuard } from '@/lib/api/require-admin'
 
 const MIGRATION_SQL = `
 -- ViralizaHost Schema Migration
@@ -422,13 +423,9 @@ VALUES
 ON CONFLICT (slug) DO UPDATE SET price_akz=EXCLUDED.price_akz, price_brl=EXCLUDED.price_brl, price_usd=EXCLUDED.price_usd, updated_at=now();
 `
 
-export async function POST(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  const expectedKey = `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(-8)}`
-
-  if (!authHeader?.endsWith(expectedKey.slice(-8))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+export async function POST() {
+  const denied = await adminGuard()
+  if (denied) return denied
 
   try {
     const supabase = createClient(
@@ -487,6 +484,9 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
+  const denied = await adminGuard()
+  if (denied) return denied
+
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -515,7 +515,6 @@ export async function GET() {
     return NextResponse.json({
       connected: true,
       schema: 'viralizahost',
-      url: process.env.NEXT_PUBLIC_SUPABASE_URL,
       tables: results,
       plans: plans ?? []
     })

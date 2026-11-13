@@ -76,12 +76,13 @@ export async function POST(req: NextRequest) {
     const body = await req.text()
 
     const webhookSecret = process.env.RESEND_WEBHOOK_SECRET
-    if (webhookSecret) {
-      const valid = validateSvixSignature(body, req.headers, webhookSecret)
-      if (!valid) {
-        console.warn('[resend-webhook] Invalid signature')
-        return NextResponse.json({ error: 'Invalid signature.' }, { status: 401 })
-      }
+    if (!webhookSecret) {
+      console.error('[resend-webhook] RESEND_WEBHOOK_SECRET not configured — rejecting request')
+      return NextResponse.json({ error: 'Webhook not configured.' }, { status: 503 })
+    }
+    if (!validateSvixSignature(body, req.headers, webhookSecret)) {
+      console.warn('[resend-webhook] Invalid signature')
+      return NextResponse.json({ error: 'Invalid signature.' }, { status: 401 })
     }
 
     let payload: ResendWebhookPayload

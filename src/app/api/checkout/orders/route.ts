@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthClient, createAdminClient, createRpcClient, createAdminWriteClient } from '@/lib/supabase/server'
+import { PLAN_CATALOG } from '@/lib/checkout/catalog'
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,31 +75,58 @@ export async function POST(req: NextRequest) {
     const dbPayment = paymentMap[paymentMethod] ?? 'bank_transfer'
     const status    = paymentMethod === 'bic_transfer' ? 'aguardando_confirmacao' : 'pending'
 
-    // ── 4. Server-side price validation for domain items ──────────────────
-    const domainItems = (items ?? []).filter((i: any) => i.type === 'domain')
-    if (domainItems.length > 0) {
-      const dbClient = createAdminWriteClient()
-      const { data: dbDomains } = await dbClient
-        .from('site_domains')
-        .select('extension, price_annual, price_monthly')
-        .eq('active', true)
+    // ── 4. Server-side validation of every item (price, quantity, cycle) ──
+    // Never trust prices sent by the browser: each item must match a price
+    // the checkout page itself could have shown (DB first, catalog fallback).
+    const VALID_CYCLES = ['monthly', '6months', '1year', '2years', '3years']
+    if (billingCycle != null && !VALID_CYCLES.includes(billingCycle)) {
+      return NextResponse.json({ error: 'Ciclo de faturação inválido.' }, { status: 400 })
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ error: 'Carrinho vazio.' }, { status: 400 })
+    }
 
-      for (const item of domainItems) {
+    const priceDb = createAdminWriteClient()
+    const [{ data: dbDomains }, { data: dbProducts }, { data: dbEmailPlans }] = await Promise.all([
+      priceDb.from('site_domains').select('extension, price_annual, price_monthly').eq('active', true),
+      priceDb.from('products').select('slug, price_monthly').eq('active', true),
+      priceDb.from('site_email_plans').select('slug, price_monthly').eq('active', true),
+    ])
+
+    const invalidItem = () =>
+      NextResponse.json({ error: 'Preço inválido. Atualize a página e tente novamente.' }, { status: 400 })
+
+    for (const item of items) {
+      const qty = item?.quantity ?? 1
+      if (!Number.isInteger(qty) || qty < 1 || qty > 100 || typeof item?.id !== 'string') {
+        return NextResponse.json({ error: 'Item inválido no carrinho.' }, { status: 400 })
+      }
+      const submitted = Number(item.price)
+
+      if (item.type === 'domain') {
         // Derive TLD from plan id: 'domain-com' → '.com', 'domain-com-br' → '.com.br'
         const tld = '.' + (item.id as string).replace(/^domain-/, '').replace(/-/g, '.')
-        const row = dbDomains?.find((d: any) => d.extension === tld)
-        if (row) {
-          const expected = row.price_annual ?? row.price_monthly ?? 0
-          if (expected > 0) {
-            const pct = Math.abs(item.price - expected) / expected
-            if (pct > 0.15) {
-              console.error('[checkout/orders] price tamper detected — submitted:', item.price, 'expected:', expected, 'tld:', tld)
-              return NextResponse.json({ error: 'Preço inválido. Atualize a página e tente novamente.' }, { status: 400 })
-            }
-            // Override with DB price to prevent rounding drift
-            item.price = expected
-          }
+        const row = dbDomains?.find((d: { extension: string }) => d.extension === tld)
+        const expected = row ? (row.price_annual ?? row.price_monthly ?? 0) : 0
+        if (expected <= 0 || Math.abs(submitted - expected) / expected > 0.15) {
+          console.error('[checkout/orders] domain price rejected — submitted:', submitted, 'expected:', expected, 'tld:', tld)
+          return invalidItem()
         }
+        item.price = expected // override with DB price to prevent rounding drift
+        continue
+      }
+
+      // Same resolution order as the checkout page: email plans > products > catalog
+      type PriceRow = { slug: string; price_monthly: number | null }
+      const allowed = [
+        (dbEmailPlans as PriceRow[] | null)?.find(e => e.slug === item.id)?.price_monthly,
+        (dbProducts as PriceRow[] | null)?.find(p => p.slug === item.id)?.price_monthly,
+        PLAN_CATALOG[item.id]?.price,
+      ].filter((v): v is number => typeof v === 'number' && v > 0)
+
+      if (allowed.length === 0 || !allowed.some(v => Math.round(v) === Math.round(submitted))) {
+        console.error('[checkout/orders] plan price rejected — id:', item.id, 'submitted:', submitted, 'allowed:', allowed)
+        return invalidItem()
       }
     }
 

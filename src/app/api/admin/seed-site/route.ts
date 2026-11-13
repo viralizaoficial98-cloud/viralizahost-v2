@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { adminGuard } from '@/lib/api/require-admin'
 
 // Seed data ---------------------------------------------------------------
 
@@ -179,6 +180,9 @@ async function upsertTable(
 // Handlers ----------------------------------------------------------------
 
 export async function POST() {
+  const denied = await adminGuard()
+  if (denied) return denied
+
   const db = await createAdminClient()
 
   const summary = await Promise.all(
@@ -192,6 +196,9 @@ export async function POST() {
 }
 
 export async function GET() {
+  const denied = await adminGuard()
+  if (denied) return denied
+
   const db = await createAdminClient()
 
   const results = await Promise.all(TABLES.map(t => getCount(db, t)))

@@ -22,7 +22,7 @@ const currencySymbol: Record<string, string> = { AOA: 'Kz', AKZ: 'Kz', USD: '$',
 // Suggested TLDs to show when user types without extension
 const SUGGEST_TLDS = ['.com', '.ao', '.net', '.org', '.io']
 
-type CheckResult = { tld: string; domain: string; available: boolean | null; loading: boolean }
+type CheckResult = { tld: string; domain: string; available: boolean | null; verified?: boolean; loading: boolean }
 
 const benefits = [
   { icon: Lock, title: 'Protecção de Privacidade', desc: 'WHOIS protegido e dados ocultos' },
@@ -129,9 +129,9 @@ export function DomainSearchBar() {
           signal: abort.signal,
         })
         const json = await res.json()
-        setResults(prev => prev.map((r, i) => i === idx ? { ...r, available: json.available, loading: false } : r))
+        setResults(prev => prev.map((r, i) => i === idx ? { ...r, available: json.available, verified: json.verified !== false, loading: false } : r))
       } catch {
-        setResults(prev => prev.map((r, i) => i === idx ? { ...r, available: true, loading: false } : r))
+        setResults(prev => prev.map((r, i) => i === idx ? { ...r, available: true, verified: false, loading: false } : r))
       }
     }))
   }
@@ -273,6 +273,7 @@ export function DomainSearchBar() {
                   const isLoading = r.loading
                   const isAvailable = !isLoading && r.available === true
                   const isOccupied = !isLoading && r.available === false
+                  const isUnverified = isAvailable && r.verified === false
 
                   return (
                     <div
@@ -285,7 +286,7 @@ export function DomainSearchBar() {
                       {/* Left: domain + price */}
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          isLoading ? 'bg-[#DDD]' : isAvailable ? 'bg-green-400' : 'bg-red-400'
+                          isLoading ? 'bg-[#DDD]' : isUnverified ? 'bg-amber-400' : isAvailable ? 'bg-green-400' : 'bg-red-400'
                         }`} />
                         <span className="font-black text-[#0A0A0A] text-sm md:text-base truncate">{r.domain}</span>
                         {isLoading
@@ -305,12 +306,18 @@ export function DomainSearchBar() {
 
                         {isAvailable && (
                           <>
-                            <span className="flex items-center gap-1.5 text-green-600 text-xs font-bold">
-                              <span className="check-pop inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-100">
-                                <Check size={10} className="text-green-600" />
+                            {isUnverified ? (
+                              <span className="flex items-center gap-1.5 text-amber-600 text-xs font-bold" title="Não foi possível confirmar automaticamente. A nossa equipa confirma a disponibilidade após o pedido.">
+                                <span className="hidden sm:inline">A confirmar</span>
                               </span>
-                              <span className="hidden sm:inline">Disponível</span>
-                            </span>
+                            ) : (
+                              <span className="flex items-center gap-1.5 text-green-600 text-xs font-bold">
+                                <span className="check-pop inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-100">
+                                  <Check size={10} className="text-green-600" />
+                                </span>
+                                <span className="hidden sm:inline">Disponível</span>
+                              </span>
+                            )}
                             <button
                               onClick={() => goToCheckout(r.domain, r.tld)}
                               className="group flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all duration-200 hover:gap-2.5 hover:scale-105"

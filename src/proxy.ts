@@ -24,17 +24,22 @@ export default async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
-  const protectedPaths = ['/dashboard', '/domains', '/hosting', '/email', '/tickets', '/billing', '/settings']
+  // Match whole path segments only ('/email' must not catch '/email-corporativo').
+  const under = (p: string) => path === p || path.startsWith(`${p}/`)
+
+  const protectedPaths = ['/dashboard', '/domains', '/hosting', '/tickets', '/billing', '/settings']
+  // '/email' is the client area page; '/email/*' are public marketing pages.
+  const protectedExact = ['/email']
   const adminPaths = ['/admin']
   const authRoutes = ['/login', '/register', '/forgot-password']
 
-  if (protectedPaths.some(p => path.startsWith(p)) && !user) {
+  if ((protectedPaths.some(under) || protectedExact.includes(path)) && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
-  if (adminPaths.some(p => path.startsWith(p)) && !user) {
+  if (adminPaths.some(under) && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
-  if (authRoutes.some(p => path.startsWith(p)) && user) {
+  if (authRoutes.some(under) && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

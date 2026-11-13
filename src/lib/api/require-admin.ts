@@ -34,3 +34,17 @@ export async function requireAdminRole(): Promise<string> {
 
   return user.id
 }
+
+/**
+ * Route Handler guard: returns a 401/403 response when the caller is not an
+ * admin, or null when the request may proceed.
+ */
+export async function adminGuard(): Promise<Response | null> {
+  try {
+    await requireAdminRole()
+    return null
+  } catch (err) {
+    const status = (err as { status?: number })?.status === 403 ? 403 : 401
+    return Response.json({ error: status === 403 ? 'Sem permissão.' : 'Não autenticado.' }, { status })
+  }
+}
