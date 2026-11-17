@@ -19,6 +19,8 @@ interface ServiceHeroProps {
   highlights?: string[]
   guarantee?: boolean
   badge?: { text: string; color?: string }
+  /** 'split': texto à esquerda e imagem à direita com degradê (sem imagem por trás do texto) */
+  layout?: 'background' | 'split'
 }
 
 export function ServiceHero({
@@ -38,11 +40,27 @@ export function ServiceHero({
   highlights = [],
   guarantee = true,
   badge,
+  layout = 'background',
 }: ServiceHeroProps) {
   return (
-    <section className="relative min-h-[520px] flex flex-col justify-center overflow-hidden pt-[68px]"
+    <section className={`relative flex flex-col justify-center overflow-hidden pt-[68px] ${layout === 'split' ? 'min-h-[560px] lg:min-h-[620px]' : 'min-h-[520px]'}`}
       style={{ backgroundColor: bgColor }}>
-      {bgImage && (
+      {bgImage && layout === 'split' && (
+        <>
+          {/* Imagem do lado direito: invisível atrás do texto, nítida à direita */}
+          <div className="absolute inset-y-0 right-0 w-full lg:w-[64%] bg-cover bg-center opacity-25 lg:opacity-100"
+            style={{
+              backgroundImage: `url(${bgImage})`,
+              maskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.15) 18%, rgba(0,0,0,0.6) 40%, #000 68%)',
+              WebkitMaskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.15) 18%, rgba(0,0,0,0.6) 40%, #000 68%)',
+            }} />
+          {/* Brilho amarelo da marca e fusão suave com o fundo */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_45%_60%_at_80%_50%,rgba(245,183,0,0.12),transparent)]" />
+          <div className="absolute inset-x-0 top-0 h-32" style={{ background: `linear-gradient(to bottom, ${bgColor}, transparent)` }} />
+          <div className="absolute inset-x-0 bottom-0 h-32" style={{ background: `linear-gradient(to top, ${bgColor}, transparent)` }} />
+        </>
+      )}
+      {bgImage && layout !== 'split' && (
         <>
           <div className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${bgImage})` }} />

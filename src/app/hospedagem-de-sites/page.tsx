@@ -85,15 +85,17 @@ export default async function HospedagemDeSitesPage() {
           bgColor={banner?.bg_color ?? '#080d1a'}
           highlights={banner?.highlights?.length ? banner.highlights : ["LiteSpeed Enterprise","NVMe SSD Gen4","Uptime 99.9%","cPanel Incluído"]}
           guarantee={banner?.show_guarantee ?? true}
+          layout="split"
         />
         <DynamicServicePricing
           category="hosting"
           cols={3}
           showBillingToggle
+          carousel
           title="Hospedagem de Sites — Escolha o seu plano"
           subtitle="Sem compromisso. Todos os planos com garantia de 30 dias."
           fallbackPlans={fallbackPlans} />
-        <IncludedFeatures features={included} />
+        <IncludedFeatures features={included} hoverBorder />
         <FinalCTA
           title="Comece hoje com 30 dias de garantia"
           subtitle="Migração gratuita, suporte 24/7 e uptime 99.9% garantido. Sem riscos." />

@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { getPriceForCycle, type BillingCycle, type Product } from '@/lib/products'
 import { useLocale } from '@/hooks/useLocale'
 import { convertFromAOA } from '@/lib/currency'
+import { PlansCarousel } from './PlansCarousel'
+import type { ReactNode } from 'react'
 
 const BADGE_COLORS: Record<string, string> = {
   'MAIS POPULAR': 'bg-[#F5B700] text-black',
@@ -42,6 +44,8 @@ interface Props {
   cols?: 2 | 3 | 4
   showBillingToggle?: boolean
   fallbackPlans?: FallbackPlan[]
+  /** Mostra os planos numa única linha com setas (carrossel) em vez de grelha */
+  carousel?: boolean
 }
 
 const CYCLE_KEYS: BillingCycle[] = ['monthly', '6months', '1year', '2years', '3years']
@@ -49,7 +53,13 @@ const CYCLE_DISCOUNTS: Record<BillingCycle, number> = {
   monthly: 0, '6months': 15, '1year': 30, '2years': 45, '3years': 55,
 }
 
-export function DynamicServicePricing({ category, subcategory, title, subtitle, cols = 3, showBillingToggle = false, fallbackPlans }: Props) {
+function PlansWrap({ carousel, gridClass, children }: { carousel: boolean; gridClass: string; children: ReactNode }) {
+  return carousel
+    ? <PlansCarousel>{children}</PlansCarousel>
+    : <div className={`grid grid-cols-1 ${gridClass} gap-6 max-w-6xl mx-auto`}>{children}</div>
+}
+
+export function DynamicServicePricing({ category, subcategory, title, subtitle, cols = 3, showBillingToggle = false, fallbackPlans, carousel = false }: Props) {
   const { t, formatCurrency, currency } = useLocale()
   const [plans, setPlans] = useState<ProductWithFeatures[]>([])
   const [loading, setLoading] = useState(true)
@@ -100,7 +110,7 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
             <h2 className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3 mb-3">{title ?? defaultTitle}</h2>
             <p className="text-[#666] max-w-xl mx-auto text-sm md:text-base">{subtitle ?? defaultSubtitle}</p>
           </div>
-          <div className={`grid grid-cols-1 ${gridClass[cols]} gap-6 max-w-6xl mx-auto`}>
+          <PlansWrap carousel={carousel} gridClass={gridClass[cols]}>
             {fallbackPlans.map(plan => (
               <div key={plan.id} className={`relative rounded-2xl flex flex-col transition-all duration-300 hover:-translate-y-1 ${plan.popular ? 'bg-[#0A0A0A] border-2 border-[#F5B700] shadow-[0_8px_40px_rgba(245,183,0,0.20)]' : 'bg-white border border-[#E8E8E8] shadow-sm hover:shadow-md'}`}>
                 {plan.badge && (
@@ -129,7 +139,7 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
                 </div>
               </div>
             ))}
-          </div>
+          </PlansWrap>
         </div>
       </section>
     )
@@ -164,7 +174,7 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 size={32} className="animate-spin text-[#F5B700]" /></div>
         ) : (
-          <div className={`grid grid-cols-1 ${gridClass[cols]} gap-6 max-w-6xl mx-auto`}>
+          <PlansWrap carousel={carousel} gridClass={gridClass[cols]}>
             {plans.map(plan => {
               const price = getPriceForCycle(plan, billing)
               const monthlyPrice = plan.price_monthly
@@ -245,7 +255,7 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
                 </div>
               )
             })}
-          </div>
+          </PlansWrap>
         )}
       </div>
     </section>

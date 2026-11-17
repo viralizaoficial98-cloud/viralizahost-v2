@@ -11,6 +11,8 @@ interface IncludedFeaturesProps {
   title?: string
   subtitle?: string
   dark?: boolean
+  /** Borda amarela ao passar o rato em cada cartão */
+  hoverBorder?: boolean
 }
 
 export function IncludedFeatures({
@@ -18,6 +20,7 @@ export function IncludedFeatures({
   title = 'Todos os planos incluem',
   subtitle = 'Recursos premium sem custo adicional em todos os planos.',
   dark = false,
+  hoverBorder = false,
 }: IncludedFeaturesProps) {
   return (
     <section className={`py-20 ${dark ? 'bg-[#0A0A0A]' : 'bg-white'}`}>
@@ -38,7 +41,7 @@ export function IncludedFeatures({
           {features.map(({ icon: Icon, title: t, desc }) => (
             <div key={t} className={`flex gap-4 p-5 rounded-2xl ${
               dark ? 'bg-[#111] border border-[#1E1E1E]' : 'bg-[#F8F8F8] border border-[#EFEFEF]'
-            }`}>
+            } ${hoverBorder ? 'transition-all duration-300 hover:border-[#F5B700] hover:shadow-[0_0_0_1px_#F5B700,0_8px_24px_rgba(245,183,0,0.15)] hover:-translate-y-0.5' : ''}`}>
               <div className="w-10 h-10 rounded-xl bg-[#F5B700]/10 flex items-center justify-center shrink-0">
                 <Icon size={18} className="text-[#F5B700]" />
               </div>
