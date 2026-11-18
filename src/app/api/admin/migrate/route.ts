@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceClient } from '@/lib/supabase/server'
+import { isMysqlBackend } from '@/lib/db/backend'
 import { adminGuard } from '@/lib/api/require-admin'
 
 const MIGRATION_SQL = `
@@ -428,11 +429,10 @@ export async function POST() {
   if (denied) return denied
 
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    if (isMysqlBackend()) {
+      return NextResponse.json({ error: 'Com MySQL o schema é gerido por database/mysql/001_schema.sql (phpMyAdmin), não por esta rota.' }, { status: 409 })
+    }
+    const supabase = createServiceClient()
 
     const results: { step: string; ok: boolean; error?: string }[] = []
 
@@ -488,11 +488,7 @@ export async function GET() {
   if (denied) return denied
 
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    const supabase = createServiceClient()
 
     const tables = ['profiles', 'plans', 'services', 'domains', 'tickets', 'invoices', 'notifications', 'activity_logs']
     const results: Record<string, { ok: boolean; count?: number; error?: string }> = {}

@@ -1,4 +1,6 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { unstable_cache } from 'next/cache'
+import { isMysqlBackend } from '@/lib/db/backend'
 import {
   HOME_HERO_CACHE_TAG, HOME_HERO_TABLE,
   normalizeVideoSrc, settingsToHeroConfig,
@@ -32,7 +34,25 @@ export function getEnvHeroConfig(env: Record<string, string | undefined> = proce
   return { mode: 'video', videoSrc }
 }
 
+/** MySQL: mesma cache (60 s + tag home-hero) através de unstable_cache, já que a consulta não usa fetch. */
+const getMysqlHeroConfig = unstable_cache(async (): Promise<HeroConfig> => {
+  try {
+    const { executeQuery } = await import('@/lib/db/executor')
+    const { data, error } = await executeQuery({
+      table: HOME_HERO_TABLE, action: 'select', columns: 'mode, video_url',
+      filters: [{ type: 'op', col: 'id', op: 'eq', value: 1 }], order: [], single: 'maybe',
+    }, { role: 'anon' })
+    if (error) throw new Error(error.message)
+    if (!data) return getEnvHeroConfig()
+    return settingsToHeroConfig(data as Pick<HomeHeroSettings, 'mode' | 'video_url'>)
+  } catch (err) {
+    console.warn('[HeroSection] não foi possível ler site_home_hero (MySQL), a usar variáveis de ambiente:', (err as Error)?.message ?? err)
+    return getEnvHeroConfig()
+  }
+}, ['home-hero-config'], { revalidate: REVALIDATE_SECONDS, tags: [HOME_HERO_CACHE_TAG] })
+
 export async function getHeroConfig(): Promise<HeroConfig> {
+  if (isMysqlBackend()) return getMysqlHeroConfig()
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!url || !anonKey) return getEnvHeroConfig()

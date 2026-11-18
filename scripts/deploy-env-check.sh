@@ -45,6 +45,19 @@ check RESEND_API_KEY
 check RESEND_FROM_EMAIL
 check RESEND_FROM_NAME
 
+if [ "$NEXT_PUBLIC_DATA_BACKEND" = "mysql" ]; then
+  echo ""
+  echo "── Base de dados MySQL (NEXT_PUBLIC_DATA_BACKEND=mysql) ──"
+  check MYSQL_USER
+  check MYSQL_PASSWORD
+  check MYSQL_DATABASE
+  if [ -z "$MYSQL_SOCKET" ] && [ -z "$MYSQL_HOST" ]; then
+    echo -e "${RED}✗ MYSQL_SOCKET ou MYSQL_HOST — NÃO CONFIGURADO${NC}"; FAIL=$((FAIL+1))
+  else
+    echo -e "${GREEN}✓ ligação: ${MYSQL_SOCKET:-$MYSQL_HOST:${MYSQL_PORT:-3306}}${NC}"; OK=$((OK+1))
+  fi
+fi
+
 echo ""
 echo "── Resultado ──"
 echo -e "${GREEN}OK: $OK${NC}  ${RED}FALHA: $FAIL${NC}"

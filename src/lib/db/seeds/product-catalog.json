@@ -1,0 +1,1008 @@
+{
+  "blocks": [
+    {
+      "insertCols": [
+        "slug",
+        "category",
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "updateCols": [
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "rows": [
+        {
+          "slug": "hosting-start",
+          "category": "hosting",
+          "name": "Plano Start",
+          "description": "Ideal para sites pessoais e blogs",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 10,
+          "price_monthly": "19900.00",
+          "price_6months": "16900.00",
+          "price_1year": "13900.00",
+          "price_2years": "10900.00",
+          "price_3years": "8900.00",
+          "cta_label": "Começar com Start"
+        },
+        {
+          "slug": "hosting-business",
+          "category": "hosting",
+          "name": "Plano Business",
+          "description": "Para pequenas e médias empresas",
+          "badge": "MAIS POPULAR",
+          "popular": true,
+          "active": true,
+          "position": 20,
+          "price_monthly": "39900.00",
+          "price_6months": "33900.00",
+          "price_1year": "27900.00",
+          "price_2years": "21900.00",
+          "price_3years": "17900.00",
+          "cta_label": "Começar com Business"
+        },
+        {
+          "slug": "hosting-turbo",
+          "category": "hosting",
+          "name": "Plano Turbo",
+          "description": "Performance máxima sem limites",
+          "badge": "MELHOR VALOR",
+          "popular": false,
+          "active": true,
+          "position": 30,
+          "price_monthly": "79900.00",
+          "price_6months": "67900.00",
+          "price_1year": "55900.00",
+          "price_2years": "43900.00",
+          "price_3years": "35900.00",
+          "cta_label": "Começar com Turbo"
+        }
+      ]
+    },
+    {
+      "insertCols": [
+        "slug",
+        "category",
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "updateCols": [
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "rows": [
+        {
+          "slug": "wp-start",
+          "category": "wordpress",
+          "name": "WordPress Start",
+          "description": "Para blogs e sites pessoais",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 10,
+          "price_monthly": "24900.00",
+          "price_6months": "21200.00",
+          "price_1year": "17400.00",
+          "price_2years": "13700.00",
+          "price_3years": "11200.00",
+          "cta_label": "Começar com Start"
+        },
+        {
+          "slug": "wp-pro",
+          "category": "wordpress",
+          "name": "WordPress Pro",
+          "description": "Para empresas e lojas WooCommerce",
+          "badge": "MAIS POPULAR",
+          "popular": true,
+          "active": true,
+          "position": 20,
+          "price_monthly": "49900.00",
+          "price_6months": "42400.00",
+          "price_1year": "34900.00",
+          "price_2years": "27400.00",
+          "price_3years": "22500.00",
+          "cta_label": "Começar com Pro"
+        },
+        {
+          "slug": "wp-turbo",
+          "category": "wordpress",
+          "name": "WordPress Turbo",
+          "description": "Máxima performance para alta demanda",
+          "badge": "MELHOR VALOR",
+          "popular": false,
+          "active": true,
+          "position": 30,
+          "price_monthly": "99900.00",
+          "price_6months": "84900.00",
+          "price_1year": "69900.00",
+          "price_2years": "54900.00",
+          "price_3years": "44900.00",
+          "cta_label": "Começar com Turbo"
+        }
+      ]
+    },
+    {
+      "insertCols": [
+        "slug",
+        "category",
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "updateCols": [
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "rows": [
+        {
+          "slug": "email-starter",
+          "category": "email",
+          "name": "Email Starter",
+          "description": "Para freelancers e profissionais",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 10,
+          "price_monthly": "6800.00",
+          "price_6months": "5780.00",
+          "price_1year": "4760.00",
+          "price_2years": "3740.00",
+          "price_3years": "3060.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "email-standard",
+          "category": "email",
+          "name": "Email Standard",
+          "description": "Para equipas e pequenas empresas",
+          "badge": "MAIS POPULAR",
+          "popular": true,
+          "active": true,
+          "position": 20,
+          "price_monthly": "14800.00",
+          "price_6months": "12580.00",
+          "price_1year": "10360.00",
+          "price_2years": "8140.00",
+          "price_3years": "6660.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "email-premium",
+          "category": "email",
+          "name": "Email Premium",
+          "description": "Para empresas em crescimento",
+          "badge": "MELHOR VALOR",
+          "popular": false,
+          "active": true,
+          "position": 30,
+          "price_monthly": "28000.00",
+          "price_6months": "23800.00",
+          "price_1year": "19600.00",
+          "price_2years": "15400.00",
+          "price_3years": "12600.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "microsoft-365-outlook",
+          "category": "email",
+          "name": "Microsoft 365 Outlook",
+          "description": "Suite completa Microsoft 365",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 40,
+          "price_monthly": "52000.00",
+          "price_6months": "44200.00",
+          "price_1year": "36400.00",
+          "price_2years": "28600.00",
+          "price_3years": "23400.00",
+          "cta_label": "Contratar"
+        }
+      ]
+    },
+    {
+      "insertCols": [
+        "slug",
+        "category",
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "updateCols": [
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "rows": [
+        {
+          "slug": "vps-nvme2",
+          "category": "vps",
+          "name": "VPS NVMe 2",
+          "description": "Para projectos iniciais",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 10,
+          "price_monthly": "45000.00",
+          "price_6months": "38200.00",
+          "price_1year": "31500.00",
+          "price_2years": "24800.00",
+          "price_3years": "20200.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "vps-nvme4",
+          "category": "vps",
+          "name": "VPS NVMe 4",
+          "description": "Para aplicações e e-commerce",
+          "badge": "MAIS POPULAR",
+          "popular": true,
+          "active": true,
+          "position": 20,
+          "price_monthly": "85000.00",
+          "price_6months": "72200.00",
+          "price_1year": "59500.00",
+          "price_2years": "46800.00",
+          "price_3years": "38200.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "vps-nvme8",
+          "category": "vps",
+          "name": "VPS NVMe 8",
+          "description": "Para alta demanda e escala",
+          "badge": "MELHOR VALOR",
+          "popular": false,
+          "active": true,
+          "position": 30,
+          "price_monthly": "159000.00",
+          "price_6months": "135200.00",
+          "price_1year": "111300.00",
+          "price_2years": "87500.00",
+          "price_3years": "71500.00",
+          "cta_label": "Contratar"
+        }
+      ]
+    },
+    {
+      "insertCols": [
+        "slug",
+        "category",
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "updateCols": [
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "rows": [
+        {
+          "slug": "reseller-start",
+          "category": "reseller",
+          "name": "Reseller Start",
+          "description": "Para começar no mercado",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 10,
+          "price_monthly": "59900.00",
+          "price_6months": "50900.00",
+          "price_1year": "41900.00",
+          "price_2years": "33000.00",
+          "price_3years": "26900.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "reseller-growth",
+          "category": "reseller",
+          "name": "Reseller Growth",
+          "description": "Para resellers em crescimento",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 20,
+          "price_monthly": "99900.00",
+          "price_6months": "84900.00",
+          "price_1year": "69900.00",
+          "price_2years": "54900.00",
+          "price_3years": "44900.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "reseller-business",
+          "category": "reseller",
+          "name": "Reseller Business",
+          "description": "Para agências profissionais",
+          "badge": "MAIS POPULAR",
+          "popular": true,
+          "active": true,
+          "position": 30,
+          "price_monthly": "179900.00",
+          "price_6months": "152900.00",
+          "price_1year": "125900.00",
+          "price_2years": "98900.00",
+          "price_3years": "80900.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "reseller-enterprise",
+          "category": "reseller",
+          "name": "Reseller Enterprise",
+          "description": "Para grandes revendedores",
+          "badge": "MELHOR VALOR",
+          "popular": false,
+          "active": true,
+          "position": 40,
+          "price_monthly": "349900.00",
+          "price_6months": "297400.00",
+          "price_1year": "244900.00",
+          "price_2years": "192400.00",
+          "price_3years": "157400.00",
+          "cta_label": "Contratar"
+        }
+      ]
+    },
+    {
+      "insertCols": [
+        "slug",
+        "category",
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_1year",
+        "cta_label"
+      ],
+      "updateCols": [
+        "price_monthly",
+        "price_1year",
+        "cta_label"
+      ],
+      "rows": [
+        {
+          "slug": "ded-16",
+          "category": "dedicated",
+          "name": "Dedicado NVMe 16",
+          "description": "Para sistemas de médio porte",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 10,
+          "price_monthly": "249000.00",
+          "price_1year": "174300.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "ded-32",
+          "category": "dedicated",
+          "name": "Dedicado NVMe 32",
+          "description": "Para alta demanda",
+          "badge": "MAIS POPULAR",
+          "popular": true,
+          "active": true,
+          "position": 20,
+          "price_monthly": "449000.00",
+          "price_1year": "314300.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "ded-64",
+          "category": "dedicated",
+          "name": "Dedicado NVMe 64",
+          "description": "Para infra-estruturas empresa",
+          "badge": "MELHOR VALOR",
+          "popular": false,
+          "active": true,
+          "position": 30,
+          "price_monthly": "799000.00",
+          "price_1year": "559300.00",
+          "cta_label": "Contratar"
+        }
+      ]
+    },
+    {
+      "insertCols": [
+        "slug",
+        "category",
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_1year",
+        "cta_label"
+      ],
+      "updateCols": [
+        "price_monthly",
+        "price_1year",
+        "cta_label"
+      ],
+      "rows": [
+        {
+          "slug": "win-black",
+          "category": "dedicated-windows",
+          "name": "Black",
+          "description": "Servidor Windows dedicado inicial",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 10,
+          "price_monthly": "299000.00",
+          "price_1year": "209300.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "win-sapphire",
+          "category": "dedicated-windows",
+          "name": "Sapphire",
+          "description": "Para empresas e sistemas críticos",
+          "badge": "MAIS POPULAR",
+          "popular": true,
+          "active": true,
+          "position": 20,
+          "price_monthly": "549000.00",
+          "price_1year": "384300.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "win-diamond",
+          "category": "dedicated-windows",
+          "name": "Diamond",
+          "description": "Alta performance e disponibilidade",
+          "badge": "MELHOR VALOR",
+          "popular": false,
+          "active": true,
+          "position": 30,
+          "price_monthly": "999000.00",
+          "price_1year": "699300.00",
+          "cta_label": "Contratar"
+        }
+      ]
+    },
+    {
+      "insertCols": [
+        "slug",
+        "category",
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "updateCols": [
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "price_2years",
+        "price_3years",
+        "cta_label"
+      ],
+      "rows": [
+        {
+          "slug": "ia-starter",
+          "category": "website-builder",
+          "name": "IA Starter",
+          "description": "Para landing pages e portfólios",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 10,
+          "price_monthly": "14900.00",
+          "price_6months": "12600.00",
+          "price_1year": "10400.00",
+          "price_2years": "8200.00",
+          "price_3years": "6700.00",
+          "cta_label": "Começar"
+        },
+        {
+          "slug": "ia-pro",
+          "category": "website-builder",
+          "name": "IA Pro",
+          "description": "Para pequenos negócios",
+          "badge": "MAIS POPULAR",
+          "popular": true,
+          "active": true,
+          "position": 20,
+          "price_monthly": "29900.00",
+          "price_6months": "25400.00",
+          "price_1year": "20900.00",
+          "price_2years": "16400.00",
+          "price_3years": "13400.00",
+          "cta_label": "Começar"
+        },
+        {
+          "slug": "ia-business",
+          "category": "website-builder",
+          "name": "IA Business",
+          "description": "Para empresas e lojas online",
+          "badge": "MELHOR VALOR",
+          "popular": false,
+          "active": true,
+          "position": 30,
+          "price_monthly": "59900.00",
+          "price_6months": "50900.00",
+          "price_1year": "41900.00",
+          "price_2years": "32900.00",
+          "price_3years": "26900.00",
+          "cta_label": "Começar"
+        }
+      ]
+    },
+    {
+      "insertCols": [
+        "slug",
+        "category",
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_1year",
+        "cta_label"
+      ],
+      "updateCols": [
+        "price_monthly",
+        "price_1year",
+        "cta_label"
+      ],
+      "rows": [
+        {
+          "slug": "ssl-dv",
+          "category": "ssl",
+          "name": "SSL Domain Validated",
+          "description": "Certificado SSL básico DV",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 10,
+          "price_monthly": "4900.00",
+          "price_1year": "3430.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "ssl-ov",
+          "category": "ssl",
+          "name": "SSL Organization Validated",
+          "description": "Validação de organização OV",
+          "badge": "MAIS POPULAR",
+          "popular": true,
+          "active": true,
+          "position": 20,
+          "price_monthly": "9900.00",
+          "price_1year": "6930.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "ssl-ev",
+          "category": "ssl",
+          "name": "SSL Extended Validation",
+          "description": "Máxima confiança EV",
+          "badge": "MELHOR VALOR",
+          "popular": false,
+          "active": true,
+          "position": 30,
+          "price_monthly": "19900.00",
+          "price_1year": "13930.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "ssl-wildcard",
+          "category": "ssl",
+          "name": "SSL Wildcard",
+          "description": "Todos os subdomínios cobertos",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 40,
+          "price_monthly": "29900.00",
+          "price_1year": "20930.00",
+          "cta_label": "Contratar"
+        }
+      ]
+    },
+    {
+      "insertCols": [
+        "slug",
+        "category",
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "cta_label"
+      ],
+      "updateCols": [
+        "price_monthly",
+        "price_6months",
+        "price_1year",
+        "cta_label"
+      ],
+      "rows": [
+        {
+          "slug": "backup-100",
+          "category": "backup",
+          "name": "Backup 100 GB",
+          "description": "Para sites e pequenos projectos",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 10,
+          "price_monthly": "4900.00",
+          "price_6months": "4200.00",
+          "price_1year": "3430.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "backup-500",
+          "category": "backup",
+          "name": "Backup 500 GB",
+          "description": "Para empresas e e-commerce",
+          "badge": "MAIS POPULAR",
+          "popular": true,
+          "active": true,
+          "position": 20,
+          "price_monthly": "9900.00",
+          "price_6months": "8400.00",
+          "price_1year": "6930.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "backup-2000",
+          "category": "backup",
+          "name": "Backup 2 TB",
+          "description": "Para grandes infra-estruturas",
+          "badge": "MELHOR VALOR",
+          "popular": false,
+          "active": true,
+          "position": 30,
+          "price_monthly": "19900.00",
+          "price_6months": "16900.00",
+          "price_1year": "13930.00",
+          "cta_label": "Contratar"
+        }
+      ]
+    },
+    {
+      "insertCols": [
+        "slug",
+        "category",
+        "name",
+        "description",
+        "badge",
+        "popular",
+        "active",
+        "position",
+        "price_monthly",
+        "price_1year",
+        "cta_label"
+      ],
+      "updateCols": [
+        "price_monthly",
+        "price_1year",
+        "cta_label"
+      ],
+      "rows": [
+        {
+          "slug": "protection-basic",
+          "category": "protection",
+          "name": "Protecção Basic",
+          "description": "Firewall e monitorização básica",
+          "badge": null,
+          "popular": false,
+          "active": true,
+          "position": 10,
+          "price_monthly": "7900.00",
+          "price_1year": "5530.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "protection-pro",
+          "category": "protection",
+          "name": "Protecção Pro",
+          "description": "Anti-malware + WAF avançado",
+          "badge": "MAIS POPULAR",
+          "popular": true,
+          "active": true,
+          "position": 20,
+          "price_monthly": "14900.00",
+          "price_1year": "10430.00",
+          "cta_label": "Contratar"
+        },
+        {
+          "slug": "protection-premium",
+          "category": "protection",
+          "name": "Protecção Premium",
+          "description": "Protecção total DDoS + CDN",
+          "badge": "MELHOR VALOR",
+          "popular": false,
+          "active": true,
+          "position": 30,
+          "price_monthly": "29900.00",
+          "price_1year": "20930.00",
+          "cta_label": "Contratar"
+        }
+      ]
+    }
+  ],
+  "featureSlugs": [
+    "hosting-start",
+    "hosting-business",
+    "hosting-turbo"
+  ],
+  "features": [
+    {
+      "slug": "hosting-business",
+      "feature": "5 sites hospedados",
+      "included": true,
+      "position": 1
+    },
+    {
+      "slug": "hosting-business",
+      "feature": "50 GB NVMe SSD",
+      "included": true,
+      "position": 2
+    },
+    {
+      "slug": "hosting-business",
+      "feature": "SSL grátis",
+      "included": true,
+      "position": 3
+    },
+    {
+      "slug": "hosting-business",
+      "feature": "cPanel incluído",
+      "included": true,
+      "position": 4
+    },
+    {
+      "slug": "hosting-business",
+      "feature": "20 contas de e-mail",
+      "included": true,
+      "position": 5
+    },
+    {
+      "slug": "hosting-business",
+      "feature": "Backup diário",
+      "included": true,
+      "position": 6
+    },
+    {
+      "slug": "hosting-business",
+      "feature": "Migração gratuita",
+      "included": true,
+      "position": 7
+    },
+    {
+      "slug": "hosting-business",
+      "feature": "Suporte prioritário 24/7",
+      "included": true,
+      "position": 8
+    },
+    {
+      "slug": "hosting-business",
+      "feature": "CDN básico",
+      "included": true,
+      "position": 9
+    },
+    {
+      "slug": "hosting-business",
+      "feature": "Sites ilimitados",
+      "included": false,
+      "position": 10
+    },
+    {
+      "slug": "hosting-start",
+      "feature": "1 site hospedado",
+      "included": true,
+      "position": 1
+    },
+    {
+      "slug": "hosting-start",
+      "feature": "20 GB NVMe SSD",
+      "included": true,
+      "position": 2
+    },
+    {
+      "slug": "hosting-start",
+      "feature": "SSL grátis",
+      "included": true,
+      "position": 3
+    },
+    {
+      "slug": "hosting-start",
+      "feature": "cPanel incluído",
+      "included": true,
+      "position": 4
+    },
+    {
+      "slug": "hosting-start",
+      "feature": "5 contas de e-mail",
+      "included": true,
+      "position": 5
+    },
+    {
+      "slug": "hosting-start",
+      "feature": "Backup semanal",
+      "included": true,
+      "position": 6
+    },
+    {
+      "slug": "hosting-start",
+      "feature": "Migração gratuita",
+      "included": true,
+      "position": 7
+    },
+    {
+      "slug": "hosting-start",
+      "feature": "Suporte 24/7",
+      "included": true,
+      "position": 8
+    },
+    {
+      "slug": "hosting-start",
+      "feature": "Sites ilimitados",
+      "included": false,
+      "position": 9
+    },
+    {
+      "slug": "hosting-start",
+      "feature": "CDN global",
+      "included": false,
+      "position": 10
+    },
+    {
+      "slug": "hosting-turbo",
+      "feature": "Sites ilimitados",
+      "included": true,
+      "position": 1
+    },
+    {
+      "slug": "hosting-turbo",
+      "feature": "200 GB NVMe SSD",
+      "included": true,
+      "position": 2
+    },
+    {
+      "slug": "hosting-turbo",
+      "feature": "SSL grátis",
+      "included": true,
+      "position": 3
+    },
+    {
+      "slug": "hosting-turbo",
+      "feature": "cPanel incluído",
+      "included": true,
+      "position": 4
+    },
+    {
+      "slug": "hosting-turbo",
+      "feature": "E-mails ilimitados",
+      "included": true,
+      "position": 5
+    },
+    {
+      "slug": "hosting-turbo",
+      "feature": "Backup diário automático",
+      "included": true,
+      "position": 6
+    },
+    {
+      "slug": "hosting-turbo",
+      "feature": "Migração gratuita",
+      "included": true,
+      "position": 7
+    },
+    {
+      "slug": "hosting-turbo",
+      "feature": "Suporte premium 24/7",
+      "included": true,
+      "position": 8
+    },
+    {
+      "slug": "hosting-turbo",
+      "feature": "CDN global",
+      "included": true,
+      "position": 9
+    },
+    {
+      "slug": "hosting-turbo",
+      "feature": "IP dedicado",
+      "included": true,
+      "position": 10
+    }
+  ]
+}

@@ -1,0 +1,3657 @@
+{
+  "activity_logs": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "action": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "login",
+          "logout",
+          "create",
+          "update",
+          "delete",
+          "payment",
+          "suspend",
+          "activate"
+        ]
+      },
+      "entity_type": {
+        "kind": "text",
+        "nullable": true
+      },
+      "entity_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "description": {
+        "kind": "text",
+        "nullable": false
+      },
+      "ip_address": {
+        "kind": "text",
+        "nullable": true
+      },
+      "user_agent": {
+        "kind": "text",
+        "nullable": true
+      },
+      "metadata": {
+        "kind": "json",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "activity_logs_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "ai_audit_logs": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "conversation_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "tool_name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "tool_input": {
+        "kind": "json",
+        "nullable": true
+      },
+      "result_summary": {
+        "kind": "text",
+        "nullable": true
+      },
+      "success": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "error_message": {
+        "kind": "text",
+        "nullable": true
+      },
+      "ip_address": {
+        "kind": "text",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "ai_audit_logs_conversation_id_fkey",
+        "cols": [
+          "conversation_id"
+        ],
+        "refTable": "ai_conversations",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "auth.users",
+        "refCols": [
+          "id"
+        ],
+        "external": true
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "ai_conversations": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "session_token": {
+        "kind": "text",
+        "nullable": true
+      },
+      "title": {
+        "kind": "text",
+        "nullable": true
+      },
+      "status": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "user_level": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "metadata": {
+        "kind": "json",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "auth.users",
+        "refCols": [
+          "id"
+        ],
+        "external": true
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "ai_messages": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "conversation_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "role": {
+        "kind": "text",
+        "nullable": false
+      },
+      "content": {
+        "kind": "text",
+        "nullable": false
+      },
+      "tool_name": {
+        "kind": "text",
+        "nullable": true
+      },
+      "tool_input": {
+        "kind": "json",
+        "nullable": true
+      },
+      "tool_output": {
+        "kind": "json",
+        "nullable": true
+      },
+      "tokens_used": {
+        "kind": "int",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "ai_messages_conversation_id_fkey",
+        "cols": [
+          "conversation_id"
+        ],
+        "refTable": "ai_conversations",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "banner_pages": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "page_slug": {
+        "kind": "text",
+        "nullable": false
+      },
+      "page_name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "breadcrumb": {
+        "kind": "text",
+        "nullable": true
+      },
+      "breadcrumb_parent": {
+        "kind": "text",
+        "nullable": true
+      },
+      "breadcrumb_parent_href": {
+        "kind": "text",
+        "nullable": true
+      },
+      "tag": {
+        "kind": "text",
+        "nullable": true
+      },
+      "title": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "subtitle": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "bg_image": {
+        "kind": "text",
+        "nullable": true
+      },
+      "bg_color": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "highlights": {
+        "kind": "array",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "button_primary_text": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "button_primary_link": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "button_secondary_text": {
+        "kind": "text",
+        "nullable": true
+      },
+      "button_secondary_link": {
+        "kind": "text",
+        "nullable": true
+      },
+      "price_text": {
+        "kind": "text",
+        "nullable": true
+      },
+      "show_guarantee": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "overlay_opacity": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "is_active": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "clients": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "company_name": {
+        "kind": "text",
+        "nullable": true
+      },
+      "tax_id": {
+        "kind": "text",
+        "nullable": true
+      },
+      "address": {
+        "kind": "text",
+        "nullable": true
+      },
+      "city": {
+        "kind": "text",
+        "nullable": true
+      },
+      "state": {
+        "kind": "text",
+        "nullable": true
+      },
+      "postal_code": {
+        "kind": "text",
+        "nullable": true
+      },
+      "notes": {
+        "kind": "text",
+        "nullable": true
+      },
+      "credit_balance": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "currency": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "AKZ",
+          "BRL",
+          "USD"
+        ],
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "clients_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "company_billing_settings": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "company_name": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "logo_url": {
+        "kind": "text",
+        "nullable": true
+      },
+      "email": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "website": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "phone": {
+        "kind": "text",
+        "nullable": true
+      },
+      "address": {
+        "kind": "text",
+        "nullable": true
+      },
+      "bank_name": {
+        "kind": "text",
+        "nullable": true
+      },
+      "account_holder": {
+        "kind": "text",
+        "nullable": true
+      },
+      "account_number": {
+        "kind": "text",
+        "nullable": true
+      },
+      "iban": {
+        "kind": "text",
+        "nullable": true
+      },
+      "swift": {
+        "kind": "text",
+        "nullable": true
+      },
+      "payment_instructions": {
+        "kind": "text",
+        "nullable": true
+      },
+      "footer_text": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "default_due_days": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "email_subject_template": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "email_body_template": {
+        "kind": "text",
+        "nullable": true
+      },
+      "auto_email_on_create": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "active": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_by": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "active_unique_key": {
+        "kind": "int",
+        "nullable": true,
+        "generated": true,
+        "internal": true
+      }
+    },
+    "fks": [
+      {
+        "cols": [
+          "updated_by"
+        ],
+        "refTable": "auth.users",
+        "refCols": [
+          "id"
+        ],
+        "external": true
+      }
+    ],
+    "generated": [
+      "active_unique_key"
+    ],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "currency_rates": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "base_currency": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "target_currency": {
+        "kind": "text",
+        "nullable": false
+      },
+      "rate": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 8
+      },
+      "source": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "is_active": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "domains": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "service_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "extension": {
+        "kind": "text",
+        "nullable": false
+      },
+      "full_domain": {
+        "kind": "text",
+        "nullable": true,
+        "generated": true
+      },
+      "status": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "active",
+          "expired",
+          "pending",
+          "transferred",
+          "locked"
+        ],
+        "hasDefault": true
+      },
+      "registrar": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "nameservers": {
+        "kind": "json",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "auto_renew": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "is_locked": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "whois_privacy": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "registered_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "expires_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "price_paid": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "currency": {
+        "kind": "enum",
+        "nullable": true,
+        "values": [
+          "AKZ",
+          "BRL",
+          "USD"
+        ]
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "order_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "registered": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "domains_order_id_fkey",
+        "cols": [
+          "order_id"
+        ],
+        "refTable": "orders",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "domains_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "domains_service_id_fkey",
+        "cols": [
+          "service_id"
+        ],
+        "refTable": "services",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [
+      "full_domain"
+    ],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "email_logs": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "invoice_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "order_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "recipient": {
+        "kind": "text",
+        "nullable": false
+      },
+      "sender": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "subject": {
+        "kind": "text",
+        "nullable": true
+      },
+      "provider": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "provider_message_id": {
+        "kind": "text",
+        "nullable": true
+      },
+      "status": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "queued",
+          "processing",
+          "sent",
+          "delivered",
+          "bounced",
+          "failed",
+          "complained",
+          "delayed"
+        ],
+        "hasDefault": true
+      },
+      "error_message": {
+        "kind": "text",
+        "nullable": true
+      },
+      "attempts": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "initiated_by_agent": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "initiated_by": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "sent_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "delivered_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "failed_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "email_logs_invoice_id_fkey",
+        "cols": [
+          "invoice_id"
+        ],
+        "refTable": "invoices",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "email_logs_order_id_fkey",
+        "cols": [
+          "order_id"
+        ],
+        "refTable": "orders",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "email_logs_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "emails": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "hosting_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "email_address": {
+        "kind": "text",
+        "nullable": false
+      },
+      "display_name": {
+        "kind": "text",
+        "nullable": true
+      },
+      "quota_mb": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "used_mb": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "status": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "emails_hosting_id_fkey",
+        "cols": [
+          "hosting_id"
+        ],
+        "refTable": "hosting_accounts",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "emails_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "hosting_accounts": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "service_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "server_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "cpanel_username": {
+        "kind": "text",
+        "nullable": false
+      },
+      "primary_domain": {
+        "kind": "text",
+        "nullable": false
+      },
+      "status": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "pending",
+          "active",
+          "suspended",
+          "cancelled",
+          "expired",
+          "pending_provisioning"
+        ],
+        "hasDefault": true
+      },
+      "disk_used_mb": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "bandwidth_used_mb": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "email_count": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "db_count": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "php_version": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "ssl_enabled": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "disk_limit_mb": {
+        "kind": "int",
+        "nullable": true
+      },
+      "package_name": {
+        "kind": "text",
+        "nullable": true
+      },
+      "ip_address": {
+        "kind": "text",
+        "nullable": true
+      },
+      "suspension_reason": {
+        "kind": "text",
+        "nullable": true
+      },
+      "last_synced_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "cpanel_url": {
+        "kind": "text",
+        "nullable": true
+      }
+    },
+    "fks": [
+      {
+        "name": "hosting_accounts_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "hosting_accounts_server_id_fkey",
+        "cols": [
+          "server_id"
+        ],
+        "refTable": "servers",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "hosting_accounts_service_id_fkey",
+        "cols": [
+          "service_id"
+        ],
+        "refTable": "services",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "invoice_items": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "invoice_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "product_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "description": {
+        "kind": "text",
+        "nullable": false
+      },
+      "quantity": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "unit_price": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "subtotal": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "position": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "invoice_items_invoice_id_fkey",
+        "cols": [
+          "invoice_id"
+        ],
+        "refTable": "invoices",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "invoice_items_product_id_fkey",
+        "cols": [
+          "product_id"
+        ],
+        "refTable": "products",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "invoice_send_logs": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "invoice_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "order_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "ticket_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "customer_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "recipient": {
+        "kind": "text",
+        "nullable": false
+      },
+      "provider": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "provider_message_id": {
+        "kind": "text",
+        "nullable": true
+      },
+      "status": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "error_message": {
+        "kind": "text",
+        "nullable": true
+      },
+      "initiated_by": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "initiated_by_agent": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "cols": [
+          "initiated_by"
+        ],
+        "refTable": "auth.users",
+        "refCols": [
+          "id"
+        ],
+        "external": true
+      },
+      {
+        "name": "invoice_send_logs_invoice_id_fkey",
+        "cols": [
+          "invoice_id"
+        ],
+        "refTable": "invoices",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "invoices": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "invoice_number": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "service_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "status": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "pending",
+          "paid",
+          "overdue",
+          "cancelled",
+          "refunded",
+          "under_review",
+          "partially_paid",
+          "rejected",
+          "draft",
+          "sending",
+          "sent",
+          "generated",
+          "failed"
+        ],
+        "hasDefault": true
+      },
+      "currency": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "AKZ",
+          "BRL",
+          "USD"
+        ],
+        "hasDefault": true
+      },
+      "subtotal": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "discount": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "tax": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "total": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "items": {
+        "kind": "json",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "due_date": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "paid_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "notes": {
+        "kind": "text",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "order_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "amount_paid": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "ticket_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "issue_date": {
+        "kind": "date",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "pdf_storage_path": {
+        "kind": "text",
+        "nullable": true
+      },
+      "emailed_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "created_by": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "email_to": {
+        "kind": "text",
+        "nullable": true
+      },
+      "email_from": {
+        "kind": "text",
+        "nullable": true
+      },
+      "email_provider": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "email_provider_id": {
+        "kind": "text",
+        "nullable": true
+      },
+      "email_sent_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "email_last_error": {
+        "kind": "text",
+        "nullable": true
+      },
+      "email_attempts": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "email_delivered_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "email_bounced_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "email_status": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "proof_file": {
+        "kind": "text",
+        "nullable": true
+      }
+    },
+    "fks": [
+      {
+        "cols": [
+          "created_by"
+        ],
+        "refTable": "auth.users",
+        "refCols": [
+          "id"
+        ],
+        "external": true
+      },
+      {
+        "name": "invoices_order_id_fkey",
+        "cols": [
+          "order_id"
+        ],
+        "refTable": "orders",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "invoices_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "invoices_service_id_fkey",
+        "cols": [
+          "service_id"
+        ],
+        "refTable": "services",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "invoices_ticket_id_fkey",
+        "cols": [
+          "ticket_id"
+        ],
+        "refTable": "tickets",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "notifications": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "type": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "info",
+          "warning",
+          "error",
+          "success"
+        ],
+        "hasDefault": true
+      },
+      "title": {
+        "kind": "text",
+        "nullable": false
+      },
+      "message": {
+        "kind": "text",
+        "nullable": false
+      },
+      "link": {
+        "kind": "text",
+        "nullable": true
+      },
+      "is_read": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "notifications_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "order_items": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "order_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "service_name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "service_type": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "price": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "quantity": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": true,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "order_items_order_id_fkey",
+        "cols": [
+          "order_id"
+        ],
+        "refTable": "orders",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "orders": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "user_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "billing_cycle": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "domain_name": {
+        "kind": "text",
+        "nullable": true
+      },
+      "domain_action": {
+        "kind": "text",
+        "nullable": true
+      },
+      "payment_method": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "amount": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "status": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "proof_file": {
+        "kind": "text",
+        "nullable": true
+      },
+      "transfer_ref": {
+        "kind": "text",
+        "nullable": true
+      },
+      "notes": {
+        "kind": "text",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "use_default_ns": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "ns1": {
+        "kind": "text",
+        "nullable": true
+      },
+      "ns2": {
+        "kind": "text",
+        "nullable": true
+      },
+      "ns3": {
+        "kind": "text",
+        "nullable": true
+      },
+      "ns4": {
+        "kind": "text",
+        "nullable": true
+      }
+    },
+    "fks": [
+      {
+        "cols": [
+          "user_id"
+        ],
+        "refTable": "auth.users",
+        "refCols": [
+          "id"
+        ],
+        "external": true
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "payments": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "invoice_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "method": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "credit_card",
+          "paypal",
+          "mercadopago",
+          "pix",
+          "bank_transfer",
+          "multicaixa"
+        ],
+        "hasDefault": true
+      },
+      "amount": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "currency": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "AKZ",
+          "BRL",
+          "USD"
+        ],
+        "hasDefault": true
+      },
+      "status": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "gateway_ref": {
+        "kind": "text",
+        "nullable": true
+      },
+      "gateway_data": {
+        "kind": "json",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "paid_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "order_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "proof_url": {
+        "kind": "text",
+        "nullable": true
+      },
+      "proof_filename": {
+        "kind": "text",
+        "nullable": true
+      },
+      "proof_mime": {
+        "kind": "text",
+        "nullable": true
+      },
+      "transfer_ref": {
+        "kind": "text",
+        "nullable": true
+      },
+      "transfer_date": {
+        "kind": "date",
+        "nullable": true
+      },
+      "payer_name": {
+        "kind": "text",
+        "nullable": true
+      },
+      "payer_bank": {
+        "kind": "text",
+        "nullable": true
+      },
+      "declared_amount": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "rejection_reason": {
+        "kind": "text",
+        "nullable": true
+      },
+      "reviewed_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "reviewed_by": {
+        "kind": "uuid",
+        "nullable": true
+      }
+    },
+    "fks": [
+      {
+        "name": "payments_invoice_id_fkey",
+        "cols": [
+          "invoice_id"
+        ],
+        "refTable": "invoices",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "payments_order_id_fkey",
+        "cols": [
+          "order_id"
+        ],
+        "refTable": "orders",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "payments_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "plans": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "slug": {
+        "kind": "text",
+        "nullable": false
+      },
+      "name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "type": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "shared",
+          "vps",
+          "dedicated",
+          "reseller"
+        ],
+        "hasDefault": true
+      },
+      "description": {
+        "kind": "text",
+        "nullable": true
+      },
+      "features": {
+        "kind": "json",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "price_akz": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "price_brl": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "price_usd": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "disk_gb": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "bandwidth_gb": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "email_accounts": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "max_domains": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "max_subdomains": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "max_databases": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "is_popular": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "is_active": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "sort_order": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "product_features": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "product_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "feature": {
+        "kind": "text",
+        "nullable": false
+      },
+      "included": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "position": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "product_features_product_id_fkey",
+        "cols": [
+          "product_id"
+        ],
+        "refTable": "products",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "products": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "slug": {
+        "kind": "text",
+        "nullable": false
+      },
+      "category": {
+        "kind": "text",
+        "nullable": false
+      },
+      "name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "description": {
+        "kind": "text",
+        "nullable": true
+      },
+      "badge": {
+        "kind": "text",
+        "nullable": true
+      },
+      "popular": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "active": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "position": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "price_monthly": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "price_6months": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "price_1year": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "price_2years": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "price_3years": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "color": {
+        "kind": "text",
+        "nullable": true
+      },
+      "href_override": {
+        "kind": "text",
+        "nullable": true
+      },
+      "meta": {
+        "kind": "json",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "subcategory": {
+        "kind": "text",
+        "nullable": true
+      },
+      "cta_label": {
+        "kind": "text",
+        "nullable": true
+      },
+      "cta_url": {
+        "kind": "text",
+        "nullable": true
+      },
+      "currency": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "price_aoa": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "price_brl": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "price_usd": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "use_auto_conversion": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "profiles": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "email": {
+        "kind": "text",
+        "nullable": false
+      },
+      "full_name": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "phone": {
+        "kind": "text",
+        "nullable": true
+      },
+      "country": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "role": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "client",
+          "admin",
+          "reseller"
+        ],
+        "hasDefault": true
+      },
+      "currency": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "AKZ",
+          "BRL",
+          "USD"
+        ],
+        "hasDefault": true
+      },
+      "avatar_url": {
+        "kind": "text",
+        "nullable": true
+      },
+      "is_active": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "email_verified": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "cols": [
+          "id"
+        ],
+        "refTable": "auth.users",
+        "refCols": [
+          "id"
+        ],
+        "external": true
+      }
+    ],
+    "generated": [],
+    "appDefaults": {}
+  },
+  "servers": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "hostname": {
+        "kind": "text",
+        "nullable": false
+      },
+      "ip_address": {
+        "kind": "text",
+        "nullable": false
+      },
+      "location": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "whm_url": {
+        "kind": "text",
+        "nullable": true
+      },
+      "whm_api_token": {
+        "kind": "text",
+        "nullable": true
+      },
+      "whm_username": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "is_active": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "max_accounts": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "current_load": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "notes": {
+        "kind": "text",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "services": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "plan_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "server_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "status": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "pending",
+          "active",
+          "suspended",
+          "cancelled",
+          "expired",
+          "pending_provisioning"
+        ],
+        "hasDefault": true
+      },
+      "currency": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "AKZ",
+          "BRL",
+          "USD"
+        ],
+        "hasDefault": true
+      },
+      "price": {
+        "kind": "decimal",
+        "nullable": false,
+        "scale": 2,
+        "hasDefault": true
+      },
+      "billing_cycle": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "started_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "expires_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "auto_renew": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "notes": {
+        "kind": "text",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "order_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "service_type": {
+        "kind": "text",
+        "nullable": true
+      },
+      "service_name": {
+        "kind": "text",
+        "nullable": true
+      }
+    },
+    "fks": [
+      {
+        "name": "services_order_id_fkey",
+        "cols": [
+          "order_id"
+        ],
+        "refTable": "orders",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "services_plan_id_fkey",
+        "cols": [
+          "plan_id"
+        ],
+        "refTable": "plans",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "services_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "services_server_id_fkey",
+        "cols": [
+          "server_id"
+        ],
+        "refTable": "servers",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "site_banners": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "position": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "active": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "bg_image": {
+        "kind": "text",
+        "nullable": true
+      },
+      "bg_color": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "accent_color": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "tag": {
+        "kind": "text",
+        "nullable": true
+      },
+      "title": {
+        "kind": "text",
+        "nullable": true
+      },
+      "subtitle": {
+        "kind": "text",
+        "nullable": true
+      },
+      "cta_text": {
+        "kind": "text",
+        "nullable": true
+      },
+      "cta_href": {
+        "kind": "text",
+        "nullable": true
+      },
+      "cta_secondary_text": {
+        "kind": "text",
+        "nullable": true
+      },
+      "cta_secondary_href": {
+        "kind": "text",
+        "nullable": true
+      },
+      "features": {
+        "kind": "array",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": true,
+        "hasDefault": true
+      }
+    },
+    "fks": [],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "site_domains": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "extension": {
+        "kind": "text",
+        "nullable": false
+      },
+      "price_monthly": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "price_annual": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "currency": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "popular": {
+        "kind": "bool",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "active": {
+        "kind": "bool",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "position": {
+        "kind": "int",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": true,
+        "hasDefault": true
+      }
+    },
+    "fks": [],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "site_email_plans": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "description": {
+        "kind": "text",
+        "nullable": true
+      },
+      "badge": {
+        "kind": "text",
+        "nullable": true
+      },
+      "price_monthly": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "price_annual": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "discount_annual": {
+        "kind": "int",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "features": {
+        "kind": "array",
+        "nullable": true
+      },
+      "active": {
+        "kind": "bool",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "featured": {
+        "kind": "bool",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "position": {
+        "kind": "int",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "currency": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "storage_gb": {
+        "kind": "int",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "accounts": {
+        "kind": "int",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "color": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "popular": {
+        "kind": "bool",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "slug": {
+        "kind": "text",
+        "nullable": true
+      }
+    },
+    "fks": [],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "site_home_hero": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "mode": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "video_url": {
+        "kind": "text",
+        "nullable": true
+      },
+      "video_storage_path": {
+        "kind": "text",
+        "nullable": true
+      },
+      "video_file_name": {
+        "kind": "text",
+        "nullable": true
+      },
+      "video_size_bytes": {
+        "kind": "bigint",
+        "nullable": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_by": {
+        "kind": "uuid",
+        "nullable": true
+      }
+    },
+    "fks": [],
+    "generated": [],
+    "appDefaults": {}
+  },
+  "site_hosting_plans": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "description": {
+        "kind": "text",
+        "nullable": true
+      },
+      "badge": {
+        "kind": "text",
+        "nullable": true
+      },
+      "price_monthly": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "price_annual": {
+        "kind": "decimal",
+        "nullable": true,
+        "scale": 2
+      },
+      "discount_annual": {
+        "kind": "int",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "features": {
+        "kind": "array",
+        "nullable": true
+      },
+      "active": {
+        "kind": "bool",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "featured": {
+        "kind": "bool",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "position": {
+        "kind": "int",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "currency": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "slug": {
+        "kind": "text",
+        "nullable": true
+      }
+    },
+    "fks": [],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "site_team": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "is_ceo": {
+        "kind": "bool",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "role": {
+        "kind": "text",
+        "nullable": true
+      },
+      "title": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "bio": {
+        "kind": "text",
+        "nullable": true
+      },
+      "photo_url": {
+        "kind": "text",
+        "nullable": true
+      },
+      "flag": {
+        "kind": "text",
+        "nullable": true
+      },
+      "country": {
+        "kind": "text",
+        "nullable": true
+      },
+      "accent_color": {
+        "kind": "text",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "position": {
+        "kind": "int",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "active": {
+        "kind": "bool",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "country_code": {
+        "kind": "text",
+        "nullable": true
+      },
+      "specialty": {
+        "kind": "text",
+        "nullable": true
+      },
+      "secondary_flag": {
+        "kind": "text",
+        "nullable": true
+      },
+      "secondary_country_code": {
+        "kind": "text",
+        "nullable": true
+      },
+      "secondary_country_name": {
+        "kind": "text",
+        "nullable": true
+      }
+    },
+    "fks": [],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "sso_audit_logs": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "service_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "hosting_account_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "access_type": {
+        "kind": "text",
+        "nullable": false
+      },
+      "ip_address": {
+        "kind": "text",
+        "nullable": true
+      },
+      "user_agent": {
+        "kind": "text",
+        "nullable": true
+      },
+      "success": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "error_message": {
+        "kind": "text",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "sso_audit_logs_hosting_account_id_fkey",
+        "cols": [
+          "hosting_account_id"
+        ],
+        "refTable": "hosting_accounts",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "sso_audit_logs_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "sso_audit_logs_service_id_fkey",
+        "cols": [
+          "service_id"
+        ],
+        "refTable": "services",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "ticket_attachments": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "ticket_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "message_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "invoice_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "file_name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "storage_path": {
+        "kind": "text",
+        "nullable": false
+      },
+      "mime_type": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "file_size": {
+        "kind": "int",
+        "nullable": true
+      },
+      "uploaded_by": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "ticket_attachments_invoice_id_fkey",
+        "cols": [
+          "invoice_id"
+        ],
+        "refTable": "invoices",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "ticket_attachments_message_id_fkey",
+        "cols": [
+          "message_id"
+        ],
+        "refTable": "ticket_messages",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "ticket_attachments_ticket_id_fkey",
+        "cols": [
+          "ticket_id"
+        ],
+        "refTable": "tickets",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "cols": [
+          "uploaded_by"
+        ],
+        "refTable": "auth.users",
+        "refCols": [
+          "id"
+        ],
+        "external": true
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "ticket_messages": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "ticket_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "message": {
+        "kind": "text",
+        "nullable": false
+      },
+      "is_staff": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "attachments": {
+        "kind": "json",
+        "nullable": true,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "is_internal": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "ticket_messages_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "ticket_messages_ticket_id_fkey",
+        "cols": [
+          "ticket_id"
+        ],
+        "refTable": "tickets",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "tickets": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "subject": {
+        "kind": "text",
+        "nullable": false
+      },
+      "status": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "open",
+          "in_progress",
+          "resolved",
+          "closed"
+        ],
+        "hasDefault": true
+      },
+      "priority": {
+        "kind": "enum",
+        "nullable": false,
+        "values": [
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ],
+        "hasDefault": true
+      },
+      "department": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "assigned_to": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "service_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "closed_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "ticket_number": {
+        "kind": "text",
+        "nullable": true
+      },
+      "category": {
+        "kind": "text",
+        "nullable": true
+      },
+      "domain_id": {
+        "kind": "uuid",
+        "nullable": true
+      }
+    },
+    "fks": [
+      {
+        "name": "tickets_assigned_to_fkey",
+        "cols": [
+          "assigned_to"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "tickets_domain_id_fkey",
+        "cols": [
+          "domain_id"
+        ],
+        "refTable": "domains",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "tickets_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "tickets_service_id_fkey",
+        "cols": [
+          "service_id"
+        ],
+        "refTable": "services",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "whm_accounts": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "server_id": {
+        "kind": "uuid",
+        "nullable": false
+      },
+      "whm_username": {
+        "kind": "text",
+        "nullable": false
+      },
+      "primary_domain": {
+        "kind": "text",
+        "nullable": false
+      },
+      "contact_email": {
+        "kind": "text",
+        "nullable": true
+      },
+      "package_name": {
+        "kind": "text",
+        "nullable": true
+      },
+      "ip_address": {
+        "kind": "text",
+        "nullable": true
+      },
+      "owner": {
+        "kind": "text",
+        "nullable": true
+      },
+      "partition": {
+        "kind": "text",
+        "nullable": true
+      },
+      "disk_used_mb": {
+        "kind": "int",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "disk_limit_mb": {
+        "kind": "int",
+        "nullable": true
+      },
+      "unix_startdate": {
+        "kind": "bigint",
+        "nullable": true
+      },
+      "account_created_at": {
+        "kind": "datetime",
+        "nullable": true
+      },
+      "is_suspended": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "suspension_reason": {
+        "kind": "text",
+        "nullable": true
+      },
+      "theme": {
+        "kind": "text",
+        "nullable": true
+      },
+      "php_version": {
+        "kind": "text",
+        "nullable": true
+      },
+      "max_pop": {
+        "kind": "text",
+        "nullable": true
+      },
+      "max_sub": {
+        "kind": "text",
+        "nullable": true
+      },
+      "max_sql": {
+        "kind": "text",
+        "nullable": true
+      },
+      "max_ftp": {
+        "kind": "text",
+        "nullable": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "service_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "hosting_account_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "raw_metadata": {
+        "kind": "json",
+        "nullable": true
+      },
+      "status": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "last_synced_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "sync_status": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "requires_manual_link": {
+        "kind": "bool",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "link_status": {
+        "kind": "text",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "notes": {
+        "kind": "text",
+        "nullable": true
+      }
+    },
+    "fks": [
+      {
+        "name": "whm_accounts_hosting_account_id_fkey",
+        "cols": [
+          "hosting_account_id"
+        ],
+        "refTable": "hosting_accounts",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "whm_accounts_profile_id_fkey",
+        "cols": [
+          "profile_id"
+        ],
+        "refTable": "profiles",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "whm_accounts_server_id_fkey",
+        "cols": [
+          "server_id"
+        ],
+        "refTable": "servers",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "whm_accounts_service_id_fkey",
+        "cols": [
+          "service_id"
+        ],
+        "refTable": "services",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  },
+  "whm_package_mappings": {
+    "pk": [
+      "id"
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "server_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "whm_package_name": {
+        "kind": "text",
+        "nullable": false
+      },
+      "plan_id": {
+        "kind": "uuid",
+        "nullable": true
+      },
+      "label": {
+        "kind": "text",
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "datetime",
+        "nullable": false,
+        "hasDefault": true
+      }
+    },
+    "fks": [
+      {
+        "name": "whm_package_mappings_plan_id_fkey",
+        "cols": [
+          "plan_id"
+        ],
+        "refTable": "plans",
+        "refCols": [
+          "id"
+        ]
+      },
+      {
+        "name": "whm_package_mappings_server_id_fkey",
+        "cols": [
+          "server_id"
+        ],
+        "refTable": "servers",
+        "refCols": [
+          "id"
+        ]
+      }
+    ],
+    "generated": [],
+    "appDefaults": {
+      "id": "uuid"
+    }
+  }
+}
