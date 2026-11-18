@@ -1,9 +1,10 @@
 'use client'
 import Link from 'next/link'
-import { Monitor, Image, Globe, Mail, Users, Server, RefreshCw, Sparkles, Package, LayoutTemplate } from 'lucide-react'
+import { Monitor, Image, Globe, Mail, Users, Server, RefreshCw, Sparkles, Package, LayoutTemplate, Film } from 'lucide-react'
 import { useEffect, useState, useCallback } from 'react'
 
-const modules = [
+const modules: { href: string; icon: typeof Image; label: string; desc: string; color: string; table: string | null }[] = [
+  { href: '/admin/site/hero',          icon: Film,           label: 'Topo da Página Inicial', desc: 'Ativar carrossel ou vídeo',   color: '#0EA5E9', table: null },
   { href: '/admin/site/banners',       icon: Image,          label: 'Banners / Hero',       desc: 'Slides do carrossel principal',   color: '#F5B700', table: 'site_banners' },
   { href: '/admin/site/banner-pages',  icon: LayoutTemplate, label: 'Banner das Páginas',   desc: 'Hero de cada página de serviço',  color: '#F97316', table: 'banner_pages' },
   { href: '/admin/site/domains',       icon: Globe,          label: 'Domínios',             desc: 'Extensões e preços de domínios',  color: '#3B82F6', table: 'site_domains' },
@@ -24,7 +25,7 @@ export default function SitePage() {
     try {
       const res = await fetch('/api/admin/seed-site')
       const data = await res.json()
-      setCounts(modules.map(m => data[m.table] ?? 0))
+      setCounts(modules.map(m => (m.table ? data[m.table] ?? 0 : 0)))
     } catch {
       setCounts(modules.map(() => 0))
     }
@@ -114,12 +115,12 @@ export default function SitePage() {
                   <Icon size={22} style={{ color: mod.color }} />
                 </div>
                 <span className="text-xs font-bold px-2.5 py-1 rounded-full"
-                  style={loading
+                  style={loading || !mod.table
                     ? { background: '#F1F5F9', color: '#94A3B8' }
                     : counts[i] > 0
                       ? { background: `${mod.color}12`, color: mod.color }
                       : { background: '#FEF3C7', color: '#D9A300' }}>
-                  {loading ? '…' : `${counts[i]} itens`}
+                  {!mod.table ? 'Definição' : loading ? '…' : `${counts[i]} itens`}
                 </span>
               </div>
               <h2 className="font-black text-base mb-1" style={{ color: '#0B0B0D' }}>{mod.label}</h2>
