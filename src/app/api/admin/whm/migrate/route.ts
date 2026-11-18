@@ -135,42 +135,8 @@ export async function POST() {
   try {
     await requireAdminRole()
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !serviceKey) {
-      return NextResponse.json({ error: 'Supabase env vars not set.' }, { status: 500 })
-    }
-
-    const projectRef = supabaseUrl.replace('https://', '').split('.')[0]
-
-    // Execute via Supabase Management API
-    const res = await fetch(
-      `https://api.supabase.com/v1/projects/${projectRef}/database/query`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${serviceKey}`,
-        },
-        body: JSON.stringify({ query: WHM_MIGRATION_SQL }),
-      }
-    )
-
-    if (!res.ok) {
-      const text = await res.text()
-      // Fallback: try via RPC if Management API unavailable
-      console.warn('[whm/migrate] Management API failed:', res.status, text)
-
-      // Try line-by-line via rpc (limited)
-      return NextResponse.json({
-        success: false,
-        error: `Management API returned ${res.status}. Execute a migração manualmente no Supabase SQL Editor.`,
-        sql: WHM_MIGRATION_SQL,
-        managementApiError: text,
-      }, { status: 500 })
-    }
-
+    // MariaDB: as tabelas WHM são criadas por database/mariadb/001_schema.sql (phpMyAdmin).
+    // O SQL PostgreSQL acima fica apenas como referência histórica.
     // Verify tables now exist
     const db = createAdminWriteClient()
     const checks = await Promise.all([

@@ -3,14 +3,11 @@ import { Metadata } from 'next'
 import { CreditCard, TrendingUp, Clock, CheckCircle2, AlertCircle, Package, ExternalLink } from 'lucide-react'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { createAdminWriteClient } from '@/lib/supabase/server'
-import { createClient as createStorageClient } from '@supabase/supabase-js'
+import { createClient as createStorageClient } from '@/lib/supabase/service'
 import { redirect } from 'next/navigation'
 
 function storageAdmin() {
-  return createStorageClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
+  return createStorageClient()
 }
 
 export const dynamic   = 'force-dynamic'

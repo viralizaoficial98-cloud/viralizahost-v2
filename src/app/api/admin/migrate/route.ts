@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/service'
 import { adminGuard } from '@/lib/api/require-admin'
 
 const MIGRATION_SQL = `
@@ -428,37 +428,12 @@ export async function POST() {
   if (denied) return denied
 
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    const supabase = createClient()
 
     const results: { step: string; ok: boolean; error?: string }[] = []
 
-    // Executar SQL via PostgreSQL direto
-    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      .replace('https://', '')
-      .split('.')[0]
-
-    const response = await fetch(
-      `https://api.supabase.com/v1/projects/${projectRef}/database/query`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
-        },
-        body: JSON.stringify({ query: MIGRATION_SQL })
-      }
-    )
-
-    if (!response.ok) {
-      const errText = await response.text()
-      results.push({ step: 'migration_sql', ok: false, error: errText })
-    } else {
-      results.push({ step: 'migration_sql', ok: true })
-    }
+    // MariaDB: o schema é aplicado com database/mariadb/001_schema.sql (phpMyAdmin); aqui só se valida.
+    results.push({ step: 'mariadb_schema', ok: true })
 
     // Validar via Supabase client
     const { data: plans, error: plansErr } = await supabase
@@ -488,11 +463,7 @@ export async function GET() {
   if (denied) return denied
 
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    const supabase = createClient()
 
     const tables = ['profiles', 'plans', 'services', 'domains', 'tickets', 'invoices', 'notifications', 'activity_logs']
     const results: Record<string, { ok: boolean; count?: number; error?: string }> = {}

@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createAdminWriteClient, createRpcClient } from '@/lib/supabase/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
-import { createClient as createStorageClient } from '@supabase/supabase-js'
+import { createClient as createStorageClient } from '@/lib/supabase/service'
 
 // Storage client — NO db.schema header (Storage API breaks with it)
 function storageAdmin() {
-  return createStorageClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
+  return createStorageClient()
 }
 
 export async function GET() {

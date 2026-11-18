@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient, createAuthClient, createRpcClient } from '@/lib/supabase/server'
+import { createAdminClient, createRpcClient } from '@/lib/supabase/server'
+import { requireAdminRole } from '@/lib/api/require-admin'
 
+// Antes só exigia sessão iniciada; agora exige o papel admin.
 async function requireAdmin() {
-  const auth = await createAuthClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
-  return user
+  return requireAdminRole()
 }
 
 // SQL that the admin can run manually in the Supabase Dashboard if all automatic methods fail.
 // This is identical to what setup_product_catalog() does, but as raw SQL.
-const MANUAL_SQL = `-- Run this in Supabase Dashboard → SQL Editor
+const MANUAL_SQL = `-- MariaDB: as tabelas vêm de database/mariadb/001_schema.sql e os dados de scripts/mariadb/migrate-data.mjs
 -- It creates the products catalog tables and seeds all products.
 -- Copy from: supabase/migrations/20260712_000000_products_rpc.sql
 
@@ -38,33 +37,6 @@ export async function POST(req: NextRequest) {
       })
     }
   } catch {}
-
-  // ── Step 2: Try Supabase Management API with SUPABASE_ACCESS_TOKEN ──
-  const pat = process.env.SUPABASE_ACCESS_TOKEN
-  if (pat) {
-    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      .replace('https://', '').split('.')[0]
-
-    try {
-      const mgmtRes = await fetch(
-        `https://api.supabase.com/v1/projects/${projectRef}/database/query`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${pat}`,
-          },
-          body: JSON.stringify({ query: 'SELECT public.setup_product_catalog()' }),
-        }
-      )
-      if (mgmtRes.ok) {
-        return NextResponse.json({
-          success: true,
-          message: 'Tabelas criadas e catálogo carregado com sucesso via Management API.',
-        })
-      }
-    } catch {}
-  }
 
   // ── Step 3: Check if tables already exist (maybe migration was applied) ──
   try {

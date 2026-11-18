@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseClient } from '@/lib/supabase/service'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import {
   HOME_HERO_VIDEO_BUCKET, HOME_HERO_VIDEO_FOLDER,
@@ -17,13 +17,9 @@ export async function guardAdmin(): Promise<{ userId: string } | { denied: NextR
   }
 }
 
-/** Cliente service role sem db.schema (a Storage API não usa o cabeçalho de schema). */
+/** Cliente com o papel service (storage e base de dados MariaDB). */
 export function storageAdminClient() {
-  return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  )
+  return createSupabaseClient()
 }
 
 /** Cria o bucket se a migração ainda não o tiver criado. */

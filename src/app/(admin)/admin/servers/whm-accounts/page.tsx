@@ -115,12 +115,11 @@ export default async function WhmAccountsPage({ searchParams }: PageProps) {
         <div className="rounded-2xl p-5 space-y-3" style={card}>
           <div className="flex items-center gap-2">
             <Database size={16} style={{ color: '#64748B' }} />
-            <h3 className="text-sm font-bold" style={{ color: '#0B0B0D' }}>SQL alternativo — Supabase SQL Editor</h3>
+            <h3 className="text-sm font-bold" style={{ color: '#0B0B0D' }}>Schema MariaDB — phpMyAdmin</h3>
           </div>
           <p className="text-xs" style={{ color: '#64748B' }}>
-            Se o botão não funcionar, execute este SQL manualmente no
-            <a href="https://app.supabase.com" target="_blank" rel="noopener noreferrer"
-              className="underline mx-1" style={{ color: '#F5B700' }}>Supabase SQL Editor</a>:
+            As tabelas WHM são criadas ao importar <code>database/mariadb/001_schema.sql</code> no phpMyAdmin.
+            O SQL abaixo (PostgreSQL) fica apenas como referência histórica:
           </p>
           <pre className="text-[10px] rounded-xl p-4 overflow-x-auto"
             style={{ background: '#0F172A', color: '#E2E8F0', lineHeight: 1.5 }}>

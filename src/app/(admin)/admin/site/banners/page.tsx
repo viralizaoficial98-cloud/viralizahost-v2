@@ -124,7 +124,7 @@ function ImageUploadArea({
             <X size={14} />
           </button>
           <div className="absolute bottom-0 left-0 right-0 px-3 py-1 text-xs truncate" style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}>
-            {resolved.startsWith('http') ? 'Supabase Storage' : 'Ficheiro /public'}
+            {resolved.startsWith('http') ? 'Armazenamento' : 'Ficheiro /public'}
           </div>
         </div>
       )}
@@ -210,7 +210,7 @@ function ImageUploadArea({
             onBlur={() => onUrlChange(urlDraft)}
           />
           <p className="text-xs" style={{ color: '#94A3B8' }}>
-            Ficheiros em <code>/public</code> ou URLs públicas do Supabase Storage.
+            Ficheiros em <code>/public</code> ou URLs públicas do armazenamento (/storage/v1/object/public/…).
           </p>
         </div>
       )}

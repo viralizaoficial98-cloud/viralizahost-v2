@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { createAdminWriteClient } from '@/lib/supabase/server'
-import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
+import { createClient as createSupabaseAdmin } from '@/lib/supabase/service'
 
 export const dynamic   = 'force-dynamic'
 export const revalidate = 0
@@ -21,11 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { data: profile } = await db.from('profiles').select('email').eq('id', targetUserId).single()
   if (!profile) return NextResponse.json({ error: 'Cliente não encontrado.' }, { status: 404 })
 
-  const supabaseAdmin = createSupabaseAdmin(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const supabaseAdmin = createSupabaseAdmin()
 
   const { error } = await supabaseAdmin.auth.resetPasswordForEmail((profile as any).email, {
     redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://viralizahost.com'}/reset-password`,

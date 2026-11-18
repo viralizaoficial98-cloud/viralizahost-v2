@@ -12,6 +12,9 @@ import { FAQSection } from '@/components/landing/FAQSection'
 import { CTASection } from '@/components/landing/CTASection'
 import { TeamSection } from '@/components/landing/TeamSection'
 
+// ISR: o topo (vídeo/carrossel) é lido de site_home_hero; o admin revalida ao gravar.
+export const revalidate = 60
+
 export default function HomePage() {
   return (
     <>

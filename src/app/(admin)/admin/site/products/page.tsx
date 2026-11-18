@@ -301,8 +301,8 @@ function SetupBanner({ onSuccess }: { onSuccess: () => void }) {
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                     <p className="text-xs font-bold text-amber-800 mb-1">Como resolver em 3 passos:</p>
                     <ol className="text-xs text-amber-700 space-y-1 list-decimal list-inside">
-                      <li>Abra o <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="underline font-semibold">Supabase Dashboard → SQL Editor</a></li>
-                      <li>Copie e execute o ficheiro <code className="bg-amber-100 px-1 rounded font-mono">supabase/migrations/20260712_000000_products_rpc.sql</code></li>
+                      <li>Abra o phpMyAdmin e confirme que importou <code className="bg-amber-100 px-1 rounded font-mono">database/mariadb/001_schema.sql</code></li>
+                      <li>Importe os dados com <code className="bg-amber-100 px-1 rounded font-mono">node scripts/mariadb/migrate-data.mjs copy --tables products,product_features</code></li>
                       <li>Volte aqui e clique em <strong>Configurar Agora</strong> novamente</li>
                     </ol>
                   </div>

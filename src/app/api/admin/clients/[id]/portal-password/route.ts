@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { createAdminWriteClient } from '@/lib/supabase/server'
-import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
+import { createClient as createSupabaseAdmin } from '@/lib/supabase/service'
 
 export const dynamic   = 'force-dynamic'
 export const revalidate = 0
@@ -29,11 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // Use Supabase Admin Auth (service_role) — never exposed to browser
-  const supabaseAdmin = createSupabaseAdmin(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const supabaseAdmin = createSupabaseAdmin()
 
   const { error } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
     password: newPassword,

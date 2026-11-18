@@ -26,14 +26,11 @@ type UploadState =
 
 type Notice = { ok: boolean; text: string } | null
 
-/* ─── Upload direto para o Supabase Storage (URL assinado) ───────────── */
+/* ─── Upload para o armazenamento do servidor (URL assinado) ─────────── */
 function uploadToSignedUrl(signedUrl: string, file: File, onProgress: (pct: number) => void, signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', signedUrl)
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
-    xhr.setRequestHeader('apikey', anon)
-    xhr.setRequestHeader('Authorization', `Bearer ${anon}`)
     xhr.setRequestHeader('x-upsert', 'false')
     xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)) }
     xhr.onload = () => {
@@ -41,7 +38,7 @@ function uploadToSignedUrl(signedUrl: string, file: File, onProgress: (pct: numb
       let msg = `HTTP ${xhr.status}`
       try { const j = JSON.parse(xhr.responseText); msg = j.message ?? j.error ?? msg } catch {}
       if (xhr.status === 413 || /exceeded the maximum allowed size/i.test(msg)) {
-        msg = 'O ficheiro excede o limite de tamanho do Supabase Storage (verifique o limite global do projeto).'
+        msg = 'O ficheiro excede o limite de tamanho permitido pelo servidor (verifique client_max_body_size / LimitRequestBody do proxy web).'
       }
       reject(new Error(msg))
     }
@@ -353,7 +350,7 @@ export default function HomeHeroAdminPage() {
                 <p className="text-sm font-semibold" style={{ color: '#0B0B0D' }}>
                   {hasVideo ? 'Substituir vídeo' : 'Carregar vídeo'} — arraste o MP4 ou clique para escolher
                 </p>
-                <p className="text-xs" style={{ color: '#94A3B8' }}>O ficheiro é enviado diretamente para o Supabase Storage.</p>
+                <p className="text-xs" style={{ color: '#94A3B8' }}>O ficheiro é enviado diretamente para o armazenamento do servidor.</p>
                 <input ref={fileRef} type="file" accept="video/mp4,.mp4" className="hidden"
                   data-testid="home-hero-video-input"
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { createAdminWriteClient } from '@/lib/supabase/server'
 import {
-  HOME_HERO_TABLE, HOME_HERO_VIDEO_BUCKET,
+  HOME_HERO_CACHE_TAG, HOME_HERO_TABLE, HOME_HERO_VIDEO_BUCKET,
   isHomeHeroMode, normalizeVideoSrc,
   type HomeHeroSettings,
 } from '@/lib/home-hero'
@@ -45,7 +45,7 @@ function dbErrorResponse(err: unknown) {
   const missing = e.code === '42P01' || e.code === 'PGRST205' || /site_home_hero/.test(e.message ?? '')
   return NextResponse.json({
     error: missing
-      ? 'A tabela site_home_hero não existe. Execute a migração supabase/migrations/20261118_000000_home_hero.sql no Supabase.'
+      ? 'A tabela site_home_hero não existe. Importe database/mariadb/001_schema.sql no phpMyAdmin.'
       : `Erro na base de dados: ${e.message ?? 'desconhecido'}`,
   }, { status: 500 })
 }
@@ -136,6 +136,7 @@ export async function PUT(req: NextRequest) {
   }
 
   revalidatePath('/')
+  revalidateTag(HOME_HERO_CACHE_TAG, { expire: 0 })
   return NextResponse.json({ settings: data })
 }
 
@@ -160,5 +161,6 @@ export async function DELETE() {
 
   await removeStoredVideo(current.video_storage_path)
   revalidatePath('/')
+  revalidateTag(HOME_HERO_CACHE_TAG, { expire: 0 })
   return NextResponse.json({ settings: data })
 }

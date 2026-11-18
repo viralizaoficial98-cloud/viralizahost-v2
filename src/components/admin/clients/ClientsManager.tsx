@@ -218,7 +218,7 @@ function PortalPasswordModal({ client, onClose, onSuccess }: { client: Client; o
           </div>
           {err && <p className="text-xs font-semibold" style={{ color: '#DC2626' }}>{err}</p>}
           <p className="text-xs" style={{ color: '#94A3B8' }}>
-            A senha é alterada via Supabase Admin Auth no servidor. Nunca é guardada em texto simples nem registada em logs.
+            A senha é alterada no servidor (hash bcrypt). Nunca é guardada em texto simples nem registada em logs.
           </p>
         </div>
         <div className="px-6 pb-5 flex gap-3">
