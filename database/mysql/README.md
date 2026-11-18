@@ -46,7 +46,7 @@ As falhas 1 e 2 existem **agora** em produção. As correções para o Supabase 
 | Ficheiro | Para quê |
 |---|---|
 | `database/mysql/001_schema.sql` | Cria as 37 tabelas (MariaDB 10.6+ / MySQL 8.0.16+). Idempotente. Importável pelo phpMyAdmin. |
-| `scripts/mysql-migration/migrate-data.mjs` | `check`, `import` (`--resume`, `--prune`), `validate`, `reverse` |
+| `scripts/mysql-migration/migrate-data.mjs` (+ `sources.mjs`, `common.mjs`) | `export` (pela API REST do Supabase, sem senha da base), `check`, `import` (`--resume`, `--prune`), `validate`, `reverse` |
 | `scripts/mysql-migration/generate-schema.mjs` | Regenera o DDL e os metadados a partir do PostgreSQL |
 | `scripts/mysql-migration/extract-seeds.mjs` | Dados semeados por `setup_product_catalog` e `setup_banner_pages` |
 | `database/supabase-hotfix/*.sql` | Correções de segurança para o Supabase atual |
@@ -98,95 +98,77 @@ uapi --user=<conta> Mysql set_privileges_on_database user=<conta>_vhapp database
 ### 4.3 Código da migração numa pasta separada (não toca no site em produção)
 ```bash
 cd /var/www/viralizahost && git fetch origin feat/migracao-mysql
-git worktree add /var/www/viralizahost-mysql origin/feat/migracao-mysql
+git worktree add --detach /var/www/viralizahost-mysql FETCH_HEAD
 cd /var/www/viralizahost-mysql && npm ci
 ```
-
-### 4.4 Credenciais da migração (fora do repositório, só root)
-A ligação ao Supabase está em **Supabase → Connect → Session pooler** (URI). A senha da base está em Project Settings → Database.
+Se a pasta já existir, atualize-a para a versão mais recente da branch:
 ```bash
-install -m 600 /dev/null /root/.vh-migracao.env
-cat > /root/.vh-migracao.env <<'EOF'
-SOURCE_PG_URL=postgresql://postgres.<ref>:<SENHA_SUPABASE>@aws-0-<região>.pooler.supabase.com:5432/postgres
+cd /var/www/viralizahost-mysql && git fetch origin feat/migracao-mysql && git checkout --detach FETCH_HEAD && npm ci
+```
+
+### 4.4 Credenciais MySQL no `.env.local` (o site ainda não muda de base)
+A migração **não precisa de acesso ao painel do Supabase**:
+- lê os dados pela API REST, com `NEXT_PUBLIC_SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`, que já estão no `.env.local` do site;
+- só precisa que lhe acrescente as credenciais MySQL.
+
+Enquanto `NEXT_PUBLIC_DATA_BACKEND` não for `mysql`, o site ignora estas linhas.
+```bash
+cd /var/www/viralizahost && cp .env.local /root/env.local.backup-$(date +%F) && chmod 600 /root/env.local.backup-*
+nano .env.local
+```
+Acrescente no fim do ficheiro, com os seus valores (a senha fica entre aspas simples):
+```
+# MySQL (cPanel) — usado pela migração e, depois da troca, pelo site
 MYSQL_SOCKET=/var/lib/mysql/mysql.sock
 MYSQL_USER=<conta>_vhapp
-MYSQL_PASSWORD=<SENHA_MYSQL>
-MYSQL_DATABASE=<conta>_vh_validacao
-EOF
-nano /root/.vh-migracao.env   # substituir os valores entre < >
+MYSQL_PASSWORD='<SENHA_MYSQL>'
+MYSQL_DATABASE=<conta>_viralizahost
 ```
+Os comandos seguintes usam `node --env-file`, que exige Node 20.6 ou superior (`node -v`).
 
-### 4.5 Criar as tabelas, importar e validar
-```bash
-cd /var/www/viralizahost-mysql && set -a && . /root/.vh-migracao.env && set +a
-mysql --default-character-set=utf8mb4 -S "$MYSQL_SOCKET" -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < database/mysql/001_schema.sql
-mkdir -p /root/vh-migracao-logs
-node scripts/mysql-migration/migrate-data.mjs check    | tee /root/vh-migracao-logs/1-check.log
-node scripts/mysql-migration/migrate-data.mjs import   | tee /root/vh-migracao-logs/2-import.log
-node scripts/mysql-migration/migrate-data.mjs validate | tee /root/vh-migracao-logs/3-validate.log
-```
-- Em vez do `mysql … < 001_schema.sql`, pode usar o phpMyAdmin: selecionar a base → **Importar** → escolher o ficheiro.
-- O `check` tem de terminar com "Schema compatível". Se listar diferenças (por exemplo, colunas criadas no Supabase fora das migrations), envie-me o ficheiro `1-check.log`.
-- O `validate` tem de terminar com **"VALIDAÇÃO OK"**: tabelas idênticas linha a linha, nenhum registo órfão e totais financeiros iguais.
-
-**Importação interrompida:** volte a executar `import`. Cada linha é escrita com `INSERT … ON DUPLICATE KEY UPDATE` pela chave primária, por isso não há duplicados. Com `--resume`, cada tabela continua a partir da última chave importada (tabela `_migration_state`).
-
-### 4.6 (Recomendado) Testar a aplicação contra a base de validação
+### 4.5 Criar as tabelas, exportar, importar e validar
 ```bash
 cd /var/www/viralizahost-mysql
-cp /var/www/viralizahost/.env.local .env.local && chmod 600 .env.local
-printf '\nNEXT_PUBLIC_DATA_BACKEND=mysql\nMYSQL_SOCKET=%s\nMYSQL_USER=%s\nMYSQL_PASSWORD=%s\nMYSQL_DATABASE=%s\n' \
-  "$MYSQL_SOCKET" "$MYSQL_USER" "$MYSQL_PASSWORD" "$MYSQL_DATABASE" >> .env.local
-npm run build && nohup npx next start -p 3101 > /root/vh-migracao-logs/validacao-app.log 2>&1 &
+E=/var/www/viralizahost/.env.local
+mysql --default-character-set=utf8mb4 -S /var/lib/mysql/mysql.sock -u'<conta>_vhapp' -p '<conta>_viralizahost' < database/mysql/001_schema.sql
+node --env-file=$E scripts/mysql-migration/migrate-data.mjs export   --dir=/root/vh-export-1
+node --env-file=$E scripts/mysql-migration/migrate-data.mjs check    --from=/root/vh-export-1
+node --env-file=$E scripts/mysql-migration/migrate-data.mjs import   --from=/root/vh-export-1
+node --env-file=$E scripts/mysql-migration/migrate-data.mjs validate --from=/root/vh-export-1
 ```
-- Abra a aplicação no seu computador com `ssh -L 3101:localhost:3101 root@<servidor>` e depois **http://localhost:3101**.
-- **Atenção:** esta instância usa o Auth e o Storage **reais**. Navegue e faça login à vontade. Não faça uploads, envios de faturas nem ações WHM (suspender, SSO) com clientes reais.
-- No fim: `fuser -k 3101/tcp`.
+- Em vez do comando `mysql … < 001_schema.sql`, pode importar as tabelas pelo phpMyAdmin: selecionar a base → **Importar** → escolher o ficheiro.
+- O `export` grava cada tabela em `/root/vh-export-1/*.json` (só root lê). Esta pasta é também um **backup** dos dados do Supabase.
+- O `check` tem de terminar com "Schema compatível". Se não terminar, envie-me o resultado.
+- O `validate` tem de terminar com **"VALIDAÇÃO OK"**: tabelas idênticas linha a linha, nenhum registo órfão e totais financeiros iguais.
+
+**Importação interrompida:** volte a executar o mesmo `import`. Cada linha é escrita com `INSERT … ON DUPLICATE KEY UPDATE` pela chave primária, por isso não há duplicados. Com `--resume`, cada tabela continua a partir da última chave importada (tabela `_migration_state`).
+
+Com acesso à senha da base do Supabase, pode ler diretamente do PostgreSQL: defina `SOURCE_PG_URL` e omita `--from`.
 
 ## 5. Troca em produção (janela de manutenção, ~5 a 10 min sem serviço)
-
-### 5.0 Antes da janela
-1. Fazer merge da branch `feat/migracao-mysql` na `main`.
-2. Criar a base de produção `<conta>_viralizahost` com o mesmo utilizador (4.2), importar `001_schema.sql` e fazer uma primeira importação com validação (4.5, com `MYSQL_DATABASE=<conta>_viralizahost` no `/root/.vh-migracao.env`). Isto pode ser feito dias antes.
-3. Ter `pg_dump` 15+ no servidor (`pg_dump --version`). Se não houver, confirmar que há um backup recente em Supabase → Database → Backups.
-
-### 5.1 Backups
 ```bash
-B=/root/backups/vh-$(date +%F-%H%M) && mkdir -p "$B" && chmod 700 "$B"
-set -a && . /root/.vh-migracao.env && set +a
-pg_dump "$SOURCE_PG_URL" --schema=viralizahost --format=custom --file="$B/supabase-viralizahost.dump"
-cp /var/www/viralizahost/.env.local "$B/env.local.antes"
-git -C /var/www/viralizahost rev-parse HEAD > "$B/commit.antes"
-```
-
-### 5.2 Parar as escritas e fazer a sincronização final
-```bash
+# 5.1 Parar as escritas
 pm2 stop viralizahost
-cd /var/www/viralizahost-mysql && git fetch origin && git checkout --detach origin/main && npm ci
-node scripts/mysql-migration/migrate-data.mjs import --prune | tee "$B/sync-final.log"
-node scripts/mysql-migration/migrate-data.mjs validate      | tee "$B/validate-final.log"
-mysqldump --single-transaction --default-character-set=utf8mb4 -S "$MYSQL_SOCKET" -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" > "$B/mysql-apos-sync.sql"
-```
-Se o `validate` **não** terminar com "VALIDAÇÃO OK", **pare aqui**. Reponha o site com `pm2 start viralizahost` (continua no Supabase) e envie-me o log.
 
-### 5.3 Trocar a configuração, compilar e reiniciar
-```bash
-cd /var/www/viralizahost && git status --short     # tem de estar vazio
-git pull --ff-only origin main
-sed -i '/^NEXT_PUBLIC_DATA_BACKEND=/d;/^MYSQL_/d' .env.local
-printf '\nNEXT_PUBLIC_DATA_BACKEND=mysql\nMYSQL_SOCKET=%s\nMYSQL_USER=%s\nMYSQL_PASSWORD=%s\nMYSQL_DATABASE=%s\n' \
-  "$MYSQL_SOCKET" "$MYSQL_USER" "$MYSQL_PASSWORD" "$MYSQL_DATABASE" >> .env.local
-(set -a && . ./.env.local && set +a && bash scripts/deploy-env-check.sh)
+# 5.2 Exportação final (= backup dos dados do Supabase), sincronização e validação
+cd /var/www/viralizahost-mysql && E=/var/www/viralizahost/.env.local
+F=/root/vh-export-final-$(date +%F-%H%M)
+node --env-file=$E scripts/mysql-migration/migrate-data.mjs export   --dir=$F
+node --env-file=$E scripts/mysql-migration/migrate-data.mjs import   --from=$F --prune
+node --env-file=$E scripts/mysql-migration/migrate-data.mjs validate --from=$F
+#    → tem de terminar com "VALIDAÇÃO OK"; se não terminar: pm2 start viralizahost (continua no Supabase) e pare aqui
+
+# 5.3 Código novo + ativar o MySQL + compilar (obrigatório antes de reiniciar)
+cd /var/www/viralizahost && git status --short           # tem de estar vazio
+git fetch origin feat/migracao-mysql && git checkout -B feat/migracao-mysql FETCH_HEAD   # ou: git pull --ff-only origin main, depois do merge
+sed -i '/^NEXT_PUBLIC_DATA_BACKEND=/d' .env.local && echo 'NEXT_PUBLIC_DATA_BACKEND=mysql' >> .env.local
 npm ci && npm run build
 pm2 start viralizahost --update-env
 ```
-**É obrigatório recompilar antes de reiniciar:** `NEXT_PUBLIC_DATA_BACKEND` é fixada no build.
 
 ### 5.4 Verificações imediatas
 ```bash
 curl -s -o /dev/null -w "home %{http_code}\n" https://viralizahost.com/
-curl -s -X POST https://viralizahost.com/api/db -H 'content-type: application/json' -H 'x-vh-db: 1' \
-  -d '{"table":"site_banners","action":"select","columns":"id","filters":[],"order":[],"limit":1}'
 pm2 logs viralizahost --lines 200 --nostream | grep -iE "error|\[db\]" | tail -20
 ```
 No browser:
@@ -208,17 +190,18 @@ O que for criado no MySQL depois da troca não aparece no Supabase.
 ### B) Rollback preservando os registos criados depois da troca
 ```bash
 pm2 stop viralizahost
-B=/root/backups/vh-rollback-$(date +%F-%H%M) && mkdir -p "$B"
-cd /var/www/viralizahost-mysql && set -a && . /root/.vh-migracao.env && set +a   # MYSQL_DATABASE = base de produção
-pg_dump "$SOURCE_PG_URL" --schema=viralizahost --format=custom --file="$B/supabase-antes-reverse.dump"
-node scripts/mysql-migration/migrate-data.mjs reverse | tee "$B/reverse.log"
-node scripts/mysql-migration/migrate-data.mjs validate | tee "$B/validate.log"
+cd /var/www/viralizahost-mysql && E=/var/www/viralizahost/.env.local
+node --env-file=$E scripts/mysql-migration/migrate-data.mjs export --dir=/root/vh-supabase-antes-rollback   # backup
+node --env-file=$E scripts/mysql-migration/migrate-data.mjs reverse --prune
+node --env-file=$E scripts/mysql-migration/migrate-data.mjs export --dir=/root/vh-supabase-depois-rollback
+node --env-file=$E scripts/mysql-migration/migrate-data.mjs validate --from=/root/vh-supabase-depois-rollback --ignore-cols=updated_at
 cd /var/www/viralizahost && sed -i 's/^NEXT_PUBLIC_DATA_BACKEND=.*/NEXT_PUBLIC_DATA_BACKEND=supabase/' .env.local
 npm run build && pm2 start viralizahost --update-env
 ```
-- O `reverse` copia para o Supabase todas as linhas do MySQL, novas e alteradas, sem duplicados (`ON CONFLICT`).
-- Durante a cópia, os triggers ficam desligados, para preservar números de tickets e datas.
-- Com `reverse --prune`, também apaga no Supabase as linhas que foram apagadas no MySQL depois da troca. Use só se tiver a certeza.
+- **O que o `reverse` faz pela API:**
+  - envia para o Supabase só as linhas **novas ou alteradas** no MySQL; as novas seguem por ordem de criação, para que os tickets fiquem com os mesmos números;
+  - com `--prune`, apaga no Supabase o que foi apagado no MySQL.
+- **Porque se ignora `updated_at`:** os triggers do Supabase atualizam essa coluna nas linhas alteradas, por isso a validação compara tudo exceto essa coluna.
 - Os utilizadores novos já existem no Supabase Auth, porque o Auth nunca saiu do Supabase.
 
 ## 7. phpMyAdmin

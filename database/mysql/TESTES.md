@@ -30,6 +30,21 @@ Para reproduzir os testes: `scripts/mysql-migration/test/run-e2e.sh` (as instru�
 | Rollback `reverse` (MySQL → PostgreSQL) com papel **sem superutilizador**, como o `postgres` do Supabase: registos criados, alterados e apagados depois da troca voltam ao PostgreSQL, os triggers ficam desligados durante a cópia (o número do ticket não é recalculado) e são religados; validação OK | ✅ | — |
 | Exportação/importação dos dados de base das migrations (planos, produtos, banners das páginas, câmbios, faturação, topo) e validação | ✅ | ✅ |
 
+### Migração sem acesso ao painel do Supabase (API REST + chave de serviço)
+
+Testado contra o PostgREST 12.2.8, o mesmo motor da API REST do Supabase, ligado a uma cópia dos dados de teste. Usa uma chave `service_role` e o acesso anónimo é recusado.
+
+| Teste | MariaDB 10.6 |
+|---|---|
+| `export`: 37 tabelas → JSON (ficheiros 600, pasta 700); decimais e bigint lidos como texto exato; microssegundos preservados | ✅ |
+| Paginação acima de 1 000 linhas (2 640 linhas em `activity_logs`) | ✅ |
+| `check` / `import` / `validate --from=<snapshot>` → VALIDAÇÃO OK; validação cruzada direta contra o PostgreSQL de origem → OK | ✅ |
+| Sincronização final: a validação deteta linhas novas, alteradas (incluindo +0,07 nos totais financeiros) e apagadas; `import --prune` → OK | ✅ |
+| Importação morta a meio (`kill -9`, `activity_logs` 1 811/2 640) → `import --resume` → OK | ✅ |
+| `reverse --prune` pela API: só linhas novas ou alteradas são enviadas (2 tickets novos com os mesmos números, 1 fatura alterada, 2 notificações apagadas); validação direta ignorando `updated_at` → OK | ✅ |
+| Leitura das credenciais do `.env.local` com `node --env-file`, incluindo uma senha com `#`, `$`, `"` e `=` | ✅ |
+| Modo de ligação direta (`SOURCE_PG_URL`) continua a funcionar depois da reorganização do script | ✅ |
+
 ## 3. Fluxos da aplicação em modo MySQL
 
 Resultado: **MariaDB 10.6 — 155/155** · **MySQL 8.0 — 155/155**. Em ambos os casos a execução partiu de uma base nova.
@@ -240,7 +255,7 @@ Compilação com `NEXT_PUBLIC_DATA_BACKEND` por definir (= `supabase`), contra o
 
 ## 5. Ainda por validar (não foi possível testar aqui)
 
-- **Exportação real do Supabase de produção** (`check`/`import`/`validate` com `SOURCE_PG_URL`). Sem acesso, o schema foi reconstruído a partir das migrations. Se a produção tiver colunas ou tabelas fora das migrations, o `check` mostra-as e a importação não arranca até serem corrigidas.
+- **Exportação real do Supabase de produção** (`export` pela API REST, ou `SOURCE_PG_URL`). Sem acesso, o schema foi reconstruído a partir das migrations. Se a produção tiver colunas ou tabelas fora das migrations, o `check` mostra-as e a importação não arranca até serem corrigidas.
 - **Versão do MySQL/MariaDB do cPanel**: testado em MariaDB 10.6 e MySQL 8.0. Versões mais antigas (MariaDB < 10.6, MySQL < 8.0.16) não foram testadas.
 - **Supabase Auth e Storage reais**: login, recuperação (email real com link), uploads e URLs assinados foram testados contra o simulador, que segue a mesma API.
 - **WHM real**: testadas as funções que a app usa (version, listaccts, accountsummary, suspendacct, unsuspendacct, create_user_session, …) contra o simulador. Não foram testados a criação real de contas nem o UAPI de emails/bases de dados.
