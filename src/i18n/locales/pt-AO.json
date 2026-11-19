@@ -210,5 +210,10 @@
     "code": "AOA",
     "name": "Kwanza angolano",
     "perMonth": "Kz/mês"
+  },
+  "hero": {
+    "title": "Hospedagem de sites, domínios, e-mail corporativo e servidores VPS",
+    "titleHighlight": "em Angola e no Brasil",
+    "subtitle": "Hospedagem web premium com LiteSpeed, NVMe SSD, cPanel e suporte 24/7. Uptime 99.9% garantido."
   }
 }
