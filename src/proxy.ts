@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { SESSION_COOKIE, userFromSessionToken } from '@/lib/auth/server'
+import { SESSION_COOKIE, getProfileRole, userFromSessionToken } from '@/lib/auth/server'
 
 // Protecção de rotas (runtime Node.js). Mesmas regras de antes; a sessão passa a
 // ser o cookie vh_session validado em MariaDB (antes: cookies sb-* do Supabase).
@@ -31,6 +31,12 @@ export default async function proxy(request: NextRequest) {
     const res = NextResponse.redirect(new URL('/login', request.url))
     if (token) res.cookies.delete(SESSION_COOKIE)
     return res
+  }
+  // /admin exige o papel admin (antes bastava sessão: um cliente via o painel sem dados)
+  if (user && adminPaths.some(under)) {
+    let role: string | null = null
+    try { role = await getProfileRole(user.id) } catch {}
+    if (role !== 'admin') return NextResponse.redirect(new URL('/dashboard', request.url))
   }
   if (isAuthRoute && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
