@@ -20,7 +20,10 @@ export async function POST(req: Request) {
   if ('error' in r) return NextResponse.json({ error: r.error }, { status: 400 })
   if (confirm) {
     const token = await issueToken(r.user.id, 'signup', '/dashboard')
-    await sendAuthEmail('signup', r.user.email, `${siteUrl()}/api/auth/verify?type=signup&token_hash=${encodeURIComponent(token)}`)
+    const sent = await sendAuthEmail('signup', r.user.email, `${siteUrl()}/api/auth/verify?type=signup&token_hash=${encodeURIComponent(token)}`)
+    // Como o Supabase: a conta fica criada, mas o erro é devolvido para o formulário não
+    // dizer "verifique o e-mail" quando nada foi enviado. "Esqueci a senha" também confirma.
+    if (!sent.ok) return NextResponse.json({ error: authError('Error sending confirmation email', 500, 'unexpected_failure') }, { status: 500 })
     return NextResponse.json({ user: r.user, session: null })
   }
   const s = await createSession(r.user.id)
