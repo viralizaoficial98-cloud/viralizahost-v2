@@ -6,13 +6,15 @@
  *
  * Ambiente: DB_* (para confirmar IDs na base), ADMIN_EMAIL, ADMIN_PASSWORD.
  * Cria uma conta fictícia (teste+<data>@viralizahost.invalid) e apaga-a no fim
- * (use --keep para a manter). Nunca imprime senhas nem cookies.
+ * (use --keep para a manter). --no-signup não cria contas. Nunca imprime senhas nem cookies.
  */
 import mysql from 'mysql2/promise'
 import { randomBytes } from 'node:crypto'
 
 const BASE = (process.env.BASE_URL || 'http://127.0.0.1:3100').replace(/\/$/, '')
 const KEEP = process.argv.includes('--keep')
+// --no-signup: verificação pós-produção (só site, produtos, admin e senha errada; não cria contas)
+const NO_SIGNUP = process.argv.includes('--no-signup')
 const { ADMIN_EMAIL, ADMIN_PASSWORD } = process.env
 if (!ADMIN_EMAIL || !ADMIN_PASSWORD) { console.error('Defina ADMIN_EMAIL e ADMIN_PASSWORD no ficheiro protegido.'); process.exit(2) }
 
@@ -70,6 +72,16 @@ const ps = await adm.req('/admin/site')
 ok(ps.status === 200, `admin abre /admin/site → ${ps.status}`)
 const ac = await adm.req('/api/admin/clients')
 ok(ac.status === 200, `API admin /api/admin/clients → ${ac.status}`, ac.text)
+
+if (NO_SIGNUP) {
+  const bad0 = await new S().login(ADMIN_EMAIL, ADMIN_PASSWORD + 'x')
+  ok(bad0.status === 400 && bad0.json?.error?.message === 'Invalid login credentials', 'senha errada do admin rejeitada')
+  await adm.req('/api/auth/logout', { method: 'POST' })
+  ok(!(await adm.req('/api/auth/user')).json?.user, 'logout do admin')
+  await db.end()
+  console.log(`\n${pass} OK, ${fail} falhadas`)
+  process.exit(fail ? 1 : 0)
+}
 
 console.log('\n3. Conta fictícia: registo, sessão, logout')
 const email = `teste+${new Date().toISOString().slice(0, 10).replace(/-/g, '')}${randomBytes(3).toString('hex')}@viralizahost.invalid`
