@@ -36,7 +36,7 @@
 import pg from 'pg'
 import mysql from 'mysql2/promise'
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, writeFile, stat, copyFile, rename } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, stat, rename } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
