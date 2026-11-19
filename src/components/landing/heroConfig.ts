@@ -1,4 +1,5 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { unstable_cache } from 'next/cache'
+import { createAnonClient } from '@/lib/supabase/server'
 import {
   HOME_HERO_CACHE_TAG, HOME_HERO_TABLE,
   normalizeVideoSrc, settingsToHeroConfig,
@@ -32,31 +33,26 @@ export function getEnvHeroConfig(env: Record<string, string | undefined> = proce
   return { mode: 'video', videoSrc }
 }
 
-export async function getHeroConfig(): Promise<HeroConfig> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !anonKey) return getEnvHeroConfig()
-
-  try {
-    // Cliente sem cookies (não torna a página dinâmica) e com fetch cacheado.
-    const supabase = createSupabaseClient(url, anonKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-      db: { schema: 'viralizahost' },
-      global: {
-        fetch: (input, init) => fetch(input, {
-          ...init,
-          next: { revalidate: REVALIDATE_SECONDS, tags: [HOME_HERO_CACHE_TAG] },
-        }),
-      },
-    })
-
-    const { data, error } = await supabase
+// Leitura cacheada (sem cookies — não torna a página dinâmica), invalidada pela tag.
+const readHomeHero = unstable_cache(
+  async () => {
+    const { data, error } = await createAnonClient()
       .from(HOME_HERO_TABLE)
       .select('mode, video_url')
       .eq('id', 1)
       .maybeSingle<Pick<HomeHeroSettings, 'mode' | 'video_url'>>()
+    if (error) throw Object.assign(new Error(error.message), { code: error.code })
+    return data
+  },
+  ['home-hero-settings'],
+  { revalidate: REVALIDATE_SECONDS, tags: [HOME_HERO_CACHE_TAG] },
+)
 
-    if (error) throw error
+export async function getHeroConfig(): Promise<HeroConfig> {
+  if (!process.env.DB_NAME) return getEnvHeroConfig()
+
+  try {
+    const data = await readHomeHero()
     if (!data) return getEnvHeroConfig()
     return settingsToHeroConfig(data)
   } catch (err) {
