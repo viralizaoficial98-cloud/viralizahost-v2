@@ -8,7 +8,7 @@ export default async function proxy(request: NextRequest) {
   // Match whole path segments only ('/email' must not catch '/email-corporativo').
   const under = (p: string) => path === p || path.startsWith(`${p}/`)
 
-  const protectedPaths = ['/dashboard', '/domains', '/hosting', '/tickets', '/billing', '/settings']
+  const protectedPaths = ['/dashboard', '/domains', '/hosting', '/tickets', '/billing', '/settings', '/orders', '/services']
   // '/email' is the client area page; '/email/*' are public marketing pages.
   const protectedExact = ['/email']
   const adminPaths = ['/admin']

@@ -653,9 +653,6 @@ export const SCHEMA_META: SchemaMeta = {
       [
         "name",
         "extension"
-      ],
-      [
-        "name"
       ]
     ],
     "columns": {

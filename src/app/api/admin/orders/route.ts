@@ -1,162 +1,106 @@
-import { createAdminClient, createAdminWriteClient, createRpcClient, createServiceClient as createStorageClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { createAdminWriteClient, createServiceClient } from '@/lib/supabase/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
+import { getPool } from '@/lib/db/pool'
+import { confirmPayment, rejectProof, PaymentError } from '@/lib/commerce/payments'
+import { markServiceActive, provisionOrder, provisionService, refreshOrderActivation } from '@/lib/commerce/provisioning'
 
-// Storage client — NO db.schema header (Storage API breaks with it)
-function storageAdmin() {
-  return createStorageClient()
-}
+export const dynamic = 'force-dynamic'
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export async function GET() {
-  try {
-    await requireAdminRole()
-  } catch {
-    return NextResponse.json({ orders: [], error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const db = createAdminWriteClient() // plain supabase-js, viralizahost schema, service_role
-
-  // ── 1. Fetch orders ──────────────────────────────────────────────────────
-  const { data: ordersRaw, error: ordErr } = await db
-    .from('orders')
-    .select('id, user_id, status, amount, billing_cycle, payment_method, domain_name, domain_action, proof_file, transfer_ref, notes, created_at, updated_at')
-    .order('created_at', { ascending: false })
-    .limit(300)
-
-  if (ordErr) {
-    console.error('[admin/orders GET] orders query failed:', ordErr.message)
-    return NextResponse.json({ orders: [], error: ordErr.message })
-  }
-
-  const orders = ordersRaw ?? []
-  if (orders.length === 0) return NextResponse.json({ orders: [] })
-
-  // ── 2. Fetch order_items ──────────────────────────────────────────────────
-  const orderIds = orders.map((o: any) => o.id)
-  const { data: itemsRaw } = await db
-    .from('order_items')
-    .select('id, order_id, service_name, service_type, price, quantity')
-    .in('order_id', orderIds)
-
-  const itemsMap = new Map<string, any[]>()
-  for (const item of (itemsRaw ?? []) as any[]) {
-    const arr = itemsMap.get(item.order_id) ?? []
-    arr.push(item)
-    itemsMap.set(item.order_id, arr)
-  }
-
-  // ── 3. Fetch profiles by user_id (profiles.id = auth.users.id) ────────────
-  const userIds = [...new Set(orders.map((o: any) => o.user_id).filter(Boolean) as string[])]
-  const { data: profilesRaw } = userIds.length > 0
-    ? await db.from('profiles').select('id, full_name, email, phone').in('id', userIds)
-    : { data: [] }
-  const profileMap = new Map((profilesRaw ?? []).map((p: any) => [p.id, p]))
-
-  // ── 4. Generate signed URLs for proof files ──────────────────────────────
-  const storage = storageAdmin()
-  const ordersWithData = await Promise.all(
-    orders.map(async (order: any) => {
-      let proof_url: string | null = null
-      if (order.proof_file) {
-        const { data: signed } = await storage.storage
-          .from('payment-proofs')
-          .createSignedUrl(order.proof_file, 3600)
-        proof_url = signed?.signedUrl ?? null
-      }
-      return {
-        ...order,
-        proof_url,
-        profiles: order.user_id ? (profileMap.get(order.user_id) ?? null) : null,
-        order_items: itemsMap.get(order.id) ?? [],
-      }
-    })
-  )
-
-  return NextResponse.json({ orders: ordersWithData })
+  try { await requireAdminRole() } catch { return NextResponse.json({ orders: [], error: 'Unauthorized' }, { status: 401 }) }
+  const db = createAdminWriteClient()
+  const { data: orders, error } = await db.from('orders')
+    .select(`id, order_number, user_id, status, payment_status, activation_status, amount, subtotal, tax_amount, billing_cycle, payment_method,
+      domain_name, proof_file, transfer_ref, notes, created_at, updated_at, paid_at,
+      order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation)`)
+    .order('created_at', { ascending: false }).limit(300)
+  if (error) return NextResponse.json({ orders: [], error: error.message })
+  const ids = (orders ?? []).map((o: any) => o.id)
+  const userIds = [...new Set((orders ?? []).map((o: any) => o.user_id).filter(Boolean))]
+  const [{ data: services }, { data: profiles }, { data: invoices }, { data: payments }] = await Promise.all([
+    ids.length ? db.from('services').select('id, order_id, order_item_id, service_name, service_type, provisioning_status, provisioning_error, provisioning_attempts, external_ref, domain').in('order_id', ids) : { data: [] },
+    userIds.length ? db.from('profiles').select('id, full_name, email, phone').in('id', userIds) : { data: [] },
+    ids.length ? db.from('invoices').select('id, order_id, invoice_number, status, total, amount_paid').in('order_id', ids) : { data: [] },
+    ids.length ? db.from('payments').select('id, order_id, invoice_id, status, amount, proof_url, transfer_ref, created_at').in('order_id', ids).order('created_at', { ascending: false }) : { data: [] },
+  ])
+  const storage = createServiceClient().storage.from('payment-proofs')
+  const out = await Promise.all((orders ?? []).map(async (o: any) => {
+    const pays = (payments ?? []).filter((p: any) => p.order_id === o.id)
+    const proofPath = pays.find((p: any) => p.proof_url)?.proof_url ?? o.proof_file
+    const signed = proofPath ? (await storage.createSignedUrl(proofPath, 3600)).data?.signedUrl ?? null : null
+    return {
+      ...o,
+      profiles: (profiles ?? []).find((p: any) => p.id === o.user_id) ?? null,
+      services: (services ?? []).filter((s: any) => s.order_id === o.id),
+      invoice: (invoices ?? []).find((i: any) => i.order_id === o.id) ?? null,
+      payments: pays.map((p: any) => ({ ...p, proof_url: undefined, has_proof: !!p.proof_url })),
+      proof_url: signed,
+    }
+  }))
+  return NextResponse.json({ orders: out })
 }
 
+// Acções do administrador. Nenhuma acção de activação cobra o cliente.
 export async function POST(req: NextRequest) {
-  let adminUserId: string
+  let adminId: string
+  try { adminId = await requireAdminRole() } catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  const body = await req.json().catch(() => ({})) as { orderId?: string; serviceId?: string; paymentId?: string; action?: string; notes?: string; reason?: string; externalRef?: string }
+  const db = getPool()
+  const log = (action: string, entity: string, id: string, description: string) =>
+    db.query("INSERT INTO activity_logs (id, profile_id, action, entity_type, entity_id, description) VALUES (UUID(), ?, 'update', ?, ?, ?)", [adminId, entity, id, `${action}: ${description}`]).catch(() => {})
+
   try {
-    adminUserId = await requireAdminRole()
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const body = await req.json()
-  const { orderId, action, notes } = body
-
-  if (!orderId || !['approve', 'reject'].includes(action)) {
-    return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
-  }
-
-  const db  = createAdminWriteClient()
-  const rpc = createRpcClient()
-
-  if (action === 'approve') {
-    console.log('[admin/orders] APPROVING', orderId, 'by', adminUserId?.slice(0, 8))
-
-    // Try RPC first (only works if migration was applied)
-    const { data: rpcData, error: rpcErr } = await rpc.rpc('approve_order', { p_order_id: orderId })
-    if (!rpcErr) {
-      // Ensure services exist (inline fallback if provision_order_services not applied)
-      await ensureServicesExist(db, orderId)
-      console.log('[admin/orders] APPROVED via RPC', orderId, rpcData)
-      return NextResponse.json(rpcData ?? { ok: true })
+    switch (body.action) {
+      // Pagamento confirmado (comprovativo validado) → activa os serviços
+      case 'approve': {
+        const [[inv]] = await db.query('SELECT id, total, amount_paid FROM invoices WHERE order_id = ?', [body.orderId]) as any
+        if (!inv) return NextResponse.json({ error: 'Encomenda sem factura.' }, { status: 404 })
+        const [[pay]] = await db.query("SELECT id FROM payments WHERE invoice_id = ? AND status IN ('under_review','proof_uploaded','pending') ORDER BY created_at DESC LIMIT 1", [inv.id]) as any
+        // Repetir a aprovação é seguro: factura já paga → 'already_paid' e só se activa o que faltar
+        const r = await confirmPayment({ invoiceId: inv.id, amount: Number(inv.total) - Number(inv.amount_paid ?? 0), source: 'proof', paymentId: pay?.id ?? null, reviewerId: adminId })
+        const results = await provisionOrder(body.orderId!)
+        await log('approve', 'order', body.orderId!, `pagamento ${r.status}; activação ${results.map(x => x.status).join(',')}`)
+        return NextResponse.json({ ok: true, payment: r.status, provisioning: results })
+      }
+      case 'reject_proof': {
+        const [[pay]] = await db.query("SELECT id FROM payments WHERE order_id = ? AND status IN ('under_review','proof_uploaded','pending') ORDER BY created_at DESC LIMIT 1", [body.orderId]) as any
+        if (!pay) return NextResponse.json({ error: 'Sem comprovativo pendente.' }, { status: 404 })
+        await rejectProof(pay.id, body.reason ?? 'Comprovativo inválido', adminId)
+        await log('reject_proof', 'order', body.orderId!, body.reason ?? '')
+        return NextResponse.json({ ok: true })
+      }
+      // Cancelar encomenda não paga (pagas exigem reembolso, fora deste fluxo)
+      case 'reject':
+      case 'cancel': {
+        const [[o]] = await db.query('SELECT payment_status FROM orders WHERE id = ?', [body.orderId]) as any
+        if (!o) return NextResponse.json({ error: 'Encomenda inexistente.' }, { status: 404 })
+        if (o.payment_status === 'paid') return NextResponse.json({ error: 'Encomenda paga: trate o reembolso antes de cancelar.' }, { status: 409 })
+        await db.query("UPDATE orders SET status = 'rejected', activation_status = 'cancelled', notes = ? WHERE id = ?", [body.notes ?? null, body.orderId])
+        await db.query("UPDATE services SET status = 'cancelled' WHERE order_id = ? AND provisioning_status <> 'active'", [body.orderId])
+        await db.query("UPDATE invoices SET status = 'cancelled' WHERE order_id = ? AND status <> 'paid'", [body.orderId])
+        await log('cancel', 'order', body.orderId!, body.notes ?? '')
+        return NextResponse.json({ ok: true, status: 'rejected' })
+      }
+      case 'provision': {
+        const r = await provisionService(body.serviceId!)
+        const [[s]] = await db.query('SELECT order_id FROM services WHERE id = ?', [body.serviceId]) as any
+        if (s) await refreshOrderActivation(s.order_id)
+        await log('provision', 'service', body.serviceId!, r.status)
+        return NextResponse.json({ ok: r.status === 'active', result: r })
+      }
+      case 'mark_active': {
+        await markServiceActive(body.serviceId!, body.notes ?? null, body.externalRef ?? null)
+        await log('mark_active', 'service', body.serviceId!, body.externalRef ?? '')
+        return NextResponse.json({ ok: true })
+      }
+      default:
+        return NextResponse.json({ error: 'Acção inválida.' }, { status: 400 })
     }
-
-    // Fallback: inline approve + provision
-    console.warn('[admin/orders] RPC failed, using inline approve. error:', rpcErr.message)
-    const { error: ordUpd } = await db.from('orders').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', orderId)
-    if (ordUpd) {
-      console.error('[admin/orders approve inline] order update failed:', ordUpd.message)
-      return NextResponse.json({ error: ordUpd.message }, { status: 500 })
-    }
-    await db.from('services').update({ status: 'active', updated_at: new Date().toISOString() }).eq('order_id', orderId)
-    await db.from('domains').update({ status: 'active', registered_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('order_id', orderId)
-    const { data: inv } = await db.from('invoices').select('total').eq('order_id', orderId).maybeSingle()
-    if (inv) await db.from('invoices').update({ status: 'paid', amount_paid: inv.total, paid_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('order_id', orderId)
-    await ensureServicesExist(db, orderId)
-    console.log('[admin/orders] APPROVED inline', orderId)
-    return NextResponse.json({ ok: true, status: 'active' })
-  }
-
-  // reject
-  console.log('[admin/orders] REJECTING', orderId, 'notes:', notes)
-  const { data, error } = await rpc.rpc('reject_order', { p_order_id: orderId, p_notes: notes ?? null })
-  if (error) {
-    // Inline fallback
-    await db.from('orders').update({ status: 'rejected', notes: notes ?? null, updated_at: new Date().toISOString() }).eq('id', orderId)
-    await db.from('services').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('order_id', orderId)
-    await db.from('invoices').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('order_id', orderId)
-  }
-  console.log('[admin/orders] REJECTED', orderId)
-  return NextResponse.json(data ?? { ok: true })
-}
-
-// Idempotent: create services rows for order items that don't have one yet
-async function ensureServicesExist(db: ReturnType<typeof createAdminWriteClient>, orderId: string) {
-  const { data: order } = await db.from('orders').select('id, user_id, billing_cycle, amount, status').eq('id', orderId).maybeSingle()
-  if (!order?.user_id) return
-
-  const { data: items } = await db.from('order_items').select('id, service_name, service_type, price, quantity').eq('order_id', orderId)
-  if (!items?.length) return
-
-  const { data: existing } = await db.from('services').select('id, service_name').eq('order_id', orderId)
-  const existingNames = new Set((existing ?? []).map((s: any) => s.service_name))
-
-  for (const item of items) {
-    if (existingNames.has(item.service_name)) continue
-    const { error } = await db.from('services').insert({
-      profile_id:    order.user_id,
-      plan_id:       null,
-      service_type:  item.service_type ?? 'other',
-      service_name:  item.service_name ?? 'Serviço',
-      status:        order.status === 'active' ? 'active' : 'pending_provisioning',
-      order_id:      orderId,
-      price:         item.price ?? 0,
-      billing_cycle: order.billing_cycle ?? 'monthly',
-    })
-    if (error) console.error('[ensureServicesExist] insert failed:', error.message, '— item:', item.service_name)
+  } catch (e) {
+    if (e instanceof PaymentError) return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })
+    console.error('[admin/orders]', body.action, (e as Error).message)
+    return NextResponse.json({ error: (e as Error).message }, { status: 400 })
   }
 }

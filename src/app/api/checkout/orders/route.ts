@@ -1,200 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthClient, createAdminClient, createRpcClient, createAdminWriteClient } from '@/lib/supabase/server'
-import { PLAN_CATALOG } from '@/lib/checkout/catalog'
+import { createOrder, OrderError } from '@/lib/commerce/orders'
+import { createSession, createUser, getSessionUser, setSessionCookie } from '@/lib/auth/server'
+import { getPool } from '@/lib/db/pool'
+import { clientIp, rateLimit } from '@/lib/auth/rate-limit'
 
+export const dynamic = 'force-dynamic'
+
+// Criação da encomenda. Preços, disponibilidade e impostos são recalculados no
+// servidor; o cliente só confirma o total que viu (acceptedTotal). Repetir o
+// pedido com a mesma idempotencyKey devolve a mesma encomenda.
 export async function POST(req: NextRequest) {
+  if (!rateLimit(`order:${clientIp(req)}`, 20, 10 * 60_000)) {
+    return NextResponse.json({ error: 'Demasiados pedidos. Tente novamente dentro de alguns minutos.' }, { status: 429 })
+  }
+  let body: Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 }) }
+
+  // ── Utilizador: sessão ou conta criada no checkout ──────────────────────────
+  let userId = (await getSessionUser())?.id ?? null
+  if (!userId) {
+    const u = body.userData ?? {}
+    if (!u.email || !u.password) return NextResponse.json({ error: 'Inicie sessão ou crie uma conta para concluir a encomenda.', code: 'auth_required' }, { status: 401 })
+    const created = await createUser({
+      email: String(u.email), password: String(u.password), email_confirm: true,
+      user_metadata: { full_name: String(u.name ?? '').slice(0, 120), phone: String(u.phone ?? '').slice(0, 40), source: 'checkout' },
+    })
+    if ('error' in created) {
+      const exists = created.error.code === 'email_exists'
+      return NextResponse.json({ error: exists ? 'Já existe uma conta com este e-mail. Inicie sessão para continuar.' : created.error.message, code: exists ? 'email_exists' : 'signup_failed' }, { status: exists ? 409 : 400 })
+    }
+    userId = created.user.id
+    const s = await createSession(userId)
+    await setSessionCookie(s.token, s.expiresAt)
+  }
+
+  // ── Comprovativo opcional: tem de existir e não pode estar usado noutra encomenda ──
+  const proof = body.proofFile ? String(body.proofFile) : null
+  if (proof) {
+    const [[obj]] = await getPool().query("SELECT name FROM storage_objects WHERE bucket_id = 'payment-proofs' AND name = ?", [proof]) as any // eslint-disable-line @typescript-eslint/no-explicit-any
+    const [[used]] = await getPool().query('SELECT id FROM payments WHERE proof_url = ? LIMIT 1', [proof]) as any // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (!obj || used) return NextResponse.json({ error: 'Comprovativo inválido. Envie o ficheiro novamente.', code: 'proof_invalid' }, { status: 400 })
+  }
+
   try {
-    const body = await req.json()
-    const {
-      items, billingCycle, domainName, domainAction,
-      useDefaultNs, ns1, ns2, ns3, ns4,
-      paymentMethod, proofFileUrl, transferRef,
-      userData, amount,
-    } = body
-
-    console.log('[checkout/orders] START — paymentMethod:', paymentMethod, 'amount:', amount)
-
-    // ── 1. Resolve authenticated user ──────────────────────────────────────
-    // createAuthClient has NO db.schema — auth.getUser() must never send
-    // a Content-Profile header; that belongs only to PostgREST table queries.
-    const authClient = await createAuthClient()
-    const { data: { user: sessionUser }, error: authErr } = await authClient.auth.getUser()
-
-    console.log('[checkout/orders] auth.getUser —', sessionUser?.id ?? 'no session', authErr?.message ?? 'ok')
-
-    const db = await createAdminClient() // for profile upsert (table query, viralizahost schema)
-    let userId: string | null = sessionUser?.id ?? null
-
-    // ── 2. Create account if user arrived as guest ─────────────────────────
-    if (!userId && userData?.email && userData?.password) {
-      console.log('[checkout/orders] creating guest account for', userData.email)
-      const { data: newUser, error: signUpErr } = await db.auth.admin.createUser({
-        email:         userData.email,
-        password:      userData.password,
-        email_confirm: true,
-        user_metadata: { full_name: userData.name, phone: userData.phone },
-      })
-
-      if (signUpErr) {
-        console.error('[checkout/orders] signup error:', signUpErr.message)
-        return NextResponse.json({ error: `Erro ao criar conta: ${signUpErr.message}` }, { status: 400 })
-      }
-
-      userId = newUser?.user?.id ?? null
-
-      if (userId) {
-        await (db as any).from('profiles').upsert({
-          id:             userId,
-          email:          userData.email,
-          full_name:      userData.name,
-          phone:          userData.phone ?? null,
-          country:        'AO',
-          role:           'client',
-          currency:       'AKZ',
-          is_active:      true,
-          email_verified: false,
-        }, { onConflict: 'id' })
-      }
-    }
-
-    if (!userId) {
-      console.error('[checkout/orders] no userId — aborting')
-      return NextResponse.json(
-        { error: 'Sessão inválida. Faça login e tente novamente.' },
-        { status: 401 }
-      )
-    }
-
-    // ── 3. Map payment method ──────────────────────────────────────────────
-    const paymentMap: Record<string, string> = {
-      pix:          'pix',
-      card:         'credit_card',
-      paypal:       'paypal',
-      bic_transfer: 'bank_transfer',
-    }
-    const dbPayment = paymentMap[paymentMethod] ?? 'bank_transfer'
-    const status    = paymentMethod === 'bic_transfer' ? 'aguardando_confirmacao' : 'pending'
-
-    // ── 4. Server-side validation of every item (price, quantity, cycle) ──
-    // Never trust prices sent by the browser: each item must match a price
-    // the checkout page itself could have shown (DB first, catalog fallback).
-    const VALID_CYCLES = ['monthly', '6months', '1year', '2years', '3years']
-    if (billingCycle != null && !VALID_CYCLES.includes(billingCycle)) {
-      return NextResponse.json({ error: 'Ciclo de faturação inválido.' }, { status: 400 })
-    }
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'Carrinho vazio.' }, { status: 400 })
-    }
-
-    const priceDb = createAdminWriteClient()
-    const [{ data: dbDomains }, { data: dbProducts }, { data: dbEmailPlans }] = await Promise.all([
-      priceDb.from('site_domains').select('extension, price_annual, price_monthly').eq('active', true),
-      priceDb.from('products').select('slug, price_monthly').eq('active', true),
-      priceDb.from('site_email_plans').select('slug, price_monthly').eq('active', true),
-    ])
-
-    const invalidItem = () =>
-      NextResponse.json({ error: 'Preço inválido. Atualize a página e tente novamente.' }, { status: 400 })
-
-    for (const item of items) {
-      const qty = item?.quantity ?? 1
-      if (!Number.isInteger(qty) || qty < 1 || qty > 100 || typeof item?.id !== 'string') {
-        return NextResponse.json({ error: 'Item inválido no carrinho.' }, { status: 400 })
-      }
-      const submitted = Number(item.price)
-
-      if (item.type === 'domain') {
-        // Derive TLD from plan id: 'domain-com' → '.com', 'domain-com-br' → '.com.br'
-        const tld = '.' + (item.id as string).replace(/^domain-/, '').replace(/-/g, '.')
-        const row = dbDomains?.find((d: { extension: string }) => d.extension === tld)
-        const expected = row ? (row.price_annual ?? row.price_monthly ?? 0) : 0
-        if (expected <= 0 || Math.abs(submitted - expected) / expected > 0.15) {
-          console.error('[checkout/orders] domain price rejected — submitted:', submitted, 'expected:', expected, 'tld:', tld)
-          return invalidItem()
-        }
-        item.price = expected // override with DB price to prevent rounding drift
-        continue
-      }
-
-      // Same resolution order as the checkout page: email plans > products > catalog
-      type PriceRow = { slug: string; price_monthly: number | null }
-      const allowed = [
-        (dbEmailPlans as PriceRow[] | null)?.find(e => e.slug === item.id)?.price_monthly,
-        (dbProducts as PriceRow[] | null)?.find(p => p.slug === item.id)?.price_monthly,
-        PLAN_CATALOG[item.id]?.price,
-      ].filter((v): v is number => typeof v === 'number' && v > 0)
-
-      if (allowed.length === 0 || !allowed.some(v => Math.round(v) === Math.round(submitted))) {
-        console.error('[checkout/orders] plan price rejected — id:', item.id, 'submitted:', submitted, 'allowed:', allowed)
-        return invalidItem()
-      }
-    }
-
-    // ── 5. Build items payload ─────────────────────────────────────────────
-    const PLAN_SLUG_MAP: Record<string, string> = { pro: 'premium' }
-    const rpcItems = (items ?? []).map((item: any) => {
-      const slug = item.id as string
-      return {
-        service_name: item.name,
-        service_type: item.type,
-        price:        Math.round(item.price),
-        quantity:     item.quantity ?? 1,
-        plan_slug:    PLAN_SLUG_MAP[slug] ?? slug,
-      }
+    const { order, quote } = await createOrder({
+      userId,
+      idempotencyKey: String(body.idempotencyKey ?? ''),
+      lines: Array.isArray(body.lines) ? body.lines : [],
+      acceptedTotal: Number(body.acceptedTotal),
+      paymentMethod: String(body.paymentMethod ?? ''),
+      proofFile: proof,
+      transferRef: body.transferRef ? String(body.transferRef).slice(0, 120) : null,
+      billingDetails: body.billingDetails && typeof body.billingDetails === 'object' ? body.billingDetails : null,
+      nameservers: body.nameservers,
     })
-
-    // ── 5b. Re-compute total server-side from validated prices ─────────────
-    const DOMAIN_YEARS_SRV: Record<string, number> = { monthly: 1, '6months': 1, '1year': 1, '2years': 2, '3years': 3 }
-    const DOMAIN_DISC_SRV:  Record<string, number> = { monthly: 0, '6months': 0, '1year': 0, '2years': 0.10, '3years': 0.15 }
-    const HOST_MONTHS_SRV:  Record<string, number> = { monthly: 1, '6months': 6, '1year': 12, '2years': 24, '3years': 36 }
-    const HOST_DISC_SRV:    Record<string, number> = { monthly: 0, '6months': 0.15, '1year': 0.30, '2years': 0.45, '3years': 0.55 }
-
-    const serverAmount = Math.round((items ?? []).reduce((acc: number, item: any) => {
-      const price = Math.round(item.price)
-      const qty   = item.quantity ?? 1
-      const cycle = billingCycle ?? 'monthly'
-      if (item.type === 'domain') {
-        return acc + price * qty * (DOMAIN_YEARS_SRV[cycle] ?? 1) * (1 - (DOMAIN_DISC_SRV[cycle] ?? 0))
-      }
-      return acc + price * qty * (HOST_MONTHS_SRV[cycle] ?? 1) * (1 - (HOST_DISC_SRV[cycle] ?? 0))
-    }, 0))
-
-    console.log('[checkout/orders] CALLING RPC create_order — userId:', userId, 'items:', rpcItems.length, 'serverAmount:', serverAmount)
-
-    // ── 6. Call RPC via rpcClient (NO db.schema) ───────────────────────────
-    // public.create_order uses SECURITY DEFINER + SET search_path = viralizahost
-    // so it operates on viralizahost tables without PostgREST needing the schema exposed.
-    const rpcClient = createRpcClient()
-    const { data, error: rpcErr } = await rpcClient.rpc('create_order', {
-      p_user_id:        userId,
-      p_billing_cycle:  billingCycle  ?? 'monthly',
-      p_domain_name:    domainName    ?? '',
-      p_domain_action:  domainAction  ?? '',
-      p_use_default_ns: useDefaultNs  ?? true,
-      p_ns1:            ns1           ?? 'ns1.viralizahost.com',
-      p_ns2:            ns2           ?? 'ns2.viralizahost.com',
-      p_ns3:            ns3           ?? null,
-      p_ns4:            ns4           ?? null,
-      p_payment_method: dbPayment,
-      p_amount:         serverAmount,
-      p_proof_file:     proofFileUrl  ?? '',
-      p_transfer_ref:   transferRef   ?? '',
-      p_status:         status,
-      p_items:          rpcItems,
-    })
-
-    if (rpcErr) {
-      console.error('[checkout/orders] RPC error:', rpcErr.message, rpcErr)
-      return NextResponse.json({ error: rpcErr.message }, { status: 500 })
-    }
-
-    const orderId = (data as any)?.id
-    console.log('[checkout/orders] ORDER CREATED — id:', orderId, 'status:', status)
-
-    return NextResponse.json({ id: orderId, status })
-
-  } catch (err: any) {
-    console.error('[checkout/orders] UNEXPECTED ERROR:', err)
-    return NextResponse.json({ error: err.message ?? 'Erro interno' }, { status: 500 })
+    console.info('[checkout/orders]', order.replayed ? 'repetição' : 'criada', order.order_number, order.total)
+    return NextResponse.json({ order, quote: { total: quote.total, currency: quote.currency } }, { status: order.replayed ? 200 : 201 })
+  } catch (e) {
+    if (e instanceof OrderError) return NextResponse.json({ error: e.message, code: e.code, ...e.extra }, { status: e.status })
+    console.error('[checkout/orders] erro:', (e as Error).message)
+    return NextResponse.json({ error: 'Não foi possível criar a encomenda. Tente novamente.' }, { status: 500 })
   }
 }
