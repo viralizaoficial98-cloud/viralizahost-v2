@@ -2,39 +2,27 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Shield, Zap, Headphones, Lock, Globe, RefreshCw, Check, X, Loader2, ArrowRight } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { useLocale } from '@/hooks/useLocale'
 import { convertFromAOA } from '@/lib/currency'
 
-type ExtItem = { tld: string; label: string; price: string; priceNum: number; currency: string; popular: boolean }
+type ExtItem = { tld: string; label: string; priceNum: number; renewNum: number | null; popular: boolean }
 
-const defaultExtensions: ExtItem[] = [
-  { tld: '.com',    label: 'O mais popular',     price: 'Kz 4.500/ano',  priceNum: 4500,  currency: 'AOA', popular: true  },
-  { tld: '.net',    label: 'Tecnologia & redes', price: 'Kz 5.200/ano',  priceNum: 5200,  currency: 'AOA', popular: false },
-  { tld: '.org',    label: 'Organizações',       price: 'Kz 4.800/ano',  priceNum: 4800,  currency: 'AOA', popular: false },
-  { tld: '.ao',     label: 'Angola oficial',     price: 'Kz 8.000/ano',  priceNum: 8000,  currency: 'AOA', popular: true  },
-  { tld: '.com.br', label: 'Brasil',             price: 'R$ 49/ano',     priceNum: 4900,  currency: 'BRL', popular: false },
-  { tld: '.io',     label: 'Startups & tech',    price: 'Kz 18.000/ano', priceNum: 18000, currency: 'AOA', popular: false },
-]
+// Extensões e preços vêm do catálogo (/api/catalog/domains → domain_prices). Sem preços de recurso.
+const LABELS: Record<string, string> = { '.ao': 'Angola oficial', '.co.ao': 'Empresas em Angola', '.com': 'O mais popular', '.net': 'Tecnologia e redes', '.org': 'Organizações', '.it.ao': 'Tecnologia em Angola', '.io': 'Startups e tecnologia', '.online': 'Presença online', '.shop': 'Lojas', '.store': 'Lojas' }
 
-const currencySymbol: Record<string, string> = { AOA: 'Kz', AKZ: 'Kz', USD: '$', BRL: 'R$', EUR: '€' }
-
-// Suggested TLDs to show when user types without extension
-const SUGGEST_TLDS = ['.com', '.ao', '.net', '.org', '.io']
-
-type CheckResult = { tld: string; domain: string; available: boolean | null; verified?: boolean; loading: boolean }
+type CheckResult = { tld: string; domain: string; status: 'available' | 'unavailable' | 'confirm' | 'on_request' | null; loading: boolean }
 
 const benefits = [
-  { icon: Lock, title: 'Protecção de Privacidade', desc: 'WHOIS protegido e dados ocultos' },
-  { icon: Globe, title: 'DNS Premium', desc: 'Propagação ultrarrápida' },
-  { icon: Shield, title: 'Segurança Avançada', desc: 'DNSSEC activado por padrão' },
-  { icon: RefreshCw, title: 'Renovação Automática', desc: 'Nunca perca o seu domínio' },
-  { icon: Headphones, title: 'Suporte Especializado', desc: 'Equipa técnica 24/7' },
+  { icon: Globe, title: 'Extensões nacionais', desc: '.ao, .co.ao e outras' },
+  { icon: Search, title: 'Alternativas', desc: 'Sugestões noutras extensões' },
+  { icon: RefreshCw, title: 'Renovação indicada', desc: 'Preço de renovação visível' },
+  { icon: Lock, title: 'Código EPP cifrado', desc: 'Nas transferências' },
+  { icon: Headphones, title: 'Suporte', desc: 'Equipa técnica por ticket' },
 ]
 
 const trustItems = [
-  { icon: Shield, text: 'Pesquisa 100% segura' },
-  { icon: Zap, text: 'Activação rápida' },
+  { icon: Shield, text: 'Preços em kwanzas' },
+  { icon: Zap, text: 'Disponibilidade revalidada na encomenda' },
   { icon: Headphones, text: 'Suporte especializado' },
 ]
 
@@ -42,110 +30,56 @@ export function DomainSearchBar() {
   const { formatCurrency, currency } = useLocale()
   const fmtAOA = (n: number) => formatCurrency(convertFromAOA(n, currency))
   const [query, setQuery] = useState('')
-  const [extensions, setExtensions] = useState<ExtItem[]>(defaultExtensions)
+  const [extensions, setExtensions] = useState<ExtItem[]>([])
   const [results, setResults] = useState<CheckResult[]>([])
   const [searching, setSearching] = useState(false)
   const [revealed, setRevealed] = useState<boolean[]>([])
   const abortRef = useRef<AbortController | null>(null)
   const router = useRouter()
 
+  const [extError, setExtError] = useState(false)
+  const [searchError, setSearchError] = useState('')
   useEffect(() => {
-    const supabase = createClient()
-    supabase.from('site_domains').select('*').eq('active', true).order('position')
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setExtensions(data.map((d: any) => {
-            const priceNum = d.price_annual ?? d.price_monthly ?? 0
-            const sym = currencySymbol[d.currency] ?? d.currency
-            return {
-              tld: d.extension,
-              label: d.label || d.extension,
-              price: `${fmtAOA(priceNum)}/ano`,
-              priceNum,
-              currency: d.currency,
-              popular: d.popular ?? false,
-            }
-          }))
-        }
-      })
+    fetch('/api/catalog/domains', { cache: 'no-store' })
+      .then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error); return j })
+      .then(j => setExtensions((j.extensions as { extension: string; status: string; register: number | null; renew: number | null; national: boolean }[])
+        .filter(e => e.status === 'active' && e.register != null).slice(0, 6)
+        .map(e => ({ tld: e.extension, label: LABELS[e.extension] ?? e.extension, priceNum: e.register ?? 0, renewNum: e.renew, popular: e.extension === '.ao' || e.extension === '.com' }))))
+      .catch(() => setExtError(true))
   }, [])
 
-  function getExtByTld(tld: string): ExtItem {
-    return extensions.find(e => e.tld === tld) ?? defaultExtensions.find(e => e.tld === tld) ?? defaultExtensions[0]
+  function getExtByTld(tld: string): ExtItem | undefined {
+    return extensions.find(e => e.tld === tld)
   }
 
   async function handleSearch() {
-    const q = query.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
+    const q = query.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./, '')
     if (!q) return
-
-    // Cancel previous search
     if (abortRef.current) abortRef.current.abort()
     const abort = new AbortController()
     abortRef.current = abort
-
-    setSearching(true)
-    setResults([])
-
-    // Determine which TLDs to check
-    const allTlds = extensions.map(e => e.tld)
-    const matchedTld = allTlds.find(tld => q.endsWith(tld))
-    let tlds: string[]
-    let baseName: string
-
-    if (matchedTld) {
-      // User typed full domain — check that TLD plus alternatives
-      baseName = q.slice(0, q.length - matchedTld.length)
-      const others = SUGGEST_TLDS.filter(t => t !== matchedTld).slice(0, 3)
-      tlds = [matchedTld, ...others]
-    } else {
-      // No extension — suggest defaults
-      baseName = q
-      tlds = SUGGEST_TLDS
-    }
-
-    // Seed skeleton state — all loading
-    const initial: CheckResult[] = tlds.map(tld => ({
-      tld,
-      domain: `${baseName}${tld}`,
-      available: null,
-      loading: true,
-    }))
-    setResults(initial)
-    setRevealed(tlds.map(() => false))
-    setSearching(false)
-
-    // Stagger reveal: each row slides in 120ms apart after a 200ms initial delay
-    tlds.forEach((_, idx) => {
-      setTimeout(() => {
-        setRevealed(prev => { const next = [...prev]; next[idx] = true; return next })
-      }, 200 + idx * 120)
-    })
-
-    // Fire checks in parallel
-    await Promise.allSettled(tlds.map(async (tld, idx) => {
-      const domain = `${baseName}${tld}`
-      try {
-        const res = await fetch(`/api/checkout/domain-check?domain=${encodeURIComponent(domain)}`, {
-          signal: abort.signal,
-        })
-        const json = await res.json()
-        setResults(prev => prev.map((r, i) => i === idx ? { ...r, available: json.available, verified: json.verified !== false, loading: false } : r))
-      } catch {
-        setResults(prev => prev.map((r, i) => i === idx ? { ...r, available: true, verified: false, loading: false } : r))
-      }
-    }))
+    setSearching(true); setSearchError(''); setResults([])
+    try {
+      const res = await fetch(`/api/domains/search?q=${encodeURIComponent(q)}`, { signal: abort.signal, cache: 'no-store' })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? 'A pesquisa falhou.')
+      const all = [j.exact, ...j.alternatives].slice(0, 6) as { domain: string; extension: string; availability: CheckResult['status'] }[]
+      setResults(all.map(r => ({ tld: r.extension, domain: r.domain, status: r.availability, loading: false })))
+      setRevealed(all.map(() => false))
+      all.forEach((_, idx) => setTimeout(() => setRevealed(prev => { const n = [...prev]; n[idx] = true; return n }), 120 + idx * 100))
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') setSearchError((e as Error).message === 'Failed to fetch' ? 'Sem ligação. Tente novamente.' : (e as Error).message)
+    } finally { setSearching(false) }
   }
 
-  function goToCheckout(domain: string, tld: string) {
-    router.push(`/checkout?tld=${encodeURIComponent(tld)}&domain=${encodeURIComponent(domain)}`)
+  // Escolher a duração do registo e adicionar ao carrinho acontece na página de domínios
+  function goToCheckout(domain: string) {
+    router.push(`/dominios/pesquisar?q=${encodeURIComponent(domain)}`)
   }
 
   function handleRegisterTld(tld: string) {
-    const domainName = query.trim() ? `${query.trim()}${tld}` : ''
-    const url = domainName
-      ? `/checkout?tld=${encodeURIComponent(tld)}&domain=${encodeURIComponent(domainName)}`
-      : `/checkout?tld=${encodeURIComponent(tld)}`
-    router.push(url)
+    const name = query.trim().toLowerCase().split('.')[0]
+    router.push(name ? `/dominios/pesquisar?q=${encodeURIComponent(name + tld)}` : `/dominios/pesquisar?ext=${encodeURIComponent(tld)}`)
   }
 
   return (
@@ -261,6 +195,7 @@ export function DomainSearchBar() {
               </div>
             </div>
 
+            {searchError && <p className="mt-2 text-sm text-red-600 text-center" role="alert">{searchError} <button className="underline font-bold" onClick={handleSearch}>Tentar novamente</button></p>}
             {/* Results panel */}
             {results.length > 0 && (
               <div
@@ -271,9 +206,10 @@ export function DomainSearchBar() {
                   const ext = getExtByTld(r.tld)
                   const isVisible = revealed[idx]
                   const isLoading = r.loading
-                  const isAvailable = !isLoading && r.available === true
-                  const isOccupied = !isLoading && r.available === false
-                  const isUnverified = isAvailable && r.verified === false
+                  const isUnverified = !isLoading && r.status === 'confirm'
+                  const isAvailable = !isLoading && (r.status === 'available' || isUnverified)
+                  const isOccupied = !isLoading && r.status === 'unavailable'
+                  const isOnRequest = !isLoading && r.status === 'on_request'
 
                   return (
                     <div
@@ -291,7 +227,7 @@ export function DomainSearchBar() {
                         <span className="font-black text-[#0A0A0A] text-sm md:text-base truncate">{r.domain}</span>
                         {isLoading
                           ? <span className="skeleton-bar h-4 w-20 inline-block" />
-                          : <span className="text-[#AAA] text-xs font-medium hidden sm:inline">{fmtAOA(ext.priceNum)}/ano</span>
+                          : ext ? <span className="text-[#AAA] text-xs font-medium hidden sm:inline">{fmtAOA(ext.priceNum)}/1.º ano</span> : null
                         }
                       </div>
 
@@ -307,8 +243,8 @@ export function DomainSearchBar() {
                         {isAvailable && (
                           <>
                             {isUnverified ? (
-                              <span className="flex items-center gap-1.5 text-amber-600 text-xs font-bold" title="Não foi possível confirmar automaticamente. A nossa equipa confirma a disponibilidade após o pedido.">
-                                <span className="hidden sm:inline">A confirmar</span>
+                              <span className="flex items-center gap-1.5 text-amber-600 text-xs font-bold" title="Sem consulta automática nesta extensão: encomenda já, paga depois de a equipa confirmar.">
+                                <span className="hidden sm:inline">A confirmar pela equipa</span>
                               </span>
                             ) : (
                               <span className="flex items-center gap-1.5 text-green-600 text-xs font-bold">
@@ -319,13 +255,13 @@ export function DomainSearchBar() {
                               </span>
                             )}
                             <button
-                              onClick={() => goToCheckout(r.domain, r.tld)}
+                              onClick={() => goToCheckout(r.domain)}
                               className="group flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all duration-200 hover:gap-2.5 hover:scale-105"
                               style={{ background: '#F5B700', color: '#0A0A0A', boxShadow: '0 2px 12px rgba(245,183,0,0.35)' }}
                               onMouseEnter={e => { e.currentTarget.style.background = '#0A0A0A'; e.currentTarget.style.color = '#F5B700' }}
                               onMouseLeave={e => { e.currentTarget.style.background = '#F5B700'; e.currentTarget.style.color = '#0A0A0A' }}
                             >
-                              Registar agora <ArrowRight size={11} />
+                              Escolher <ArrowRight size={11} />
                             </button>
                           </>
                         )}
@@ -335,9 +271,10 @@ export function DomainSearchBar() {
                             <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-100">
                               <X size={10} className="text-red-500" />
                             </span>
-                            Ocupado
+                            Indisponível
                           </span>
                         )}
+                        {isOnRequest && <span className="text-[#888] text-xs font-bold">Sob consulta</span>}
                       </div>
                     </div>
                   )
@@ -346,7 +283,7 @@ export function DomainSearchBar() {
                 {/* Footer hint */}
                 <div className="px-5 py-3 bg-[#FAFAFA] border-t border-[#F0F0F0] flex items-center gap-2">
                   <Shield size={11} className="text-[#F5B700]" />
-                  <span className="text-[#AAA] text-[11px]">Resultados em tempo real · Activação em minutos · SSL incluído</span>
+                  <span className="text-[#AAA] text-[11px]">A disponibilidade volta a ser verificada quando confirmar a encomenda</span>
                 </div>
               </div>
             )}
@@ -364,7 +301,8 @@ export function DomainSearchBar() {
 
           {/* Extension cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            {extensions.map(({ tld, label, price, popular }) => (
+            {extError && <p className="col-span-full text-center text-sm text-[#888]" role="alert">Não foi possível carregar as extensões. <a href="/dominios" className="underline">Ver domínios</a></p>}
+            {extensions.map(({ tld, label, priceNum, popular }) => (
               <div
                 key={tld}
                 className="group relative flex flex-col items-center text-center bg-white border rounded-2xl p-5 cursor-pointer transition-all duration-200"
@@ -382,7 +320,7 @@ export function DomainSearchBar() {
                 )}
                 <div className="text-2xl font-black text-[#0A0A0A] mb-1">{tld}</div>
                 <div className="text-[11px] text-[#999] mb-3 leading-tight">{label}</div>
-                <div className="text-[13px] font-bold text-[#0A0A0A] mb-4">{price}</div>
+                <div className="text-[13px] font-bold text-[#0A0A0A] mb-4">{fmtAOA(priceNum)}/1.º ano</div>
                 <button
                   onClick={() => handleRegisterTld(tld)}
                   className="w-full py-2 rounded-xl text-xs font-bold transition-all duration-200 border"

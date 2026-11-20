@@ -114,6 +114,7 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 
 const BILLING_CYCLE_LABELS: Record<string, string> = {
   monthly:   'Mensal',
+  '3months': 'Trimestral',
   '6months': '6 Meses',
   '1year':   '1 Ano',
   '2years':  '2 Anos',

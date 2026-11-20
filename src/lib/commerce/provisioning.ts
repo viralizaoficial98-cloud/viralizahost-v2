@@ -157,7 +157,7 @@ async function extendService(db: Queryable, serviceId: string, months: number) {
 /** Activação manual concluída pelo administrador (ex.: domínio registado no registrador). */
 export async function markServiceActive(serviceId: string, note: string | null, externalRef: string | null) {
   const db = getPool()
-  const [s] = await rows(db, 'SELECT s.id, s.order_id, s.service_type, s.domain, s.profile_id, s.renews_service_id, s.provisioning_status, oi.months, o.payment_status FROM services s JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id WHERE s.id = ?', [serviceId])
+  const [s] = await rows(db, 'SELECT s.id, s.order_id, s.service_type, s.domain, s.profile_id, s.renews_service_id, s.provisioning_status, oi.months, oi.years, o.payment_status FROM services s JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id WHERE s.id = ?', [serviceId])
   if (!s) throw new Error('Serviço inexistente.')
   if (s.payment_status !== 'paid') throw new Error('A encomenda ainda não está paga.')
   if (s.renews_service_id) {
@@ -171,8 +171,8 @@ export async function markServiceActive(serviceId: string, note: string | null, 
   await setStatus(serviceId, 'active', null, { external_ref: externalRef, next_due_date: due, notes: note })
   if (s.service_type === 'domain' && s.domain) {
     await db.query(`UPDATE domains SET status = 'active', registered_at = COALESCE(registered_at, CURRENT_TIMESTAMP(6)),
-      expires_at = GREATEST(COALESCE(expires_at, CURRENT_TIMESTAMP(6)), CURRENT_TIMESTAMP(6)) + INTERVAL 1 YEAR, service_id = COALESCE(service_id, ?)
-      WHERE profile_id = ? AND CONCAT(name, extension) = ?`, [serviceId, s.profile_id, s.domain])
+      expires_at = GREATEST(COALESCE(expires_at, CURRENT_TIMESTAMP(6)), CURRENT_TIMESTAMP(6)) + INTERVAL ? YEAR, service_id = COALESCE(service_id, ?)
+      WHERE profile_id = ? AND CONCAT(name, extension) = ?`, [Math.max(1, Number(s.years ?? 1)), serviceId, s.profile_id, s.domain])
   }
   await refreshOrderActivation(s.order_id)
 }

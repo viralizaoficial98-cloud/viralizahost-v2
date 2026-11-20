@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { ServicePricingCards, type PricingPlan } from '@/components/service/ServicePricingCards'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Code, Globe, Shield, Zap, RotateCcw, Lock, Headphones, BarChart, Layers } from 'lucide-react'
@@ -14,39 +14,6 @@ export const metadata: Metadata = {
   description: 'WordPress com builder visual, plugins premium, SSL grátis e hospedagem optimizada para máxima performance.',
 }
 
-const plans: PricingPlan[] = [
-  {
-    id: 'wp-builder-start',
-    name: 'Builder Start',
-    price: 'Kz 29.900', priceAOA: 29900,
-    period: '/mês',
-    description: 'Para começar com WordPress',
-    features: ['1 site WordPress', 'Builder visual incluído', '20 GB NVMe SSD', 'SSL grátis', 'Plugins premium básicos', 'Backup semanal', 'Suporte 24/7'],
-    notIncluded: ['WooCommerce', 'Plugins premium avançados'],
-    cta: 'Começar com Builder',
-  },
-  {
-    id: 'wp-builder-pro',
-    name: 'Builder Pro',
-    price: 'Kz 59.900', priceAOA: 59900,
-    period: '/mês',
-    description: 'Para lojas e empresas',
-    popular: true,
-    badge: 'MAIS POPULAR',
-    features: ['5 sites WordPress', 'Builder visual avançado', '50 GB NVMe SSD', 'SSL grátis', 'Plugins premium completos', 'WooCommerce integrado', 'Backup diário', 'CDN global', 'Suporte prioritário 24/7'],
-    cta: 'Começar com Builder Pro',
-  },
-  {
-    id: 'wp-builder-turbo',
-    name: 'Builder Turbo',
-    price: 'Kz 119.900', priceAOA: 119900,
-    period: '/mês',
-    description: 'Máxima performance e flexibilidade',
-    badge: 'MELHOR VALOR',
-    features: ['Sites ilimitados', 'Builder visual premium', '200 GB NVMe SSD', 'SSL grátis', 'Todos os plugins premium', 'WooCommerce avançado', 'Backup diário automático', 'CDN global premium', 'Ambiente staging', 'IP dedicado', 'Suporte premium 24/7'],
-    cta: 'Começar com Builder Turbo',
-  },
-]
 
 const included = [
   { icon: Code, title: 'Builder Visual', desc: 'Editor drag-and-drop profissional para criar páginas bonitas sem código.' },
@@ -82,14 +49,14 @@ export default async function ConstrutorWordPressPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["Builder Visual","Plugins Premium","WordPress Pré-instalado","CDN Global"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <ServicePricingCards plans={plans} cols={3}
+        <DynamicServicePricing category="wordpress" subcategory="builder" cols={3} showBillingToggle
           title="Construtor WordPress — Planos"
-          subtitle="Tudo o que precisa para criar sites WordPress profissionais." />
+          subtitle="Escolha o plano, depois o domínio e a duração." />
         <IncludedFeatures features={included}
           title="Incluído em todos os planos WordPress" />
         <FinalCTA
           title="Comece a construir com WordPress hoje"
-          subtitle="Builder visual, plugins premium e hospedagem optimizada. Garantia de 30 dias." />
+          subtitle="Builder visual, plugins premium e hospedagem optimizada." />
       </main>
       <Footer />
     </>

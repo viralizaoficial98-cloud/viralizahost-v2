@@ -60,7 +60,7 @@ interface Props {
   carousel?: boolean
 }
 
-const CYCLE_KEYS: BillingCycle[] = ['monthly', '6months', '1year', '2years', '3years']
+const CYCLE_KEYS: BillingCycle[] = ['monthly', '3months', '6months', '1year', '2years', '3years']
 
 function PlansWrap({ carousel, gridClass, children }: { carousel: boolean; gridClass: string; children: ReactNode }) {
   return carousel
@@ -68,19 +68,21 @@ function PlansWrap({ carousel, gridClass, children }: { carousel: boolean; gridC
     : <div className={`grid grid-cols-1 ${gridClass} gap-6 max-w-6xl mx-auto`}>{children}</div>
 }
 
-export function DynamicServicePricing({ category, subcategory, title, subtitle, cols = 3, showBillingToggle = false, fallbackPlans, carousel = false }: Props) {
+export function DynamicServicePricing({ category, subcategory, title, subtitle, cols = 3, showBillingToggle = false, carousel = false }: Props) {
   const { t, formatCurrency, currency } = useLocale()
   const [plans, setPlans] = useState<ProductWithFeatures[]>([])
-  const [loading, setLoading] = useState(true)
+  // loading → ok | empty (catálogo sem planos publicados) | error (falha ao carregar)
+  const [state, setState] = useState<'loading' | 'ok' | 'empty' | 'error'>('loading')
+  const [attempt, setAttempt] = useState(0)
+  const loading = state === 'loading'
   const [billing, setBilling] = useState<BillingCycle>('monthly')
 
   const defaultTitle = t('plans.features') !== 'plans.features' ? t('cta.viewPlans') : 'Escolha o plano ideal'
-  const defaultSubtitle = t('plans.support247') !== 'plans.support247'
-    ? `${t('plans.ssl')} · ${t('plans.backup')} · ${t('plans.moneyBack')}`
-    : 'Todos os planos incluem suporte técnico especializado e garantia de 30 dias.'
+  const defaultSubtitle = 'Preços em kwanzas. Cada plano mostra o valor a pagar e o valor de renovação.'
 
   const CYCLE_LABELS: Record<BillingCycle, string> = {
     monthly:   t('billing.monthly'),
+    '3months': 'Trimestral',
     '6months': t('billing.6months'),
     '1year':   t('billing.1year'),
     '2years':  t('billing.2years'),
@@ -91,15 +93,16 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
     const params = new URLSearchParams({ category })
     if (subcategory) params.set('subcategory', subcategory)
     fetch(`/api/products?${params}`, { cache: 'no-store' })
-      .then(r => r.json())
+      .then(async r => { const json = await r.json(); if (!r.ok || !json.success) throw new Error(json.message ?? `HTTP ${r.status}`); return json })
       .then(json => {
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setPlans(json.data as ProductWithFeatures[])
-        }
+        const list = (Array.isArray(json.data) ? json.data : []) as ProductWithFeatures[]
+        setPlans(list); setState(list.length ? 'ok' : 'empty')
       })
-      .catch(err => console.error('[DynamicServicePricing] fetch error:', err))
-      .finally(() => setLoading(false))
-  }, [category, subcategory])
+      .catch(err => { console.error('[DynamicServicePricing] fetch error:', err); setState('error') })
+  }, [category, subcategory, attempt])
+  const retry = () => { setState('loading'); setAttempt(a => a + 1) }
+  // Só os ciclos que existem em pelo menos um plano
+  const cycleKeys = CYCLE_KEYS.filter(c => plans.some(p => (p.product_prices ?? []).some(x => x.cycle === c && Number(x.active) === 1)))
 
   const gridClass: Record<number, string> = {
     2: 'md:grid-cols-2',
@@ -108,49 +111,6 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
   }
 
   const fmtAOA = (aoa: number) => formatCurrency(convertFromAOA(aoa, currency))
-
-  // Fallback to static plans if DB empty
-  if (!loading && plans.length === 0 && fallbackPlans) {
-    return (
-      <section id="planos" className="bg-[#F8F8F8] py-20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <span className="section-tag">{t('billing.bestValue') !== 'billing.bestValue' ? t('billing.bestValue') : 'Planos e Preços'}</span>
-            <h2 className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3 mb-3">{title ?? defaultTitle}</h2>
-            <p className="text-[#666] max-w-xl mx-auto text-sm md:text-base">{subtitle ?? defaultSubtitle}</p>
-          </div>
-          <PlansWrap carousel={carousel} gridClass={gridClass[cols]}>
-            {fallbackPlans.map(plan => (
-              <div key={plan.id} className={`relative rounded-2xl flex flex-col transition-all duration-300 hover:-translate-y-1 ${plan.popular ? 'bg-[#0A0A0A] border-2 border-[#F5B700] shadow-[0_8px_40px_rgba(245,183,0,0.20)]' : 'bg-white border border-[#E8E8E8] shadow-sm hover:shadow-md'}`}>
-                {plan.badge && (
-                  <div className="absolute -top-3.5 left-0 right-0 flex justify-center">
-                    <span className={`text-[10px] font-black px-4 py-1.5 rounded-full ${BADGE_COLORS[plan.badge] ?? 'bg-[#F5B700] text-black'}`}>{plan.badge}</span>
-                  </div>
-                )}
-                <div className="p-7 flex-1">
-                  <h3 className={`font-bold text-base mb-1 ${plan.popular ? 'text-white' : 'text-[#0A0A0A]'}`}>{plan.name}</h3>
-                  {plan.description && <p className={`text-xs mb-4 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{plan.description}</p>}
-                  <div className="mb-6">
-                    {/* Sem catálogo carregado não se mostram preços fixos: o preço vem sempre do servidor no carrinho */}
-                    <span className={`text-lg font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>Preço confirmado no carrinho</span>
-                  </div>
-                  <ul className="space-y-2.5">
-                    {plan.features.map(f => <li key={f} className="flex items-start gap-2.5 text-sm"><Check size={14} className={`mt-0.5 shrink-0 ${plan.popular ? 'text-[#F5B700]' : 'text-green-500'}`} /><span className={plan.popular ? 'text-gray-300' : 'text-[#444]'}>{f}</span></li>)}
-                    {plan.notIncluded?.map(f => <li key={f} className="flex items-start gap-2.5 text-sm opacity-40"><X size={14} className="mt-0.5 shrink-0 text-gray-400" /><span className={plan.popular ? 'text-gray-500' : 'text-[#888]'}>{f}</span></li>)}
-                  </ul>
-                </div>
-                <div className="px-7 pb-7">
-                  <Link href={plan.href ?? `/checkout?plan=${plan.id}`} className={`block w-full text-center py-3 rounded-xl text-sm font-bold transition-all ${plan.popular ? 'btn-primary btn-shimmer' : 'bg-[#0A0A0A] text-white hover:bg-[#1A1A1A]'}`}>
-                    {plan.cta ?? t('cta.start')}
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </PlansWrap>
-        </div>
-      </section>
-    )
-  }
 
   return (
     <section id="planos" className="bg-[#F8F8F8] py-20">
@@ -163,7 +123,7 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
           {showBillingToggle && (
             <div className="flex justify-center mt-6">
               <div className="flex items-center gap-1 bg-white border border-[#E8E8E8] rounded-2xl p-1.5 shadow-sm overflow-x-auto max-w-full" style={{ scrollbarWidth: 'none' }}>
-                {CYCLE_KEYS.map(c => (
+                {cycleKeys.map(c => (
                   <button
                     key={c}
                     onClick={() => setBilling(c)}
@@ -178,7 +138,19 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20"><Loader2 size={32} className="animate-spin text-[#F5B700]" /></div>
+          <div className="flex justify-center py-20" role="status" aria-label="A carregar planos"><Loader2 size={32} className="animate-spin text-[#F5B700]" /></div>
+        ) : state === 'error' ? (
+          <div className="max-w-xl mx-auto text-center bg-white border border-red-200 rounded-2xl p-8" role="alert" data-testid="plans-error">
+            <p className="font-bold text-[#0A0A0A]">Não foi possível carregar os planos.</p>
+            <p className="text-sm text-[#666] mt-1">Verifique a ligação e tente novamente. Se persistir, fale connosco.</p>
+            <button onClick={retry} className="mt-4 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#F5B700] text-[#0A0A0A]">Tentar novamente</button>
+          </div>
+        ) : state === 'empty' ? (
+          <div className="max-w-xl mx-auto text-center bg-white border border-[#E8E8E8] rounded-2xl p-8" data-testid="plans-empty">
+            <p className="font-bold text-[#0A0A0A]">Ainda não há planos publicados nesta categoria.</p>
+            <p className="text-sm text-[#666] mt-1">Peça-nos uma proposta e respondemos com as opções disponíveis.</p>
+            <Link href="/suporte/contactar" className="inline-block mt-4 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#0A0A0A] text-white">Falar com a equipa</Link>
+          </div>
         ) : (
           <PlansWrap carousel={carousel} gridClass={gridClass[cols]}>
             {plans.map(plan => {
@@ -187,9 +159,9 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
               const monthlyPrice = cyclePrice(plan, 'monthly')?.perMonth ?? null
               const onRequest = plan.sale_status === 'on_request'
               const features = [...(plan.product_features ?? [])].sort((a, b) => a.position - b.position)
-              const checkoutHref = onRequest
-                ? `/tickets?assunto=${encodeURIComponent(`Pedido de proposta — ${plan.name}`)}`
-                : plan.href_override ?? `/checkout?plan=${plan.slug}&billing=${billing}`
+              // Plano → /comprar (domínio → duração → carrinho). «Sob consulta» → formulário de cotação.
+              const checkoutHref = onRequest ? `/comprar/${plan.slug}` : `/comprar/${plan.slug}?ciclo=${billing}`
+              const unit = (plan as ProductWithFeatures & { quantity_unit?: string | null }).quantity_unit
 
               return (
                 <div
@@ -225,7 +197,7 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
                           <span className={`text-3xl font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>
                             {fmtAOA(price)}
                           </span>
-                          <span className={`text-sm ml-1 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{t('billing.perMonth')}</span>
+                          <span className={`text-sm ml-1 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{t('billing.perMonth')}{unit ? ` por ${unit}` : ''}</span>
                           {cp?.total != null && cp.months > 1 && (
                             <p className={`text-xs mt-1 ${plan.popular ? 'text-gray-400' : 'text-[#666]'}`}>Cobrado {fmtAOA(cp.total)} por {cp.months} meses</p>
                           )}
@@ -270,7 +242,7 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
                           : 'bg-[#0A0A0A] text-white hover:bg-[#1A1A1A]'
                       }`}
                     >
-                      {onRequest ? 'Pedir proposta' : (plan as any).cta_label ?? t('cta.start')}
+                      {onRequest ? 'Pedir proposta' : 'Escolher plano'}
                     </Link>
                   </div>
                 </div>

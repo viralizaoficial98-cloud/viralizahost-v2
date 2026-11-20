@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminWriteClient, createServiceClient } from '@/lib/supabase/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { getPool } from '@/lib/db/pool'
-import { confirmPayment, rejectProof, PaymentError } from '@/lib/commerce/payments'
+import { confirmPayment, rejectProof, resolveDomainAvailability, PaymentError } from '@/lib/commerce/payments'
 import { markServiceActive, provisionOrder, provisionService, refreshOrderActivation } from '@/lib/commerce/provisioning'
 
 export const dynamic = 'force-dynamic'
@@ -12,9 +12,9 @@ export async function GET() {
   try { await requireAdminRole() } catch { return NextResponse.json({ orders: [], error: 'Unauthorized' }, { status: 401 }) }
   const db = createAdminWriteClient()
   const { data: orders, error } = await db.from('orders')
-    .select(`id, order_number, user_id, status, payment_status, activation_status, amount, subtotal, tax_amount, billing_cycle, payment_method,
+    .select(`id, order_number, user_id, status, payment_status, activation_status, hold_reason, amount, subtotal, tax_amount, billing_cycle, payment_method,
       domain_name, proof_file, transfer_ref, notes, created_at, updated_at, paid_at,
-      order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation)`)
+      order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, years)`)
     .order('created_at', { ascending: false }).limit(300)
   if (error) return NextResponse.json({ orders: [], error: error.message })
   const ids = (orders ?? []).map((o: any) => o.id)
@@ -46,7 +46,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   let adminId: string
   try { adminId = await requireAdminRole() } catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  const body = await req.json().catch(() => ({})) as { orderId?: string; serviceId?: string; paymentId?: string; action?: string; notes?: string; reason?: string; externalRef?: string }
+  const body = await req.json().catch(() => ({})) as { orderItemId?: string; available?: boolean; orderId?: string; serviceId?: string; paymentId?: string; action?: string; notes?: string; reason?: string; externalRef?: string }
   const db = getPool()
   const log = (action: string, entity: string, id: string, description: string) =>
     db.query("INSERT INTO activity_logs (id, profile_id, action, entity_type, entity_id, description) VALUES (UUID(), ?, 'update', ?, ?, ?)", [adminId, entity, id, `${action}: ${description}`]).catch(() => {})
@@ -89,6 +89,12 @@ export async function POST(req: NextRequest) {
         if (s) await refreshOrderActivation(s.order_id)
         await log('provision', 'service', body.serviceId!, r.status)
         return NextResponse.json({ ok: r.status === 'active', result: r })
+      }
+      // Disponibilidade de domínio confirmada pela equipa (extensões sem consulta automática)
+      case 'domain_availability': {
+        const r = await resolveDomainAvailability(body.orderItemId!, body.available === true)
+        await log('domain_availability', 'order_item', body.orderItemId!, body.available ? 'disponível' : 'indisponível')
+        return NextResponse.json({ ok: true, ...r })
       }
       case 'mark_active': {
         await markServiceActive(body.serviceId!, body.notes ?? null, body.externalRef ?? null)

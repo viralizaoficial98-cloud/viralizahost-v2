@@ -5,7 +5,6 @@ import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
-import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Bot, Zap, MessageCircle, Globe, Shield, HardDrive, Lock, Headphones, Layers } from 'lucide-react'
@@ -15,40 +14,6 @@ export const metadata: Metadata = {
   description: 'Configure assistentes inteligentes, integrações e automações sem complicação. WhatsApp, Gmail, Slack e mais.',
 }
 
-const fallbackPlans: PricingPlan[] = [
-  {
-    id: 'vps-ai-cloud-start',
-    name: 'AI Cloud Start',
-    price: 'Kz 89.000', priceAOA: 89000,
-    period: '/mês',
-    description: 'Para começar com agentes de IA',
-    features: ['Agente de IA pré-instalado', '2 vCPU', '4 GB RAM', '60 GB NVMe SSD', 'Integração WhatsApp', 'Integração Gmail', 'SSL grátis', 'Backup semanal', 'Suporte 24/7'],
-    notIncluded: ['Agentes múltiplos', 'Integração Slack/Trello'],
-    cta: 'Começar com AI Cloud Start',
-  },
-  {
-    id: 'vps-ai-cloud-pro',
-    name: 'AI Cloud Pro',
-    price: 'Kz 169.000', priceAOA: 169000,
-    period: '/mês',
-    description: 'Para empresas e equipas',
-    popular: true,
-    badge: 'MAIS POPULAR',
-    features: ['Múltiplos agentes de IA', '4 vCPU', '8 GB RAM', '120 GB NVMe SSD', 'Integração WhatsApp', 'Integração Telegram', 'Integração Gmail', 'Integração Google Agenda', 'Integração Slack', 'SSL grátis', 'Backup diário', 'Suporte prioritário 24/7'],
-    cta: 'Começar com AI Cloud Pro',
-  },
-  {
-    id: 'vps-ai-cloud-enterprise',
-    name: 'AI Cloud Enterprise',
-    price: 'Kz 349.000', priceAOA: 349000,
-    period: '/mês',
-    description: 'Para grandes operações com IA',
-    badge: 'ENTERPRISE',
-    features: ['Agentes ilimitados', '8 vCPU', '16 GB RAM', '240 GB NVMe SSD', 'Integração WhatsApp', 'Integração Telegram', 'Integração Gmail', 'Integração Google Agenda', 'Integração Slack', 'Integração Trello', 'Integrações personalizadas', 'SSL grátis', 'Backup diário', 'Gerente de conta dedicado', 'Suporte premium 24/7'],
-    cta: 'Contatar Comercial',
-    href: '/tickets',
-  },
-]
 
 const included = [
   { icon: Bot, title: 'Agente de IA Pré-instalado', desc: 'Assistente inteligente configurado e pronto para representar o seu negócio.' },
@@ -92,15 +57,14 @@ export default async function ViralizaAICloudPage() {
           cols={3}
           showBillingToggle
           title="Viraliza AI Cloud — Planos"
-          subtitle="Agentes de IA integrados com as ferramentas do seu negócio."
-          fallbackPlans={fallbackPlans} />
+          subtitle="Agentes de IA integrados com as ferramentas do seu negócio." />
         <IncludedFeatures features={included} dark
           title="Tudo incluído no Viraliza AI Cloud" />
         <FinalCTA
           title="Active os seus agentes de IA hoje"
           subtitle="Assistentes inteligentes, integrações completas e suporte especializado."
           cta="Contratar AI Cloud"
-          ctaHref="/checkout?plan=vps-ai-cloud-pro" />
+          ctaHref="/comprar/vps-ai-cloud-pro" />
       </main>
       <Footer />
     </>

@@ -5,7 +5,6 @@ import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
-import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Workflow, Zap, Shield, HardDrive, Globe, MessageCircle, Headphones, Lock, Server } from 'lucide-react'
@@ -15,39 +14,6 @@ export const metadata: Metadata = {
   description: 'Servidor VPS com n8n pré-instalado para automações, integrações, IA e produtividade. Fluxos ilimitados.',
 }
 
-const fallbackPlans: PricingPlan[] = [
-  {
-    id: 'vps-n8n-start',
-    name: 'n8n Start',
-    price: 'Kz 55.000', priceAOA: 55000,
-    period: '/mês',
-    description: 'Para começar com automações',
-    features: ['n8n pré-instalado', '2 vCPU', '4 GB RAM', '60 GB NVMe SSD', 'Fluxos ilimitados', 'SSL grátis', 'Backup semanal', 'Suporte 24/7'],
-    notIncluded: ['Múltiplas instâncias', 'WhatsApp integrado'],
-    cta: 'Começar com n8n Start',
-  },
-  {
-    id: 'vps-n8n-pro',
-    name: 'n8n Pro',
-    price: 'Kz 99.000', priceAOA: 99000,
-    period: '/mês',
-    description: 'Para agências e equipas',
-    popular: true,
-    badge: 'MAIS POPULAR',
-    features: ['n8n pré-instalado', '4 vCPU', '8 GB RAM', '120 GB NVMe SSD', 'Fluxos ilimitados', 'SSL grátis', 'Webhooks avançados', 'Integração WhatsApp', 'Integração Google Sheets', 'Backup diário', 'Suporte prioritário 24/7'],
-    cta: 'Começar com n8n Pro',
-  },
-  {
-    id: 'vps-n8n-scale',
-    name: 'n8n Scale',
-    price: 'Kz 179.000', priceAOA: 179000,
-    period: '/mês',
-    description: 'Para alta demanda e múltiplas equipas',
-    badge: 'MELHOR VALOR',
-    features: ['n8n pré-instalado', '8 vCPU', '16 GB RAM', '240 GB NVMe SSD', 'Múltiplas instâncias n8n', 'Fluxos ilimitados', 'SSL grátis', 'Webhooks avançados', 'Integração WhatsApp', 'Integração Google Sheets', 'Integração CRMs', 'Backup diário', 'Suporte premium 24/7'],
-    cta: 'Começar com n8n Scale',
-  },
-]
 
 const included = [
   { icon: Workflow, title: 'n8n Pré-instalado', desc: 'Instância n8n configurada e pronta a usar desde o primeiro minuto.' },
@@ -91,15 +57,14 @@ export default async function VPSn8nPage() {
           cols={3}
           showBillingToggle
           title="VPS n8n — Automação sem limites"
-          subtitle="Servidor pronto com n8n configurado. Active e comece a automatizar hoje."
-          fallbackPlans={fallbackPlans} />
+          subtitle="Servidor pronto com n8n configurado. Active e comece a automatizar hoje." />
         <IncludedFeatures features={included} dark
           title="Tudo incluído no VPS n8n" />
         <FinalCTA
           title="Comece a automatizar hoje com n8n"
           subtitle="Servidor pré-configurado, fluxos ilimitados e suporte especializado."
           cta="Contratar VPS n8n"
-          ctaHref="/checkout?plan=vps-n8n-pro" />
+          ctaHref="/comprar/vps-n8n-pro" />
       </main>
       <Footer />
     </>

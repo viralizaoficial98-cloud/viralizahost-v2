@@ -12,7 +12,7 @@ interface FinalCTAProps {
 
 export function FinalCTA({
   title = 'Pronto para começar?',
-  subtitle = 'Crie a sua conta agora e aproveite 30 dias de garantia sem risco.',
+  subtitle = 'Escolha o plano, o domínio e a duração e conclua a encomenda em minutos.',
   cta = 'Criar Conta Grátis',
   ctaHref = '/register',
   ctaSecondary = 'Falar com Especialista',

@@ -5,7 +5,6 @@ import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
-import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Cpu, HardDrive, Globe, Shield, Zap, Server, Headphones, Lock, RotateCcw } from 'lucide-react'
@@ -15,39 +14,6 @@ export const metadata: Metadata = {
   description: 'Servidores VPS com RAM DDR5, NVMe SSD, IP dedicado e transferência ilimitada. Root access total.',
 }
 
-const plans: PricingPlan[] = [
-  {
-    id: 'vps-nvme2',
-    name: 'VPS NVMe 2',
-    price: 'Kz 45.000', priceAOA: 45000,
-    period: '/mês',
-    description: 'Para projectos iniciais',
-    features: ['2 vCPU', '4 GB RAM DDR5', '60 GB NVMe SSD', 'IP dedicado', 'Transferência ilimitada', 'Root access', 'Migração grátis', 'Suporte 24/7'],
-    notIncluded: ['cPanel', 'Backup gerido'],
-    cta: 'Contratar VPS NVMe 2',
-  },
-  {
-    id: 'vps-nvme4',
-    name: 'VPS NVMe 4',
-    price: 'Kz 85.000', priceAOA: 85000,
-    period: '/mês',
-    description: 'Para aplicações e e-commerce',
-    popular: true,
-    badge: 'MAIS POPULAR',
-    features: ['4 vCPU', '8 GB RAM DDR5', '120 GB NVMe SSD', 'IP dedicado', 'Transferência ilimitada', 'Root access', 'cPanel opcional', 'Backup semanal gerido', 'Migração grátis', 'Suporte prioritário 24/7'],
-    cta: 'Contratar VPS NVMe 4',
-  },
-  {
-    id: 'vps-nvme8',
-    name: 'VPS NVMe 8',
-    price: 'Kz 159.000', priceAOA: 159000,
-    period: '/mês',
-    description: 'Para alta demanda e escala',
-    badge: 'MELHOR VALOR',
-    features: ['8 vCPU', '16 GB RAM DDR5', '240 GB NVMe SSD', 'IP dedicado', 'Transferência ilimitada', 'Root access', 'cPanel incluído', 'Backup diário gerido', 'Migração grátis', 'Snapshots', 'Suporte premium 24/7'],
-    cta: 'Contratar VPS NVMe 8',
-  },
-]
 
 const included = [
   { icon: Cpu, title: 'vCPU Dedicadas', desc: 'Núcleos de CPU exclusivos sem partilha com outros utilizadores.' },
@@ -85,15 +51,14 @@ export default async function ServidorVPSPage() {
         />
         <DynamicServicePricing category="vps" cols={3} showBillingToggle
           title="Servidor VPS — Escolha o seu plano"
-          subtitle="Alta performance com escalabilidade total. Activação imediata."
-          fallbackPlans={plans} />
+          subtitle="Escolha o plano e a duração; a equipa activa o servidor depois do pagamento confirmado." />
         <IncludedFeatures features={included} dark
           title="Infra-estrutura premium incluída" />
         <FinalCTA
           title="Active o seu VPS em minutos"
-          subtitle="Activação imediata, root access total e suporte especializado 24/7."
+          subtitle="Acesso root e suporte especializado. Activação pela equipa depois do pagamento confirmado."
           cta="Contratar VPS"
-          ctaHref="/checkout?plan=vps-nvme4" />
+          ctaHref="/comprar/vps-nvme4" />
       </main>
       <Footer />
     </>

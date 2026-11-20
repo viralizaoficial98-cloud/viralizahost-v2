@@ -5,7 +5,6 @@ import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
-import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Cpu, HardDrive, Globe, Shield, Zap, Server, Headphones, Lock, RotateCcw } from 'lucide-react'
@@ -15,49 +14,6 @@ export const metadata: Metadata = {
   description: 'Servidores Linux dedicados com recursos exclusivos, root access e alta disponibilidade. Ideal para sistemas críticos.',
 }
 
-const plans: PricingPlan[] = [
-  {
-    id: 'ded-16',
-    name: 'Dedicado NVMe 16',
-    price: 'Kz 249.000', priceAOA: 249000,
-    period: '/mês',
-    description: 'Para sistemas e aplicações de médio porte',
-    features: ['16 vCPU dedicadas', '32 GB RAM DDR5', '480 GB NVMe SSD', '2 IPs dedicados', 'cPanel/WHM opcional', 'SSL grátis', 'Migração gratuita', 'Suporte técnico 24/7'],
-    notIncluded: ['IPs adicionais', 'Backup gerido diário'],
-    cta: 'Contratar NVMe 16',
-  },
-  {
-    id: 'ded-32',
-    name: 'Dedicado NVMe 32',
-    price: 'Kz 449.000', priceAOA: 449000,
-    period: '/mês',
-    description: 'Para projectos de alta demanda',
-    popular: true,
-    badge: 'MAIS POPULAR',
-    features: ['32 vCPU dedicadas', '64 GB RAM DDR5', '960 GB NVMe SSD', '4 IPs dedicados', 'cPanel/WHM incluído', 'SSL grátis', 'Backup semanal gerido', 'Migração gratuita', 'Suporte prioritário 24/7'],
-    cta: 'Contratar NVMe 32',
-  },
-  {
-    id: 'ded-64',
-    name: 'Dedicado NVMe 64',
-    price: 'Kz 799.000', priceAOA: 799000,
-    period: '/mês',
-    description: 'Para infra-estruturas empresariais',
-    badge: 'MELHOR VALOR',
-    features: ['64 vCPU dedicadas', '128 GB RAM DDR5', '1.920 GB NVMe SSD', '8 IPs dedicados', 'cPanel/WHM incluído', 'SSL grátis', 'Backup diário gerido', 'Migração gratuita', 'Snapshots', 'SLA premium', 'Suporte premium 24/7'],
-    cta: 'Contratar NVMe 64',
-  },
-  {
-    id: 'ded-128',
-    name: 'Dedicado NVMe 128',
-    price: 'Sob consulta',
-    period: '',
-    description: 'Infra-estrutura exclusiva máxima',
-    features: ['128 vCPU dedicadas', '256 GB RAM DDR5', '3.840 GB NVMe SSD', 'IPs dedicados ilimitados', 'cPanel/WHM incluído', 'SSL grátis', 'Backup diário + offsite', 'Migração gratuita', 'Gerente de infra-estrutura', 'SLA enterprise', 'Suporte VIP 24/7'],
-    cta: 'Contatar Comercial',
-    href: '/tickets',
-  },
-]
 
 const included = [
   { icon: Cpu, title: 'vCPU 100% Dedicadas', desc: 'Núcleos exclusivos sem qualquer partilha de recursos com outros servidores.' },
@@ -95,8 +51,7 @@ export default async function ServidorDedicadoPage() {
         />
         <DynamicServicePricing category="dedicated" cols={4} showBillingToggle
           title="Servidor Dedicado Linux — Planos"
-          subtitle="Recursos exclusivos, sem partilha. Máxima performance e controlo total."
-          fallbackPlans={plans} />
+          subtitle="Recursos exclusivos, sem partilha. Máxima performance e controlo total." />
         <IncludedFeatures features={included} dark
           title="Infra-estrutura enterprise incluída" />
         <FinalCTA

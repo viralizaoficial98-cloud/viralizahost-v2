@@ -1,86 +1,58 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { kz as kzFmt } from '@/lib/commerce/status'
+import { Suspense } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { FloatingChat } from '@/components/layout/FloatingChat'
-import { createAdminWriteClient } from '@/lib/supabase/server'
-import { Shield, Lock, Zap, RefreshCw, Globe, Headphones } from 'lucide-react'
-import { DominiosListing } from '@/components/landing/DominiosListing'
+import { DomainShop } from '@/components/purchase/DomainShop'
+import { listExtensions } from '@/lib/commerce/domain-catalog'
 
 export const dynamic = 'force-dynamic'
-
 export const metadata: Metadata = {
-  title: 'Domínios — Todos os preços',
-  description: 'Veja todos os domínios disponíveis e registe o seu com o melhor preço em Angola.',
+  title: 'Domínios — Pesquisa e preços',
+  description: 'Pesquise, registe e transfira domínios .ao, .co.ao, .com e outros, com preços em kwanzas.',
 }
-
-const benefits = [
-  { icon: Lock, title: 'SSL Grátis', desc: 'HTTPS incluído no registo' },
-  { icon: Shield, title: 'WHOIS Protegido', desc: 'Privacidade total dos seus dados' },
-  { icon: Zap, title: 'DNS Ultrarrápido', desc: 'Propagação em minutos' },
-  { icon: RefreshCw, title: 'Renovação Automática', desc: 'Nunca perca o seu domínio' },
-  { icon: Globe, title: 'Subdomínios Ilimitados', desc: 'Organize como quiser' },
-  { icon: Headphones, title: 'Suporte 24/7', desc: 'Equipa técnica especializada' },
-]
+const kz = (n: number | null) => (n == null ? '—' : kzFmt(Math.round(n)))
 
 export default async function DominiosPage() {
-  const supabase = createAdminWriteClient()
-  const { data, error } = await supabase
-    .from('site_domains')
-    .select('extension, price_annual, price_monthly, currency, popular')
-    .eq('active', true)
-    .order('position')
-
-  const extensions = data ?? []
-  const fetchError = error ? error.message : null
-
+  let exts: Awaited<ReturnType<typeof listExtensions>> | null = null
+  try { exts = await listExtensions() } catch { exts = null }
   return (
     <>
       <Header />
       <main>
-        {/* Hero */}
-        <section className="bg-[#0A0A0A] pt-28 pb-16 text-center px-4">
-          <div className="flex items-center justify-center gap-4 mb-4">
-            <div className="h-px w-16 bg-gradient-to-r from-transparent to-[#F5B700]" />
-            <p className="text-[#F5B700] text-xs font-bold tracking-widest uppercase">Registo de Domínios</p>
-            <div className="h-px w-16 bg-gradient-to-l from-transparent to-[#F5B700]" />
-          </div>
-          <h1 className="text-4xl md:text-5xl font-black text-white mb-4 leading-tight">
-            Todos os domínios{' '}
-            <span className="text-[#F5B700]">e preços</span>
-          </h1>
-          <p className="text-[#999] text-base md:text-lg max-w-2xl mx-auto">
-            Escolha a extensão certa para a sua marca. Activação imediata, SSL incluído.
-          </p>
+        <section className="bg-[#0A0A0A] pt-28 pb-12 text-center px-4">
+          <p className="text-[#F5B700] text-xs font-bold tracking-widest uppercase mb-4">Registo de Domínios</p>
+          <h1 className="text-4xl md:text-5xl font-black text-white mb-4 leading-tight">Encontre o seu <span className="text-[#F5B700]">domínio</span></h1>
+          <p className="text-[#999] text-base md:text-lg max-w-2xl mx-auto">Disponibilidade, alternativas e preços de registo e renovação em kwanzas.</p>
         </section>
-
-        {/* Extensions grid with search */}
-        <DominiosListing extensions={extensions} fetchError={fetchError} />
-
-        {/* Benefits */}
-        <section className="bg-[#FAFAFA] py-16 px-4">
+        <section className="bg-[#F7F7F7] py-10 px-4">
+          <div className="max-w-4xl mx-auto"><Suspense><DomainShop /></Suspense></div>
+        </section>
+        <section className="bg-white py-14 px-4" aria-labelledby="ext-title">
           <div className="max-w-5xl mx-auto">
-            <p className="text-center text-xs font-black text-[#999] uppercase tracking-widest mb-8">
-              Incluído em todos os domínios
-            </p>
-            <div
-              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-[#E8E8E8] rounded-2xl overflow-hidden"
-              style={{ boxShadow: '0 2px 20px rgba(0,0,0,0.06)' }}
-            >
-              {benefits.map(({ icon: Icon, title, desc }) => (
-                <div key={title} className="bg-white px-4 py-6 flex flex-col items-center text-center gap-2">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#FFF8E1]">
-                    <Icon size={18} className="text-[#F5B700]" />
-                  </div>
-                  <p className="text-[#0A0A0A] font-bold text-xs leading-tight">{title}</p>
-                  <p className="text-[#999] text-[11px] leading-snug">{desc}</p>
-                </div>
-              ))}
-            </div>
+            <h2 id="ext-title" className="text-2xl font-black text-[#0A0A0A] mb-6">Extensões e preços (1 ano)</h2>
+            {!exts ? (
+              <p className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700" role="alert">Não foi possível carregar os preços. Recarregue a página dentro de instantes.</p>
+            ) : !exts.length ? (
+              <p className="p-4 rounded-xl bg-[#F8F8F8] text-sm">Ainda não há extensões publicadas.</p>
+            ) : (
+              <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {exts.map(e => (
+                  <li key={e.extension}>
+                    <Link href={e.status === 'active' ? `/dominios/pesquisar?ext=${encodeURIComponent(e.extension)}` : '/suporte/contactar'} className="block rounded-xl border border-[#E8E8E8] p-4 hover:border-[#F5B700] transition-colors">
+                      <p className="font-black text-lg text-[#0A0A0A]">{e.extension}</p>
+                      {e.status === 'active' ? <><p className="text-sm font-bold">{kz(e.register)}</p><p className="text-[11px] text-[#888]">renova {kz(e.renew)}</p></> : <p className="text-sm text-[#888]">Sob consulta</p>}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-6 text-sm"><Link href="/dominios/precos" className="font-bold underline">Tabela completa com transferências</Link></p>
           </div>
         </section>
       </main>
       <Footer />
-      <FloatingChat />
     </>
   )
 }

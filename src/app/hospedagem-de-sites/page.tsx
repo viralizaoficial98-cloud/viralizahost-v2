@@ -4,11 +4,9 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { ServicePricingCards } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Server, Shield, Zap, HardDrive, Mail, RotateCcw, Headphones, Globe, Lock } from 'lucide-react'
-import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 
 export const metadata: Metadata = {
@@ -16,43 +14,6 @@ export const metadata: Metadata = {
   description: 'Hospedagem web premium com LiteSpeed, NVMe SSD, SSL grátis, cPanel e suporte 24/7. Uptime 99.9% garantido.',
 }
 
-const fallbackPlans: PricingPlan[] = [
-  {
-    id: 'hosting-start',
-    name: 'Plano Start',
-    price: 'Kz 19.900',
-    priceAOA: 19900,
-    period: '/mês',
-    description: 'Ideal para sites pessoais e blogs',
-    features: ['1 site hospedado', '20 GB NVMe SSD', 'SSL grátis', 'cPanel incluído', '5 contas de e-mail', 'Backup semanal', 'Migração gratuita', 'Suporte 24/7'],
-    notIncluded: ['Sites ilimitados', 'CDN global'],
-    cta: 'Começar com Start',
-  },
-  {
-    id: 'hosting-business',
-    name: 'Plano Business',
-    price: 'Kz 39.900',
-    priceAOA: 39900,
-    period: '/mês',
-    description: 'Para pequenas e médias empresas',
-    popular: true,
-    badge: 'MAIS POPULAR',
-    features: ['5 sites hospedados', '50 GB NVMe SSD', 'SSL grátis', 'cPanel incluído', '20 contas de e-mail', 'Backup diário', 'Migração gratuita', 'Suporte prioritário 24/7', 'CDN básico'],
-    notIncluded: ['Sites ilimitados'],
-    cta: 'Começar com Business',
-  },
-  {
-    id: 'hosting-turbo',
-    name: 'Plano Turbo',
-    price: 'Kz 79.900',
-    priceAOA: 79900,
-    period: '/mês',
-    description: 'Performance máxima sem limites',
-    badge: 'MELHOR VALOR',
-    features: ['Sites ilimitados', '200 GB NVMe SSD', 'SSL grátis', 'cPanel incluído', 'E-mails ilimitados', 'Backup diário automático', 'Migração gratuita', 'Suporte premium 24/7', 'CDN global', 'IP dedicado'],
-    cta: 'Começar com Turbo',
-  },
-]
 
 const included = [
   { icon: Shield, title: 'SSL Grátis', desc: 'Certificado SSL/TLS Let\'s Encrypt instalado automaticamente em todos os domínios.' },
@@ -95,11 +56,10 @@ export default async function HospedagemDeSitesPage() {
           showBillingToggle
           carousel
           title="Hospedagem de Sites — Escolha o seu plano"
-          subtitle="Sem compromisso. Todos os planos com garantia de 30 dias."
-          fallbackPlans={fallbackPlans} />
+          subtitle="Escolha o plano, depois o domínio e a duração." />
         <IncludedFeatures features={included} hoverBorder />
         <FinalCTA
-          title="Comece hoje com 30 dias de garantia"
+          title="Comece hoje"
           subtitle="Migração gratuita, suporte 24/7 e uptime 99.9% garantido. Sem riscos." />
       </main>
       <Footer />

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Ensaio completo contra a base de ENSAIO e o WHM simulado. Nunca apontar para produção.
 #   APP_LOG=/caminho/next.log BASE_URL=http://localhost:3000 bash scripts/mariadb/rehearsal/run-all.sh
+# O processo Next de ensaio deve correr com RDAP_BOOTSTRAP_URL=http://127.0.0.1:12088/dns.json (mock-rdap.mjs),
+# NODE_EXTRA_CA_CERTS=<certificado do WHM simulado>, ORDER_RATE_LIMIT=500 e QUOTE_RATE_LIMIT=200.
 set -u
 cd "$(dirname "$0")/../../.."
 case "$(node --env-file=.env.local -p 'process.env.DB_NAME')" in
@@ -21,6 +23,7 @@ run "Importação WHM" node --env-file=.env.local scripts/mariadb/rehearsal/whm-
 if [ "${SKIP_UI:-0}" = "1" ]; then
   echo; echo "=== Interface e links: ignorados (SKIP_UI=1, sem Chromium neste servidor)"
 else
+  run "Percursos de compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/purchase-flows-e2e.cjs
   run "Interface desktop + iPhone" node scripts/mariadb/rehearsal/ui-e2e.cjs
   run "Links do site" node scripts/mariadb/rehearsal/links-audit.cjs
   run "Links com sessão" node scripts/mariadb/rehearsal/links-audit-auth.cjs

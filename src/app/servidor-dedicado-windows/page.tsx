@@ -5,7 +5,6 @@ import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
-import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Monitor, HardDrive, Globe, Shield, Zap, Server, Headphones, Lock, RotateCcw } from 'lucide-react'
@@ -15,39 +14,6 @@ export const metadata: Metadata = {
   description: 'Servidores Windows Server com Plesk, ASP.NET, MS SQL, RDP e alta disponibilidade para projectos Microsoft.',
 }
 
-const plans: PricingPlan[] = [
-  {
-    id: 'win-black',
-    name: 'Black',
-    price: 'Kz 299.000', priceAOA: 299000,
-    period: '/mês',
-    description: 'Para projectos iniciais Windows',
-    features: ['16 vCPU dedicadas', '32 GB RAM DDR5', '480 GB NVMe SSD', 'Windows Server 2022', 'Plesk incluído', 'ASP.NET', 'MS SQL Express', 'Remote Desktop (RDP)', 'SSL grátis', 'Suporte 24/7'],
-    notIncluded: ['MS SQL Standard', 'Backup gerido diário'],
-    cta: 'Contratar Black',
-  },
-  {
-    id: 'win-sapphire',
-    name: 'Sapphire',
-    price: 'Kz 549.000', priceAOA: 549000,
-    period: '/mês',
-    description: 'Para sistemas empresariais',
-    popular: true,
-    badge: 'MAIS POPULAR',
-    features: ['32 vCPU dedicadas', '64 GB RAM DDR5', '960 GB NVMe SSD', 'Windows Server 2022', 'Plesk incluído', 'ASP.NET avançado', 'MS SQL Standard', 'Remote Desktop (RDP)', 'SSL grátis', 'Backup semanal', 'Alta disponibilidade', 'Suporte prioritário 24/7'],
-    cta: 'Contratar Sapphire',
-  },
-  {
-    id: 'win-diamond',
-    name: 'Diamond',
-    price: 'Kz 999.000', priceAOA: 999000,
-    period: '/mês',
-    description: 'Máxima performance para MS SQL',
-    badge: 'MELHOR VALOR',
-    features: ['64 vCPU dedicadas', '128 GB RAM DDR5', '1.920 GB NVMe SSD', 'Windows Server 2022', 'Plesk Enterprise', 'ASP.NET avançado', 'MS SQL Enterprise', 'Remote Desktop (RDP)', 'SSL grátis', 'Backup diário gerido', 'Alta disponibilidade', 'IP dedicado', 'SLA premium', 'Suporte premium 24/7'],
-    cta: 'Contratar Diamond',
-  },
-]
 
 const included = [
   { icon: Monitor, title: 'Windows Server 2022', desc: 'Sistema operativo Windows Server licenciado e actualizado incluído.' },
@@ -85,8 +51,7 @@ export default async function ServidorDedicadoWindowsPage() {
         />
         <DynamicServicePricing category="dedicated-windows" cols={3} showBillingToggle
           title="Servidor Dedicado Windows — Planos"
-          subtitle="Hardware exclusivo com Windows Server licenciado. Suporte especializado 24/7."
-          fallbackPlans={plans} />
+          subtitle="Hardware exclusivo com Windows Server licenciado. Suporte especializado 24/7." />
         <IncludedFeatures features={included} dark
           title="Infra-estrutura Windows completa incluída" />
         <FinalCTA

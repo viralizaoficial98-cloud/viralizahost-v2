@@ -1,5 +1,6 @@
 'use client'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Save, ExternalLink, AlertTriangle } from 'lucide-react'
 import { AdminPageShell } from '@/components/admin/AdminPageShell'
 
@@ -11,7 +12,7 @@ type Price = { id: string; cycle: string; months: number; price: number; renewal
 type Product = { id: string; slug: string; name: string; category: string; subcategory: string | null; sale_status: 'active' | 'draft' | 'on_request'; provisioning: string | null; whm_package: string | null; pricing_note: string | null; prices: Price[] }
 type DomainPrice = { id: string; extension: string; operation: string; years: number; price: number | null; status: 'active' | 'draft' | 'on_request'; reference: any }
 
-const CYCLES = [['monthly', 'Mensal'], ['6months', '6 meses'], ['1year', '1 ano'], ['2years', '2 anos'], ['3years', '3 anos']] as const
+const CYCLES = [['monthly', 'Mensal'], ['3months', 'Trimestral'], ['6months', '6 meses'], ['1year', '1 ano'], ['2years', '2 anos'], ['3years', '3 anos']] as const
 const STATUS = { active: 'À venda', on_request: 'Sob consulta', draft: 'Rascunho' }
 const OP = { register: 'Registo', renew: 'Renovação', transfer: 'Transferência' } as Record<string, string>
 const input = 'w-full border border-[#E5E7EB] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-[#F5B700]'
@@ -105,7 +106,41 @@ function DomainRow({ d, onSaved }: { d: DomainPrice; onSaved: () => void }) {
   )
 }
 
+const CAT_GROUPS: Record<string, { label: string; categories: string[] | null }> = {
+  all: { label: 'Tudo', categories: null },
+  hosting: { label: 'Hospedagem', categories: ['hosting', 'wordpress', 'website-builder', 'reseller'] },
+  email: { label: 'E-mail', categories: ['email'] },
+  servidores: { label: 'VPS e dedicados', categories: ['vps', 'dedicated', 'dedicated-windows'] },
+  outros: { label: 'Outros', categories: ['ssl', 'backup', 'protection', 'domain', 'microsoft365'] },
+  dominios: { label: 'Domínios', categories: [] },
+}
+
+/** Nova extensão de domínio: entra em rascunho (sem preço) até a equipa a publicar. */
+function NewExtension({ onSaved }: { onSaved: () => void }) {
+  const [ext, setExt] = useState('')
+  const [msg, setMsg] = useState('')
+  async function add() {
+    setMsg('')
+    const r = await fetch('/api/admin/catalog', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'extension', extension: ext }) })
+    const j = await r.json(); setMsg(r.ok ? 'Extensão criada em rascunho: defina os preços e publique.' : j.error); if (r.ok) { setExt(''); onSaved() }
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 mt-3">
+      <input className={`${input} max-w-[160px]`} placeholder=".exemplo" value={ext} onChange={e => setExt(e.target.value)} aria-label="Nova extensão" />
+      <button onClick={add} className="px-3 py-1.5 rounded-lg text-sm font-bold bg-[#F5B700] text-black">Acrescentar extensão</button>
+      <span className="text-xs" role="status">{msg}</span>
+    </div>
+  )
+}
+
 export default function CatalogPage() {
+  return <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#F5B700]" /></div>}><Catalog /></Suspense>
+}
+
+function Catalog() {
+  const params = useSearchParams()
+  const router = useRouter()
+  const cat = CAT_GROUPS[params.get('cat') ?? 'all'] ? (params.get('cat') ?? 'all') : 'all'
   const [data, setData] = useState<{ products: Product[]; domains: DomainPrice[] } | null>(null)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('')
@@ -115,13 +150,15 @@ export default function CatalogPage() {
   useEffect(load, [load])
   const groups = useMemo(() => {
     const g = new Map<string, Product[]>()
+    const cats = CAT_GROUPS[cat].categories
     for (const p of data?.products ?? []) {
+      if (cats && !cats.includes(p.category)) continue
       if (filter && !`${p.name} ${p.slug}`.toLowerCase().includes(filter.toLowerCase())) continue
       const k = p.subcategory ? `${p.category} / ${p.subcategory}` : p.category
       g.set(k, [...(g.get(k) ?? []), p])
     }
     return [...g.entries()]
-  }, [data, filter])
+  }, [data, filter, cat])
 
   return (
     <AdminPageShell title="Catálogo e preços" subtitle="Estado de venda, pacote WHM, preços e renovação por ciclo. O checkout usa sempre estes valores.">
@@ -129,22 +166,29 @@ export default function CatalogPage() {
       {!data && !error && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#F5B700]" /></div>}
       {data && (
         <div className="space-y-6">
-          <input className={`${input} max-w-sm`} placeholder="Filtrar planos…" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filtrar planos" />
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Categoria">
+            {Object.entries(CAT_GROUPS).map(([k, g]) => (
+              <button key={k} role="tab" aria-selected={cat === k} onClick={() => router.replace(k === 'all' ? '/admin/site/catalog' : `/admin/site/catalog?cat=${k}`)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-bold border ${cat === k ? 'bg-[#F5B700] border-[#F5B700] text-black' : 'bg-white border-[#E5E7EB] text-[#334155]'}`}>{g.label}</button>
+            ))}
+          </div>
+          {cat !== 'dominios' && <input className={`${input} max-w-sm`} placeholder="Filtrar planos…" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filtrar planos" />}
           {groups.map(([k, list]) => (
             <section key={k}>
               <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">{k}</h2>
               <div className="space-y-2">{list.map(p => <ProductRow key={p.id} p={p} onSaved={load} />)}</div>
             </section>
           ))}
-          <section>
-            <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">Domínios (1 ano)</h2>
+          {(cat === 'all' || cat === 'dominios') && <section>
+            <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">Domínios (preço por 1 ano; registos de 2–3 anos = registo + renovações)</h2>
             <div className="rounded-xl border border-[#E5E7EB] bg-white p-3 overflow-x-auto">
               <table className="w-full text-sm min-w-[640px]">
                 <thead><tr className="text-left text-[11px] uppercase text-[#64748B]"><th>Extensão</th><th>Operação</th><th>Preço (Kz)</th><th>Estado</th><th>Referência</th><th /></tr></thead>
                 <tbody>{data.domains.map(d => <DomainRow key={d.id} d={d} onSaved={load} />)}</tbody>
               </table>
             </div>
-          </section>
+            <NewExtension onSaved={load} />
+          </section>}
         </div>
       )}
     </AdminPageShell>

@@ -35,6 +35,10 @@ const BASE = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, ''
   }
   console.log(`Âncoras sem alvo: ${missing.size}`); for (const m of missing) console.log('  ✗ ' + m)
 
+  const comprar = [...refs.keys()].filter(k => k.startsWith('/comprar/'))
+  const badComprar = comprar.filter(k => seen.get(k) !== 200)
+  console.log(`Botões «Escolher plano» (/comprar): ${comprar.length}; com erro: ${badComprar.length}`)
+  for (const k of badComprar) console.log(`  ✗ ${k} ← ${refs.get(k)}`)
   const buys = [...refs.keys()].filter(k => k.startsWith('/checkout?'))
   let okN = 0; const fails = []
   for (const u of buys) {
@@ -55,5 +59,5 @@ const BASE = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, ''
   console.log(`Botões de compra: ${buys.length}; válidos: ${okN}; com problema: ${fails.length}`)
   for (const f of fails) console.log('  ✗ ' + f)
   await b.close()
-  process.exit(bad.length || fails.length ? 1 : 0)
+  process.exit(bad.length || fails.length || badComprar.length || missing.size ? 1 : 0)
 })()

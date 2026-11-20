@@ -5,7 +5,6 @@ import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
-import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { MessageCircle, Zap, Shield, HardDrive, Globe, Lock, Headphones, Server, Workflow } from 'lucide-react'
@@ -15,39 +14,6 @@ export const metadata: Metadata = {
   description: 'Servidor VPS com Evolution API para WhatsApp Business, chatbots, integrações e automações. Múltiplos números.',
 }
 
-const fallbackPlans: PricingPlan[] = [
-  {
-    id: 'vps-evolution-start',
-    name: 'Evolution Start',
-    price: 'Kz 69.000', priceAOA: 69000,
-    period: '/mês',
-    description: 'Para começar com WhatsApp API',
-    features: ['Evolution API pré-instalada', '2 vCPU', '4 GB RAM', '60 GB NVMe SSD', 'Até 5 números WhatsApp', 'Webhooks incluídos', 'SSL grátis', 'Backup semanal', 'Suporte 24/7'],
-    notIncluded: ['Até 20 números', 'Painel multi-instância'],
-    cta: 'Começar com Evolution Start',
-  },
-  {
-    id: 'vps-evolution-pro',
-    name: 'Evolution Pro',
-    price: 'Kz 129.000', priceAOA: 129000,
-    period: '/mês',
-    description: 'Para empresas e agências',
-    popular: true,
-    badge: 'MAIS POPULAR',
-    features: ['Evolution API pré-instalada', '4 vCPU', '8 GB RAM', '120 GB NVMe SSD', 'Até 20 números WhatsApp', 'Webhooks avançados', 'Painel multi-instância', 'Integrações n8n e CRM', 'SSL grátis', 'Backup diário', 'Suporte prioritário 24/7'],
-    cta: 'Começar com Evolution Pro',
-  },
-  {
-    id: 'vps-evolution-scale',
-    name: 'Evolution Scale',
-    price: 'Kz 249.000', priceAOA: 249000,
-    period: '/mês',
-    description: 'Para alto volume e múltiplas empresas',
-    badge: 'MELHOR VALOR',
-    features: ['Evolution API pré-instalada', '8 vCPU', '16 GB RAM', '240 GB NVMe SSD', 'Até 100 números WhatsApp', 'Webhooks avançados', 'Painel multi-instância', 'Todas as integrações', 'Monitoramento de sessões', 'SSL grátis', 'Backup diário', 'Suporte premium 24/7'],
-    cta: 'Começar com Evolution Scale',
-  },
-]
 
 const included = [
   { icon: MessageCircle, title: 'Evolution API Pré-instalada', desc: 'API do WhatsApp configurada e pronta para conectar os seus números.' },
@@ -91,15 +57,14 @@ export default async function VPSEvolutionAPIPage() {
           cols={3}
           showBillingToggle
           title="VPS Evolution API — Planos"
-          subtitle="Servidor pré-configurado com Evolution API. Comece a automatizar o WhatsApp hoje."
-          fallbackPlans={fallbackPlans} />
+          subtitle="Servidor pré-configurado com Evolution API. Comece a automatizar o WhatsApp hoje." />
         <IncludedFeatures features={included} dark
           title="Tudo incluído no VPS Evolution API" />
         <FinalCTA
           title="Comece a automatizar o WhatsApp hoje"
           subtitle="Servidor pré-configurado, múltiplos números e integrações completas."
           cta="Contratar Evolution API"
-          ctaHref="/checkout?plan=vps-evolution-pro" />
+          ctaHref="/comprar/vps-evolution-pro" />
       </main>
       <Footer />
     </>

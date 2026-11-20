@@ -48,6 +48,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .single()
 
   if (!invoice) return NextResponse.json({ error: 'Fatura não encontrada.' }, { status: 404 })
+  if ((invoice as { status?: string }).status === 'draft') {
+    return NextResponse.json({ error: 'Ainda não pague: a equipa está a confirmar a disponibilidade do domínio. Avisamos quando puder pagar.' }, { status: 409 })
+  }
 
   // Validate payment belongs to this user + invoice
   const { data: payment } = await db

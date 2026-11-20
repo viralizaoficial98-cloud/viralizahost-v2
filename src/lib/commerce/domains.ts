@@ -1,11 +1,14 @@
 import 'server-only'
 
 // Disponibilidade de domínios via RDAP (bootstrap oficial da IANA).
-// Quando o registo não publica RDAP (ex.: .ao) ou a consulta falha, devolve
-// `verified: false`: a encomenda é aceite, mas o registo fica para confirmação
-// manual — nunca se afirma disponibilidade sem verificação.
+// Três estados:
+//   available   — o registo respondeu 404 (não existe)          → pode ser comprado
+//   unavailable — o registo devolveu o objecto do domínio        → não pode ser registado
+//   confirm     — extensão sem RDAP (ex.: .ao), timeout ou erro  → «A confirmar pela equipa»
+// Uma falha, um timeout ou a falta de integração NUNCA contam como disponível.
+// RDAP_BOOTSTRAP_URL permite apontar para outro bootstrap (ex.: RDAP simulado no ensaio).
 
-const BOOTSTRAP_URL = 'https://data.iana.org/rdap/dns.json'
+const BOOTSTRAP_URL = process.env.RDAP_BOOTSTRAP_URL || 'https://data.iana.org/rdap/dns.json'
 const BOOTSTRAP_TTL_MS = 24 * 60 * 60 * 1000
 let bootstrapCache: { map: Map<string, string>; fetchedAt: number } | null = null
 
@@ -39,12 +42,13 @@ function rdapBaseFor(domain: string, map: Map<string, string>): string | null {
   return null
 }
 
-export interface Availability { domain: string; available: boolean; verified: boolean; note?: string }
+export type AvailabilityStatus = 'available' | 'unavailable' | 'confirm'
+export interface Availability { domain: string; status: AvailabilityStatus; available: boolean; verified: boolean; note?: string }
 
 export async function checkAvailability(domainRaw: string): Promise<Availability> {
   const domain = normalizeDomain(domainRaw)
-  if (!domain) return { domain: String(domainRaw ?? ''), available: false, verified: true, note: 'invalid' }
-  const unverified = (note: string): Availability => ({ domain, available: true, verified: false, note })
+  if (!domain) return { domain: String(domainRaw ?? ''), status: 'unavailable', available: false, verified: true, note: 'invalid' }
+  const unverified = (note: string): Availability => ({ domain, status: 'confirm', available: false, verified: false, note })
   const map = await loadBootstrap()
   if (!map) return unverified('bootstrap_unavailable')
   const base = rdapBaseFor(domain, map)
@@ -55,8 +59,8 @@ export async function checkAvailability(domainRaw: string): Promise<Availability
       headers: { 'User-Agent': 'ViralizaHost/1.0', Accept: 'application/rdap+json' },
       redirect: 'follow',
     })
-    if (res.status === 404) return { domain, available: true, verified: true }
-    if (res.ok) return { domain, available: false, verified: true }
+    if (res.status === 404) return { domain, status: 'available', available: true, verified: true }
+    if (res.ok) return { domain, status: 'unavailable', available: false, verified: true }
     return unverified(`rdap_status_${res.status}`)
   } catch {
     return unverified('lookup_timeout')
