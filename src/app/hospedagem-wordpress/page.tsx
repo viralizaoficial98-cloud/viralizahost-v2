@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
+import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
@@ -34,6 +35,7 @@ const included = [
 
 export default async function HospedagemWordPressPage() {
   const banner = await getBannerPage('hospedagem-wordpress')
+  const fromPrice = await fromPriceText('wordpress')
   return (
     <>
       <Header />
@@ -43,7 +45,7 @@ export default async function HospedagemWordPressPage() {
           tag={banner?.tag ?? 'WordPress Optimizado'}
           title={banner?.title ?? 'Hospedagem WordPress optimizada para máxima performance'}
           subtitle={banner?.subtitle ?? 'WordPress pré-instalado, LiteSpeed, SSL grátis, CDN global e criador de sites com IA incluído em todos os planos.'}
-          price={banner?.price_text ?? 'A partir de Kz 24.900/mês'}
+          price={fromPrice ?? undefined}
           cta={banner?.button_primary_text ?? 'Ver Planos WordPress'}
           ctaHref={banner?.button_primary_link ?? '#planos'}
           ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}

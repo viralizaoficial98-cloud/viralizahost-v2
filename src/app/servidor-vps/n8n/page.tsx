@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
+import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -62,6 +63,7 @@ const included = [
 
 export default async function VPSn8nPage() {
   const banner = await getBannerPage('vps-n8n')
+  const fromPrice = await fromPriceText('vps', 'n8n')
   return (
     <>
       <Header />
@@ -73,7 +75,7 @@ export default async function VPSn8nPage() {
           tag={banner?.tag ?? 'Automação com n8n'}
           title={banner?.title ?? 'Crie e rode as suas automações em minutos'}
           subtitle={banner?.subtitle ?? 'Servidor VPS com n8n preparado para automações, integrações com WhatsApp, Google Sheets, CRMs e muito mais. Fluxos ilimitados.'}
-          price={banner?.price_text ?? 'A partir de Kz 55.000/mês'}
+          price={fromPrice ?? undefined}
           cta={banner?.button_primary_text ?? 'Ver Planos n8n'}
           ctaHref={banner?.button_primary_link ?? '#planos'}
           ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}

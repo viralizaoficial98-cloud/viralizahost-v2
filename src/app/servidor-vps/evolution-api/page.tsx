@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
+import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -62,6 +63,7 @@ const included = [
 
 export default async function VPSEvolutionAPIPage() {
   const banner = await getBannerPage('vps-evolution-api')
+  const fromPrice = await fromPriceText('vps', 'evolution-api')
   return (
     <>
       <Header />
@@ -73,7 +75,7 @@ export default async function VPSEvolutionAPIPage() {
           tag={banner?.tag ?? 'WhatsApp Business API'}
           title={banner?.title ?? 'Automatize, integre e escale o seu WhatsApp com Evolution API'}
           subtitle={banner?.subtitle ?? 'Servidor VPS preparado para WhatsApp Business, chatbots, integrações e automações. Múltiplos números, webhooks e painel completo.'}
-          price={banner?.price_text ?? 'A partir de Kz 69.000/mês'}
+          price={fromPrice ?? undefined}
           cta={banner?.button_primary_text ?? 'Ver Planos Evolution API'}
           ctaHref={banner?.button_primary_link ?? '#planos'}
           ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}

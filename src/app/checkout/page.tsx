@@ -9,7 +9,7 @@ import { createAuthClient, createClient } from '@/lib/supabase/client'
 
 /* ─── Tipos da cotação (espelho de src/lib/commerce/quote.ts) ─────────── */
 interface QuoteLine {
-  index: number; type: 'product' | 'domain'; slug?: string; name: string; serviceType: string
+  index: number; type: 'product' | 'domain' | 'renewal'; slug?: string; name: string; serviceType: string
   cycle?: Cycle; months?: number; quantity: number; quantityUnit?: string | null; maxQuantity?: number
   unitPrice: number; lineTotal: number; renewalPrice: number; domain?: string; domainMode?: DomainMode
   operation?: 'register' | 'transfer' | 'renew'; extension?: string
@@ -176,8 +176,8 @@ function CartStep({ quote, onNext }: { quote: Quote | null; onNext: () => void }
             <li key={l.key} className="border border-[#E8E8E8] rounded-xl p-4" data-testid="cart-line">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-bold text-[#0A0A0A]">{q?.name ?? (l.type === 'domain' ? l.domain : l.slug)}</p>
-                  {q && !q.error && <p className="text-sm text-[#555] mt-0.5">{kz(q.lineTotal)}{q.cycle ? ` / ${CYCLE_PER[q.cycle]}` : ' / ano'}{q.renewalPrice ? <span className="text-xs text-[#999]"> · renova por {kz(q.renewalPrice)}</span> : null}</p>}
+                  <p className="font-bold text-[#0A0A0A]">{q?.name ?? (l.type === 'domain' ? l.domain : l.type === 'renewal' ? (l.label ?? 'Renovação') : l.slug)}</p>
+                  {q && !q.error && <p className="text-sm text-[#555] mt-0.5">{kz(q.lineTotal)}{q.cycle ? ` / ${CYCLE_PER[q.cycle]}` : ' / ano'}{q.renewalPrice && q.type !== 'renewal' ? <span className="text-xs text-[#999]"> · renova por {kz(q.renewalPrice)}</span> : null}</p>}
                   {q?.error && (
                     <p className="text-sm text-red-600 mt-1 flex items-start gap-1" role="alert"><AlertCircle size={14} className="mt-0.5 shrink-0" />{q.error.message}
                       {q.error.code === 'on_request' && <Link href="/suporte/contactar" className="underline ml-1">Contactar</Link>}</p>
@@ -452,13 +452,16 @@ function CheckoutContent() {
     handled.current = true
     const plan = params.get('plan'), domain = params.get('domain'), tld = params.get('tld')
     const billingParam = params.get('billing')
+    const renew = params.get('renew'), renewDomain = params.get('renew_domain')
+    if (renew && /^[0-9a-f-]{36}$/i.test(renew)) cart.addRenewal(renew)
+    if (renewDomain) cart.addDomain(renewDomain, 'renew')
     if (plan) {
       const slug = plan.startsWith('domain') ? null : (PLAN_CATALOG[plan]?.id ?? plan)
       if (slug) cart.addProduct(slug, LEGACY_BILLING[billingParam ?? ''] ?? 'monthly')
     }
     if (domain) cart.addDomain(domain, 'register')
     if (tld && !domain) document.getElementById('cart-step')?.scrollIntoView()
-    if (plan || domain || tld) router.replace('/checkout')
+    if (plan || domain || tld || renew || renewDomain) router.replace('/checkout')
   }, [hydrated, params, cart, router])
 
   const submit = async () => {

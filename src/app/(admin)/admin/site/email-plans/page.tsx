@@ -39,7 +39,7 @@ export default function EmailPlansPage() {
   const toggle   = async (p: EmailPlan) => { await supabase.from('site_email_plans').update({ active: !p.active }).eq('id', p.id); load() }
 
   return (
-    <AdminPageShell title="Planos de Email" subtitle="Planos de email corporativo do site"
+    <AdminPageShell title="Planos de Email" subtitle="Conteúdo dos cartões de e-mail. O preço cobrado edita-se em Catálogo e Preços e é copiado para aqui."
       action={<button style={btnPrimary} onClick={openNew}><Plus size={15} /> Novo Plano</button>}>
 
       {/* Cards view */}

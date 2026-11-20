@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
+import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -62,6 +63,7 @@ const included = [
 
 export default async function ServidorVPSPage() {
   const banner = await getBannerPage('servidor-vps')
+  const fromPrice = await fromPriceText('vps')
   return (
     <>
       <Header />
@@ -71,7 +73,7 @@ export default async function ServidorVPSPage() {
           tag={banner?.tag ?? 'Servidores Cloud VPS'}
           title={banner?.title ?? 'Servidor VPS de alta performance para projectos exigentes'}
           subtitle={banner?.subtitle ?? 'Infraestrutura segura, rápida e escalável para sistemas, sites, automações e aplicações. RAM DDR5 e NVMe SSD incluídos.'}
-          price={banner?.price_text ?? 'A partir de Kz 45.000/mês'}
+          price={fromPrice ?? undefined}
           cta={banner?.button_primary_text ?? 'Ver Planos VPS'}
           ctaHref={banner?.button_primary_link ?? '#planos'}
           ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}

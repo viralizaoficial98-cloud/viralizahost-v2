@@ -164,8 +164,8 @@ try {
         await q('UPDATE product_prices SET months = ?, price = ?, renewal_price = ?, reference = ?, active = 1 WHERE id = ?', [cy.months, cy.price, cy.renewal, reference, cur.id]); stats.precos_actualizados++
       } else stats.precos_mantidos++
     }
-    // colunas de apresentação (valor mensal equivalente por ciclo) — só quando os preços são (re)escritos
-    if (args['update-prices'] || stats.precos_inseridos) {
+    // colunas de apresentação (valor mensal equivalente por ciclo) — sempre derivadas de product_prices
+    {
       const [m] = await q("SELECT price FROM product_prices WHERE product_id = ? AND cycle = 'monthly'", [p.id])
       const pm = id => q(`SELECT ROUND(price / months, 2) AS v FROM product_prices WHERE product_id = ? AND cycle = ?`, [p.id, id]).then(r => r[0]?.v ?? null)
       await q('UPDATE products SET price_monthly = ?, price_6months = ?, price_1year = ?, price_2years = ?, price_3years = ?, currency = ? WHERE id = ?',
@@ -180,6 +180,13 @@ try {
     await q('UPDATE product_prices SET active = 0 WHERE product_id = ?', [p.id])
     stats.produtos_actualizados++
   }
+  // Produtos à venda sem preço no catálogo (legado ou sem referência pública) → rascunho, fora do site
+  const unpriced = await q(`SELECT p.id, p.slug FROM products p WHERE p.sale_status = 'active'
+    AND NOT EXISTS (SELECT 1 FROM product_prices pp WHERE pp.product_id = p.id AND pp.active = 1)`)
+  for (const p of unpriced) {
+    await q("UPDATE products SET sale_status = 'draft', pricing_note = COALESCE(pricing_note, 'Sem preço de referência no catálogo (rascunho).') WHERE id = ?", [p.id])
+  }
+  if (unpriced.length) { stats.rascunhos = unpriced.length; console.warn('! sem preço → rascunho:', unpriced.map(p => p.slug).join(', ')) }
   for (const d of domainRows) {
     const reference = JSON.stringify({ provider: d.provider, url: d.url, consulted_at: R.consulted_at, ref: d.ref, ref_currency: d.currency, promo_first_year: d.promo, rate: d.currency === 'USD' ? RATE : null, factor: F, verbatim: d.verbatim })
     const [cur] = await q('SELECT id FROM domain_prices WHERE extension = ? AND operation = ? AND years = 1', [d.ext, d.op])
@@ -203,6 +210,12 @@ try {
       [randomUUID(), ext, Math.round(reg.price / 12), reg.price, ext === '.ao' || ext === '.com' ? 1 : 0, pos])
     else if (args['update-prices']) await q('UPDATE site_domains SET price_monthly = ?, price_annual = ? WHERE id = ?', [Math.round(reg.price / 12), reg.price, s.id])
   }
+  // site_email_plans (secção de e-mail da página inicial): mesmo preço do catálogo, sem desconto anual
+  for (const ep of await q('SELECT e.id, e.slug, pp.price FROM site_email_plans e JOIN products p ON p.slug = e.slug JOIN product_prices pp ON pp.product_id = p.id AND pp.cycle = \'monthly\' AND pp.active = 1')) {
+    await q('UPDATE site_email_plans SET price_monthly = ?, price_annual = ?, discount_annual = 0 WHERE id = ?', [ep.price, ep.price, ep.id]); stats.planos_email_site = (stats.planos_email_site ?? 0) + 1
+  }
+  const orphan = await q('SELECT e.slug FROM site_email_plans e LEFT JOIN products p ON p.slug = e.slug WHERE e.active = 1 AND p.id IS NULL')
+  if (orphan.length) console.warn('! site_email_plans sem produto no catálogo (o checkout não os vende):', orphan.map(o => o.slug).join(', '))
   await conn.commit()
   console.log('✓', JSON.stringify(stats))
 } catch (e) {

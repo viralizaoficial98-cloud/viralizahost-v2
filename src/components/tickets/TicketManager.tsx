@@ -56,17 +56,17 @@ function Toast({ type, msg, onClose }: { type: 'success' | 'error'; msg: string;
   )
 }
 
-export default function TicketManager() {
+export default function TicketManager({ initialSubject = '' }: { initialSubject?: string } = {}) {
   const router = useRouter()
   const [tickets, setTickets]       = useState<Ticket[]>([])
   const [loading, setLoading]       = useState(true)
-  const [showModal, setShowModal]   = useState(false)
+  const [showModal, setShowModal]   = useState(!!initialSubject)
   const [submitting, setSubmitting] = useState(false)
   const [toast, setToast]           = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [filter, setFilter]         = useState('all')
 
   // Form state
-  const [subject,     setSubject]     = useState('')
+  const [subject,     setSubject]     = useState(initialSubject.slice(0, 200))
   const [category,    setCategory]    = useState('')
   const [priority,    setPriority]    = useState('medium')
   const [description, setDescription] = useState('')

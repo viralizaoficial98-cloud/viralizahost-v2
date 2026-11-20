@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
+import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -72,6 +73,7 @@ const included = [
 
 export default async function ServidorDedicadoPage() {
   const banner = await getBannerPage('servidor-dedicado')
+  const fromPrice = await fromPriceText('dedicated')
   return (
     <>
       <Header />
@@ -81,7 +83,7 @@ export default async function ServidorDedicadoPage() {
           tag={banner?.tag ?? 'Infraestrutura Dedicada'}
           title={banner?.title ?? 'Infraestrutura dedicada para alta performance'}
           subtitle={banner?.subtitle ?? 'Servidores Linux dedicados para projectos robustos, sistemas críticos e alta demanda. Recursos exclusivos, root access e SLA garantido.'}
-          price={banner?.price_text ?? 'A partir de Kz 249.000/mês'}
+          price={fromPrice ?? undefined}
           cta={banner?.button_primary_text ?? 'Ver Planos Dedicado'}
           ctaHref={banner?.button_primary_link ?? '#planos'}
           ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}

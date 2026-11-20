@@ -18,6 +18,18 @@ const BADGE_COLORS: Record<string, string> = {
 
 type ProductWithFeatures = Product & {
   product_features: { feature: string; included: boolean; position: number }[]
+  product_prices?: { cycle: BillingCycle; months: number; price: number; renewal_price: number; active: boolean | number }[]
+  sale_status?: 'active' | 'draft' | 'on_request'
+  pricing_note?: string | null
+}
+
+/** Preço do ciclo a partir do catálogo (product_prices): total cobrado e equivalente mensal. */
+function cyclePrice(plan: ProductWithFeatures, cycle: BillingCycle) {
+  const row = (plan.product_prices ?? []).find(r => r.cycle === cycle && Number(r.active) === 1)
+  if (row) return { total: Number(row.price), months: Number(row.months), perMonth: Number(row.price) / Number(row.months), renewal: Number(row.renewal_price) }
+  if (plan.product_prices?.length) return null
+  const legacy = getPriceForCycle(plan, cycle)
+  return legacy == null ? null : { total: null, months: 1, perMonth: legacy, renewal: null }
 }
 
 /** Numeric AOA price supported alongside legacy string price */
@@ -49,9 +61,6 @@ interface Props {
 }
 
 const CYCLE_KEYS: BillingCycle[] = ['monthly', '6months', '1year', '2years', '3years']
-const CYCLE_DISCOUNTS: Record<BillingCycle, number> = {
-  monthly: 0, '6months': 15, '1year': 30, '2years': 45, '3years': 55,
-}
 
 function PlansWrap({ carousel, gridClass, children }: { carousel: boolean; gridClass: string; children: ReactNode }) {
   return carousel
@@ -122,10 +131,8 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
                   <h3 className={`font-bold text-base mb-1 ${plan.popular ? 'text-white' : 'text-[#0A0A0A]'}`}>{plan.name}</h3>
                   {plan.description && <p className={`text-xs mb-4 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{plan.description}</p>}
                   <div className="mb-6">
-                    <span className={`text-3xl font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>
-                      {plan.priceAOA != null ? fmtAOA(plan.priceAOA) : plan.price}
-                    </span>
-                    {plan.period && <span className={`text-sm ml-1 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{t('billing.perMonth')}</span>}
+                    {/* Sem catálogo carregado não se mostram preços fixos: o preço vem sempre do servidor no carrinho */}
+                    <span className={`text-lg font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>Preço confirmado no carrinho</span>
                   </div>
                   <ul className="space-y-2.5">
                     {plan.features.map(f => <li key={f} className="flex items-start gap-2.5 text-sm"><Check size={14} className={`mt-0.5 shrink-0 ${plan.popular ? 'text-[#F5B700]' : 'text-green-500'}`} /><span className={plan.popular ? 'text-gray-300' : 'text-[#444]'}>{f}</span></li>)}
@@ -163,7 +170,6 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
                     className={`shrink-0 px-3 sm:px-4 py-2 rounded-xl font-semibold text-xs transition-all whitespace-nowrap ${billing === c ? 'bg-[#F5B700] text-[#0A0A0A] shadow-sm' : 'text-gray-500 hover:text-[#0A0A0A]'}`}
                   >
                     {CYCLE_LABELS[c]}
-                    {CYCLE_DISCOUNTS[c] > 0 && <span className="ml-1 opacity-70">-{CYCLE_DISCOUNTS[c]}%</span>}
                   </button>
                 ))}
               </div>
@@ -176,10 +182,14 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
         ) : (
           <PlansWrap carousel={carousel} gridClass={gridClass[cols]}>
             {plans.map(plan => {
-              const price = getPriceForCycle(plan, billing)
-              const monthlyPrice = plan.price_monthly
+              const cp = cyclePrice(plan, billing)
+              const price = cp?.perMonth ?? null
+              const monthlyPrice = cyclePrice(plan, 'monthly')?.perMonth ?? null
+              const onRequest = plan.sale_status === 'on_request'
               const features = [...(plan.product_features ?? [])].sort((a, b) => a.position - b.position)
-              const checkoutHref = plan.href_override ?? `/checkout?plan=${plan.slug}&billing=${billing}`
+              const checkoutHref = onRequest
+                ? `/tickets?assunto=${encodeURIComponent(`Pedido de proposta — ${plan.name}`)}`
+                : plan.href_override ?? `/checkout?plan=${plan.slug}&billing=${billing}`
 
               return (
                 <div
@@ -205,13 +215,24 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
                     )}
 
                     <div className="mb-6">
-                      {price != null ? (
+                      {onRequest ? (
+                        <>
+                          <span className={`text-2xl font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>Sob consulta</span>
+                          {plan.pricing_note && <p className={`text-xs mt-1 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{plan.pricing_note}</p>}
+                        </>
+                      ) : price != null ? (
                         <>
                           <span className={`text-3xl font-black ${plan.popular ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`}>
                             {fmtAOA(price)}
                           </span>
                           <span className={`text-sm ml-1 ${plan.popular ? 'text-gray-400' : 'text-[#888]'}`}>{t('billing.perMonth')}</span>
-                          {showBillingToggle && billing !== 'monthly' && monthlyPrice && price < monthlyPrice && (
+                          {cp?.total != null && cp.months > 1 && (
+                            <p className={`text-xs mt-1 ${plan.popular ? 'text-gray-400' : 'text-[#666]'}`}>Cobrado {fmtAOA(cp.total)} por {cp.months} meses</p>
+                          )}
+                          {cp?.renewal != null && (
+                            <p className={`text-[11px] mt-0.5 ${plan.popular ? 'text-gray-500' : 'text-[#999]'}`}>Renova por {fmtAOA(cp.renewal)}{cp.months > 1 ? ` / ${cp.months} meses` : t('billing.perMonth')}</p>
+                          )}
+                          {showBillingToggle && billing !== 'monthly' && monthlyPrice && price < monthlyPrice - 0.5 && (
                             <div className="text-xs text-green-500 font-semibold mt-1">
                               ✓ {t('billing.save')} {fmtAOA(monthlyPrice - price)}{t('billing.perMonth')}
                             </div>
@@ -249,7 +270,7 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
                           : 'bg-[#0A0A0A] text-white hover:bg-[#1A1A1A]'
                       }`}
                     >
-                      {(plan as any).cta_label ?? t('cta.start')}
+                      {onRequest ? 'Pedir proposta' : (plan as any).cta_label ?? t('cta.start')}
                     </Link>
                   </div>
                 </div>

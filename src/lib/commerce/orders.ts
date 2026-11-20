@@ -74,6 +74,9 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
     const [prev] = await rows(conn, 'SELECT id FROM orders WHERE user_id = ? AND idempotency_key = ? FOR UPDATE', [input.userId, input.idempotencyKey])
     if (prev) return { order: await summary(conn, prev.id, true), quote: await quoteCart(input.lines, { db: conn, userId: input.userId, checkAvailability: false }) }
 
+    // Renovações: bloqueia o serviço original para impedir duas renovações por pagar em paralelo
+    const renewIds = input.lines.filter(l => (l as any)?.type === 'renewal').map(l => String((l as any).serviceId))
+    if (renewIds.length) await conn.query(`SELECT id FROM services WHERE id IN (${renewIds.map(() => '?').join(',')}) FOR UPDATE`, renewIds)
     const quote = await quoteCart(input.lines, { db: conn, userId: input.userId, checkAvailability: true })
     if (!quote.valid) throw new OrderError('cart_invalid', 'Há itens que não podem ser encomendados.', 409, { quote })
     if (Math.round(quote.total * 100) !== Math.round(Number(input.acceptedTotal) * 100)) {
@@ -108,18 +111,18 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
       const epp = l.type === 'domain' && l.operation === 'transfer' && raw?.eppCode ? secretEpp(String(raw.eppCode)) : null
       await conn.query(
         `INSERT INTO order_items (id, order_id, service_name, service_type, price, quantity, product_id, product_slug, billing_cycle, months,
-           unit_price, line_total, renewal_price, domain_name, domain_operation, epp_code_enc)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           unit_price, line_total, renewal_price, domain_name, domain_operation, epp_code_enc, renews_service_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [itemId, orderId, l.name, l.serviceType, l.unitPrice, l.quantity, l.productId ?? null, l.slug ?? null, l.cycle ?? null, l.months ?? null,
-          l.unitPrice, l.lineTotal, l.renewalPrice, l.domain ?? null, l.type === 'domain' ? l.operation : (l.domainMode ?? null), epp],
+          l.unitPrice, l.lineTotal, l.renewalPrice, l.domain ?? null, l.type === 'domain' ? l.operation : (l.domainMode ?? null), epp, l.renewsServiceId ?? null],
       )
       // Serviço (um por item) — a activação acontece só depois do pagamento confirmado
       const serviceType = l.type === 'domain' ? 'domain' : l.serviceType
       await conn.query(
         `INSERT INTO services (id, profile_id, service_type, service_name, status, currency, price, billing_cycle, order_id, product_id, order_item_id,
-           domain, renewal_price, provisioning_status)
-         VALUES (?, ?, ?, ?, 'pending', 'AKZ', ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-        [randomUUID(), input.userId, serviceType, l.name, l.lineTotal, l.cycle ?? '1year', orderId, l.productId ?? null, itemId, l.domain ?? null, l.renewalPrice],
+           renews_service_id, domain, renewal_price, provisioning_status)
+         VALUES (?, ?, ?, ?, 'pending', 'AKZ', ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        [randomUUID(), input.userId, serviceType, l.name, l.lineTotal, l.cycle ?? '1year', orderId, l.productId ?? null, itemId, l.renewsServiceId ?? null, l.domain ?? null, l.renewalPrice],
       )
       if (l.type === 'domain' && l.operation !== 'renew' && l.domain) {
         const parts = splitDomain(l.domain, exts)!
@@ -132,7 +135,7 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
           [randomUUID(), input.userId, parts.name, parts.extension, orderId, l.lineTotal],
         )
       }
-      invoiceItems.push({ name: l.name, type: l.type === 'domain' ? 'domain' : l.serviceType, quantity: l.quantity, unit_price: l.unitPrice, price: l.lineTotal, cycle: l.cycle ?? null, renewal_price: l.renewalPrice })
+      invoiceItems.push({ name: l.name, type: l.type === 'domain' ? 'domain' : l.type === 'renewal' ? 'renewal' : l.serviceType, quantity: l.quantity, unit_price: l.unitPrice, price: l.lineTotal, cycle: l.cycle ?? null, renewal_price: l.renewalPrice })
     }
 
     const invoiceId = randomUUID()

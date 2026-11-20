@@ -2073,6 +2073,11 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "text",
         "hasDefault": true,
         "nullable": true
+      },
+      "renews_service_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": [
@@ -3165,6 +3170,11 @@ export const SCHEMA_META: SchemaMeta = {
         "nullable": true
       },
       "order_item_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "renews_service_id": {
         "kind": "uuid",
         "hasDefault": true,
         "nullable": true

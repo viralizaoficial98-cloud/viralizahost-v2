@@ -55,6 +55,15 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
 
   const due = addMonths(Number(s.months ?? 12))
   try {
+    if (s.renews_service_id) {
+      // Renovação paga: serviços no nosso WHM prolongam já; os restantes dependem do fornecedor
+      const [orig] = await rows(db, 'SELECT p.provisioning FROM services o LEFT JOIN products p ON p.id = o.product_id WHERE o.id = ?', [s.renews_service_id])
+      if (orig?.provisioning === 'whm') {
+        await extendService(db, s.renews_service_id, Number(s.months ?? 12))
+        return await done('active', 'Renovação aplicada.', { next_due_date: null })
+      }
+      return await done('manual_required', 'Renovação paga: confirmar a renovação no fornecedor e marcar como concluída.')
+    }
     if (s.service_type === 'domain') {
       return await done('manual_required', `${s.domain_operation === 'transfer' ? 'Transferência' : s.domain_operation === 'renew' ? 'Renovação' : 'Registo'} manual no registrador: integração de registrador não configurada.`)
     }
@@ -131,12 +140,25 @@ export async function refreshOrderActivation(orderId: string) {
   await db.query(`UPDATE orders SET activation_status = ?, status = IF(? = 'active', 'active', status) WHERE id = ?`, [agg, agg, orderId])
 }
 
+/** Prolonga a data de vencimento do serviço original (a partir do vencimento actual ou de hoje). */
+async function extendService(db: Queryable, serviceId: string, months: number) {
+  await db.query(`UPDATE services SET next_due_date = DATE_ADD(GREATEST(COALESCE(next_due_date, CURRENT_DATE), CURRENT_DATE), INTERVAL ? MONTH),
+    status = IF(status = 'expired', 'active', status) WHERE id = ?`, [months || 12, serviceId])
+}
+
 /** Activação manual concluída pelo administrador (ex.: domínio registado no registrador). */
 export async function markServiceActive(serviceId: string, note: string | null, externalRef: string | null) {
   const db = getPool()
-  const [s] = await rows(db, 'SELECT s.id, s.order_id, s.service_type, s.domain, s.profile_id, oi.months, o.payment_status FROM services s JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id WHERE s.id = ?', [serviceId])
+  const [s] = await rows(db, 'SELECT s.id, s.order_id, s.service_type, s.domain, s.profile_id, s.renews_service_id, s.provisioning_status, oi.months, o.payment_status FROM services s JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id WHERE s.id = ?', [serviceId])
   if (!s) throw new Error('Serviço inexistente.')
   if (s.payment_status !== 'paid') throw new Error('A encomenda ainda não está paga.')
+  if (s.renews_service_id) {
+    // Atómico: só a primeira confirmação prolonga o serviço original
+    const [r] = await db.query("UPDATE services SET provisioning_status = 'active', provisioning_error = NULL, status = 'active', provisioned_at = CURRENT_TIMESTAMP(6), notes = ? WHERE id = ? AND provisioning_status <> 'active'", [note, serviceId]) as any
+    if (r.affectedRows) await extendService(db, s.renews_service_id, Number(s.months ?? 12))
+    await refreshOrderActivation(s.order_id)
+    return
+  }
   const due = addMonths(Number(s.months ?? 12))
   await setStatus(serviceId, 'active', null, { external_ref: externalRef, next_due_date: due, notes: note })
   if (s.service_type === 'domain' && s.domain) {

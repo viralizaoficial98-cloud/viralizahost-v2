@@ -13,10 +13,12 @@ export type DomainMode = 'register' | 'transfer' | 'existing'
 export type CartLineInput =
   | { type: 'product'; slug: string; cycle: Cycle; quantity?: number; domain?: string; domainMode?: DomainMode }
   | { type: 'domain'; domain: string; operation: 'register' | 'transfer' | 'renew'; years?: number; eppCode?: string }
+  | { type: 'renewal'; serviceId: string }
 
 export interface QuoteLine {
   index: number
-  type: 'product' | 'domain'
+  type: 'product' | 'domain' | 'renewal'
+  renewsServiceId?: string
   slug?: string
   productId?: string
   name: string
@@ -68,6 +70,11 @@ const MSG: Record<string, string> = {
   epp_required: 'Indique o código de autorização (EPP) para transferir o domínio.',
   domain_not_owned: 'Só pode renovar domínios da sua conta.',
   domain_line_missing: 'Adicione ao carrinho o registo ou a transferência deste domínio.',
+  login_required: 'Inicie sessão para renovar os seus serviços.',
+  service_not_owned: 'Serviço inexistente ou de outra conta.',
+  service_not_renewable: 'Este serviço não pode ser renovado aqui (sem preço de renovação ou cancelado).',
+  renewal_pending: 'Já existe uma renovação por pagar para este serviço — veja as Encomendas.',
+  duplicate_line: 'Item repetido no carrinho.',
 }
 const err = (code: string) => ({ code, message: MSG[code] ?? code })
 
@@ -93,6 +100,25 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
   const list = Array.isArray(input) ? input.slice(0, 30) : []
 
   for (const [index, raw] of list.entries()) {
+    if (raw?.type === 'renewal') {
+      // Renovação: preço de renovação aceite na compra original (services.renewal_price)
+      const base: QuoteLine = { index, type: 'renewal', name: 'Renovação', serviceType: 'other', provisioning: 'renewal', quantity: 1, unitPrice: 0, lineTotal: 0, renewalPrice: 0, renewsServiceId: String(raw.serviceId ?? '') }
+      if (!opts.userId) { lines.push({ ...base, error: err('login_required') }); continue }
+      if (lines.some(x => x.renewsServiceId === base.renewsServiceId)) { lines.push({ ...base, error: err('duplicate_line') }); continue }
+      const [s] = await rows(db, `SELECT s.id, s.service_name, s.service_type, s.domain, s.status, s.renewal_price, s.billing_cycle, s.renews_service_id, s.product_id, oi.months
+        FROM services s LEFT JOIN order_items oi ON oi.id = s.order_item_id WHERE s.id = ? AND s.profile_id = ?`, [base.renewsServiceId, opts.userId])
+      if (!s) { lines.push({ ...base, error: err('service_not_owned') }); continue }
+      Object.assign(base, { name: `Renovação — ${s.service_name}${s.domain ? ` (${s.domain})` : ''}`, serviceType: s.service_type ?? 'other', domain: s.domain ?? undefined, productId: s.product_id ?? undefined })
+      const price = Number(s.renewal_price ?? 0)
+      if (s.renews_service_id || !(price > 0) || ['cancelled', 'pending', 'pending_provisioning'].includes(s.status) || s.service_type === 'domain') { lines.push({ ...base, error: err('service_not_renewable') }); continue }
+      const [pend] = await rows(db, `SELECT r.id FROM services r JOIN orders o ON o.id = r.order_id
+        WHERE r.renews_service_id = ? AND o.payment_status IN ('unpaid','proof_submitted','failed') AND o.status = 'pending' LIMIT 1`, [s.id])
+      if (pend) { lines.push({ ...base, error: err('renewal_pending') }); continue }
+      const cycle = (CYCLES as readonly string[]).includes(s.billing_cycle) ? s.billing_cycle as Cycle : undefined
+      Object.assign(base, { cycle, months: Number(s.months ?? 12), unitPrice: price, lineTotal: price, renewalPrice: price })
+      lines.push(base)
+      continue
+    }
     if (raw?.type === 'domain') {
       const domain = normalizeDomain(raw.domain)
       const op = raw.operation

@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
+import { fromPriceText } from '@/lib/commerce/from-price'
 import { ServicePricingCards } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
@@ -67,6 +68,7 @@ const included = [
 
 export default async function HospedagemDeSitesPage() {
   const banner = await getBannerPage('hospedagem-de-sites')
+  const fromPrice = await fromPriceText('hosting')
   return (
     <>
       <Header />
@@ -76,7 +78,7 @@ export default async function HospedagemDeSitesPage() {
           tag={banner?.tag ?? 'Hospedagem Premium'}
           title={banner?.title ?? 'Hospedagem de Sites Premium para o seu Negócio'}
           subtitle={banner?.subtitle ?? 'Performance ultrarrápida com LiteSpeed, NVMe SSD, SSL grátis, cPanel e suporte técnico especializado 24/7.'}
-          price={banner?.price_text ?? 'A partir de Kz 19.900/mês'}
+          price={fromPrice ?? undefined}
           cta={banner?.button_primary_text ?? 'Ver Planos'}
           ctaHref={banner?.button_primary_link ?? '#planos'}
           ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}

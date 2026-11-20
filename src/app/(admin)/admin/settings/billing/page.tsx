@@ -17,6 +17,8 @@ interface BillingSettings {
   payment_instructions: string
   footer_text: string
   default_due_days: number
+  tax_rate: number
+  tax_label: string
   email_subject_template: string
   email_body_template: string
   auto_email_on_create: boolean
@@ -36,6 +38,8 @@ const EMPTY: BillingSettings = {
   payment_instructions: 'Após efectuar a transferência, envie o comprovativo para comercial@viralizahost.com indicando o número da factura.',
   footer_text: 'ViralizaHost — Hospedagem Web, Domínios e E-mails Corporativos\nE-mail: comercial@viralizahost.com | viralizahost.com | Suporte 24/7',
   default_due_days: 7,
+  tax_rate: 0,
+  tax_label: 'IVA',
   email_subject_template: 'Factura ViralizaHost nº {invoice_number} — {service_name}',
   email_body_template: '',
   auto_email_on_create: false,
@@ -160,6 +164,12 @@ export default function BillingSettingsPage() {
             value={String(form.default_due_days)}
             onChange={v => set('default_due_days', parseInt(v) || 7)}
           />
+        </Field>
+        <Field label="Imposto aplicado no checkout (%) — 0 = sem imposto">
+          <Input type="number" value={String(form.tax_rate)} onChange={v => set('tax_rate', Math.min(100, Math.max(0, Number(v) || 0)))} />
+        </Field>
+        <Field label="Nome do imposto">
+          <Input value={form.tax_label} onChange={v => set('tax_label', v)} />
         </Field>
         <Field label="Rodapé da factura PDF">
           <Textarea value={form.footer_text} onChange={v => set('footer_text', v)} rows={2} />
