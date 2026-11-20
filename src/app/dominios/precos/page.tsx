@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { kz as kzFmt } from '@/lib/commerce/status'
 import { ShopPage } from '@/components/purchase/ShopPage'
 import { listExtensions } from '@/lib/commerce/domain-catalog'
 
 export const metadata: Metadata = { title: 'Preços de Domínios', description: 'Preços de registo, renovação e transferência de domínios na ViralizaHost.' }
 export const dynamic = 'force-dynamic'
 
-const kz = (n: number | null) => (n == null ? '—' : n === 0 ? 'Sem custo' : `Kz ${Math.round(n).toLocaleString('pt-PT').replace(/\s/g, '.')}`)
+const kz = (n: number | null) => (n == null ? '—' : n === 0 ? 'Sem custo' : kzFmt(Math.round(n)))
 
 // Tabela pública a partir de domain_prices (mesma fonte do carrinho e do painel).
 export default async function PrecosDominiosPage() {

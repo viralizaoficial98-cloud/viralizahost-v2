@@ -5,7 +5,6 @@ import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
-import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Bot, Zap, Globe, Shield, BarChart, Headphones, Lock, Code, Layers } from 'lucide-react'
@@ -15,39 +14,6 @@ export const metadata: Metadata = {
   description: 'Crie um site profissional em minutos com inteligência artificial. Sem código, sem design, sem complicações.',
 }
 
-const plans: PricingPlan[] = [
-  {
-    id: 'ia-starter',
-    name: 'IA Starter',
-    price: 'Kz 14.900', priceAOA: 14900,
-    period: '/mês',
-    description: 'Para começar com IA',
-    features: ['1 site criado com IA', '10 GB de armazenamento', 'SSL grátis', 'Domínio gratuito 1 ano', 'Templates IA ilimitados', 'Suporte 24/7'],
-    notIncluded: ['E-commerce integrado', 'IA de conteúdo avançada'],
-    cta: 'Criar Meu Site',
-  },
-  {
-    id: 'ia-pro',
-    name: 'IA Pro',
-    price: 'Kz 29.900', priceAOA: 29900,
-    period: '/mês',
-    description: 'Para empresas e profissionais',
-    popular: true,
-    badge: 'MAIS POPULAR',
-    features: ['3 sites criados com IA', '50 GB de armazenamento', 'SSL grátis', 'Domínio gratuito 1 ano', 'Templates IA ilimitados', 'IA de conteúdo avançada', 'Blog integrado', 'Formulários e leads', 'Suporte prioritário 24/7'],
-    cta: 'Criar com IA Pro',
-  },
-  {
-    id: 'ia-business',
-    name: 'IA Business',
-    price: 'Kz 59.900', priceAOA: 59900,
-    period: '/mês',
-    description: 'Para lojas e alto tráfego',
-    badge: 'MELHOR VALOR',
-    features: ['Sites ilimitados com IA', '200 GB de armazenamento', 'SSL grátis', 'Domínios ilimitados', 'Templates IA ilimitados', 'IA de conteúdo avançada', 'E-commerce integrado', 'SEO automático com IA', 'Analytics avançados', 'Suporte premium 24/7'],
-    cta: 'Criar com IA Business',
-  },
-]
 
 const included = [
   { icon: Bot, title: 'IA Criadora de Sites', desc: 'Descreve o teu negócio e a IA cria o site completo em segundos.' },
@@ -85,15 +51,14 @@ export default async function CriadorDeSitesPage() {
         />
         <DynamicServicePricing category="website-builder" cols={3} showBillingToggle
           title="Criador de Sites com IA — Planos"
-          subtitle="Crie sites profissionais sem nenhum conhecimento técnico."
-          fallbackPlans={plans} />
+          subtitle="Crie sites profissionais sem nenhum conhecimento técnico." />
         <IncludedFeatures features={included}
           title="Tudo incluído no seu criador de sites" />
         <FinalCTA
           title="Crie o seu site agora com IA"
           subtitle="Sem código, sem design, sem complicações. O site fica pronto em minutos."
           cta="Começar Grátis"
-          ctaHref="/checkout?plan=ia-starter" />
+          ctaHref="/comprar/ia-starter" />
       </main>
       <Footer />
     </>

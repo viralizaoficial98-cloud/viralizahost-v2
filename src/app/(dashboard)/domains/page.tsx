@@ -90,7 +90,7 @@ export default async function DomainsPage() {
           <h1 className="text-2xl font-black" style={{ color: '#0B0B0D' }}>Domínios</h1>
           <p className="text-sm mt-1" style={{ color: '#64748B' }}>Gerencie todos os seus domínios registados</p>
         </div>
-        <a href="/checkout?plan=domain.com"
+        <a href="/dominios/pesquisar"
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-black transition-all"
           style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.35)' }}>
           <Plus size={16} /> Registar Domínio
@@ -191,7 +191,7 @@ export default async function DomainsPage() {
             <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>
               Registe o seu primeiro domínio ou sincronize a sua conta de hospedagem
             </p>
-            <a href="/checkout?plan=domain.com"
+            <a href="/dominios/pesquisar"
               className="px-5 py-2.5 rounded-xl text-sm font-bold text-black inline-block"
               style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.30)' }}>
               Registar primeiro domínio

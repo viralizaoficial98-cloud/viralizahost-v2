@@ -26,7 +26,7 @@ export default function PrivacyPage() {
         <li>Não guardamos dados de cartão. Não guardamos senhas do cPanel: o acesso é feito por ligação temporária gerada no momento.</li>
         <li>Códigos de transferência de domínio são guardados cifrados e usados só para a transferência.</li>
       </ul>
-      <h2>Cookies e armazenamento no navegador</h2>
+      <h2 id="cookies">Cookies e armazenamento no navegador</h2>
       <ul>
         <li>Um cookie de sessão (<code>vh_session</code>) mantém o início de sessão.</li>
         <li>O carrinho de compras fica guardado no seu navegador até concluir ou esvaziar a encomenda.</li>

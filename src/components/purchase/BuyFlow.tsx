@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { Check, ChevronLeft, ChevronRight, Globe, Loader2, Search, ArrowRightLeft, Link2, AlertCircle, ShoppingCart, Minus, Plus, Clock, XCircle } from 'lucide-react'
+import { kz as kzFmt } from '@/lib/commerce/status'
 import { useCart, type Cycle, type NewCartLine } from '@/store/cartStore'
 
 // Percurso de compra: Plano → Escolher domínio → Escolher duração → Carrinho.
@@ -37,7 +38,7 @@ const useSelections = create<{ by: Record<string, Selection>; set: (slug: string
   ),
 )
 
-const kz = (n: number) => `Kz ${Math.round(n).toLocaleString('pt-PT').replace(/\s/g, '.')}`
+const kz = (n: number) => kzFmt(Math.round(n))
 export const CYCLE_NAME: Record<Cycle, string> = { monthly: 'Mensal', '3months': 'Trimestral', '6months': 'Semestral', '1year': 'Anual', '2years': '2 anos', '3years': '3 anos' }
 const DURATION = (m: number) => (m === 1 ? '1 mês' : m < 12 ? `${m} meses` : m === 12 ? '12 meses (1 ano)' : `${m} meses (${m / 12} anos)`)
 const NS = ['ns1.viralizahost.com', 'ns2.viralizahost.com']

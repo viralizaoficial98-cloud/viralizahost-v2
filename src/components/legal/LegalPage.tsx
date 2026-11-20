@@ -7,7 +7,7 @@ export function LegalPage({ title, intro, children }: { title: string; intro: st
     <>
       <Header />
       <main className="bg-white">
-        <article className="container mx-auto px-4 py-28 max-w-3xl text-[#333] leading-relaxed [&_h2]:text-xl [&_h2]:font-black [&_h2]:text-[#0A0A0A] [&_h2]:mt-8 [&_h2]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mt-1">
+        <article className="container mx-auto px-4 py-28 max-w-3xl text-[#333] leading-relaxed [&_h2]:scroll-mt-28 [&_h2]:text-xl [&_h2]:font-black [&_h2]:text-[#0A0A0A] [&_h2]:mt-8 [&_h2]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mt-1">
           <h1 className="text-3xl md:text-4xl font-black text-[#0A0A0A] mb-3">{title}</h1>
           <p className="text-[#666] mb-6">{intro}</p>
           {children}

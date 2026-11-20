@@ -126,6 +126,7 @@ const emailColumns: ColDef[] = [
   {
     title: 'Planos de E-mail',
     items: [
+      { icon: Mail,    label: 'Planos e preços de e-mail', desc: 'Compare os planos e escolha', href: '/email-corporativo#planos' },
       { icon: Mail,    label: 'E-mail Starter',         desc: 'Plano de entrada, preço por caixa',             href: '/comprar/email-starter' },
       { icon: Zap,     label: 'E-mail Standard',        desc: 'Mais espaço, preço por caixa',            href: '/comprar/email-standard' },
       { icon: Server,  label: 'E-mail Premium',         desc: 'Máximo espaço, preço por caixa',            href: '/comprar/email-premium' },
@@ -807,7 +808,7 @@ export function Header() {
                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0" />
-                  <span className="text-white text-xs font-bold">Activação imediata</span>
+                  <span className="text-white text-xs font-bold">Activação após o pagamento</span>
                 </div>
                 <p className="text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.38)' }}>
                   Configure o seu e-mail corporativo em minutos.

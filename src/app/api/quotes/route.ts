@@ -9,8 +9,11 @@ export const dynamic = 'force-dynamic'
 // Pedido de cotação para planos «sob consulta». Fica no painel (/admin/quotes).
 // Devolve a referência para o visitante ver a confirmação.
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// 5 pedidos por IP em 10 min; QUOTE_RATE_LIMIT só para o processo de ensaio.
+const QUOTE_LIMIT = Math.min(1000, Math.max(1, Number(process.env.QUOTE_RATE_LIMIT) || 5))
+
 export async function POST(req: NextRequest) {
-  if (!rateLimit(`quote:${clientIp(req)}`, 5, 10 * 60_000)) return NextResponse.json({ error: 'Demasiados pedidos. Tente dentro de alguns minutos.' }, { status: 429 })
+  if (!rateLimit(`quote:${clientIp(req)}`, QUOTE_LIMIT, 10 * 60_000)) return NextResponse.json({ error: 'Demasiados pedidos. Tente dentro de alguns minutos.' }, { status: 429 })
   const b = await req.json().catch(() => null) as Record<string, unknown> | null
   const str = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max)
   const name = str(b?.name, 255), email = str(b?.email, 255).toLowerCase(), phone = str(b?.phone, 60), company = str(b?.company, 255), message = str(b?.message, 3000)

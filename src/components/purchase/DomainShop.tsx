@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertCircle, Check, Loader2, Search, ShoppingCart, XCircle, ArrowRightLeft, Globe, RefreshCw } from 'lucide-react'
+import { kz as kzFmt } from '@/lib/commerce/status'
 import { useCart } from '@/store/cartStore'
 
 // Domínio avulso: pesquisa → disponibilidade e alternativas → duração do registo → carrinho.
@@ -13,7 +14,7 @@ type Status = 'available' | 'unavailable' | 'confirm' | 'on_request'
 interface Ext { extension: string; status: 'active' | 'on_request'; register: number | null; renew: number | null; transfer: number | null; eppRequired: boolean; national: boolean; maxYears: number }
 interface Result extends Ext { domain: string; availability: Status }
 
-const kz = (n: number) => `Kz ${Math.round(n).toLocaleString('pt-PT').replace(/\s/g, '.')}`
+const kz = (n: number) => kzFmt(Math.round(n))
 const STATUS_UI: Record<Status, { label: string; cls: string }> = {
   available: { label: 'Disponível', cls: 'bg-green-50 text-green-700 border-green-200' },
   unavailable: { label: 'Indisponível', cls: 'bg-red-50 text-red-700 border-red-200' },

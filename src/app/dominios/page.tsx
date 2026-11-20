@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { kz as kzFmt } from '@/lib/commerce/status'
 import { Suspense } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
   title: 'Domínios — Pesquisa e preços',
   description: 'Pesquise, registe e transfira domínios .ao, .co.ao, .com e outros, com preços em kwanzas.',
 }
-const kz = (n: number | null) => (n == null ? '—' : `Kz ${Math.round(n).toLocaleString('pt-PT').replace(/\s/g, '.')}`)
+const kz = (n: number | null) => (n == null ? '—' : kzFmt(Math.round(n)))
 
 export default async function DominiosPage() {
   let exts: Awaited<ReturnType<typeof listExtensions>> | null = null
