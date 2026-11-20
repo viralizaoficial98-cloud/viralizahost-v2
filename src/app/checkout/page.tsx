@@ -403,7 +403,7 @@ function ReviewStep({ quote, method, proof, submitting, error, onSubmit, onBack 
       </div>
       <label className="flex items-start gap-2 text-sm mb-4">
         <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} className="mt-1" />
-        <span>Confirmo os serviços, os ciclos e os valores de renovação indicados.</span>
+        <span>Confirmo os serviços, os ciclos e os valores de renovação indicados e aceito os <a href="/terms" target="_blank" className="underline">Termos de Serviço</a>.</span>
       </label>
       {error && <p className="text-sm text-red-600 mb-4 flex gap-1" role="alert"><AlertCircle size={16} className="shrink-0" />{error}</p>}
       <div className="flex justify-between">

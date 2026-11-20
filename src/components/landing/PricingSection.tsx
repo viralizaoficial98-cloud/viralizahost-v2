@@ -379,7 +379,7 @@ export function PricingSection() {
             </div>
 
             <Link
-              href={`/checkout?plan=${plan.id}&billing=${billing === 'annual' ? '1year' : 'monthly'}`}
+              href={plan.id === 'reseller' ? '/revenda-de-hospedagem#planos' : `/checkout?plan=${plan.id}&billing=${billing === 'annual' ? '1year' : 'monthly'}`}
               className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
                 plan.is_popular
                   ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'

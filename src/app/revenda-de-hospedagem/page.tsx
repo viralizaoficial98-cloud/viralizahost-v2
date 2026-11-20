@@ -101,7 +101,7 @@ export default async function RevendaDeHospedagemPage() {
           title="Inicie o seu negócio de hospedagem hoje"
           subtitle="Infraestrutura premium, marca própria e suporte dedicado ao revendedor."
           cta="Começar a Revender"
-          ctaHref="/checkout?plan=reseller-start" />
+          ctaHref="#planos" />
       </main>
       <Footer />
     </>

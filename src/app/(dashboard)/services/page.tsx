@@ -116,7 +116,7 @@ export default async function ServicesPage() {
                     <>
                       <Usage used={s.hosting.diskUsedMb} limit={s.hosting.diskLimitMb} />
                       <p className="text-xs text-[#64748B]">{s.hosting.emailCount} contas de e-mail · {s.hosting.dbCount} bases de dados{s.hosting.php ? ` · PHP ${s.hosting.php}` : ''}</p>
-                      <p className="text-[11px] text-[#94A3B8]">Dados do WHM em {date(s.hosting.lastSynced)}</p>
+                      {s.hosting.lastSynced && <p className="text-[11px] text-[#94A3B8]">Dados do WHM em {date(s.hosting.lastSynced)}</p>}
                     </>
                   ) : s.kind === 'domain' ? (
                     <p className="text-xs text-[#64748B]">A gestão automática de DNS/NS depende da integração com o registrador, que ainda não está activa. Peça a alteração ao suporte.</p>

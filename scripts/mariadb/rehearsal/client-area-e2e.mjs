@@ -46,6 +46,14 @@ r = await c2.req('/services')
 ok(r.status === 200 && !r.text.includes(svc.domain), 'cliente 2 não vê os serviços do cliente 1')
 r = await c2.req(`/api/client/hosting/${svc.id}/cpanel-sso`, { method: 'POST' })
 ok(r.status === 404, 'SSO cPanel de serviço alheio → 404')
+r = await c1.req(`/api/client/hosting/${svc.id}/cpanel-sso`, { method: 'POST' })
+ok(r.status === 200 && r.json?.redirectUrl?.includes('cpsess'), 'SSO cPanel do próprio serviço devolve ligação temporária')
+r = await c1.req(`/api/client/hosting/${svc.id}/webmail-sso`, { method: 'POST' })
+ok(r.status === 200 && !!r.json?.redirectUrl, 'SSO Webmail do próprio serviço')
+if (process.env.APP_LOG) {
+  const log = (await import('node:fs')).readFileSync(process.env.APP_LOG, 'utf8')
+  ok(!/cpsess|session=ensaio/.test(log), 'ligação temporária do cPanel não aparece nos logs da aplicação')
+}
 r = await new S().req('/services')
 ok(r.status === 307 || r.status === 302 || r.location?.includes('/login'), 'sem sessão → redireccionado para login')
 
