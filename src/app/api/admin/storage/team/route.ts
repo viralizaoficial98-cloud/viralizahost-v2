@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createServiceClient as createSupabaseClient } from '@/lib/supabase/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
 
 const BUCKET    = 'site-team'
@@ -7,10 +7,7 @@ const MAX_BYTES = 5 * 1024 * 1024   // 5 MB
 const ALLOWED_MIME = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
 function storageAdminClient() {
-  return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
+  return createSupabaseClient()
 }
 
 async function ensureBucket(supabase: ReturnType<typeof storageAdminClient>) {

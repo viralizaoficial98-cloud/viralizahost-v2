@@ -285,7 +285,7 @@ export function HostingCard({ ha, whm, pkgName, server, index }: HostingCardProp
 }
 
 // ─── Branded cPanel / Webmail buttons ────────────────────────────────────────
-function CpanelButton({ serviceId, type }: { serviceId: string; type: 'cpanel' | 'webmail' }) {
+export function CpanelButton({ serviceId, type }: { serviceId: string; type: 'cpanel' | 'webmail' }) {
   return (
     <SSOButtonInner serviceId={serviceId} type={type} />
   )

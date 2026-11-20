@@ -4,6 +4,7 @@ import { Monitor, Image, Globe, Mail, Users, Server, RefreshCw, Sparkles, Packag
 import { useEffect, useState, useCallback } from 'react'
 
 const modules: { href: string; icon: typeof Image; label: string; desc: string; color: string; table: string | null }[] = [
+  { href: '/admin/site/catalog',       icon: Package,        label: 'Catálogo e Preços',    desc: 'Preços por ciclo, renovação, estado de venda, pacote WHM', color: '#16A34A', table: 'product_prices' },
   { href: '/admin/site/hero',          icon: Film,           label: 'Topo da Página Inicial', desc: 'Ativar carrossel ou vídeo',   color: '#0EA5E9', table: null },
   { href: '/admin/site/banners',       icon: Image,          label: 'Banners / Hero',       desc: 'Slides do carrossel principal',   color: '#F5B700', table: 'site_banners' },
   { href: '/admin/site/banner-pages',  icon: LayoutTemplate, label: 'Banner das Páginas',   desc: 'Hero de cada página de serviço',  color: '#F97316', table: 'banner_pages' },

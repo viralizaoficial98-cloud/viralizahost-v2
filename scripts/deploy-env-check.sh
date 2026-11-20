@@ -30,10 +30,17 @@ echo "  ViralizaHost — Verificação de Deploy"
 echo "═══════════════════════════════════════"
 echo ""
 
-echo "── Supabase ──"
-check NEXT_PUBLIC_SUPABASE_URL
-check NEXT_PUBLIC_SUPABASE_ANON_KEY
-check SUPABASE_SERVICE_ROLE_KEY
+echo "── MariaDB ──"
+check DB_NAME
+check DB_USER
+check DB_PASSWORD
+if [ -z "$DB_SOCKET" ]; then check DB_HOST; fi
+
+echo ""
+echo "── Site / Autenticação / Ficheiros ──"
+check NEXT_PUBLIC_SITE_URL
+check STORAGE_DIR
+check STORAGE_SIGNING_SECRET
 
 echo ""
 echo "── IA ──"

@@ -38,7 +38,7 @@ export default function DomainsAdminPage() {
   const sym = currencyMap[form.currency] ?? form.currency
 
   return (
-    <AdminPageShell title="Domínios" subtitle="Extensões e preços de registo de domínios"
+    <AdminPageShell title="Domínios" subtitle="Listagem pública de extensões. Os preços cobrados (registo, renovação, transferência) editam-se em Catálogo e Preços e são copiados para aqui."
       action={<button style={btnPrimary} onClick={openNew}><Plus size={15} /> Nova Extensão</button>}>
 
       <div style={adminCard}>

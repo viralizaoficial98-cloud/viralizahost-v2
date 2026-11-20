@@ -134,7 +134,7 @@ const PLAN_ICONS = [Zap, Rocket, Crown, Users, Server]
 const PLAN_ACCENTS = ['#3B82F6', '#F5B700', '#8B5CF6', '#EF4444', '#10B981']
 
 export function PricingSection() {
-  const { format, currency } = useCurrency()
+  const { currency } = useCurrency()
   const { t, formatCurrency } = useLocale()
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
 
@@ -158,10 +158,6 @@ export function PricingSection() {
       .catch(err => console.error('[PricingSection] fetch error:', err))
   }, [])
 
-  const getStaticPrice = (price: Record<Currency, number>) => {
-    const p = price[currency]
-    return billing === 'annual' ? p : p * 1.4
-  }
 
   // Shared layout — DB plans use product_features, fallback uses hardcoded features
   const renderSection = (cards: React.ReactNode) => (
@@ -192,7 +188,6 @@ export function PricingSection() {
               }`}
             >
               {t('billing.annual')}
-              <span className="bg-[#0A0A0A] text-white text-xs px-2 py-0.5 rounded-full font-bold">-30%</span>
             </button>
           </div>
         </div>
@@ -377,22 +372,14 @@ export function PricingSection() {
             <div className="mb-6">
               <div className="flex items-baseline gap-2 mb-1">
                 <span className={`text-3xl font-black ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
-                  {format(getStaticPrice(plan.price))}
+                  {/* Enquanto o catálogo não carrega não se mostram preços fixos */}
+                  …
                 </span>
-                <span className={`text-sm ${plan.is_popular ? 'text-gray-500' : 'text-gray-400'}`}>{t('billing.perMonth')}</span>
               </div>
-              {billing === 'annual' && (
-                <div className={`text-xs line-through ${plan.is_popular ? 'text-gray-600' : 'text-gray-400'}`}>
-                  {format(getStaticPrice(plan.originalPrice))}{t('billing.perMonth')}
-                </div>
-              )}
-              {billing === 'annual' && (
-                <div className="text-xs text-green-500 font-semibold mt-1">✓ {t('billing.save')} 30%</div>
-              )}
             </div>
 
             <Link
-              href={`/checkout?plan=${plan.id}&billing=${billing === 'annual' ? '1year' : 'monthly'}`}
+              href={plan.id === 'reseller' ? '/revenda-de-hospedagem#planos' : `/checkout?plan=${plan.id}&billing=${billing === 'annual' ? '1year' : 'monthly'}`}
               className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
                 plan.is_popular
                   ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'

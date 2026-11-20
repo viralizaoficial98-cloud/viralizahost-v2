@@ -52,12 +52,21 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
     }),
     execute: async ({ category, search }) => {
       return cached(`products:${category}:${search}`, 60_000, async () => {
-        let q = db.from('products').select('id, slug, name, category, subcategory, price_monthly, price_6m, price_1y, price_2y, price_3y, meta')
+        // Preços reais do catálogo (product_prices): valor cobrado por ciclo e renovação, em Kz
+        let q = db.from('products').select('slug, name, category, subcategory, sale_status, pricing_note, product_prices(cycle, months, price, renewal_price, active)')
+          .eq('active', true).neq('sale_status', 'draft')
         if (category) q = q.eq('category', category)
         if (search) q = q.ilike('name', `%${search}%`)
-        const { data, error } = await q.order('price_monthly', { ascending: true }).limit(15)
+        const { data, error } = await q.order('position', { ascending: true }).limit(15)
         if (error) return { error: 'Erro ao pesquisar produtos.' }
-        return { products: data, count: data?.length ?? 0 }
+        const products = (data ?? []).map((p: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+          slug: p.slug, name: p.name, category: p.category, subcategory: p.subcategory,
+          sale_status: p.sale_status === 'on_request' ? 'sob consulta' : 'à venda', note: p.pricing_note ?? undefined,
+          prices_kz: p.sale_status === 'on_request' ? [] : (p.product_prices ?? []).filter((x: any) => Number(x.active) === 1) // eslint-disable-line @typescript-eslint/no-explicit-any
+            .map((x: any) => ({ cycle: x.cycle, months: Number(x.months), charged: Number(x.price), renewal: Number(x.renewal_price) })), // eslint-disable-line @typescript-eslint/no-explicit-any
+          buy_url: p.sale_status === 'active' ? `/checkout?plan=${p.slug}` : undefined,
+        }))
+        return { products, count: products.length, currency: 'AKZ' }
       })
     },
   })
@@ -93,11 +102,15 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
       const ext = parts.length >= 2 ? parts.slice(1).join('.') : ''
 
       // Get pricing for this specific extension
-      const { data: pricing } = await db
-        .from('site_domains')
-        .select('extension, price_monthly, price_annual, price_2y, price_3y')
-        .eq('extension', ext)
-        .maybeSingle()
+      // Preços cobrados no checkout (domain_prices, 1 ano, Kz)
+      const { data: rowsForExt } = await db
+        .from('domain_prices')
+        .select('extension, operation, price, status')
+        .eq('extension', `.${ext}`)
+        .eq('years', 1)
+      const pricing = rowsForExt?.length
+        ? Object.fromEntries([['extension', `.${ext}`], ...rowsForExt.map((r: any) => [r.operation, r.status === 'active' ? Number(r.price) : 'sob consulta'])]) // eslint-disable-line @typescript-eslint/no-explicit-any
+        : null
 
       // When pricing for this extension is not found, get ALL available prices
       let allAvailablePrices: unknown[] = []
@@ -105,8 +118,9 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
 
       if (!pricing) {
         const { data: allPrices } = await db
-          .from('site_domains')
-          .select('extension, price_monthly, price_annual')
+          .from('domain_prices')
+          .select('extension, price')
+          .eq('operation', 'register').eq('years', 1).eq('status', 'active')
           .order('extension')
         allAvailablePrices = allPrices ?? []
 
@@ -145,11 +159,11 @@ export function buildTools(ctx: AgentContext): Record<string, any> {
     }),
     execute: async ({ extension }) => {
       return cached(`domain_prices:${extension}`, 120_000, async () => {
-        let q = db.from('site_domains').select('extension, price_monthly, price_annual').order('extension')
-        if (extension) q = q.eq('extension', extension)
+        let q = db.from('domain_prices').select('extension, operation, price, status').eq('years', 1).order('extension')
+        if (extension) q = q.eq('extension', extension.startsWith('.') ? extension : `.${extension}`)
         const { data, error } = await q
         if (error) return { error: 'Erro ao carregar preços de domínios.' }
-        return { domain_prices: data }
+        return { domain_prices: data, currency: 'AKZ', note: 'Preço por 1 ano; status on_request = sob consulta.' }
       })
     },
   })

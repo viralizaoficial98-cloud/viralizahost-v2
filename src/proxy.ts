@@ -1,51 +1,51 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { SESSION_COOKIE, getProfileRole, userFromSessionToken } from '@/lib/auth/server'
 
+// Protecção de rotas (runtime Node.js). Mesmas regras de antes; a sessão passa a
+// ser o cookie vh_session validado em MariaDB (antes: cookies sb-* do Supabase).
 export default async function proxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  const { data: { user } } = await supabase.auth.getUser()
-
   const path = request.nextUrl.pathname
   // Match whole path segments only ('/email' must not catch '/email-corporativo').
   const under = (p: string) => path === p || path.startsWith(`${p}/`)
 
-  const protectedPaths = ['/dashboard', '/domains', '/hosting', '/tickets', '/billing', '/settings']
+  const protectedPaths = ['/dashboard', '/domains', '/hosting', '/tickets', '/billing', '/settings', '/orders', '/services']
   // '/email' is the client area page; '/email/*' are public marketing pages.
   const protectedExact = ['/email']
   const adminPaths = ['/admin']
   const authRoutes = ['/login', '/register', '/forgot-password']
 
-  if ((protectedPaths.some(under) || protectedExact.includes(path)) && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  const isProtected = protectedPaths.some(under) || protectedExact.includes(path) || adminPaths.some(under)
+  const isAuthRoute = authRoutes.some(under)
+  // Páginas públicas não precisam de consultar a base de dados.
+  if (!isProtected && !isAuthRoute) return NextResponse.next({ request })
+
+  const token = request.cookies.get(SESSION_COOKIE)?.value
+  let user = null
+  try {
+    user = token ? await userFromSessionToken(token) : null
+  } catch (err) {
+    console.error('[proxy] falha ao validar sessão:', (err as Error).message)
   }
-  if (adminPaths.some(under) && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+
+  if (isProtected && !user) {
+    const res = NextResponse.redirect(new URL('/login', request.url))
+    if (token) res.cookies.delete(SESSION_COOKIE)
+    return res
   }
-  if (authRoutes.some(under) && user) {
+  // /admin exige o papel admin (antes bastava sessão: um cliente via o painel sem dados)
+  if (user && adminPaths.some(under)) {
+    let role: string | null = null
+    try { role = await getProfileRole(user.id) } catch {}
+    if (role !== 'admin') return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+  if (isAuthRoute && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  return supabaseResponse
+  return NextResponse.next({ request })
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4)$).*)'],
+  // /storage e /api/storage ficam de fora: o proxy limitaria o corpo dos uploads a 10 MB.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|storage/|api/storage/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4)$).*)'],
 }

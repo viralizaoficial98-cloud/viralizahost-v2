@@ -44,7 +44,7 @@ export default function HostingPlansPage() {
   const planColor = (i: number) => PLAN_COLORS[i % PLAN_COLORS.length]
 
   return (
-    <AdminPageShell title="Planos de Hospedagem" subtitle="Planos e preços de hosting"
+    <AdminPageShell title="Planos de Hospedagem" subtitle="Conteúdo dos cartões de alojamento. Os preços cobrados editam-se em Catálogo e Preços."
       action={<button style={btnPrimary} onClick={openNew}><Plus size={15} /> Novo Plano</button>}>
 
       {!loading && plans.length > 0 ? (

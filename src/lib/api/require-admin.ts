@@ -23,7 +23,6 @@ export async function requireAdminRole(): Promise<string> {
     })
   }
 
-  console.log('[requireAdminRole] user:', user.id, user.email, '| profile:', profile, '| role:', profile?.role)
 
   if (profile?.role !== 'admin') {
     throw Object.assign(

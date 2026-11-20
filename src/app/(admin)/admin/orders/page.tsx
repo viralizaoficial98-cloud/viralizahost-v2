@@ -1,238 +1,152 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Check, X, Loader2, Clock, RefreshCw, ExternalLink } from 'lucide-react'
+import { Check, ExternalLink, Loader2, RefreshCw, RotateCcw, X } from 'lucide-react'
+import { ACTIVATION_STATUS, PAYMENT_STATUS, TONE_CLASS, kz } from '@/lib/commerce/status'
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Service = { id: string; order_item_id: string; service_name: string; service_type: string; provisioning_status: string; provisioning_error: string | null; provisioning_attempts: number; external_ref: string | null; domain: string | null }
 type Order = {
-  id: string
-  created_at: string
-  status: string
-  payment_method: string | null
-  amount: number
-  domain_name: string | null
-  transfer_ref: string | null
-  proof_file: string | null
-  proof_url: string | null   // signed URL generated server-side
+  id: string; order_number: string | null; created_at: string; status: string; payment_status: string; activation_status: string
+  amount: number; payment_method: string | null; transfer_ref: string | null; proof_url: string | null
   profiles: { full_name: string; email: string } | null
-  order_items: { service_name: string; service_type: string; price: number; quantity: number }[]
+  order_items: { id: string; service_name: string; quantity: number; line_total: number | null; unit_price: number | null; renewal_price: number | null; billing_cycle: string | null; domain_name: string | null }[]
+  services: Service[]; invoice: { invoice_number: string; status: string } | null
 }
+type Filter = 'todo' | 'activation' | 'done' | 'all'
 
-const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  aguardando_confirmacao: { label: 'Aguardando',  color: '#F5B700' },
-  pending:                { label: 'Pendente',    color: '#888' },
-  active:                 { label: 'Ativo',       color: '#22C55E' },
-  rejected:               { label: 'Rejeitado',   color: '#EF4444' },
-  cancelled:              { label: 'Cancelado',   color: '#EF4444' },
-}
-
-function fmtPrice(n: number) {
-  return `Kz ${n.toLocaleString('pt-AO', { minimumFractionDigits: 0 })}`
-}
+const SVC_LABEL: Record<string, string> = { pending: 'Pendente', in_progress: 'Em curso', active: 'Activo', manual_required: 'Manual', failed: 'Falhou' }
 
 export default function AdminOrdersPage() {
-  const [orders, setOrders]         = useState<Order[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [filter, setFilter]         = useState<'all' | 'aguardando_confirmacao' | 'active' | 'rejected'>('aguardando_confirmacao')
-  const [acting, setActing]         = useState<string | null>(null)
-  const [reconciling, setReconciling] = useState(false)
-  const [reconcileResult, setReconcileResult] = useState<any>(null)
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [filter, setFilter] = useState<Filter>('todo')
+  const [acting, setActing] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
 
   async function load() {
-    setLoading(true)
-    const res = await fetch('/api/admin/orders')
-    const data = await res.json()
-    setOrders(data.orders ?? [])
-    setLoading(false)
-  }
-
-  async function reconcile() {
-    setReconciling(true)
-    setReconcileResult(null)
+    setLoading(true); setError('')
     try {
-      const res = await fetch('/api/admin/orders/reconcile', { method: 'POST' })
-      const data = await res.json()
-      setReconcileResult(data)
-    } catch (e: any) {
-      setReconcileResult({ error: e.message })
-    } finally {
-      setReconciling(false)
-    }
+      const res = await fetch('/api/admin/orders'); const j = await res.json()
+      if (!res.ok || j.error) setError(j.error ?? `HTTP ${res.status}`)
+      setOrders(j.orders ?? [])
+    } catch { setError('Falha de rede.') } finally { setLoading(false) }
   }
-
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- carregamento inicial dos dados
   useEffect(() => { load() }, [])
 
-  async function act(orderId: string, action: 'approve' | 'reject') {
-    setActing(orderId + action)
-    await fetch('/api/admin/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId, action }),
-    })
-    await load()
-    setActing(null)
+  async function act(key: string, body: Record<string, unknown>, confirmText?: string) {
+    if (confirmText && !window.confirm(confirmText)) return
+    setActing(key); setNotice(null)
+    try {
+      const res = await fetch('/api/admin/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const j = await res.json()
+      if (!res.ok) setNotice({ ok: false, text: j.error ?? 'Falhou.' })
+      else if (j.provisioning) {
+        const counts = j.provisioning.reduce((a: any, r: any) => ({ ...a, [r.status]: (a[r.status] ?? 0) + 1 }), {})
+        setNotice({ ok: true, text: `Pagamento ${j.payment === 'paid' ? 'confirmado' : 'já estava confirmado'}. Activação: ${Object.entries(counts).map(([k, v]) => `${v} ${SVC_LABEL[k] ?? k}`).join(', ')}.` })
+      } else if (j.result) setNotice({ ok: j.ok, text: `${j.result.status === 'active' ? 'Activado' : 'Não activado'}: ${j.result.message}` })
+      else setNotice({ ok: true, text: 'Feito.' })
+      await load()
+    } catch { setNotice({ ok: false, text: 'Falha de rede.' }) } finally { setActing(null) }
   }
 
-  const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter)
-
-  const tabs: { key: typeof filter; label: string }[] = [
-    { key: 'aguardando_confirmacao', label: 'Aguardando' },
-    { key: 'active',                 label: 'Aprovados' },
-    { key: 'rejected',               label: 'Rejeitados' },
-    { key: 'all',                    label: 'Todos' },
-  ]
+  const filtered = orders.filter(o => filter === 'all' ? true
+    : filter === 'todo' ? o.status !== 'rejected' && o.payment_status !== 'paid'
+    : filter === 'activation' ? o.payment_status === 'paid' && !['active', 'cancelled'].includes(o.activation_status)
+    : o.activation_status === 'active' || o.status === 'rejected')
+  const tabs: [Filter, string][] = [['todo', 'Por pagar / validar'], ['activation', 'Activação pendente'], ['done', 'Concluídas'], ['all', 'Todas']]
 
   return (
-    <div className="p-6 max-w-6xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6 max-w-6xl">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-black text-[#0A0A0A]">Pedidos</h1>
-          <p className="text-sm text-[#888] mt-1">Gerir pedidos e aprovar pagamentos BIC</p>
+          <h1 className="text-2xl font-black text-[#0A0A0A]">Encomendas</h1>
+          <p className="text-sm text-[#888] mt-1">Validar pagamentos e acompanhar a activação dos serviços</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={reconcile} disabled={reconciling}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
-            style={{ background: reconciling ? '#888' : '#2563EB' }}
-            title="Cria registos de serviço para pedidos aprovados que ainda não têm serviço associado">
-            {reconciling ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Reconciliar Serviços
-          </button>
-          <button onClick={load} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#E8E8E8] text-sm text-[#555] hover:border-[#F5B700] transition-colors">
-            <RefreshCw size={14} /> Atualizar
-          </button>
-        </div>
+        <button onClick={load} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#E8E8E8] text-sm text-[#555] hover:border-[#F5B700]"><RefreshCw size={14} /> Actualizar</button>
       </div>
-
-      {/* Reconcile result */}
-      {reconcileResult && (
-        <div className="mb-4 p-4 rounded-xl text-sm"
-          style={{ background: reconcileResult.error ? '#FEF2F2' : '#F0FDF4', border: reconcileResult.error ? '1px solid #FCA5A5' : '1px solid #86EFAC' }}>
-          {reconcileResult.error ? (
-            <p className="font-semibold text-red-700">Erro: {reconcileResult.error}</p>
-          ) : (
-            <div>
-              <p className="font-bold text-green-800 mb-1">Reconciliação concluída</p>
-              <p className="text-green-700">
-                {reconcileResult.created ?? 0} serviços criados &nbsp;·&nbsp;
-                {reconcileResult.skipped ?? 0} já existiam &nbsp;·&nbsp;
-                {reconcileResult.errors ?? 0} erros
-              </p>
-              {reconcileResult.details?.filter((d: any) => d.error).map((d: any, i: number) => (
-                <p key={i} className="text-red-600 text-xs mt-1">Pedido {d.order_id}: {d.error}</p>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex gap-1 bg-[#F5F5F5] rounded-xl p-1 mb-6 w-fit">
-        {tabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setFilter(t.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${filter === t.key ? 'bg-white text-[#0A0A0A] shadow-sm' : 'text-[#888] hover:text-[#555]'}`}
-          >
-            {t.label}
-            {t.key !== 'all' && (
-              <span className="ml-1.5 text-xs font-black">
-                ({orders.filter(o => o.status === t.key).length})
-              </span>
-            )}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {tabs.map(([k, label]) => (
+          <button key={k} onClick={() => setFilter(k)} className={`px-4 py-2 rounded-xl text-sm font-bold ${filter === k ? 'bg-[#F5B700] text-black' : 'bg-white border border-[#E8E8E8] text-[#555]'}`}>
+            {label} <span className="opacity-60">({orders.filter(o => k === 'all' ? true : k === 'todo' ? o.status !== 'rejected' && o.payment_status !== 'paid' : k === 'activation' ? o.payment_status === 'paid' && !['active', 'cancelled'].includes(o.activation_status) : o.activation_status === 'active' || o.status === 'rejected').length})</span>
           </button>
         ))}
       </div>
-
-      {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={28} className="animate-spin text-[#F5B700]" /></div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-[#AAA]">
-          <Clock size={36} className="mx-auto mb-3 opacity-40" />
-          <p className="font-semibold">Nenhum pedido nesta categoria.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filtered.map(order => {
-            const st = STATUS_LABEL[order.status] ?? { label: order.status, color: '#888' }
-            const isPending = order.status === 'aguardando_confirmacao'
-            return (
-              <div key={order.id} className="bg-white border border-[#E8E8E8] rounded-2xl p-5 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  {/* Left info */}
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-xs text-[#AAA]">#{order.id.slice(0, 8).toUpperCase()}</span>
-                      <span
-                        className="text-xs font-black px-2 py-0.5 rounded-full"
-                        style={{ background: `${st.color}18`, color: st.color }}
-                      >
-                        {st.label}
-                      </span>
-                      <span className="text-xs text-[#AAA]">{new Date(order.created_at).toLocaleDateString('pt-AO')}</span>
+      {notice && <div role="status" className={`mb-4 p-3 rounded-xl text-sm ${notice.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{notice.text}</div>}
+      {error && <div className="mb-4 p-3 rounded-xl text-sm bg-red-50 text-red-700">{error}</div>}
+      {loading ? <div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#F5B700]" /></div>
+        : filtered.length === 0 ? <div className="text-center py-16 text-[#888] bg-white rounded-2xl border border-[#E8E8E8]">Nenhuma encomenda nesta lista.</div>
+        : (
+          <ul className="space-y-4">
+            {filtered.map(o => {
+              const p = PAYMENT_STATUS[o.payment_status] ?? PAYMENT_STATUS.unpaid
+              const a = ACTIVATION_STATUS[o.activation_status] ?? ACTIVATION_STATUS.pending
+              return (
+                <li key={o.id} className="bg-white border border-[#E8E8E8] rounded-2xl p-5" data-testid="admin-order">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-black text-[#0A0A0A]">{o.order_number ?? o.id.slice(0, 8)} · {kz(o.amount)}</p>
+                      <p className="text-xs text-[#888]">{new Date(o.created_at).toLocaleString('pt-PT')} · {o.profiles?.full_name ?? '—'} ({o.profiles?.email ?? 'sem perfil'}){o.invoice ? ` · Factura ${o.invoice.invoice_number}` : ''}</p>
+                      {o.transfer_ref && <p className="text-xs text-[#555] mt-1">Ref. transferência: {o.transfer_ref}</p>}
                     </div>
-
-                    {/* Client */}
-                    <p className="font-bold text-[#0A0A0A]">
-                      {order.profiles?.full_name ?? '—'}
-                      <span className="text-[#888] font-normal ml-2 text-sm">{order.profiles?.email}</span>
-                    </p>
-
-                    {/* Services */}
                     <div className="flex flex-wrap gap-2">
-                      {order.order_items.map((item, i) => (
-                        <span key={i} className="text-xs bg-[#F5F5F5] px-2 py-1 rounded-lg text-[#555]">
-                          {item.service_name} × {item.quantity}
-                        </span>
-                      ))}
-                      {order.domain_name && (
-                        <span className="text-xs bg-[#FFF8E1] px-2 py-1 rounded-lg text-[#888]">
-                          🌐 {order.domain_name}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Payment details */}
-                    <div className="flex flex-wrap gap-4 text-xs text-[#888] mt-1">
-                      <span>Pagamento: <strong className="text-[#555]">{order.payment_method?.replace('_', ' ') ?? '—'}</strong></span>
-                      {order.transfer_ref && <span>Ref: <strong className="text-[#555]">{order.transfer_ref}</strong></span>}
-                      {(order.proof_url || order.proof_file) && (
-                        <a href={order.proof_url ?? order.proof_file ?? '#'} target="_blank" rel="noreferrer"
-                          className="flex items-center gap-1 text-[#F5B700] hover:underline font-semibold">
-                          <ExternalLink size={11} /> Ver comprovativo
-                        </a>
-                      )}
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${TONE_CLASS[p.tone]}`}>{p.label}</span>
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${TONE_CLASS[a.tone]}`}>{a.label}</span>
+                      {o.status === 'rejected' && <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-50 text-red-700">Cancelada</span>}
                     </div>
                   </div>
-
-                  {/* Right: amount + actions */}
-                  <div className="flex flex-col items-end gap-3 shrink-0">
-                    <p className="text-xl font-black text-[#0A0A0A]">{fmtPrice(order.amount)}</p>
-                    {isPending && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => act(order.id, 'reject')}
-                          disabled={!!acting}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl border-2 border-red-200 text-red-600 text-sm font-bold hover:bg-red-50 transition-colors disabled:opacity-40"
-                        >
-                          {acting === order.id + 'reject' ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
-                          Rejeitar
+                  <table className="w-full text-sm mt-4">
+                    <tbody>
+                      {o.order_items.map(it => {
+                        const s = o.services.find(x => x.order_item_id === it.id)
+                        return (
+                          <tr key={it.id} className="border-t border-[#F3F3F3] align-top">
+                            <td className="py-2 pr-2">{it.service_name}{it.quantity > 1 ? ` × ${it.quantity}` : ''}{it.domain_name ? <span className="block text-xs text-[#888]">{it.domain_name}</span> : null}</td>
+                            <td className="py-2 pr-2 whitespace-nowrap">{kz(it.line_total ?? it.unit_price)}</td>
+                            <td className="py-2 pr-2">
+                              {s && <span className="text-xs font-bold">{SVC_LABEL[s.provisioning_status] ?? s.provisioning_status}{s.external_ref ? ` · ${s.external_ref}` : ''}</span>}
+                              {s?.provisioning_error && <span className="block text-xs text-[#B45309]">{s.provisioning_error}</span>}
+                            </td>
+                            <td className="py-2 text-right whitespace-nowrap">
+                              {s && o.payment_status === 'paid' && s.provisioning_status !== 'active' && (
+                                <span className="inline-flex gap-1">
+                                  <button disabled={!!acting} onClick={() => act(s.id + 'p', { action: 'provision', serviceId: s.id })} className="px-2 py-1 rounded-lg border border-[#E8E8E8] text-xs hover:border-[#F5B700]" title="Repetir activação automática (sem nova cobrança)">
+                                    {acting === s.id + 'p' ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                                  </button>
+                                  <button disabled={!!acting} onClick={() => { const ref = window.prompt('Referência da activação manual (ex.: utilizador, IP, n.º no registrador):') ?? ''; act(s.id + 'm', { action: 'mark_active', serviceId: s.id, externalRef: ref || null, notes: 'Activação manual' }) }} className="px-2 py-1 rounded-lg bg-green-600 text-white text-xs">Activo</button>
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="flex flex-wrap items-center gap-2 mt-4">
+                    {o.proof_url && <a href={o.proof_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-[#2563EB] underline"><ExternalLink size={14} /> Ver comprovativo</a>}
+                    {o.payment_status !== 'paid' && o.status !== 'rejected' && (
+                      <>
+                        <button disabled={!!acting} onClick={() => act(o.id + 'a', { action: 'approve', orderId: o.id }, `Confirmar o pagamento de ${kz(o.amount)} e activar os serviços?`)} className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-bold">
+                          {acting === o.id + 'a' ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Confirmar pagamento
                         </button>
-                        <button
-                          onClick={() => act(order.id, 'approve')}
-                          disabled={!!acting}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F5B700] text-[#0A0A0A] text-sm font-black hover:bg-[#D9A300] transition-colors disabled:opacity-40"
-                        >
-                          {acting === order.id + 'approve' ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                          Aprovar
-                        </button>
-                      </div>
+                        {o.payment_status === 'proof_submitted' && (
+                          <button disabled={!!acting} onClick={() => { const reason = window.prompt('Motivo da rejeição do comprovativo:'); if (reason) act(o.id + 'r', { action: 'reject_proof', orderId: o.id, reason }) }} className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-red-300 text-red-700 text-sm font-bold">
+                            <X size={14} /> Rejeitar comprovativo
+                          </button>
+                        )}
+                        <button disabled={!!acting} onClick={() => act(o.id + 'c', { action: 'cancel', orderId: o.id }, 'Cancelar esta encomenda?')} className="px-4 py-2 rounded-xl border border-[#E8E8E8] text-sm text-[#555]">Cancelar</button>
+                      </>
+                    )}
+                    {o.payment_status === 'paid' && !['active', 'cancelled'].includes(o.activation_status) && (
+                      <button disabled={!!acting} onClick={() => act(o.id + 'a', { action: 'approve', orderId: o.id })} className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-[#E8E8E8] text-sm"><RotateCcw size={14} /> Repetir activação</button>
                     )}
                   </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
     </div>
   )
 }

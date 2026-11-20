@@ -205,10 +205,12 @@ export async function getAccount(config: WHMConfig, username: string): Promise<W
 }
 
 export async function createAccount(config: WHMConfig, params: WHMCreateAccountParams) {
+  // Sem senha → o WHM gera uma aleatória (o cliente entra por SSO); assim nenhuma
+  // senha passa no URL do pedido nem fica nos registos do servidor.
   return whmRequest(config, 'createacct', {
     username: params.username,
     domain: params.domain,
-    password: params.password,
+    ...(params.password ? { password: params.password } : {}),
     plan: params.plan,
     contactemail: params.email,
     quota: params.quota ?? 10240,

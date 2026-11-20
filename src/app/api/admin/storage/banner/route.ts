@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createServiceClient as createSupabaseClient } from '@/lib/supabase/server'
 
 const BUCKET = 'site-banners'
 const MAX_BYTES = 10 * 1024 * 1024
@@ -7,10 +7,7 @@ const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp']
 
 // Plain service-role client without db.schema (Storage API doesn't use it)
 function storageAdminClient() {
-  return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
+  return createSupabaseClient()
 }
 
 async function ensureBucket(supabase: ReturnType<typeof storageAdminClient>) {

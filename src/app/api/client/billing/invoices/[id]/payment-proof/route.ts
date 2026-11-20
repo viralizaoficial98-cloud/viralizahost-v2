@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Validate invoice ownership
   const { data: invoice } = await db
     .from('invoices')
-    .select('id, status, total, amount_paid, currency, profile_id')
+    .select('id, status, total, amount_paid, currency, profile_id, order_id, invoice_number')
     .eq('id', invoiceId)
     .eq('profile_id', user.id)
     .single()
@@ -100,6 +100,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .from('invoices')
     .update({ status: 'under_review', updated_at: new Date().toISOString() })
     .eq('id', invoiceId)
+
+  // A encomenda associada passa a «comprovativo em análise» (o pagamento só é
+  // confirmado pelo administrador ou por notificação assinada do gateway)
+  if ((invoice as any).order_id) {
+    await db.from('orders').update({ payment_status: 'proof_submitted' }).eq('id', (invoice as any).order_id).neq('payment_status', 'paid')
+  }
 
   // Notify admins (best-effort)
   try {

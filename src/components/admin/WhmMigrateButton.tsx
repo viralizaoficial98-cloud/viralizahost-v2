@@ -35,7 +35,7 @@ export default function WhmMigrateButton() {
         // Management API not available — show SQL for manual execution
         setStatus('manual')
         setSql(data.sql)
-        setMessage(data.error ?? 'Aplique o SQL manualmente no Supabase SQL Editor.')
+        setMessage(data.error ?? 'Importe database/mariadb/schema.sql no phpMyAdmin.')
       } else {
         setStatus('error')
         setMessage(data.error ?? 'Erro ao aplicar migrações.')

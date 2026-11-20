@@ -1,16 +1,18 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Globe, Server, Mail, Ticket, CreditCard, Settings, LogOut, ChevronRight, X } from 'lucide-react'
+import { LayoutDashboard, Globe, Server, Mail, Ticket, CreditCard, Settings, LogOut, ChevronRight, X, ShoppingBag, Package } from 'lucide-react'
 import Image from 'next/image'
 import { createAuthClient } from '@/lib/supabase/client'
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard'     },
+  { href: '/services',  icon: Package,         label: 'Serviços'      },
   { href: '/domains',   icon: Globe,           label: 'Domínios'      },
   { href: '/hosting',   icon: Server,          label: 'Hospedagem'    },
   { href: '/email',     icon: Mail,            label: 'Emails'        },
   { href: '/tickets',   icon: Ticket,          label: 'Suporte'       },
+  { href: '/orders',    icon: ShoppingBag,     label: 'Encomendas'    },
   { href: '/billing',   icon: CreditCard,      label: 'Financeiro'    },
   { href: '/settings',  icon: Settings,        label: 'Configurações' },
 ]

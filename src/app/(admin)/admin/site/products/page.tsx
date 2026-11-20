@@ -147,7 +147,7 @@ function ProductForm({ initial, onSave, onCancel }: {
       </div>
 
       <div>
-        <p className="text-xs font-bold text-[#666] mb-2">Preços (Kz/mês)</p>
+        <p className="text-xs font-bold text-[#666] mb-2">Preços (Kz/mês) — só apresentação; os preços cobrados editam-se em <a href="/admin/site/catalog" className="underline">Catálogo e Preços</a></p>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {([['price_monthly','Mensal'],['price_6months','6 Meses'],['price_1year','Anual'],['price_2years','2 Anos'],['price_3years','3 Anos']] as const).map(([key, label]) => (
             <div key={key}>

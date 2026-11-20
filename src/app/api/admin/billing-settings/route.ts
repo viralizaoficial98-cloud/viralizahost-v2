@@ -38,9 +38,14 @@ export async function POST(req: NextRequest) {
     'company_name', 'email', 'website', 'phone', 'address',
     'bank_name', 'account_holder', 'account_number', 'iban', 'swift',
     'payment_instructions', 'footer_text', 'default_due_days',
-    'email_subject_template', 'email_body_template', 'auto_email_on_create',
+    'email_subject_template', 'email_body_template', 'auto_email_on_create', 'tax_rate', 'tax_label',
   ]
   const payload: Record<string, unknown> = {}
+  if ('tax_rate' in body) {
+    const t = Number(body.tax_rate)
+    if (!Number.isFinite(t) || t < 0 || t > 100) return NextResponse.json({ error: 'Taxa de imposto inválida.' }, { status: 400 })
+    body.tax_rate = Math.round(t * 100) / 100
+  }
   for (const key of allowed) {
     if (key in body) payload[key] = body[key]
   }

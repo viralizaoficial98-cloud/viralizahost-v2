@@ -295,5 +295,10 @@
     "company": "Company",
     "paymentMethods": "Payment Methods",
     "followUs": "Follow Us"
+  },
+  "hero": {
+    "title": "Website hosting, domains, business email and VPS servers",
+    "titleHighlight": "in Angola and Brazil",
+    "subtitle": "Premium web hosting with LiteSpeed, NVMe SSD, cPanel and 24/7 support. 99.9% uptime guaranteed."
   }
 }

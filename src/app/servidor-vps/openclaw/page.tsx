@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
+import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -62,6 +63,7 @@ const included = [
 
 export default async function VPSOpenClawPage() {
   const banner = await getBannerPage('vps-openclaw')
+  const fromPrice = await fromPriceText('vps', 'openclaw')
   return (
     <>
       <Header />
@@ -73,7 +75,7 @@ export default async function VPSOpenClawPage() {
           tag={banner?.tag ?? 'Agentes de IA Autónomos'}
           title={banner?.title ?? 'Coloque um agente de IA a agir por si'}
           subtitle={banner?.subtitle ?? 'Mais autonomia, mais controlo e menos tarefas manuais no seu dia a dia. OpenClaw pré-instalado e pronto para começar.'}
-          price={banner?.price_text ?? 'A partir de Kz 65.000/mês'}
+          price={fromPrice ?? undefined}
           cta={banner?.button_primary_text ?? 'Ver Planos OpenClaw'}
           ctaHref={banner?.button_primary_link ?? '#planos'}
           ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}

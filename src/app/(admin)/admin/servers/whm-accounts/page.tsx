@@ -6,6 +6,7 @@ import { Server, Users, RefreshCw, ExternalLink, Search, AlertTriangle, Database
 import Link from 'next/link'
 import WhmAccountsTable from '@/components/admin/WhmAccountsTable'
 import WhmMigrateButton from '@/components/admin/WhmMigrateButton'
+import WhmImportPanel from '@/components/admin/WhmImportPanel'
 
 export const metadata: Metadata = { title: 'Contas WHM — Admin' }
 
@@ -152,7 +153,7 @@ ALTER TABLE viralizahost.services
     .select(`
       id, whm_username, primary_domain, contact_email, package_name,
       ip_address, disk_used_mb, disk_limit_mb, is_suspended, suspension_reason,
-      status, sync_status, requires_manual_link, link_status,
+      status, sync_status, requires_manual_link, link_status, link_candidate_profile_id, link_candidate_reason,
       last_synced_at, profile_id, service_id, hosting_account_id,
       profiles(id, full_name, email)
     `, { count: 'exact' })
@@ -163,10 +164,14 @@ ALTER TABLE viralizahost.services
   if (pkg)    q = q.eq('package_name', pkg)
   if (linked === 'true')    q = q.not('profile_id', 'is', null)
   if (linked === 'false')   q = q.is('profile_id', null)
-  if (linked === 'pending') q = q.eq('sync_status', 'pending_email')
+  if (linked === 'pending') q = q.in('link_status', ['pending_validation', 'unlinked'])
 
   const { data: rawData, count } = await q
-  const rows = (rawData ?? []) as Record<string, unknown>[]
+  const rowsRaw = (rawData ?? []) as Record<string, unknown>[]
+  // Candidatas sugeridas pela importação (e-mail coincidente, por validar)
+  const candIds = [...new Set(rowsRaw.map(r => r.link_candidate_profile_id).filter(Boolean) as string[])]
+  const { data: cands } = candIds.length ? await db.from('profiles').select('id, full_name, email').in('id', candIds) : { data: [] }
+  const rows = rowsRaw.map(r => ({ ...r, candidate: (cands ?? []).find((c: { id: string }) => c.id === r.link_candidate_profile_id) ?? null })) as Record<string, any>[] // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const filtered = search
     ? rows.filter(r =>
@@ -256,6 +261,8 @@ ALTER TABLE viralizahost.services
           </Link>
         </div>
       </div>
+
+      <WhmImportPanel />
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">

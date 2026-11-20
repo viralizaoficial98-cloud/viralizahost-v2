@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
+import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -62,6 +63,7 @@ const included = [
 
 export default async function ServidorDedicadoWindowsPage() {
   const banner = await getBannerPage('servidor-dedicado-windows')
+  const fromPrice = await fromPriceText('dedicated-windows')
   return (
     <>
       <Header />
@@ -71,7 +73,7 @@ export default async function ServidorDedicadoWindowsPage() {
           tag={banner?.tag ?? 'Windows Server + Plesk'}
           title={banner?.title ?? 'Máxima performance para projectos em ASP.NET e MS SQL'}
           subtitle={banner?.subtitle ?? 'Servidor dedicado Windows com Plesk, ASP.NET, Microsoft SQL Server, Remote Desktop e alta estabilidade para sistemas críticos.'}
-          price={banner?.price_text ?? 'A partir de Kz 299.000/mês'}
+          price={fromPrice ?? undefined}
           cta={banner?.button_primary_text ?? 'Ver Planos Windows'}
           ctaHref={banner?.button_primary_link ?? '#planos'}
           ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
@@ -91,7 +93,7 @@ export default async function ServidorDedicadoWindowsPage() {
           title="Implante o seu servidor Windows hoje"
           subtitle="Windows Server licenciado, Plesk incluído e suporte de especialistas Microsoft."
           cta="Contratar Servidor Windows"
-          ctaHref="/checkout?plan=win-sapphire" />
+          ctaHref="#planos" />
       </main>
       <Footer />
     </>

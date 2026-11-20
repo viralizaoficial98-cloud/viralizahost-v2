@@ -175,7 +175,7 @@ export default async function HostingPage() {
           <p className="text-xs mb-5" style={{ color: '#94A3B8' }}>
             Ainda não possui nenhum plano de hospedagem. Escolha um plano e comece hoje.
           </p>
-          <a href="/billing" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-black"
+          <a href="/hospedagem-de-sites" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-black"
             style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', boxShadow: '0 4px 14px rgba(245,183,0,0.30)' }}>
             Ver Planos Disponíveis
           </a>

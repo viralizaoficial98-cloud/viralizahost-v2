@@ -1,23 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient, createAuthClient, createRpcClient } from '@/lib/supabase/server'
+import { createAdminClient, createRpcClient } from '@/lib/supabase/server'
+import { requireAdminRole } from '@/lib/api/require-admin'
 
+// Antes só exigia sessão iniciada; repor o catálogo é uma operação de administrador.
 async function requireAdmin() {
-  const auth = await createAuthClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
-  return user
+  return requireAdminRole()
 }
 
 // SQL that the admin can run manually in the Supabase Dashboard if all automatic methods fail.
 // This is identical to what setup_product_catalog() does, but as raw SQL.
-const MANUAL_SQL = `-- Run this in Supabase Dashboard → SQL Editor
--- It creates the products catalog tables and seeds all products.
--- Copy from: supabase/migrations/20260712_000000_products_rpc.sql
-
-SELECT public.setup_product_catalog();
-
--- If the function doesn't exist yet, run the full migration file first:
--- supabase/migrations/20260712_000000_products_rpc.sql`
+const MANUAL_SQL = `-- Importe no phpMyAdmin (base viralizahost_viralizaHost):
+--   1. database/mariadb/schema.sql
+--   2. database/mariadb/seed/product-catalog.sql`
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,33 +33,6 @@ export async function POST(req: NextRequest) {
     }
   } catch {}
 
-  // ── Step 2: Try Supabase Management API with SUPABASE_ACCESS_TOKEN ──
-  const pat = process.env.SUPABASE_ACCESS_TOKEN
-  if (pat) {
-    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      .replace('https://', '').split('.')[0]
-
-    try {
-      const mgmtRes = await fetch(
-        `https://api.supabase.com/v1/projects/${projectRef}/database/query`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${pat}`,
-          },
-          body: JSON.stringify({ query: 'SELECT public.setup_product_catalog()' }),
-        }
-      )
-      if (mgmtRes.ok) {
-        return NextResponse.json({
-          success: true,
-          message: 'Tabelas criadas e catálogo carregado com sucesso via Management API.',
-        })
-      }
-    } catch {}
-  }
-
   // ── Step 3: Check if tables already exist (maybe migration was applied) ──
   try {
     const supabase = await createAdminClient()
@@ -76,16 +43,16 @@ export async function POST(req: NextRequest) {
     if (!error && count != null) {
       return NextResponse.json({
         success: true,
-        message: `A tabela viralizahost.products já existe com ${count} produto(s).`,
+        message: `A tabela products já existe com ${count} produto(s).`,
       })
     }
   } catch {}
 
   // ── Step 4: Return migration SQL for manual execution ──
-  const migrationPath = 'supabase/migrations/20260712_000000_products_rpc.sql'
+  const migrationPath = 'database/mariadb/seed/product-catalog.sql'
   return NextResponse.json({
     success: false,
-    message: 'A migração precisa ser aplicada manualmente. Execute o ficheiro abaixo no Supabase Dashboard.',
+    message: 'A migração precisa ser aplicada manualmente. Importe o ficheiro abaixo no phpMyAdmin.',
     migrationFile: migrationPath,
     sql: MANUAL_SQL,
   }, { status: 200 })

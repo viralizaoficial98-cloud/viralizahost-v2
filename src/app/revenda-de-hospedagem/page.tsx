@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
+import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -70,6 +71,7 @@ const included = [
 
 export default async function RevendaDeHospedagemPage() {
   const banner = await getBannerPage('revenda-de-hospedagem')
+  const fromPrice = await fromPriceText('reseller')
   return (
     <>
       <Header />
@@ -79,7 +81,7 @@ export default async function RevendaDeHospedagemPage() {
           tag={banner?.tag ?? 'Revenda WHM/cPanel'}
           title={banner?.title ?? 'Crie a sua própria empresa de hospedagem com a ViralizaHost'}
           subtitle={banner?.subtitle ?? 'Venda hospedagem para os seus clientes usando a nossa infraestrutura premium. WHM, cPanel, DNS privado e marca própria.'}
-          price={banner?.price_text ?? 'A partir de Kz 59.900/mês'}
+          price={fromPrice ?? undefined}
           cta={banner?.button_primary_text ?? 'Ver Planos de Revenda'}
           ctaHref={banner?.button_primary_link ?? '#planos'}
           ctaSecondary={banner?.button_secondary_text ?? 'Falar com Comercial'}
@@ -99,7 +101,7 @@ export default async function RevendaDeHospedagemPage() {
           title="Inicie o seu negócio de hospedagem hoje"
           subtitle="Infraestrutura premium, marca própria e suporte dedicado ao revendedor."
           cta="Começar a Revender"
-          ctaHref="/checkout?plan=reseller-start" />
+          ctaHref="#planos" />
       </main>
       <Footer />
     </>

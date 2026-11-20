@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
+import { fromPriceText } from '@/lib/commerce/from-price'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import type { PricingPlan } from '@/components/service/ServicePricingCards'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
@@ -62,6 +63,7 @@ const included = [
 
 export default async function CriadorDeSitesPage() {
   const banner = await getBannerPage('criador-de-sites')
+  const fromPrice = await fromPriceText('website-builder')
   return (
     <>
       <Header />
@@ -71,7 +73,7 @@ export default async function CriadorDeSitesPage() {
           tag={banner?.tag ?? 'Com Inteligência Artificial'}
           title={banner?.title ?? 'Crie o seu site profissional em minutos com IA'}
           subtitle={banner?.subtitle ?? 'Descreve o teu negócio. A inteligência artificial cria o site completo, com textos, imagens e design. Sem código, sem design.'}
-          price={banner?.price_text ?? 'A partir de Kz 14.900/mês'}
+          price={fromPrice ?? undefined}
           cta={banner?.button_primary_text ?? 'Criar Meu Site com IA'}
           ctaHref={banner?.button_primary_link ?? '#planos'}
           ctaSecondary={banner?.button_secondary_text ?? 'Ver Demonstração'}

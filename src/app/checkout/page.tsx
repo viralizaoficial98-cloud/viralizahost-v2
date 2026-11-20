@@ -1,1256 +1,506 @@
 'use client'
-import { useEffect, useState, useRef, Suspense } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import {
-  Check, ChevronRight, ChevronLeft, Trash2, Plus, Minus,
-  Globe, Lock, CreditCard, Smartphone, Building2, Upload,
-  X, AlertCircle, Loader2, Package, Mail, Server, Tag,
-} from 'lucide-react'
-import Image from 'next/image'
-import {
-  useCheckoutStore,
-  BILLING_LABEL, BILLING_DISCOUNT, BILLING_MONTHS,
-  type BillingCycle, type CheckoutItem, type ServiceType,
-} from '@/store/checkoutStore'
-import { createClient, createAuthClient, createStorageClient } from '@/lib/supabase/client'
-import { useLocale } from '@/hooks/useLocale'
-import { convertFromAOA } from '@/lib/currency'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { AlertCircle, Check, CheckCircle2, ChevronRight, Copy, Globe, Loader2, Lock, Minus, Plus, Search, ShoppingCart, Trash2, Upload, XCircle } from 'lucide-react'
+import { useCart, toApiLine, type CartLine, type Cycle, type DomainMode } from '@/store/cartStore'
 import { PLAN_CATALOG } from '@/lib/checkout/catalog'
+import { createAuthClient, createClient } from '@/lib/supabase/client'
 
-// ─── constants ─────────────────────────────────────────────────────────────
-
-const STEPS = ['Ciclo', 'Carrinho', 'Domínio', 'Nameservers', 'Identificação', 'Pagamento']
-
-const SERVICE_ICONS: Record<ServiceType, React.ElementType> = {
-  hosting: Server, email: Mail, domain: Globe,
-  vps: Server, dedicated: Server, reseller: Package, other: Tag,
+/* ─── Tipos da cotação (espelho de src/lib/commerce/quote.ts) ─────────── */
+interface QuoteLine {
+  index: number; type: 'product' | 'domain' | 'renewal'; slug?: string; name: string; serviceType: string
+  cycle?: Cycle; months?: number; quantity: number; quantityUnit?: string | null; maxQuantity?: number
+  unitPrice: number; lineTotal: number; renewalPrice: number; domain?: string; domainMode?: DomainMode
+  operation?: 'register' | 'transfer' | 'renew'; extension?: string
+  availability?: { available: boolean; verified: boolean; note?: string }
+  cycles?: { cycle: Cycle; months: number; price: number; renewal: number }[]
+  error?: { code: string; message: string }
 }
+interface Quote { currency: 'AKZ'; lines: QuoteLine[]; subtotal: number; taxRate: number; taxLabel: string; tax: number; total: number; valid: boolean }
+interface PayMethod { id: string; label: string; available: boolean; reason?: string; requiresProof?: boolean; bank?: Record<string, string | null> }
 
+const CYCLE_LABEL: Record<Cycle, string> = { monthly: 'Mensal', '6months': '6 meses', '1year': '1 ano', '2years': '2 anos', '3years': '3 anos' }
+const CYCLE_PER: Record<Cycle, string> = { monthly: 'mês', '6months': '6 meses', '1year': 'ano', '2years': '2 anos', '3years': '3 anos' }
+const LEGACY_BILLING: Record<string, Cycle> = { monthly: 'monthly', mensal: 'monthly', '6months': '6months', semiannual: '6months', '1year': '1year', annual: '1year', anual: '1year', '2years': '2years', '3years': '3years' }
+const STEPS = ['Carrinho', 'Conta', 'Pagamento', 'Revisão']
 
-// ─── helpers ───────────────────────────────────────────────────────────────
+const kz = (n: number) => `Kz ${n.toLocaleString('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/ /g, ' ')}`
+const card = 'bg-white border border-[#E8E8E8] rounded-2xl p-6 shadow-sm'
+const btnPrimary = 'inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-black bg-[#F5B700] hover:bg-[#e0a800] disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
+const btnGhost = 'inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-[#555] border border-[#E8E8E8] hover:border-[#F5B700] transition-colors'
+const input = 'w-full border border-[#E8E8E8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#F5B700] transition-colors'
 
-/** Ensures TLD always has a leading dot: 'ao' → '.ao', '.ao' → '.ao' */
-function normalizeTld(value: string): string {
-  const clean = value.trim().toLowerCase()
-  return clean.startsWith('.') ? clean : `.${clean}`
+/* ─── Cotação no servidor (debounce) ──────────────────────────────────── */
+function useQuote(lines: CartLine[]) {
+  const [quote, setQuote] = useState<Quote | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const body = useMemo(() => JSON.stringify({ lines: lines.map(toApiLine) }), [lines])
+  const seq = useRef(0)
+  const refresh = useCallback(async () => {
+    const my = ++seq.current
+    setLoading(true); setError('')
+    try {
+      const res = await fetch('/api/checkout/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+      const j = await res.json()
+      if (my !== seq.current) return
+      if (!res.ok) throw new Error(j.error ?? `HTTP ${res.status}`)
+      setQuote(j.quote)
+    } catch (e) {
+      if (my === seq.current) setError((e as Error).message || 'Falha ao calcular os preços.')
+    } finally {
+      if (my === seq.current) setLoading(false)
+    }
+  }, [body])
+  useEffect(() => { const t = setTimeout(refresh, 350); return () => clearTimeout(t) }, [refresh])
+  return { quote, setQuote, loading, error, refresh }
 }
-
-const DOMAIN_YEARS: Record<BillingCycle, number> = {
-  monthly: 1, '6months': 1, '1year': 1, '2years': 2, '3years': 3,
-}
-const DOMAIN_DISCOUNT: Record<BillingCycle, number> = {
-  monthly: 0, '6months': 0, '1year': 0, '2years': 0.10, '3years': 0.15,
-}
-
-function calcItemTotal(item: CheckoutItem, cycle: BillingCycle) {
-  if (item.type === 'domain') {
-    const years = DOMAIN_YEARS[cycle]
-    const discount = DOMAIN_DISCOUNT[cycle]
-    return item.price * item.quantity * years * (1 - discount)
-  }
-  return item.price * item.quantity * BILLING_MONTHS[cycle] * (1 - BILLING_DISCOUNT[cycle])
-}
-
-/** Base cost before discount — uses domain formula for domains, hosting formula otherwise */
-function calcItemBase(item: CheckoutItem, cycle: BillingCycle) {
-  if (item.type === 'domain') {
-    return item.price * item.quantity * DOMAIN_YEARS[cycle]
-  }
-  return item.price * item.quantity * BILLING_MONTHS[cycle]
-}
-
-// ─── sub-components ────────────────────────────────────────────────────────
 
 function StepBar({ current }: { current: number }) {
   return (
-    <div className="flex items-center justify-center gap-0 mb-8">
+    <ol className="flex items-center gap-2 mb-8 overflow-x-auto" aria-label="Passos do checkout">
       {STEPS.map((label, i) => {
-        const num = i + 1
-        const done = num < current
-        const active = num === current
+        const n = i + 1, done = n < current, active = n === current
         return (
-          <div key={label} className="flex items-center">
-            <div className="flex flex-col items-center gap-1">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-colors ${
-                done   ? 'bg-green-500 text-white' :
-                active ? 'bg-[#F5B700] text-[#0A0A0A]' :
-                         'bg-[#E8E8E8] text-[#999]'
-              }`}>
-                {done ? <Check size={13} /> : num}
-              </div>
-              <span className={`text-[10px] font-semibold hidden sm:block ${active ? 'text-[#F5B700]' : done ? 'text-green-600' : 'text-[#AAA]'}`}>
-                {label}
-              </span>
-            </div>
-            {i < STEPS.length - 1 && (
-              <div className={`w-10 sm:w-16 h-0.5 mx-1 mb-4 transition-colors ${done ? 'bg-green-400' : 'bg-[#E8E8E8]'}`} />
-            )}
-          </div>
+          <li key={label} className="flex items-center gap-2 shrink-0">
+            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black ${done ? 'bg-green-500 text-white' : active ? 'bg-[#F5B700] text-black' : 'bg-[#EEE] text-[#999]'}`}>{done ? <Check size={14} /> : n}</span>
+            <span className={`text-sm font-bold ${active ? 'text-[#0A0A0A]' : 'text-[#999]'}`} aria-current={active ? 'step' : undefined}>{label}</span>
+            {i < STEPS.length - 1 && <ChevronRight size={14} className="text-[#CCC]" />}
+          </li>
         )
       })}
-    </div>
+    </ol>
   )
 }
 
-function OrderSummary({ items, cycle }: { items: CheckoutItem[]; cycle: BillingCycle }) {
-  const { formatCurrency, currency, t } = useLocale()
-  const fmt = (n: number) => formatCurrency(convertFromAOA(n, currency))
-  const total    = items.reduce((acc, i) => acc + calcItemTotal(i, cycle), 0)
-  const baseTotal = items.reduce((acc, i) => acc + calcItemBase(i, cycle), 0)
-  const hasDiscount = baseTotal > total
-
+function Summary({ quote, loading }: { quote: Quote | null; loading: boolean }) {
   return (
-    <div className="bg-white border border-[#E8E8E8] rounded-2xl p-5 shadow-sm">
-      <p className="text-xs font-black text-[#999] uppercase tracking-widest mb-4">{t('checkout.summary')}</p>
-      {items.length === 0 ? (
-        <p className="text-sm text-[#AAA]">Nenhum serviço selecionado.</p>
-      ) : (
+    <div className={card}>
+      <p className="text-xs font-black text-[#999] uppercase tracking-widest mb-4">Resumo</p>
+      {!quote ? <div className="flex justify-center py-6"><Loader2 className="animate-spin text-[#F5B700]" /></div> : (
         <>
-          {items.map(item => {
-            const Icon = SERVICE_ICONS[item.type]
-            const isDomain = item.type === 'domain'
-            const years = DOMAIN_YEARS[cycle]
-            const label = isDomain
-              ? `${years} ano${years > 1 ? 's' : ''} × ${item.quantity}`
-              : `${BILLING_LABEL[cycle]} × ${item.quantity}`
-            return (
-              <div key={item.id} className="flex items-start gap-3 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-[#FFF8E1] flex items-center justify-center flex-shrink-0">
-                  <Icon size={14} className="text-[#F5B700]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-[#0A0A0A] truncate">{item.name}</p>
-                  <p className="text-xs text-[#888]">{label}</p>
-                </div>
-                <p className="text-sm font-bold text-[#0A0A0A] whitespace-nowrap">
-                  {fmt(calcItemTotal(item, cycle))}
-                </p>
-              </div>
-            )
-          })}
-          <div className="border-t border-[#F0F0F0] mt-4 pt-4 space-y-1">
-            {hasDiscount && (
-              <>
-                <div className="flex justify-between text-sm text-[#888]">
-                  <span>{t('checkout.subtotal')}</span><span>{fmt(baseTotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-green-600 font-semibold">
-                  <span>{t('checkout.discount')}</span>
-                  <span>-{fmt(baseTotal - total)}</span>
-                </div>
-              </>
-            )}
-            <div className="flex justify-between font-black text-base text-[#0A0A0A] pt-1">
-              <span>{t('checkout.total')}</span><span className="text-[#F5B700]">{fmt(total)}</span>
-            </div>
+          <ul className="space-y-3 mb-4">
+            {quote.lines.filter(l => !l.error).map(l => (
+              <li key={l.index} className="flex justify-between gap-3 text-sm">
+                <span className="text-[#333]">{l.name}{l.quantity > 1 ? ` × ${l.quantity}` : ''}{l.cycle ? <span className="block text-xs text-[#999]">{CYCLE_LABEL[l.cycle]}</span> : null}</span>
+                <span className="font-bold whitespace-nowrap">{kz(l.lineTotal)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="border-t border-[#F0F0F0] pt-3 space-y-1 text-sm">
+            <div className="flex justify-between"><span className="text-[#888]">Subtotal</span><span>{kz(quote.subtotal)}</span></div>
+            {quote.taxRate > 0 && <div className="flex justify-between"><span className="text-[#888]">{quote.taxLabel} ({quote.taxRate}%)</span><span>{kz(quote.tax)}</span></div>}
+            <div className="flex justify-between text-base font-black pt-1"><span>Total</span><span>{kz(quote.total)}</span></div>
+            {quote.taxRate === 0 && <p className="text-[11px] text-[#999]">Sem impostos aplicados.</p>}
           </div>
+          {loading && <p className="text-xs text-[#999] mt-2 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> A actualizar…</p>}
         </>
       )}
     </div>
   )
 }
 
-// ─── Step 1: Billing cycle ──────────────────────────────────────────────────
-
-function Step1Cycle({ onNext }: { onNext: () => void }) {
-  const { billingCycle, setBillingCycle, items } = useCheckoutStore()
-  const isDomainOnly = items.length > 0 && items.every(i => i.type === 'domain')
-  const cycles: BillingCycle[] = isDomainOnly
-    ? ['1year', '2years', '3years']
-    : ['monthly', '6months', '1year', '2years', '3years']
-
+/* ─── Passo 1: carrinho ───────────────────────────────────────────────── */
+function DomainSearch() {
+  const addDomain = useCart(s => s.addDomain)
+  const [name, setName] = useState('')
+  const [exts, setExts] = useState<{ extension: string; price: number }[]>([])
+  const [ext, setExt] = useState('.ao')
+  const [state, setState] = useState<{ checking: boolean; result?: { available: boolean; verified: boolean }; error?: string }>({ checking: false })
+  useEffect(() => {
+    createClient().from('domain_prices').select('extension, price').eq('operation', 'register').eq('status', 'active').order('price')
+      .then(({ data }) => { if (data) setExts((data as { extension: string; price: number }[]).filter(e => e.price != null)) })
+  }, [])
+  const domain = `${name.trim().toLowerCase().replace(/\..*$/, '')}${ext}`
+  const check = async () => {
+    if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(name.trim().toLowerCase().replace(/\..*$/, ''))) { setState({ checking: false, error: 'Nome inválido: use letras, números e hífen.' }); return }
+    setState({ checking: true })
+    try {
+      const r = await fetch(`/api/checkout/domain-check?domain=${encodeURIComponent(domain)}`).then(r => r.json())
+      setState({ checking: false, result: { available: !!r.available, verified: !!r.verified } })
+    } catch { setState({ checking: false, error: 'Não foi possível verificar agora. Tente novamente.' }) }
+  }
   return (
-    <div>
-      <h2 className="text-2xl font-black text-[#0A0A0A] mb-2">Escolha o ciclo de faturação</h2>
-      <p className="text-[#888] text-sm mb-6">Períodos mais longos têm descontos maiores.</p>
-      <div className="space-y-3 mb-8">
-        {cycles.map(c => {
-          const disc = isDomainOnly ? DOMAIN_DISCOUNT[c] : BILLING_DISCOUNT[c]
-          const active = billingCycle === c
-          return (
-            <button
-              key={c}
-              onClick={() => setBillingCycle(c)}
-              className={`w-full flex items-center justify-between p-4 rounded-xl border-2 text-left transition-all ${
-                active ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#E8E8E8] bg-white hover:border-[#F5B700]/50'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  active ? 'border-[#F5B700] bg-[#F5B700]' : 'border-[#CCC]'
-                }`}>
-                  {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                </div>
-                <span className="font-bold text-[#0A0A0A]">{BILLING_LABEL[c]}</span>
-              </div>
-              {disc > 0 ? (
-                <span className="text-xs font-black px-2 py-1 bg-green-100 text-green-700 rounded-full">
-                  -{Math.round(disc * 100)}% desconto
-                </span>
-              ) : (
-                <span className="text-xs text-[#AAA]">Sem desconto</span>
-              )}
-            </button>
-          )
-        })}
+    <div className="border border-[#E8E8E8] rounded-xl p-4">
+      <p className="text-sm font-bold mb-3 flex items-center gap-2"><Globe size={16} className="text-[#F5B700]" /> Adicionar domínio</p>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input className={input} placeholder="nome-da-empresa" value={name} onChange={e => { setName(e.target.value); setState({ checking: false }) }} aria-label="Nome do domínio" />
+        <select className={`${input} sm:w-44`} value={ext} onChange={e => { setExt(e.target.value); setState({ checking: false }) }} aria-label="Extensão">
+          {exts.length === 0 && <option value=".ao">.ao</option>}
+          {exts.map(e => <option key={e.extension} value={e.extension}>{e.extension} — {kz(Number(e.price))}</option>)}
+        </select>
+        <button className={btnPrimary} onClick={check} disabled={!name.trim() || state.checking}>{state.checking ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />} Verificar</button>
       </div>
-      <button
-        onClick={onNext}
-        className="w-full py-4 bg-[#F5B700] text-[#0A0A0A] font-black rounded-xl flex items-center justify-center gap-2 hover:bg-[#D9A300] transition-colors"
-      >
-        Continuar <ChevronRight size={18} />
-      </button>
+      {state.error && <p className="text-xs text-red-600 mt-2">{state.error}</p>}
+      {state.result && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+          {state.result.available
+            ? <span className="text-green-700 font-bold flex items-center gap-1"><CheckCircle2 size={16} /> {domain} {state.result.verified ? 'está disponível' : 'parece disponível (confirmação manual após a encomenda)'}</span>
+            : <span className="text-red-600 font-bold flex items-center gap-1"><XCircle size={16} /> {domain} já está registado</span>}
+          {state.result.available
+            ? <button className={btnGhost} onClick={() => { addDomain(domain, 'register'); setState({ checking: false }); setName('') }}>Registar</button>
+            : <button className={btnGhost} onClick={() => { addDomain(domain, 'transfer'); setState({ checking: false }); setName('') }}>É meu — transferir</button>}
+        </div>
+      )}
     </div>
   )
 }
 
-// ─── Step 2: Cart ───────────────────────────────────────────────────────────
-
-function Step2Cart({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
-  const { items, billingCycle, removeItem, updateQuantity, addItem } = useCheckoutStore()
-  const { formatCurrency, currency } = useLocale()
-  const fmt = (n: number) => formatCurrency(convertFromAOA(n, currency))
-  const [showAdd, setShowAdd] = useState(false)
-
-  const extras: CheckoutItem[] = Object.values(PLAN_CATALOG).filter(p => !items.find(i => i.id === p.id))
-
+function CartStep({ quote, onNext }: { quote: Quote | null; onNext: () => void }) {
+  const { lines, update, remove, addDomain } = useCart()
+  if (!lines.length) {
+    return (
+      <div className="text-center py-10">
+        <ShoppingCart className="mx-auto text-[#CCC] mb-3" size={40} />
+        <h2 className="text-xl font-black mb-2">O carrinho está vazio</h2>
+        <p className="text-sm text-[#888] mb-6">Escolha um serviço para começar.</p>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Link className={btnPrimary} href="/hospedagem-de-sites">Hospedagem</Link>
+          <Link className={btnGhost} href="/email-corporativo">E-mail</Link>
+          <Link className={btnGhost} href="/servidor-vps">VPS</Link>
+        </div>
+        <div className="mt-8 text-left"><DomainSearch /></div>
+      </div>
+    )
+  }
+  const ql = (i: number) => quote?.lines.find(l => l.index === i)
   return (
     <div>
-      <h2 className="text-2xl font-black text-[#0A0A0A] mb-2">Reveja o seu carrinho</h2>
-      <p className="text-[#888] text-sm mb-6">Ciclo: <strong className="text-[#F5B700]">{BILLING_LABEL[billingCycle]}</strong></p>
-
-      {items.length === 0 && (
-        <div className="text-center py-10 text-[#AAA]">
-          <Package size={32} className="mx-auto mb-3 opacity-40" />
-          <p className="text-sm">Nenhum serviço no carrinho.</p>
-        </div>
-      )}
-
-      <div className="space-y-3 mb-5">
-        {items.map(item => {
-          const Icon = SERVICE_ICONS[item.type]
+      <h2 className="text-2xl font-black text-[#0A0A0A] mb-1">O seu carrinho</h2>
+      <p className="text-sm text-[#888] mb-6">Escolha o ciclo e, nos serviços de alojamento e e-mail, o domínio a usar.</p>
+      <ul className="space-y-4 mb-6">
+        {lines.map((l, i) => {
+          const q = ql(i)
           return (
-            <div key={item.id} className="bg-white border border-[#E8E8E8] rounded-xl p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[#FFF8E1] flex items-center justify-center flex-shrink-0">
-                <Icon size={18} className="text-[#F5B700]" />
+            <li key={l.key} className="border border-[#E8E8E8] rounded-xl p-4" data-testid="cart-line">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold text-[#0A0A0A]">{q?.name ?? (l.type === 'domain' ? l.domain : l.type === 'renewal' ? (l.label ?? 'Renovação') : l.slug)}</p>
+                  {q && !q.error && <p className="text-sm text-[#555] mt-0.5">{kz(q.lineTotal)}{q.cycle ? ` / ${CYCLE_PER[q.cycle]}` : ' / ano'}{q.renewalPrice && q.type !== 'renewal' ? <span className="text-xs text-[#999]"> · renova por {kz(q.renewalPrice)}</span> : null}</p>}
+                  {q?.error && (
+                    <p className="text-sm text-red-600 mt-1 flex items-start gap-1" role="alert"><AlertCircle size={14} className="mt-0.5 shrink-0" />{q.error.message}
+                      {q.error.code === 'on_request' && <Link href="/suporte/contactar" className="underline ml-1">Contactar</Link>}</p>
+                  )}
+                  {q?.availability && !q.availability.verified && <p className="text-xs text-amber-700 mt-1">Disponibilidade confirmada manualmente após a encomenda (o registo desta extensão não tem consulta automática).</p>}
+                </div>
+                <button onClick={() => remove(l.key)} className="text-[#999] hover:text-red-600 p-1" aria-label="Remover do carrinho"><Trash2 size={16} /></button>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-[#0A0A0A] text-sm">{item.name}</p>
-                <p className="text-xs text-[#888]">{fmt(item.price)}{item.type === 'domain' ? '/ano' : '/mês'}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-6 h-6 rounded-md border border-[#E8E8E8] flex items-center justify-center hover:border-[#F5B700] transition-colors">
-                  <Minus size={11} />
-                </button>
-                <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
-                <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-6 h-6 rounded-md border border-[#E8E8E8] flex items-center justify-center hover:border-[#F5B700] transition-colors">
-                  <Plus size={11} />
-                </button>
-              </div>
-              <p className="text-sm font-black text-[#0A0A0A] w-24 text-right">
-                {fmt(calcItemTotal(item, billingCycle))}
-              </p>
-              <button onClick={() => removeItem(item.id)} className="text-[#CCC] hover:text-red-500 transition-colors ml-1">
-                <Trash2 size={15} />
-              </button>
-            </div>
+
+              {l.type === 'product' && (
+                <div className="grid sm:grid-cols-2 gap-3 mt-3">
+                  <label className="text-xs text-[#888]">Ciclo de facturação
+                    <select className={`${input} mt-1`} value={l.cycle} onChange={e => update(l.key, { cycle: e.target.value as Cycle })}>
+                      {(q?.cycles?.length ? q.cycles : [{ cycle: l.cycle, months: 0, price: 0, renewal: 0 }]).map(c => (
+                        <option key={c.cycle} value={c.cycle}>{CYCLE_LABEL[c.cycle as Cycle]}{c.price ? ` — ${kz(c.price * (l.quantity || 1))}` : ''}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {q?.quantityUnit && (
+                    <div className="text-xs text-[#888]">Quantidade ({q.quantityUnit}s)
+                      <div className="flex items-center gap-2 mt-1">
+                        <button className={btnGhost} aria-label="Diminuir" onClick={() => update(l.key, { quantity: Math.max(1, l.quantity - 1) })}><Minus size={14} /></button>
+                        <span className="w-10 text-center font-bold text-sm text-[#0A0A0A]" aria-live="polite">{l.quantity}</span>
+                        <button className={btnGhost} aria-label="Aumentar" onClick={() => update(l.key, { quantity: Math.min(q.maxQuantity ?? 1, l.quantity + 1) })}><Plus size={14} /></button>
+                      </div>
+                    </div>
+                  )}
+                  {(q?.serviceType === 'hosting' || q?.serviceType === 'email') && (
+                    <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3">
+                      <label className="text-xs text-[#888]">Domínio do serviço
+                        <input className={`${input} mt-1`} placeholder="exemplo.ao" value={l.domain ?? ''} onChange={e => update(l.key, { domain: e.target.value.trim().toLowerCase() })} />
+                      </label>
+                      <label className="text-xs text-[#888]">Este domínio…
+                        <select className={`${input} mt-1`} value={l.domainMode ?? 'existing'} onChange={e => {
+                          const mode = e.target.value as DomainMode
+                          update(l.key, { domainMode: mode })
+                          if (l.domain && mode !== 'existing') addDomain(l.domain, mode)
+                        }}>
+                          <option value="existing">já é meu (sem custo)</option>
+                          <option value="register">é novo — registar</option>
+                          <option value="transfer">é meu noutro registrador — transferir</option>
+                        </select>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
+              {l.type === 'domain' && l.operation === 'transfer' && (
+                <label className="block text-xs text-[#888] mt-3">Código de autorização (EPP) {q?.extension?.endsWith('.ao') ? '(opcional para .ao)' : ''}
+                  <input type="password" autoComplete="off" className={`${input} mt-1`} value={l.eppCode ?? ''} onChange={e => update(l.key, { eppCode: e.target.value })} />
+                  <span className="block mt-1 text-[11px]">Guardado cifrado e usado apenas para a transferência. Não fica guardado no navegador.</span>
+                </label>
+              )}
+            </li>
           )
         })}
+      </ul>
+      <DomainSearch />
+      <div className="flex justify-end mt-6">
+        <button className={btnPrimary} disabled={!quote?.valid} onClick={onNext}>Continuar <ChevronRight size={16} /></button>
       </div>
+    </div>
+  )
+}
 
-      <button
-        onClick={() => setShowAdd(v => !v)}
-        className="w-full py-3 border-2 border-dashed border-[#E8E8E8] rounded-xl text-sm text-[#888] hover:border-[#F5B700] hover:text-[#F5B700] transition-all flex items-center justify-center gap-2 mb-8"
-      >
-        <Plus size={15} /> Adicionar outro serviço
-      </button>
+/* ─── Passo 2: conta e dados de facturação ───────────────────────────── */
+interface Account { loggedIn: boolean; email?: string; name?: string }
+function AccountStep({ account, setAccount, guest, setGuest, billing, setBilling, onNext, onBack }: {
+  account: Account; setAccount: (a: Account) => void
+  guest: { name: string; email: string; phone: string; password: string }; setGuest: (g: { name: string; email: string; phone: string; password: string }) => void
+  billing: Record<string, string>; setBilling: (b: Record<string, string>) => void
+  onNext: () => void; onBack: () => void
+}) {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [creds, setCreds] = useState({ email: '', password: '' })
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const login = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true); setErr('')
+    const { data, error } = await createAuthClient().auth.signInWithPassword(creds)
+    setBusy(false)
+    if (error || !data.user) { setErr(error?.message === 'Invalid login credentials' ? 'E-mail ou senha incorrectos.' : error?.message === 'Email not confirmed' ? 'Confirme o seu e-mail antes de entrar.' : (error?.message ?? 'Erro ao entrar.')); return }
+    setAccount({ loggedIn: true, email: data.user.email, name: data.user.user_metadata?.full_name })
+  }
+  const guestValid = guest.name.trim().length > 1 && /\S+@\S+\.\S+/.test(guest.email) && guest.password.length >= 8
+  const billingValid = (billing.name ?? '').trim().length > 1
+  return (
+    <div>
+      <h2 className="text-2xl font-black text-[#0A0A0A] mb-6">Conta e facturação</h2>
+      {account.loggedIn ? (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 text-sm text-green-800"><Check size={14} className="inline mr-1" /> Sessão iniciada como <strong>{account.email}</strong></div>
+      ) : (
+        <div className="mb-6">
+          <div className="flex gap-2 mb-4" role="tablist">
+            <button role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? btnPrimary : btnGhost} onClick={() => setMode('login')}>Já sou cliente</button>
+            <button role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? btnPrimary : btnGhost} onClick={() => setMode('register')}>Criar conta</button>
+          </div>
+          {mode === 'login' ? (
+            <form onSubmit={login} className="space-y-3">
+              <input className={input} type="email" autoComplete="email" placeholder="E-mail" value={creds.email} onChange={e => setCreds({ ...creds, email: e.target.value })} required />
+              <input className={input} type="password" autoComplete="current-password" placeholder="Senha" value={creds.password} onChange={e => setCreds({ ...creds, password: e.target.value })} required />
+              {err && <p className="text-sm text-red-600" role="alert">{err}</p>}
+              <button className={btnPrimary} disabled={busy}>{busy ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />} Entrar</button>
+              <Link href="/forgot-password" className="block text-xs text-[#888] underline">Esqueci a senha</Link>
+            </form>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-3">
+              <input className={input} placeholder="Nome completo" value={guest.name} onChange={e => setGuest({ ...guest, name: e.target.value })} />
+              <input className={input} type="email" autoComplete="email" placeholder="E-mail" value={guest.email} onChange={e => setGuest({ ...guest, email: e.target.value })} />
+              <input className={input} type="tel" placeholder="Telefone" value={guest.phone} onChange={e => setGuest({ ...guest, phone: e.target.value })} />
+              <input className={input} type="password" autoComplete="new-password" placeholder="Senha (mín. 8 caracteres)" value={guest.password} onChange={e => setGuest({ ...guest, password: e.target.value })} />
+              <p className="sm:col-span-2 text-xs text-[#888]">A conta é criada ao confirmar a encomenda.</p>
+            </div>
+          )}
+        </div>
+      )}
+      <p className="text-sm font-bold mb-3">Dados de facturação</p>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <input className={input} placeholder="Nome ou empresa *" value={billing.name ?? ''} onChange={e => setBilling({ ...billing, name: e.target.value })} />
+        <input className={input} placeholder="NIF (opcional)" value={billing.nif ?? ''} onChange={e => setBilling({ ...billing, nif: e.target.value })} />
+        <input className={`${input} sm:col-span-2`} placeholder="Morada (opcional)" value={billing.address ?? ''} onChange={e => setBilling({ ...billing, address: e.target.value })} />
+      </div>
+      <div className="flex justify-between mt-6">
+        <button className={btnGhost} onClick={onBack}>Voltar</button>
+        <button className={btnPrimary} disabled={!billingValid || (!account.loggedIn && (mode === 'login' || !guestValid))} onClick={onNext}>Continuar <ChevronRight size={16} /></button>
+      </div>
+    </div>
+  )
+}
 
-      {showAdd && extras.length > 0 && (
-        <div className="bg-[#FAFAFA] border border-[#E8E8E8] rounded-xl p-4 mb-6 space-y-2">
-          {extras.map(p => (
-            <button
-              key={p.id}
-              onClick={() => { addItem({ ...p, quantity: 1 }); setShowAdd(false) }}
-              className="w-full flex items-center justify-between p-3 bg-white border border-[#E8E8E8] rounded-lg hover:border-[#F5B700] transition-colors text-left"
-            >
-              <span className="text-sm font-semibold text-[#0A0A0A]">{p.name}</span>
-              <span className="text-xs text-[#888]">{fmt(p.price)}/mês</span>
+/* ─── Passo 3: pagamento ─────────────────────────────────────────────── */
+function PaymentStep({ methods, method, setMethod, proof, setProof, transferRef, setTransferRef, onNext, onBack }: {
+  methods: PayMethod[] | null; method: string; setMethod: (m: string) => void
+  proof: { path: string; name: string } | null; setProof: (p: { path: string; name: string } | null) => void
+  transferRef: string; setTransferRef: (s: string) => void; onNext: () => void; onBack: () => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState('')
+  const [copied, setCopied] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const bank = methods?.find(m => m.id === 'bank_transfer')?.bank
+  const upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return
+    if (f.size > 20 * 1024 * 1024) { setUploadErr('Ficheiro demasiado grande (máx. 20 MB).'); return }
+    setUploading(true); setUploadErr('')
+    const now = new Date()
+    const path = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    const { data, error } = await createAuthClient().storage.from('payment-proofs').upload(path, f)
+    setUploading(false)
+    if (error || !data) { setUploadErr(error?.message ?? 'Falha no envio.'); return }
+    setProof({ path: data.path, name: f.name })
+  }
+  return (
+    <div>
+      <h2 className="text-2xl font-black text-[#0A0A0A] mb-6">Pagamento</h2>
+      {!methods ? <Loader2 className="animate-spin text-[#F5B700]" /> : (
+        <div className="grid sm:grid-cols-2 gap-3 mb-6" role="radiogroup" aria-label="Método de pagamento">
+          {methods.map(m => (
+            <button key={m.id} role="radio" aria-checked={method === m.id} disabled={!m.available} onClick={() => setMethod(m.id)}
+              className={`p-4 rounded-xl border-2 text-left transition-all ${method === m.id ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#E8E8E8] bg-white'} ${m.available ? 'hover:border-[#F5B700]/50' : 'opacity-60 cursor-not-allowed'}`}>
+              <p className="text-sm font-bold">{m.label}</p>
+              <p className="text-xs text-[#888] mt-0.5">{m.available ? 'Disponível' : `Indisponível — ${m.reason}`}</p>
             </button>
           ))}
         </div>
       )}
-
-      <div className="flex gap-3">
-        <button onClick={onBack} className="flex-1 py-4 border-2 border-[#E8E8E8] text-[#666] font-bold rounded-xl flex items-center justify-center gap-2 hover:border-[#CCC] transition-colors">
-          <ChevronLeft size={18} /> Voltar
-        </button>
-        <button
-          onClick={onNext}
-          disabled={items.length === 0}
-          className="flex-[2] py-4 bg-[#F5B700] text-[#0A0A0A] font-black rounded-xl flex items-center justify-center gap-2 hover:bg-[#D9A300] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Continuar <ChevronRight size={18} />
-        </button>
+      {method === 'bank_transfer' && bank && (
+        <div className="bg-[#FAFAFA] border border-[#E8E8E8] rounded-xl p-5 space-y-3 mb-6">
+          <p className="text-sm font-bold">Dados para transferência — {bank.bank_name}</p>
+          {[['Titular', bank.account_holder], ['Conta / Coordenada', bank.account_number], ['IBAN', bank.iban], ['SWIFT', bank.swift]].filter(([, v]) => v).map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between gap-3 bg-white border border-[#EEE] rounded-lg px-3 py-2">
+              <div className="min-w-0"><p className="text-[10px] font-black text-[#999] uppercase tracking-widest">{k}</p><p className="text-sm font-bold font-mono break-all">{v}</p></div>
+              <button className="text-[#888] hover:text-[#0A0A0A] p-1" aria-label={`Copiar ${k}`} onClick={() => { navigator.clipboard?.writeText(String(v)); setCopied(String(k)); setTimeout(() => setCopied(''), 1500) }}>{copied === k ? <Check size={14} /> : <Copy size={14} />}</button>
+            </div>
+          ))}
+          {bank.payment_instructions && <p className="text-xs text-[#666]">{bank.payment_instructions}</p>}
+          <p className="text-xs text-[#888]">A encomenda fica pendente até validarmos o comprovativo. Pode enviá-lo agora ou depois, na Área do Cliente.</p>
+          <input className={input} placeholder="Referência da transferência (opcional)" value={transferRef} onChange={e => setTransferRef(e.target.value)} />
+          <button className={`${btnGhost} w-full border-dashed`} onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? <Loader2 size={14} className="animate-spin" /> : proof ? <Check size={14} className="text-green-600" /> : <Upload size={14} />}{proof ? `Comprovativo: ${proof.name}` : 'Enviar comprovativo (imagem/PDF)'}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={upload} />
+          {uploadErr && <p className="text-xs text-red-600">{uploadErr}</p>}
+        </div>
+      )}
+      <div className="flex justify-between">
+        <button className={btnGhost} onClick={onBack}>Voltar</button>
+        <button className={btnPrimary} disabled={!methods?.find(m => m.id === method && m.available)} onClick={onNext}>Rever encomenda <ChevronRight size={16} /></button>
       </div>
     </div>
   )
 }
 
-// ─── Step 3: Domain ─────────────────────────────────────────────────────────
-
-function Step3Domain({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
-  const { domainAction, domainName, setDomainAction, setDomainName } = useCheckoutStore()
-  const [checking, setChecking] = useState(false)
-  const [availability, setAvailability] = useState<'available' | 'unverified' | 'taken' | null>(null)
-  const [error, setError] = useState('')
-
-  const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9\-.]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/
-
-  async function checkDomain() {
-    if (!domainRegex.test(domainName)) { setError('Formato inválido. Ex: meusite.com'); return }
-    setError(''); setChecking(true); setAvailability(null)
-    try {
-      const res = await fetch(`/api/checkout/domain-check?domain=${encodeURIComponent(domainName)}`)
-      const data = await res.json()
-      setAvailability(!data.available ? 'taken' : data.verified === false ? 'unverified' : 'available')
-    } catch {
-      setError('Erro ao verificar domínio. Tente novamente.')
-    } finally {
-      setChecking(false)
-    }
-  }
-
-  function canProceed() {
-    if (!domainAction) return false
-    if (domainAction === 'register') return availability === 'available' || availability === 'unverified'
-    if (domainAction === 'existing') return domainRegex.test(domainName)
-    return false
-  }
-
+/* ─── Passo 4: revisão e confirmação ─────────────────────────────────── */
+function ReviewStep({ quote, method, proof, submitting, error, onSubmit, onBack }: {
+  quote: Quote | null; method: string; proof: { name: string } | null; submitting: boolean; error: string; onSubmit: () => void; onBack: () => void
+}) {
+  const [accepted, setAccepted] = useState(false)
+  if (!quote) return <Loader2 className="animate-spin text-[#F5B700]" />
   return (
     <div>
-      <h2 className="text-2xl font-black text-[#0A0A0A] mb-2">Configurar domínio</h2>
-      <p className="text-[#888] text-sm mb-6">O domínio é necessário para activar o seu serviço.</p>
-
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {(['register', 'existing'] as const).map(action => (
-          <button
-            key={action}
-            onClick={() => { setDomainAction(action); setAvailability(null); setError('') }}
-            className={`p-4 rounded-xl border-2 text-left transition-all ${
-              domainAction === action ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#E8E8E8] bg-white hover:border-[#F5B700]/40'
-            }`}
-          >
-            <p className="font-bold text-sm text-[#0A0A0A] mb-1">
-              {action === 'register' ? '🔍 Registar novo' : '🔗 Já tenho domínio'}
-            </p>
-            <p className="text-xs text-[#888]">
-              {action === 'register' ? 'Verificar disponibilidade e registar' : 'Usar um domínio existente'}
-            </p>
-          </button>
-        ))}
-      </div>
-
-      {domainAction && (
-        <div className="space-y-3 mb-6">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={domainName}
-              onChange={e => { setDomainName(e.target.value); setAvailability(null); setError('') }}
-              placeholder="meusite.com"
-              className="flex-1 border border-[#E8E8E8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#F5B700] transition-colors"
-            />
-            {domainAction === 'register' && (
-              <button
-                onClick={checkDomain}
-                disabled={checking || !domainName.trim()}
-                className="px-5 py-3 bg-[#0A0A0A] text-white text-sm font-bold rounded-xl hover:bg-[#222] transition-colors disabled:opacity-40 flex items-center gap-2"
-              >
-                {checking ? <Loader2 size={14} className="animate-spin" /> : <Globe size={14} />}
-                Verificar
-              </button>
-            )}
-          </div>
-
-          {error && (
-            <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">
-              <AlertCircle size={14} />{error}
-            </div>
-          )}
-
-          {availability === 'available' && (
-            <div className="flex items-center gap-2 text-green-700 text-sm bg-green-50 px-3 py-2 rounded-lg border border-green-200">
-              <Check size={14} /> <strong>{domainName}</strong> está disponível!
-            </div>
-          )}
-          {availability === 'unverified' && (
-            <div className="flex items-center gap-2 text-amber-700 text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
-              <AlertCircle size={14} /> Não foi possível confirmar automaticamente a disponibilidade de <strong>{domainName}</strong>. Pode avançar: a nossa equipa confirma após o pedido.
-            </div>
-          )}
-          {availability === 'taken' && (
-            <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg border border-red-200">
-              <X size={14} /> <strong>{domainName}</strong> não está disponível. Tente outro nome.
-            </div>
-          )}
-
-          {domainAction === 'existing' && domainName && !domainRegex.test(domainName) && (
-            <div className="flex items-center gap-2 text-amber-700 text-sm bg-amber-50 px-3 py-2 rounded-lg">
-              <AlertCircle size={14} /> Formato inválido. Ex: meusite.com
-            </div>
-          )}
-          {domainAction === 'existing' && domainRegex.test(domainName) && (
-            <div className="flex items-center gap-2 text-green-700 text-sm bg-green-50 px-3 py-2 rounded-lg border border-green-200">
-              <Check size={14} /> Domínio válido.
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex gap-3">
-        <button onClick={onBack} className="flex-1 py-4 border-2 border-[#E8E8E8] text-[#666] font-bold rounded-xl flex items-center justify-center gap-2 hover:border-[#CCC] transition-colors">
-          <ChevronLeft size={18} /> Voltar
-        </button>
-        <button
-          onClick={onNext}
-          disabled={!canProceed()}
-          className="flex-[2] py-4 bg-[#F5B700] text-[#0A0A0A] font-black rounded-xl flex items-center justify-center gap-2 hover:bg-[#D9A300] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Continuar <ChevronRight size={18} />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Step 4: Nameservers ────────────────────────────────────────────────────
-
-const NS_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
-
-function validateNs(value: string): boolean {
-  if (!value.trim()) return false
-  if (/https?:\/\//i.test(value)) return false
-  if (/\s/.test(value)) return false
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(value)) return false
-  return NS_REGEX.test(value.trim())
-}
-
-function Step4Nameservers({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
-  const { useDefaultNs, ns1, ns2, ns3, ns4, setUseDefaultNs, setNs } = useCheckoutStore()
-
-  const ns1Valid = validateNs(ns1)
-  const ns2Valid = validateNs(ns2)
-  const ns3Valid = !ns3.trim() || validateNs(ns3)
-  const ns4Valid = !ns4.trim() || validateNs(ns4)
-  const canProceed = useDefaultNs || (ns1Valid && ns2Valid && ns3Valid && ns4Valid)
-
-  const inputCls = (valid: boolean, touched: boolean) =>
-    `w-full border rounded-xl px-4 py-3 text-sm outline-none transition-colors ${
-      touched && !valid ? 'border-red-400 focus:border-red-500' : 'border-[#E8E8E8] focus:border-[#F5B700]'
-    }`
-
-  const [touched, setTouched] = useState<Record<string, boolean>>({})
-  const touch = (f: string) => setTouched(t => ({ ...t, [f]: true }))
-
-  return (
-    <div>
-      <h2 className="text-2xl font-black text-[#0A0A0A] mb-1">Configuração dos Nameservers</h2>
-      <p className="text-[#888] text-sm mb-6">Escolha onde pretende apontar o seu domínio.</p>
-
-      {/* Option 1 — ViralizaHost */}
-      <button
-        onClick={() => setUseDefaultNs(true)}
-        className={`w-full p-5 rounded-2xl border-2 text-left transition-all mb-3 ${
-          useDefaultNs ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#E8E8E8] bg-white hover:border-[#F5B700]/40'
-        }`}
-      >
-        <div className="flex items-start gap-3">
-          <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-            useDefaultNs ? 'border-[#F5B700] bg-[#F5B700]' : 'border-[#CCC]'
-          }`}>
-            {useDefaultNs && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-black text-[#0A0A0A] text-sm mb-1 flex items-center gap-2">
-              Utilizar os servidores DNS da ViralizaHost
-              <span className="text-[10px] font-black px-2 py-0.5 bg-[#F5B700] text-[#0A0A0A] rounded-full">Recomendado</span>
-            </p>
-            <p className="text-xs text-[#888] mb-3">
-              O domínio será automaticamente configurado para utilizar os servidores da ViralizaHost.
-              Ideal para clientes que irão utilizar Hospedagem, E-mail Corporativo ou VPS da ViralizaHost.
-            </p>
-            <div className="flex flex-col gap-1.5">
-              {['ns1.viralizahost.com', 'ns2.viralizahost.com'].map(ns => (
-                <div key={ns} className="flex items-center gap-2 px-3 py-2 bg-white border border-[#E8E8E8] rounded-xl">
-                  <Globe size={12} className="text-[#F5B700] flex-shrink-0" />
-                  <span className="text-xs font-mono font-bold text-[#0A0A0A]">{ns}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </button>
-
-      {/* Option 2 — Custom */}
-      <button
-        onClick={() => setUseDefaultNs(false)}
-        className={`w-full p-5 rounded-2xl border-2 text-left transition-all ${
-          !useDefaultNs ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#E8E8E8] bg-white hover:border-[#F5B700]/40'
-        }`}
-      >
-        <div className="flex items-start gap-3">
-          <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-            !useDefaultNs ? 'border-[#F5B700] bg-[#F5B700]' : 'border-[#CCC]'
-          }`}>
-            {!useDefaultNs && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-black text-[#0A0A0A] text-sm mb-1">Utilizar Nameservers personalizados</p>
-            <p className="text-xs text-[#888]">Indique os servidores DNS do seu fornecedor.</p>
-          </div>
-        </div>
-      </button>
-
-      {/* Custom NS fields */}
-      {!useDefaultNs && (
-        <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-          {([
-            { field: 'ns1', label: 'Nameserver 1', required: true, placeholder: 'ns1.meudns.com' },
-            { field: 'ns2', label: 'Nameserver 2', required: true, placeholder: 'ns2.meudns.com' },
-            { field: 'ns3', label: 'Nameserver 3', required: false, placeholder: 'ns3.meudns.com (Opcional)' },
-            { field: 'ns4', label: 'Nameserver 4', required: false, placeholder: 'ns4.meudns.com (Opcional)' },
-          ] as const).map(({ field, label, required, placeholder }) => {
-            const val = { ns1, ns2, ns3, ns4 }[field]
-            const valid = required ? validateNs(val) : (!val.trim() || validateNs(val))
-            const showErr = touched[field] && !valid
-            return (
-              <div key={field}>
-                <label className="block text-xs font-bold text-[#555] mb-1">
-                  {label} {required && <span className="text-red-500">*</span>}
-                </label>
-                <input
-                  type="text"
-                  value={val}
-                  placeholder={placeholder}
-                  onBlur={() => touch(field)}
-                  onChange={e => setNs(field, e.target.value)}
-                  className={inputCls(valid, !!touched[field])}
-                />
-                {showErr && (
-                  <p className="text-[11px] text-red-500 mt-1 flex items-center gap-1">
-                    <AlertCircle size={11} /> Formato inválido. Use ex: ns1.exemplo.com
-                  </p>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      <div className="flex gap-3 mt-6">
-        <button onClick={onBack} className="flex-1 py-4 border-2 border-[#E8E8E8] text-[#666] font-bold rounded-xl flex items-center justify-center gap-2 hover:border-[#CCC] transition-colors">
-          <ChevronLeft size={18} /> Voltar
-        </button>
-        <button
-          onClick={onNext}
-          disabled={!canProceed}
-          className="flex-[2] py-4 bg-[#F5B700] text-[#0A0A0A] font-black rounded-xl flex items-center justify-center gap-2 hover:bg-[#D9A300] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Continuar <ChevronRight size={18} />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Step 5: Identification ─────────────────────────────────────────────────
-
-function Step4Ident({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
-  const { userData, setUserData } = useCheckoutStore()
-  const [authState, setAuthState] = useState<'loading' | 'logged-in' | 'login-form' | 'register-form'>('loading')
-  const [profile, setProfile] = useState<{ full_name: string; email: string; phone: string | null } | null>(null)
-  const [loginEmail, setLoginEmail] = useState('')
-  const [loginPassword, setLoginPassword] = useState('')
-  const [loginError, setLoginError] = useState('')
-  const [loggingIn, setLoggingIn] = useState(false)
-
-  useEffect(() => {
-    // Use auth client (no db.schema) for auth.getUser() — schema header must not be sent
-    const auth = createAuthClient()
-    const db   = createClient()
-    auth.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        db.from('profiles').select('full_name,email,phone').eq('id', user.id).single()
-          .then(({ data }) => {
-            if (data) {
-              setProfile(data as any)
-              setUserData({ name: (data as any).full_name, email: (data as any).email, phone: (data as any).phone ?? '' })
-            }
-          })
-        setAuthState('logged-in')
-      } else {
-        setAuthState('login-form')
-      }
-    })
-  }, [])
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setLoginError(''); setLoggingIn(true)
-    // auth client (no db.schema) for signIn — schema header must not be sent to GoTrue
-    const auth = createAuthClient()
-    const db   = createClient()
-    const { data, error } = await auth.auth.signInWithPassword({ email: loginEmail, password: loginPassword })
-    if (error) { setLoginError('E-mail ou senha incorretos.'); setLoggingIn(false); return }
-    const user = data.user
-    if (user) {
-      const { data: prof } = await db.from('profiles').select('full_name,email,phone').eq('id', user.id).single()
-      if (prof) {
-        setProfile(prof as any)
-        setUserData({ name: (prof as any).full_name, email: (prof as any).email, phone: (prof as any).phone ?? '' })
-      }
-    }
-    setAuthState('logged-in')
-    setLoggingIn(false)
-  }
-
-  function isRegisterValid() {
-    return userData.name.trim().length > 1 && /\S+@\S+\.\S+/.test(userData.email) && userData.phone.trim().length > 5 && userData.password.length >= 6
-  }
-
-  const inputCls = 'w-full border border-[#E8E8E8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#F5B700] transition-colors'
-  const canProceed = authState === 'logged-in' || (authState === 'register-form' && isRegisterValid())
-
-  return (
-    <div>
-      <h2 className="text-2xl font-black text-[#0A0A0A] mb-2">Identificação</h2>
-      <p className="text-[#888] text-sm mb-6">Inicie sessão ou crie uma conta para continuar.</p>
-
-      {authState === 'loading' && (
-        <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-[#F5B700]" /></div>
-      )}
-
-      {/* Logged in */}
-      {authState === 'logged-in' && profile && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-2 text-green-700 font-bold mb-1"><Check size={16} /> Sessão iniciada</div>
-          <p className="text-sm text-green-800">{profile.full_name} · {profile.email}</p>
-          <button onClick={() => { setAuthState('login-form'); setProfile(null) }}
-            className="text-xs text-[#888] hover:text-[#555] mt-2 underline">
-            Usar outra conta
-          </button>
-        </div>
-      )}
-
-      {/* Login form */}
-      {authState === 'login-form' && (
-        <form onSubmit={handleLogin} className="space-y-3 mb-4">
-          <input type="email" placeholder="E-mail" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required className={inputCls} />
-          <input type="password" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required className={inputCls} />
-          {loginError && (
-            <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">
-              <AlertCircle size={14} />{loginError}
-            </div>
-          )}
-          <button type="submit" disabled={loggingIn}
-            className="w-full py-3 bg-[#0A0A0A] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-[#222] transition-colors disabled:opacity-50">
-            {loggingIn ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />}
-            Entrar
-          </button>
-          <div className="text-center pt-1">
-            <button type="button" onClick={() => setAuthState('register-form')}
-              className="text-sm text-[#F5B700] font-bold hover:underline">
-              Não tenho conta — Criar agora
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Register form */}
-      {authState === 'register-form' && (
-        <div className="space-y-3 mb-4">
-          <div className="bg-[#FFF8E1] border border-[#F5B700]/30 rounded-xl p-3 text-sm text-[#888]">
-            Preencha os dados abaixo. A sua conta será criada ao finalizar a encomenda.
-          </div>
-          <input type="text" placeholder="Nome completo" value={userData.name} onChange={e => setUserData({ name: e.target.value })} className={inputCls} />
-          <input type="email" placeholder="E-mail" value={userData.email} onChange={e => setUserData({ email: e.target.value })} className={inputCls} />
-          <input type="tel" placeholder="Telefone" value={userData.phone} onChange={e => setUserData({ phone: e.target.value })} className={inputCls} />
-          <input type="password" placeholder="Senha (mín. 6 caracteres)" value={userData.password} onChange={e => setUserData({ password: e.target.value })} className={inputCls} />
-          <button type="button" onClick={() => setAuthState('login-form')}
-            className="text-sm text-[#888] hover:text-[#555] underline">
-            ← Já tenho conta
-          </button>
-        </div>
-      )}
-
-      <div className="flex gap-3 mt-2">
-        <button onClick={onBack} className="flex-1 py-4 border-2 border-[#E8E8E8] text-[#666] font-bold rounded-xl flex items-center justify-center gap-2 hover:border-[#CCC] transition-colors">
-          <ChevronLeft size={18} /> Voltar
-        </button>
-        <button
-          onClick={onNext}
-          disabled={!canProceed}
-          className="flex-[2] py-4 bg-[#F5B700] text-[#0A0A0A] font-black rounded-xl flex items-center justify-center gap-2 hover:bg-[#D9A300] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Continuar <ChevronRight size={18} />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Step 5: Payment ────────────────────────────────────────────────────────
-
-function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false)
-  function copy() {
-    navigator.clipboard.writeText(value).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }
-  return (
-    <button
-      onClick={copy}
-      className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border"
-      style={copied
-        ? { background: '#E6F9EE', borderColor: '#00B14F', color: '#00B14F' }
-        : { background: '#F5F5F5', borderColor: '#E0E0E0', color: '#555' }}
-    >
-      {copied ? '✓ Copiado' : 'Copiar'}
-    </button>
-  )
-}
-
-function Step5Payment({ onSubmit, onBack, submitting, error }: { onSubmit: () => void; onBack: () => void; submitting: boolean; error?: string }) {
-  const { paymentMethod, setPaymentMethod, transferRef, setTransferRef, setProofFileUrl } = useCheckoutStore()
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [fileName, setFileName] = useState('')
-  const [uploading, setUploading] = useState(false)
-
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setFileName(file.name); setUploading(true)
-    try {
-      // Use storage client WITHOUT db.schema — Storage always uses the public schema
-      const storage = createStorageClient()
-      const now = new Date()
-      const folder = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`
-      const path = `${folder}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-
-      const { data, error } = await storage.storage.from('payment-proofs').upload(path, file, { upsert: true })
-      if (error) {
-        console.error('[upload] storage error:', error.message)
-        setFileName(`${file.name} (erro: ${error.message})`)
-      } else if (data) {
-        // Store the storage path (not the public URL) — admin can generate signed URL later
-        setProofFileUrl(data.path)
-      }
-    } catch (err: any) {
-      console.error('[upload] unexpected error:', err)
-      setFileName(`${file.name} (falhou)`)
-    }
-    setUploading(false)
-  }
-
-  const methods = [
-    { id: 'pix',          icon: Smartphone, label: 'PIX',               desc: 'Pagamento instantâneo',   color: '#00B14F', bg: '#E6F9EE' },
-    { id: 'card',         icon: CreditCard, label: 'Cartão',            desc: 'Visa, Mastercard, Amex',  color: '#2563EB', bg: '#EFF6FF' },
-    { id: 'paypal',       icon: Globe,      label: 'PayPal',            desc: 'Pagamento internacional', color: '#003087', bg: '#EEF2FF' },
-    { id: 'bic_transfer', icon: Building2,  label: 'Banco BIC',         desc: 'Transferência bancária',  color: '#E85D04', bg: '#FFF0E6' },
-  ] as const
-
-  return (
-    <div>
-      <h2 className="text-2xl font-black text-[#0A0A0A] mb-2">Forma de pagamento</h2>
-      <p className="text-[#888] text-sm mb-6">Escolha como deseja pagar.</p>
-
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {methods.map(m => {
-          const Icon = m.icon
-          const active = paymentMethod === m.id
-          return (
-            <button
-              key={m.id}
-              onClick={() => setPaymentMethod(m.id as any)}
-              className={`p-4 rounded-xl border-2 text-left transition-all ${
-                active ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#E8E8E8] bg-white hover:border-[#F5B700]/40'
-              }`}
-            >
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ background: m.bg }}>
-                <Icon size={18} style={{ color: m.color }} />
-              </div>
-              <p className="text-sm font-bold text-[#0A0A0A]">{m.label}</p>
-              <p className="text-xs text-[#888] mt-0.5">{m.desc}</p>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* BIC Transfer details */}
-      {paymentMethod === 'bic_transfer' && (
-        <div className="bg-[#FAFAFA] border border-[#E8E8E8] rounded-xl p-5 mb-6 space-y-4">
-          <p className="text-sm font-bold text-[#0A0A0A]">Dados para transferência bancária BIC:</p>
-
-          {/* Bank card image */}
-          <div className="rounded-xl overflow-hidden border border-[#E8E8E8] max-w-xs">
-            <Image
-              src="/cartão BIC.jpeg"
-              alt="Cartão BIC para transferência"
-              width={400}
-              height={250}
-              className="w-full h-auto object-cover"
-              unoptimized
-            />
-          </div>
-
-          {/* Account details with copy buttons */}
-          <div className="bg-white border border-[#E8E8E8] rounded-xl overflow-hidden">
-            {[
-              { label: 'Titular', value: 'VIRALIZA FÁCIL ANGOLA, LDA' },
-              { label: 'Coordenada BIC', value: '005100002477517910141' },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[#F0F0F0] last:border-b-0">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black text-[#999] uppercase tracking-widest mb-0.5">{label}</p>
-                  <p className="text-sm font-bold text-[#0A0A0A] font-mono break-all">{value}</p>
-                </div>
-                <CopyButton value={value} />
-              </div>
+      <h2 className="text-2xl font-black text-[#0A0A0A] mb-6">Rever e confirmar</h2>
+      <div className="overflow-x-auto mb-4">
+        <table className="w-full text-sm">
+          <thead><tr className="text-left text-xs text-[#999] uppercase"><th className="py-2 pr-3">Serviço</th><th className="py-2 pr-3">Ciclo</th><th className="py-2 pr-3 text-right">Valor</th><th className="py-2 text-right">Renovação</th></tr></thead>
+          <tbody>
+            {quote.lines.map(l => (
+              <tr key={l.index} className="border-t border-[#F0F0F0]">
+                <td className="py-2 pr-3">{l.name}{l.quantity > 1 ? ` × ${l.quantity}` : ''}{l.domain && l.type === 'product' ? <span className="block text-xs text-[#999]">{l.domain}</span> : null}</td>
+                <td className="py-2 pr-3">{l.cycle ? CYCLE_LABEL[l.cycle] : '1 ano'}</td>
+                <td className="py-2 pr-3 text-right font-bold whitespace-nowrap">{kz(l.lineTotal)}</td>
+                <td className="py-2 text-right whitespace-nowrap text-[#666]">{kz(l.renewalPrice)} / {l.cycle ? CYCLE_PER[l.cycle] : 'ano'}</td>
+              </tr>
             ))}
-          </div>
-
-          {/* Reference + proof upload */}
-          <div className="space-y-2">
-            <p className="text-xs text-[#888]">Após efectuar a transferência, envie o comprovativo:</p>
-            <input
-              type="text"
-              placeholder="Referência / Observação da transferência"
-              value={transferRef}
-              onChange={e => setTransferRef(e.target.value)}
-              className="w-full border border-[#E8E8E8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#F5B700] transition-colors"
-            />
-            <button
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-[#E8E8E8] rounded-xl text-sm text-[#888] hover:border-[#F5B700] hover:text-[#F5B700] transition-all w-full justify-center"
-            >
-              {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-              {fileName || 'Carregar comprovativo (imagem/PDF)'}
-            </button>
-            <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={handleFileUpload} />
-          </div>
-        </div>
-      )}
-
-      {/* PIX placeholder */}
-      {paymentMethod === 'pix' && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 text-sm text-green-800">
-          Após confirmar, será gerado um QR Code PIX para pagamento imediato.
-        </div>
-      )}
-
-      {/* Card placeholder */}
-      {paymentMethod === 'card' && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-800">
-          Será redirecionado para o gateway seguro (Stripe/Mercado Pago) após confirmar.
-        </div>
-      )}
-
-      {/* PayPal placeholder */}
-      {paymentMethod === 'paypal' && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-800">
-          Será redirecionado para o PayPal após confirmar.
-        </div>
-      )}
-
-      {error && (
-        <div className="flex items-start gap-2 text-red-600 text-sm bg-red-50 border border-red-200 px-4 py-3 rounded-xl mb-4">
-          <AlertCircle size={15} className="shrink-0 mt-0.5" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      <div className="flex gap-3">
-        <button onClick={onBack} disabled={submitting} className="flex-1 py-4 border-2 border-[#E8E8E8] text-[#666] font-bold rounded-xl flex items-center justify-center gap-2 hover:border-[#CCC] transition-colors disabled:opacity-40">
-          <ChevronLeft size={18} /> Voltar
-        </button>
-        <button
-          onClick={onSubmit}
-          disabled={!paymentMethod || submitting}
-          className="flex-[2] py-4 bg-[#F5B700] text-[#0A0A0A] font-black rounded-xl flex items-center justify-center gap-2 hover:bg-[#D9A300] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {submitting ? <><Loader2 size={16} className="animate-spin" /> A processar...</> : <><Lock size={16} /> Confirmar Pedido</>}
+          </tbody>
+        </table>
+      </div>
+      <div className="text-sm space-y-1 mb-4">
+        <div className="flex justify-between"><span className="text-[#888]">Subtotal</span><span>{kz(quote.subtotal)}</span></div>
+        {quote.taxRate > 0 && <div className="flex justify-between"><span className="text-[#888]">{quote.taxLabel} ({quote.taxRate}%)</span><span>{kz(quote.tax)}</span></div>}
+        <div className="flex justify-between text-lg font-black"><span>Total a pagar</span><span data-testid="review-total">{kz(quote.total)}</span></div>
+        <p className="text-xs text-[#888]">Pagamento: {method === 'bank_transfer' ? `transferência bancária${proof ? ' (comprovativo enviado)' : ' (comprovativo a enviar)'}` : method}. Os serviços são activados depois de confirmarmos o pagamento.</p>
+      </div>
+      <label className="flex items-start gap-2 text-sm mb-4">
+        <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} className="mt-1" />
+        <span>Confirmo os serviços, os ciclos e os valores de renovação indicados e aceito os <a href="/terms" target="_blank" className="underline">Termos de Serviço</a>.</span>
+      </label>
+      {error && <p className="text-sm text-red-600 mb-4 flex gap-1" role="alert"><AlertCircle size={16} className="shrink-0" />{error}</p>}
+      <div className="flex justify-between">
+        <button className={btnGhost} onClick={onBack} disabled={submitting}>Voltar</button>
+        <button className={btnPrimary} disabled={!accepted || submitting || !quote.valid} onClick={onSubmit} data-testid="confirm-order">
+          {submitting ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />} Confirmar encomenda
         </button>
       </div>
     </div>
   )
 }
 
-// ─── Step 6: Confirmation ───────────────────────────────────────────────────
-
-function StepConfirmation({ orderId }: { orderId: string }) {
-  const { items, billingCycle, domainName, paymentMethod, getTotal, clear } = useCheckoutStore()
-  const { formatCurrency, currency } = useLocale()
-  const fmt = (n: number) => formatCurrency(convertFromAOA(n, currency))
+/* ─── Página ──────────────────────────────────────────────────────────── */
+function CheckoutContent() {
   const router = useRouter()
-  const isPending = paymentMethod === 'bic_transfer'
+  const params = useSearchParams()
+  const cart = useCart()
+  // Carrinho lido do localStorage só depois da hidratação (evita divergência servidor/cliente)
+  const hydrated = useSyncExternalStore(cb => useCart.persist.onFinishHydration(cb), () => useCart.persist.hasHydrated(), () => false)
+  const [step, setStep] = useState(1)
+  const { quote, setQuote, loading } = useQuote(cart.lines)
+  const [account, setAccount] = useState<Account>({ loggedIn: false })
+  const [guest, setGuest] = useState({ name: '', email: '', phone: '', password: '' })
+  const [billing, setBilling] = useState<Record<string, string>>({})
+  const [methods, setMethods] = useState<PayMethod[] | null>(null)
+  const [method, setMethod] = useState('bank_transfer')
+  const [proof, setProof] = useState<{ path: string; name: string } | null>(null)
+  const [transferRef, setTransferRef] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
-    const t = setTimeout(() => { clear(); router.push('/dashboard') }, 4000)
-    return () => clearTimeout(t)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    createAuthClient().auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setAccount({ loggedIn: true, email: data.user.email, name: data.user.user_metadata?.full_name })
+        setBilling(b => ({ name: b.name || data.user!.user_metadata?.full_name || '', ...b }))
+      }
+    })
+    fetch('/api/checkout/payment-methods').then(r => r.json()).then(j => setMethods(j.methods ?? [])).catch(() => setMethods([]))
   }, [])
 
-  function finish() {
-    clear()
-    router.push('/dashboard')
-  }
-
-  return (
-    <div className="text-center">
-      <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
-        {isPending
-          ? <AlertCircle size={28} className="text-amber-500" />
-          : <Check size={28} className="text-green-600" />}
-      </div>
-      <h2 className="text-2xl font-black text-[#0A0A0A] mb-2">
-        {isPending ? 'Pedido aguardando validação' : 'Pedido confirmado!'}
-      </h2>
-      <p className="text-[#888] text-sm mb-6">
-        {isPending
-          ? 'Recebemos o seu pedido. Assim que confirmarmos a transferência, o serviço será activado.'
-          : 'O seu serviço será activado em breve. Verifique o seu e-mail.'}
-      </p>
-
-      <div className="bg-[#FAFAFA] border border-[#E8E8E8] rounded-xl p-5 text-left mb-6 space-y-3">
-        <p className="text-xs font-black text-[#999] uppercase tracking-widest">Resumo</p>
-        {items.map(i => (
-          <div key={i.id} className="flex justify-between text-sm">
-            <span className="text-[#0A0A0A]">{i.name}</span>
-            <span className="font-bold">{fmt(calcItemTotal(i, billingCycle))}</span>
-          </div>
-        ))}
-        <div className="border-t border-[#E8E8E8] pt-3 flex justify-between text-sm font-bold">
-          <span>Ciclo</span><span className="text-[#F5B700]">{BILLING_LABEL[billingCycle]}</span>
-        </div>
-        {domainName && (
-          <div className="flex justify-between text-sm">
-            <span className="text-[#888]">Domínio</span><span className="font-bold">{domainName}</span>
-          </div>
-        )}
-        <div className="flex justify-between text-sm">
-          <span className="text-[#888]">Pagamento</span>
-          <span className="font-bold capitalize">{paymentMethod?.replace('_', ' ')}</span>
-        </div>
-        <div className="flex justify-between font-black text-base border-t border-[#E8E8E8] pt-3">
-          <span>Total pago</span><span className="text-[#F5B700]">{fmt(getTotal())}</span>
-        </div>
-        {orderId && (
-          <div className="flex justify-between text-xs text-[#AAA]">
-            <span>Nº Pedido</span><span className="font-mono">{orderId.slice(0, 8).toUpperCase()}</span>
-          </div>
-        )}
-      </div>
-
-      {isPending && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 mb-6">
-          <strong>Status:</strong> Aguardando confirmação da transferência BIC. Entraremos em contacto assim que validarmos o pagamento.
-        </div>
-      )}
-
-      <p className="text-xs text-[#AAA] mb-4">A redirecionar para o seu perfil em 4 segundos...</p>
-      <button
-        onClick={finish}
-        className="w-full py-4 bg-[#0A0A0A] text-white font-black rounded-xl hover:bg-[#222] transition-colors"
-      >
-        Ir para o Dashboard agora
-      </button>
-    </div>
-  )
-}
-
-// ─── Main page ──────────────────────────────────────────────────────────────
-
-function CheckoutContent() {
-  const searchParams = useSearchParams()
-  const {
-    step, setStep, items, setItems, billingCycle,
-    clear, getTotal,
-  } = useCheckoutStore()
-  const [orderId, setOrderId] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [done, setDone] = useState(false)
-  const [submitError, setSubmitError] = useState('')
-  const [catalogLoading, setCatalogLoading] = useState(true)
-
-  const isDomainCheckout = items.length > 0 && items.every(i => i.type === 'domain')
-  const [planError, setPlanError] = useState<string | null>(null)
-
-  // Billing cycle URL param → store value mapping
-  const BILLING_URL_MAP: Record<string, BillingCycle> = {
-    monthly: 'monthly', annual: '1year', '1year': '1year',
-    '6months': '6months', '2years': '2years', '3years': '3years',
-  }
-
-  // Load plan from URL with live DB prices — clears stale persisted state
+  // Botões de compra: ?plan=slug&billing=ciclo · ?tld=.ao · ?domain=exemplo.ao
+  const handled = useRef(false)
   useEffect(() => {
-    const tldParam    = searchParams.get('tld')
-    const planId      = searchParams.get('plan')
-    const domainParam = searchParams.get('domain')
-    const billingParam = searchParams.get('billing')
-    clear()
-    setStep(1)
-    setPlanError(null)
-    setCatalogLoading(true)
-
-    // Apply billing cycle from URL if provided
-    if (billingParam && BILLING_URL_MAP[billingParam]) {
-      useCheckoutStore.getState().setBillingCycle(BILLING_URL_MAP[billingParam])
+    if (!hydrated || handled.current) return
+    handled.current = true
+    const plan = params.get('plan'), domain = params.get('domain'), tld = params.get('tld')
+    const billingParam = params.get('billing')
+    const renew = params.get('renew'), renewDomain = params.get('renew_domain')
+    if (renew && /^[0-9a-f-]{36}$/i.test(renew)) cart.addRenewal(renew)
+    if (renewDomain) cart.addDomain(renewDomain, 'renew')
+    if (plan) {
+      const slug = plan.startsWith('domain') ? null : (PLAN_CATALOG[plan]?.id ?? plan)
+      if (slug) cart.addProduct(slug, LEGACY_BILLING[billingParam ?? ''] ?? 'monthly')
     }
+    if (domain) cart.addDomain(domain, 'register')
+    if (tld && !domain) document.getElementById('cart-step')?.scrollIntoView()
+    if (plan || domain || tld || renew || renewDomain) router.replace('/checkout')
+  }, [hydrated, params, cart, router])
 
-    const CATEGORY_TYPE: Record<string, ServiceType> = {
-      hosting: 'hosting', wordpress: 'hosting', vps: 'vps',
-      dedicated: 'dedicated', 'dedicated-windows': 'dedicated',
-      reseller: 'reseller', email: 'email', 'website-builder': 'other',
-      domain: 'domain',
-    }
-
-    const supabase = createClient()
-
-    console.log('[CHECKOUT PARAMS]', { planId, tldParam, domainParam, billingParam })
-
-    ;(async () => {
-      try {
-        // ── Domain via TLD param ──────────────────────────────────────────────
-        // Single source of truth: viralizahost.site_domains
-        // Uses the same browser client as DomainSearchBar — no API route, no fallback.
-        if (tldParam) {
-          const normalizedTld = normalizeTld(tldParam)
-          console.log('[checkout] domain load — tld:', normalizedTld, 'domain:', domainParam)
-
-          const { data: domainRow, error: dbErr } = await (supabase as any)
-            .from('site_domains')
-            .select('extension, price_annual, price_monthly, currency')
-            .eq('extension', normalizedTld)
-            .eq('active', true)
-            .single() as { data: { extension: string; price_annual: number | null; price_monthly: number | null; currency: string } | null; error: any }
-
-          console.log('[checkout] site_domains result:', {
-            extension: domainRow?.extension,
-            price_annual: domainRow?.price_annual,
-            price_monthly: domainRow?.price_monthly,
-            currency: domainRow?.currency,
-            error: dbErr?.message ?? null,
-          })
-
-          if (dbErr || !domainRow) {
-            setPlanError('Não foi possível carregar o preço actual deste domínio. Por favor, tente novamente.')
-            console.error('[checkout] site_domains error for tld:', normalizedTld, dbErr?.message)
-            return
-          }
-
-          const price = domainRow.price_annual ?? domainRow.price_monthly
-          if (!price || price <= 0) {
-            setPlanError('O preço deste domínio não está disponível. Contacte o suporte.')
-            console.error('[checkout] price is null/zero for tld:', normalizedTld)
-            return
-          }
-
-          const itemId = `domain${normalizedTld.replace(/\./g, '-')}`
-          const name = domainParam ? `Domínio ${domainParam}` : `Domínio ${normalizedTld}`
-
-          console.log('[checkout] setting item — id:', itemId, 'price:', price, 'source: site_domains')
-
-          setItems([{ id: itemId, name, type: 'domain', price, currency: (domainRow.currency ?? 'AOA') as any, quantity: 1 }])
-          if (domainParam) {
-            useCheckoutStore.getState().setDomainName(domainParam)
-            useCheckoutStore.getState().setDomainAction('register')
-          }
-          return
-        }
-
-        // ── Non-domain plan via plan param (products table) ───────────────────
-        const { data: productRows, error: productError } = await (supabase as any)
-          .from('products')
-          .select('slug,name,category,price_monthly,price_6months,price_1year,price_2years,price_3years,active,cta_label')
-          .eq('active', true)
-
-        const catalog: Record<string, CheckoutItem> = { ...PLAN_CATALOG }
-
-        if (productError) {
-          console.warn('[checkout] products table error, using fallback catalog:', productError.message)
-        }
-
-        productRows?.forEach((p: any) => {
-          if (!p.slug) return
-          const price = p.price_monthly ?? 0
-          const type: ServiceType = CATEGORY_TYPE[p.category] ?? 'other'
-          catalog[p.slug] = { id: p.slug, name: p.name, type, price, currency: 'AOA', quantity: 1 }
-        })
-
-        // ── Email prices: site_email_plans is the single source of truth ─────
-        // The admin panel edits site_email_plans only, so we override whatever
-        // came from the products table to prevent price divergence.
-        const { data: emailPlanRows, error: emailPlanError } = await (supabase as any)
-          .from('site_email_plans')
-          .select('slug, name, price_monthly, price_annual, active')
-          .eq('active', true)
-
-        if (emailPlanError) {
-          console.warn('[checkout] site_email_plans fetch error:', emailPlanError.message)
-        }
-        console.log('[CHECKOUT EMAIL PLANS FROM DB]', emailPlanRows?.map((e: any) => ({
-          slug: e.slug, name: e.name, price_monthly: e.price_monthly,
-        })))
-
-        emailPlanRows?.forEach((ep: any) => {
-          if (!ep.slug || ep.price_monthly == null) return
-          catalog[ep.slug] = {
-            id: ep.slug,
-            name: ep.name,
-            type: 'email',
-            price: ep.price_monthly,
-            currency: 'AOA',
-            quantity: 1,
-          }
-        })
-
-        if (planId) {
-          const plan = catalog[planId]
-          console.log('[CHECKOUT PRODUCT FROM DATABASE]', {
-            planId,
-            found: !!plan,
-            name: plan?.name,
-            price: plan?.price,
-            type: plan?.type,
-          })
-          if (plan && plan.price > 0) {
-            const name = domainParam ? `Domínio ${domainParam}` : plan.name
-            console.log('[CHECKOUT CALCULATED PRICE]', {
-              planId, price: plan.price, billingParam,
-              item: { ...plan, name },
-            })
-            setItems([{ ...plan, name, quantity: 1 }])
-            if (plan.type === 'domain' && domainParam) {
-              useCheckoutStore.getState().setDomainName(domainParam)
-              useCheckoutStore.getState().setDomainAction('register')
-            }
-          } else if (plan && plan.price === 0) {
-            setPlanError('Plano não disponível. Entre em contacto com o suporte para contratar este serviço.')
-          } else {
-            setPlanError('Plano não encontrado. Verifique o link ou entre em contacto com o suporte.')
-          }
-        }
-      } catch (err) {
-        console.error('[checkout] unexpected error:', err)
-        // Only fall back to PLAN_CATALOG for non-domain plans
-        if (planId && !tldParam) {
-          const plan = PLAN_CATALOG[planId]
-          if (plan && plan.price > 0 && plan.type !== 'domain') {
-            const name = domainParam ? plan.name : plan.name
-            setItems([{ ...plan, name, quantity: 1 }])
-          } else {
-            setPlanError('Não foi possível carregar este plano. Tente novamente ou entre em contacto com o suporte.')
-          }
-        } else if (tldParam) {
-          // Never fall back for domain prices
-          setPlanError('Não foi possível carregar o preço actual deste domínio. Por favor, tente novamente.')
-        }
-      } finally {
-        setCatalogLoading(false)
-      }
-    })()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams.get('tld'), searchParams.get('plan'), searchParams.get('domain'), searchParams.get('billing')])
-
-  async function handleSubmit() {
-    const state = useCheckoutStore.getState()
-    setSubmitting(true)
-    setSubmitError('')
+  const submit = async () => {
+    if (!quote) return
+    setSubmitting(true); setSubmitError('')
+    const idempotencyKey = cart.ensureIdempotencyKey()
     try {
       const res = await fetch('/api/checkout/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items:         state.items,
-          billingCycle:  state.billingCycle,
-          domainName:    state.domainName,
-          domainAction:  state.domainAction,
-          useDefaultNs:  state.useDefaultNs,
-          ns1:           state.ns1,
-          ns2:           state.ns2,
-          ns3:           state.ns3 || null,
-          ns4:           state.ns4 || null,
-          paymentMethod: state.paymentMethod,
-          proofFileUrl:  state.proofFileUrl,
-          transferRef:   state.transferRef,
-          userData:      state.userData,
-          amount:        state.getTotal(),
+          idempotencyKey, lines: cart.lines.map(toApiLine), acceptedTotal: quote.total, paymentMethod: method,
+          proofFile: proof?.path ?? null, transferRef: transferRef || null, billingDetails: billing,
+          userData: account.loggedIn ? undefined : guest,
         }),
       })
-      const data = await res.json()
-      if (!res.ok || data.error) {
-        setSubmitError(data.error ?? 'Erro ao processar pedido. Tente novamente.')
-        return
-      }
-      if (data.id) setOrderId(data.id)
-      setDone(true)
-    } catch (err: any) {
-      setSubmitError(err?.message ?? 'Erro de rede. Verifique a sua ligação e tente novamente.')
+      const j = await res.json()
+      if (res.status === 409 && j.quote) { setQuote(j.quote); setSubmitError(j.error); return }
+      if (!res.ok) { setSubmitError(j.error ?? 'Não foi possível concluir a encomenda.'); if (j.code === 'email_exists') setStep(2); return }
+      cart.clear()
+      router.push(`/orders/${j.order.id}?nova=1`)
+    } catch {
+      setSubmitError('Falha de rede. A encomenda não foi duplicada: pode tentar de novo com segurança.')
     } finally {
       setSubmitting(false)
     }
   }
 
+  if (!hydrated) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="animate-spin text-[#F5B700]" /></div>
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10">
-      {!done && <StepBar current={step} />}
-
-      <div className="flex flex-col lg:flex-row gap-8 items-start">
-        {/* Main content */}
-        <div className="flex-1 bg-white border border-[#E8E8E8] rounded-2xl p-6 shadow-sm">
-          {done ? (
-            <StepConfirmation orderId={orderId} />
-          ) : (
-            <>
-              {step === 1 && <Step1Cycle onNext={() => setStep(2)} />}
-              {step === 2 && <Step2Cart onNext={() => setStep(isDomainCheckout ? 4 : 3)} onBack={() => setStep(1)} />}
-              {step === 3 && <Step3Domain onNext={() => setStep(4)} onBack={() => setStep(2)} />}
-              {step === 4 && <Step4Nameservers onNext={() => setStep(5)} onBack={() => setStep(isDomainCheckout ? 2 : 3)} />}
-              {step === 5 && <Step4Ident onNext={() => setStep(6)} onBack={() => setStep(4)} />}
-              {step === 6 && <Step5Payment onSubmit={handleSubmit} onBack={() => setStep(5)} submitting={submitting} error={submitError} />}
-            </>
-          )}
+    <div className="max-w-5xl mx-auto px-4 py-8 sm:py-10">
+      <StepBar current={step} />
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
+        <div className={`flex-1 w-full ${card}`} id="cart-step">
+          {step === 1 && <CartStep quote={quote} onNext={() => setStep(2)} />}
+          {step === 2 && <AccountStep account={account} setAccount={a => { setAccount(a); setBilling(b => ({ name: b.name || a.name || '', ...b })) }} guest={guest} setGuest={setGuest} billing={billing} setBilling={setBilling} onNext={() => setStep(3)} onBack={() => setStep(1)} />}
+          {step === 3 && <PaymentStep methods={methods} method={method} setMethod={setMethod} proof={proof} setProof={setProof} transferRef={transferRef} setTransferRef={setTransferRef} onNext={() => setStep(4)} onBack={() => setStep(2)} />}
+          {step === 4 && <ReviewStep quote={quote} method={method} proof={proof} submitting={submitting} error={submitError} onSubmit={submit} onBack={() => setStep(3)} />}
         </div>
-
-        {/* Sidebar summary — hidden when done */}
-        {!done && (
-          <div className="w-full lg:w-72 flex-shrink-0 space-y-4">
-            {catalogLoading
-              ? <div className="bg-white border border-[#E8E8E8] rounded-2xl p-8 shadow-sm flex justify-center"><Loader2 size={24} className="animate-spin text-[#F5B700]" /></div>
-              : planError
-                ? (
-                  <div className="bg-white border border-red-200 rounded-2xl p-6 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-bold text-red-700 mb-1">Plano não disponível</p>
-                        <p className="text-xs text-red-600">{planError}</p>
-                      </div>
-                    </div>
-                  </div>
-                )
-                : <OrderSummary items={items} cycle={billingCycle} />
-            }
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-              <p className="text-xs font-black text-green-800 uppercase tracking-widest mb-2">Garantia</p>
-              <p className="text-xs text-green-700">30 dias de garantia de satisfação. Sem perguntas.</p>
-            </div>
-          </div>
-        )}
+        {cart.lines.length > 0 && <div className="w-full lg:w-80 shrink-0"><Summary quote={quote} loading={loading} /></div>}
       </div>
     </div>
   )
@@ -1258,7 +508,7 @@ function CheckoutContent() {
 
 export default function CheckoutPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[60vh] text-[#888]">Carregando checkout...</div>}>
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[60vh] text-[#888]">A carregar o checkout…</div>}>
       <CheckoutContent />
     </Suspense>
   )
