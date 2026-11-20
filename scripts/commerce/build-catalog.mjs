@@ -216,6 +216,26 @@ try {
   }
   const orphan = await q('SELECT e.slug FROM site_email_plans e LEFT JOIN products p ON p.slug = e.slug WHERE e.active = 1 AND p.id IS NULL')
   if (orphan.length) console.warn('! site_email_plans sem produto no catálogo (o checkout não os vende):', orphan.map(o => o.slug).join(', '))
+  // Recursos dos planos de e-mail alinhados com a referência (preço por caixa). Só com
+  // --sync-email-features (substitui as funcionalidades desses 3 produtos); sem a opção, só mostra a diferença.
+  const EMAIL_FEATURES = {
+    'email-starter': ['Preço por caixa de correio', '5 GB por caixa', '5 aliases por caixa', '5 regras de reencaminhamento', 'Webmail, IMAP e SMTP'],
+    'email-standard': ['Preço por caixa de correio', '20 GB por caixa', 'Webmail, IMAP e SMTP'],
+    'email-premium': ['Preço por caixa de correio', '50 GB por caixa', '30 aliases por caixa', '50 regras de reencaminhamento', 'Webmail, IMAP e SMTP'],
+  }
+  for (const [slug, feats] of Object.entries(EMAIL_FEATURES)) {
+    const [p] = await q('SELECT id FROM products WHERE slug = ?', [slug])
+    if (!p) continue
+    const cur = (await q('SELECT feature FROM product_features WHERE product_id = ? AND included = 1 ORDER BY position', [p.id])).map(r => r.feature)
+    if (JSON.stringify(cur) === JSON.stringify(feats)) continue
+    if (args['sync-email-features']) {
+      await q('DELETE FROM product_features WHERE product_id = ?', [p.id])
+      for (const [i, f] of feats.entries()) await q('INSERT INTO product_features (id, product_id, feature, included, position) VALUES (?, ?, ?, 1, ?)', [randomUUID(), p.id, f, i + 1])
+      stats.recursos_email_alinhados = (stats.recursos_email_alinhados ?? 0) + 1
+    } else {
+      console.warn(`! ${slug}: recursos diferentes da referência (usar --sync-email-features para alinhar)\n    actual: ${cur.join(' | ') || '—'}\n    referência: ${feats.join(' | ')}`)
+    }
+  }
   await conn.commit()
   console.log('✓', JSON.stringify(stats))
 } catch (e) {

@@ -21,7 +21,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   if (!user) redirect('/login')
   // Propriedade: a política de orders só devolve encomendas do próprio cliente
   const { data: order } = await db.from('orders')
-    .select('id, order_number, created_at, amount, subtotal, tax_amount, tax_rate, payment_status, activation_status, status, payment_method, order_items(id, service_name, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name)')
+    .select('id, order_number, created_at, amount, subtotal, tax_amount, tax_rate, payment_status, activation_status, hold_reason, status, payment_method, order_items(id, service_name, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, availability)')
     .eq('id', id).eq('user_id', user.id).maybeSingle()
   if (!order) notFound()
   const [{ data: invoice }, { data: services }] = await Promise.all([
@@ -52,7 +52,11 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
 
       <div className={box}>
         <p className="text-xs font-black text-[#64748B] uppercase tracking-widest mb-3">Próximos passos</p>
-        {order.payment_status === 'unpaid' || order.payment_status === 'failed' ? (
+        {order.hold_reason === 'domain_confirmation' ? (
+          <p className="text-sm text-[#334155] flex gap-2" data-testid="order-held"><Clock size={16} className="text-amber-600 shrink-0" />Ainda não pague. A equipa está a confirmar a disponibilidade de {(order.order_items ?? []).filter((i: any) => i.availability === 'confirm').map((i: any) => i.domain_name).join(', ') /* eslint-disable-line @typescript-eslint/no-explicit-any */}. Quando estiver confirmado, a factura fica disponível aqui e pode pagar.</p>
+        ) : order.hold_reason === 'domain_unavailable' ? (
+          <p className="text-sm text-red-700 flex gap-2" data-testid="order-cancelled-domain"><Clock size={16} className="shrink-0" />O domínio pedido já não está livre, por isso a encomenda foi cancelada sem qualquer cobrança. Pode fazer uma nova encomenda com outro domínio.</p>
+        ) : order.payment_status === 'unpaid' || order.payment_status === 'failed' ? (
           <p className="text-sm text-[#334155] flex gap-2"><Clock size={16} className="text-amber-600 shrink-0" />
             {order.payment_status === 'failed' ? 'O comprovativo foi recusado. ' : ''}Faça a transferência de <strong className="text-[#0B0B0D] mx-1">{kz(order.amount)}</strong> e envie o comprovativo na factura{invoice ? <Link href={`/billing/invoices/${invoice.id}`} className="underline text-[#B45309] ml-1">{invoice.invoice_number}</Link> : null}.</p>
         ) : order.payment_status === 'proof_submitted' ? (

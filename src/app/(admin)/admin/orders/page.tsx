@@ -6,10 +6,10 @@ import { ACTIVATION_STATUS, PAYMENT_STATUS, TONE_CLASS, kz } from '@/lib/commerc
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Service = { id: string; order_item_id: string; service_name: string; service_type: string; provisioning_status: string; provisioning_error: string | null; provisioning_attempts: number; external_ref: string | null; domain: string | null }
 type Order = {
-  id: string; order_number: string | null; created_at: string; status: string; payment_status: string; activation_status: string
+  id: string; order_number: string | null; created_at: string; status: string; payment_status: string; activation_status: string; hold_reason?: string | null
   amount: number; payment_method: string | null; transfer_ref: string | null; proof_url: string | null
   profiles: { full_name: string; email: string } | null
-  order_items: { id: string; service_name: string; quantity: number; line_total: number | null; unit_price: number | null; renewal_price: number | null; billing_cycle: string | null; domain_name: string | null }[]
+  order_items: { id: string; service_name: string; quantity: number; line_total: number | null; unit_price: number | null; renewal_price: number | null; billing_cycle: string | null; domain_name: string | null; availability?: string | null; years?: number | null }[]
   services: Service[]; invoice: { invoice_number: string; status: string } | null
 }
 type Filter = 'todo' | 'activation' | 'done' | 'all'
@@ -102,7 +102,16 @@ export default function AdminOrdersPage() {
                         const s = o.services.find(x => x.order_item_id === it.id)
                         return (
                           <tr key={it.id} className="border-t border-[#F3F3F3] align-top">
-                            <td className="py-2 pr-2">{it.service_name}{it.quantity > 1 ? ` × ${it.quantity}` : ''}{it.domain_name ? <span className="block text-xs text-[#888]">{it.domain_name}</span> : null}</td>
+                            <td className="py-2 pr-2">{it.service_name}{it.quantity > 1 ? ` × ${it.quantity}` : ''}{it.domain_name ? <span className="block text-xs text-[#888]">{it.domain_name}</span> : null}
+                              {it.availability === 'confirm' && (
+                                <span className="mt-1 flex flex-wrap items-center gap-1" data-testid="domain-confirm">
+                                  <span className="text-xs font-bold text-amber-800">Disponibilidade a confirmar:</span>
+                                  <button disabled={!!acting} onClick={() => act(it.id + 'ok', { action: 'domain_availability', orderItemId: it.id, available: true }, `Confirma que ${it.domain_name} está livre? O cliente passa a poder pagar.`)} className="px-2 py-0.5 rounded bg-green-600 text-white text-xs">Livre</button>
+                                  <button disabled={!!acting} onClick={() => act(it.id + 'no', { action: 'domain_availability', orderItemId: it.id, available: false }, `${it.domain_name} está ocupado? A encomenda é cancelada sem cobrança.`)} className="px-2 py-0.5 rounded bg-red-600 text-white text-xs">Ocupado</button>
+                                </span>
+                              )}
+                              {it.availability === 'confirmed' && <span className="block text-xs text-green-700">Disponibilidade confirmada</span>}
+                            </td>
                             <td className="py-2 pr-2 whitespace-nowrap">{kz(it.line_total ?? it.unit_price)}</td>
                             <td className="py-2 pr-2">
                               {s && <span className="text-xs font-bold">{SVC_LABEL[s.provisioning_status] ?? s.provisioning_status}{s.external_ref ? ` · ${s.external_ref}` : ''}</span>}

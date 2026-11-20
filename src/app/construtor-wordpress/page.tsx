@@ -89,7 +89,7 @@ export default async function ConstrutorWordPressPage() {
           title="Incluído em todos os planos WordPress" />
         <FinalCTA
           title="Comece a construir com WordPress hoje"
-          subtitle="Builder visual, plugins premium e hospedagem optimizada. Garantia de 30 dias." />
+          subtitle="Builder visual, plugins premium e hospedagem optimizada." />
       </main>
       <Footer />
     </>

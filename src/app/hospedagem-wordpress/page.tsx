@@ -57,12 +57,12 @@ export default async function HospedagemWordPressPage() {
         />
         <DynamicServicePricing category="wordpress" cols={3} showBillingToggle
           title="Hospedagem WordPress — Escolha o plano"
-          subtitle="Todos os planos com WordPress pré-instalado e garantia de 30 dias."
+          subtitle="Escolha o plano, depois o domínio e a duração."
           fallbackPlans={fallbackPlans} />
         <IncludedFeatures features={included} />
         <FinalCTA
           title="Lance o seu WordPress hoje"
-          subtitle="WordPress pré-instalado, criador com IA e migração gratuita. Sem riscos, sem contratos." />
+          subtitle="WordPress pré-instalado, criador com IA e migração gratuita." />
       </main>
       <Footer />
     </>

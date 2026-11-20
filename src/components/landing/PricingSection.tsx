@@ -10,108 +10,6 @@ import { Currency } from '@/types'
 const AOA_RATES: Record<Currency, number> = { AKZ: 1, BRL: 0.0042, USD: 0.00109 }
 
 // Static fallback plans shown before DB loads
-const FALLBACK_PLANS = [
-  {
-    id: 'starter',
-    name: 'Starter Host',
-    icon: Zap,
-    description: 'Ideal para começar sua presença online',
-    tagline: 'Para iniciantes',
-    price: { AKZ: 4500, BRL: 19.90, USD: 3.99 },
-    originalPrice: { AKZ: 9000, BRL: 39.90, USD: 7.99 },
-    accent: '#3B82F6',
-    features: [
-      { text: '1 Site', included: true },
-      { text: '10 GB NVMe SSD', included: true },
-      { text: '100 GB Bandwidth', included: true },
-      { text: '5 Contas de Email', included: true },
-      { text: 'SSL Grátis (Let\'s Encrypt)', included: true },
-      { text: 'cPanel Premium', included: true },
-      { text: '3 Bases de Dados MySQL', included: true },
-      { text: 'Backup Semanal', included: true },
-      { text: 'IP Dedicado', included: false },
-      { text: 'Backup Diário', included: false },
-      { text: 'Wildcard SSL', included: false },
-    ],
-    is_popular: false,
-    badge: null as string | null,
-  },
-  {
-    id: 'business',
-    name: 'Business Cloud',
-    icon: Rocket,
-    description: 'Para pequenas e médias empresas crescerem',
-    tagline: 'Mais popular',
-    price: { AKZ: 9500, BRL: 39.90, USD: 7.99 },
-    originalPrice: { AKZ: 19000, BRL: 79.90, USD: 15.99 },
-    accent: '#F5B700',
-    features: [
-      { text: '5 Sites', included: true },
-      { text: '50 GB NVMe SSD', included: true },
-      { text: 'Bandwidth Ilimitado', included: true },
-      { text: '20 Contas de Email', included: true },
-      { text: 'SSL Grátis (Let\'s Encrypt)', included: true },
-      { text: 'cPanel Premium', included: true },
-      { text: '10 Bases de Dados MySQL', included: true },
-      { text: 'Backup Diário', included: true },
-      { text: 'Softaculous (400+ apps)', included: true },
-      { text: 'IP Dedicado', included: false },
-      { text: 'Wildcard SSL', included: false },
-    ],
-    is_popular: true,
-    badge: 'MAIS POPULAR' as string | null,
-  },
-  {
-    id: 'pro',
-    name: 'Cloud Pro',
-    icon: Crown,
-    description: 'Para empresas que exigem alta performance',
-    tagline: 'Melhor custo-benefício',
-    price: { AKZ: 19500, BRL: 79.90, USD: 15.99 },
-    originalPrice: { AKZ: 39000, BRL: 159.90, USD: 31.99 },
-    accent: '#8B5CF6',
-    features: [
-      { text: 'Sites Ilimitados', included: true },
-      { text: '200 GB NVMe SSD', included: true },
-      { text: 'Bandwidth Ilimitado', included: true },
-      { text: 'Emails Ilimitados', included: true },
-      { text: 'Wildcard SSL Grátis', included: true },
-      { text: 'cPanel Premium', included: true },
-      { text: 'Bases de Dados Ilimitadas', included: true },
-      { text: 'Backup Diário Automático', included: true },
-      { text: 'Softaculous Premium', included: true },
-      { text: 'IP Dedicado', included: true },
-      { text: 'Proteção DDoS Avançada', included: true },
-    ],
-    is_popular: false,
-    badge: 'MELHOR VALOR' as string | null,
-  },
-  {
-    id: 'reseller',
-    name: 'Revenda WHM',
-    icon: Users,
-    description: 'Crie o seu próprio negócio de hospedagem',
-    tagline: 'Para revendedores',
-    price: { AKZ: 35000, BRL: 149.90, USD: 29.99 },
-    originalPrice: { AKZ: 70000, BRL: 299.90, USD: 59.99 },
-    accent: '#EF4444',
-    features: [
-      { text: 'WHM + cPanel Incluído', included: true },
-      { text: '500 GB NVMe SSD', included: true },
-      { text: 'Bandwidth Ilimitado', included: true },
-      { text: 'Contas de Email Ilimitadas', included: true },
-      { text: 'SSL Ilimitado', included: true },
-      { text: 'Criar Planos Personalizados', included: true },
-      { text: 'Marca Branca (White Label)', included: true },
-      { text: 'Backup Diário Completo', included: true },
-      { text: 'Softaculous Premium', included: true },
-      { text: 'IP Dedicado', included: true },
-      { text: 'Painel de Controle Revendedor', included: true },
-    ],
-    is_popular: false,
-    badge: 'REVENDA' as string | null,
-  },
-]
 
 type ProductFeature = { feature: string; included: boolean; position: number }
 
@@ -144,19 +42,18 @@ export function PricingSection() {
     return aoa * AOA_RATES[currency]
   }
   const [dbPlans, setDbPlans] = useState<DbPlan[] | null>(null)
+  const [loadState, setLoadState] = useState<'loading' | 'empty' | 'error'>('loading')
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     fetch('/api/products?category=hosting', { cache: 'no-store' })
-      .then(r => r.json())
+      .then(async r => { const json = await r.json(); if (!r.ok || !json.success) throw new Error(json.message ?? `HTTP ${r.status}`); return json })
       .then(json => {
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setDbPlans(json.data as DbPlan[])
-        } else if (!json.success) {
-          console.error('[PricingSection] API error:', json.message, json.details)
-        }
+        const list = Array.isArray(json.data) ? json.data.filter((p: { sale_status?: string }) => p.sale_status !== 'on_request') : []
+        if (list.length) setDbPlans(list as DbPlan[]); else setLoadState('empty')
       })
-      .catch(err => console.error('[PricingSection] fetch error:', err))
-  }, [])
+      .catch(err => { console.error('[PricingSection] fetch error:', err); setLoadState('error') })
+  }, [attempt])
 
 
   // Shared layout — DB plans use product_features, fallback uses hardcoded features
@@ -195,7 +92,7 @@ export function PricingSection() {
           {cards}
         </div>
         <p className="text-center text-gray-400 text-sm mt-10">
-          ✓ {t('plans.noContracts')} &nbsp;•&nbsp; ✓ {t('plans.cancelAnytime')} &nbsp;•&nbsp; ✓ {t('plans.moneyBack')}
+          ✓ Preços em kwanzas &nbsp;•&nbsp; ✓ Renovação indicada em cada plano &nbsp;•&nbsp; ✓ Pagamento por transferência bancária
         </p>
       </div>
     </section>
@@ -277,7 +174,7 @@ export function PricingSection() {
               </div>
 
               <Link
-                href={`/checkout?plan=${plan.slug}&billing=${billing === 'annual' ? '1year' : 'monthly'}`}
+                href={`/comprar/${plan.slug}?ciclo=${billing === 'annual' ? '1year' : 'monthly'}`}
                 className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
                   plan.popular
                     ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'
@@ -320,98 +217,19 @@ export function PricingSection() {
     )
   }
 
-  // Static fallback — shown before DB responds
+  // Sem planos estáticos: enquanto carrega mostra o indicador; erro ≠ catálogo vazio
   return renderSection(
-    FALLBACK_PLANS.map(plan => {
-      const Icon = plan.icon
-      return (
-        <div
-          key={plan.id}
-          className={`relative rounded-3xl overflow-hidden transition-all duration-300 hover-lift ${
-            plan.is_popular
-              ? 'bg-[#0A0A0A] border-2 border-[#F5B700] shadow-[0_20px_60px_rgba(0,0,0,0.15)]'
-              : 'bg-white border border-[#E8E8E8] shadow-sm hover:border-[#F5B700]/40'
-          }`}
-        >
-          {plan.badge && (
-            <div
-              className={`text-center py-2.5 text-xs font-black tracking-widest ${
-                plan.is_popular ? 'bg-[#F5B700] text-[#0A0A0A]' : 'text-white text-[10px]'
-              }`}
-              style={!plan.is_popular ? { background: plan.accent } : {}}
-            >
-              ★ {plan.badge}
-            </div>
-          )}
-
-          <div className={`p-7 ${plan.badge ? 'pt-6' : ''}`}>
-            <div className="flex items-center gap-3 mb-5">
-              <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm"
-                style={{
-                  background: plan.is_popular ? `${plan.accent}25` : `${plan.accent}12`,
-                  border: `1px solid ${plan.accent}30`,
-                }}
-              >
-                <Icon size={20} style={{ color: plan.accent }} />
-              </div>
-              <div>
-                <div className={`font-bold text-base leading-tight ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
-                  {plan.name}
-                </div>
-                <div className={`text-xs mt-0.5 ${plan.is_popular ? 'text-gray-400' : 'text-gray-400'}`}>
-                  {plan.tagline}
-                </div>
-              </div>
-            </div>
-
-            <p className={`text-sm mb-6 leading-relaxed ${plan.is_popular ? 'text-gray-400' : 'text-gray-500'}`}>
-              {plan.description}
-            </p>
-
-            <div className="mb-6">
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className={`text-3xl font-black ${plan.is_popular ? 'text-white' : 'text-[#0A0A0A]'}`}>
-                  {/* Enquanto o catálogo não carrega não se mostram preços fixos */}
-                  …
-                </span>
-              </div>
-            </div>
-
-            <Link
-              href={plan.id === 'reseller' ? '/revenda-de-hospedagem#planos' : `/checkout?plan=${plan.id}&billing=${billing === 'annual' ? '1year' : 'monthly'}`}
-              className={`btn-shimmer block w-full text-center py-3.5 rounded-2xl font-bold text-sm transition-all mb-7 ${
-                plan.is_popular
-                  ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#D9A300] shadow-[0_4px_20px_rgba(245,183,0,0.35)]'
-                  : 'bg-[#0A0A0A] text-white hover:bg-[#222] shadow-sm'
-              }`}
-            >
-              {t('cta.start')} →
-            </Link>
-
-            <div className={`mb-6 h-px ${plan.is_popular ? 'bg-white/10' : 'bg-[#F0F0F0]'}`} />
-
-            <div className="space-y-3">
-              {plan.features.map(f => (
-                <div
-                  key={f.text}
-                  className={`flex items-center gap-3 text-sm ${
-                    f.included
-                      ? plan.is_popular ? 'text-gray-300' : 'text-gray-700'
-                      : plan.is_popular ? 'text-gray-600' : 'text-gray-300'
-                  }`}
-                >
-                  {f.included
-                    ? <Check size={15} className="text-green-500 flex-shrink-0" />
-                    : <X size={15} className="text-gray-300 flex-shrink-0" />
-                  }
-                  {f.text}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )
-    })
+    <div className="col-span-full text-center py-10" role={loadState === 'error' ? 'alert' : 'status'}>
+      {loadState === 'error' ? (
+        <>
+          <p className="font-bold text-[#0A0A0A]">Não foi possível carregar os planos.</p>
+          <button onClick={() => { setLoadState('loading'); setAttempt(x => x + 1) }} className="mt-3 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#F5B700] text-[#0A0A0A]">Tentar novamente</button>
+        </>
+      ) : loadState === 'empty' ? (
+        <p className="text-[#555]">Ainda não há planos de hospedagem publicados. <Link href="/suporte/contactar" className="underline">Fale connosco</Link>.</p>
+      ) : (
+        <p className="text-[#888] text-sm">A carregar planos…</p>
+      )}
+    </div>
   )
 }

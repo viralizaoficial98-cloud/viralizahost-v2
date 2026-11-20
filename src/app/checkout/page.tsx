@@ -13,11 +13,11 @@ interface QuoteLine {
   cycle?: Cycle; months?: number; quantity: number; quantityUnit?: string | null; maxQuantity?: number
   unitPrice: number; lineTotal: number; renewalPrice: number; domain?: string; domainMode?: DomainMode
   operation?: 'register' | 'transfer' | 'renew'; extension?: string
-  availability?: { available: boolean; verified: boolean; note?: string }
+  availability?: { status: 'available' | 'unavailable' | 'confirm'; available: boolean; verified: boolean; note?: string }; years?: number
   cycles?: { cycle: Cycle; months: number; price: number; renewal: number }[]
   error?: { code: string; message: string }
 }
-interface Quote { currency: 'AKZ'; lines: QuoteLine[]; subtotal: number; taxRate: number; taxLabel: string; tax: number; total: number; valid: boolean }
+interface Quote { currency: 'AKZ'; lines: QuoteLine[]; subtotal: number; taxRate: number; taxLabel: string; tax: number; total: number; valid: boolean; needsConfirmation?: boolean }
 interface PayMethod { id: string; label: string; available: boolean; reason?: string; requiresProof?: boolean; bank?: Record<string, string | null> }
 
 const CYCLE_LABEL: Record<Cycle, string> = { monthly: 'Mensal', '3months': 'Trimestral', '6months': '6 meses', '1year': '1 ano', '2years': '2 anos', '3years': '3 anos' }
@@ -89,9 +89,11 @@ function Summary({ quote, loading }: { quote: Quote | null; loading: boolean }) 
             ))}
           </ul>
           <div className="border-t border-[#F0F0F0] pt-3 space-y-1 text-sm">
-            <div className="flex justify-between"><span className="text-[#888]">Subtotal</span><span>{kz(quote.subtotal)}</span></div>
+            <div className="flex justify-between"><span className="text-[#888]">Subtotal</span><span data-testid="summary-subtotal">{kz(quote.subtotal)}</span></div>
+            <div className="flex justify-between"><span className="text-[#888]">Descontos</span><span className="text-[#888]">Nenhum aplicável</span></div>
             {quote.taxRate > 0 && <div className="flex justify-between"><span className="text-[#888]">{quote.taxLabel} ({quote.taxRate}%)</span><span>{kz(quote.tax)}</span></div>}
-            <div className="flex justify-between text-base font-black pt-1"><span>Total</span><span>{kz(quote.total)}</span></div>
+            <div className="flex justify-between text-base font-black pt-1"><span>Total</span><span data-testid="summary-total">{kz(quote.total)}</span></div>
+            {quote.needsConfirmation && <p className="text-[11px] text-amber-800 mt-1">Há domínios a confirmar pela equipa: o pagamento só é pedido depois dessa confirmação.</p>}
             {quote.taxRate === 0 && <p className="text-[11px] text-[#999]">Sem impostos aplicados.</p>}
           </div>
           {loading && <p className="text-xs text-[#999] mt-2 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> A actualizar…</p>}
@@ -182,7 +184,14 @@ function CartStep({ quote, onNext }: { quote: Quote | null; onNext: () => void }
                     <p className="text-sm text-red-600 mt-1 flex items-start gap-1" role="alert"><AlertCircle size={14} className="mt-0.5 shrink-0" />{q.error.message}
                       {q.error.code === 'on_request' && <Link href="/suporte/contactar" className="underline ml-1">Contactar</Link>}</p>
                   )}
-                  {q?.availability && !q.availability.verified && <p className="text-xs text-amber-700 mt-1">Disponibilidade confirmada manualmente após a encomenda (o registo desta extensão não tem consulta automática).</p>}
+                  {q?.availability?.status === 'confirm' && <p className="text-xs text-amber-800 mt-1">A confirmar pela equipa: a encomenda fica registada e só paga depois de confirmarmos que o domínio está livre.</p>}
+                  {l.type === 'domain' && l.operation === 'register' && (
+                    <label className="text-xs text-[#888] mt-2 flex items-center gap-2">Duração do registo
+                      <select className="border border-[#E2E2E2] rounded-lg px-2 py-1 text-sm text-[#0A0A0A]" value={l.years ?? 1} onChange={e => update(l.key, { years: Number(e.target.value) })} aria-label={`Anos de registo de ${l.domain}`}>
+                        {[1, 2, 3].map(y => <option key={y} value={y}>{y} {y === 1 ? 'ano' : 'anos'}</option>)}
+                      </select>
+                    </label>
+                  )}
                 </div>
                 <button onClick={() => remove(l.key)} className="text-[#999] hover:text-red-600 p-1" aria-label="Remover do carrinho"><Trash2 size={16} /></button>
               </div>
@@ -309,7 +318,8 @@ function AccountStep({ account, setAccount, guest, setGuest, billing, setBilling
 }
 
 /* ─── Passo 3: pagamento ─────────────────────────────────────────────── */
-function PaymentStep({ methods, method, setMethod, proof, setProof, transferRef, setTransferRef, onNext, onBack }: {
+function PaymentStep({ methods, method, setMethod, proof, setProof, transferRef, setTransferRef, onNext, onBack, held }: {
+  held: boolean
   methods: PayMethod[] | null; method: string; setMethod: (m: string) => void
   proof: { path: string; name: string } | null; setProof: (p: { path: string; name: string } | null) => void
   transferRef: string; setTransferRef: (s: string) => void; onNext: () => void; onBack: () => void
@@ -354,13 +364,19 @@ function PaymentStep({ methods, method, setMethod, proof, setProof, transferRef,
             </div>
           ))}
           {bank.payment_instructions && <p className="text-xs text-[#666]">{bank.payment_instructions}</p>}
-          <p className="text-xs text-[#888]">A encomenda fica pendente até validarmos o comprovativo. Pode enviá-lo agora ou depois, na Área do Cliente.</p>
-          <input className={input} placeholder="Referência da transferência (opcional)" value={transferRef} onChange={e => setTransferRef(e.target.value)} />
-          <button className={`${btnGhost} w-full border-dashed`} onClick={() => fileRef.current?.click()} disabled={uploading}>
-            {uploading ? <Loader2 size={14} className="animate-spin" /> : proof ? <Check size={14} className="text-green-600" /> : <Upload size={14} />}{proof ? `Comprovativo: ${proof.name}` : 'Enviar comprovativo (imagem/PDF)'}
-          </button>
-          <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={upload} />
-          {uploadErr && <p className="text-xs text-red-600">{uploadErr}</p>}
+          {held ? (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3" data-testid="pay-after-confirmation">Ainda não transfira: há domínios a confirmar pela equipa. Depois da confirmação, a factura fica disponível na Área do Cliente e pode pagar e enviar o comprovativo.</p>
+          ) : (
+            <>
+              <p className="text-xs text-[#888]">A encomenda fica pendente até validarmos o comprovativo. Pode enviá-lo agora ou depois, na Área do Cliente.</p>
+              <input className={input} placeholder="Referência da transferência (opcional)" value={transferRef} onChange={e => setTransferRef(e.target.value)} />
+              <button className={`${btnGhost} w-full border-dashed`} onClick={() => fileRef.current?.click()} disabled={uploading}>
+                {uploading ? <Loader2 size={14} className="animate-spin" /> : proof ? <Check size={14} className="text-green-600" /> : <Upload size={14} />}{proof ? `Comprovativo: ${proof.name}` : 'Enviar comprovativo (imagem/PDF)'}
+              </button>
+              <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={upload} />
+              {uploadErr && <p className="text-xs text-red-600">{uploadErr}</p>}
+            </>
+          )}
         </div>
       )}
       <div className="flex justify-between">
@@ -399,7 +415,7 @@ function ReviewStep({ quote, method, proof, submitting, error, onSubmit, onBack 
         <div className="flex justify-between"><span className="text-[#888]">Subtotal</span><span>{kz(quote.subtotal)}</span></div>
         {quote.taxRate > 0 && <div className="flex justify-between"><span className="text-[#888]">{quote.taxLabel} ({quote.taxRate}%)</span><span>{kz(quote.tax)}</span></div>}
         <div className="flex justify-between text-lg font-black"><span>Total a pagar</span><span data-testid="review-total">{kz(quote.total)}</span></div>
-        <p className="text-xs text-[#888]">Pagamento: {method === 'bank_transfer' ? `transferência bancária${proof ? ' (comprovativo enviado)' : ' (comprovativo a enviar)'}` : method}. Os serviços são activados depois de confirmarmos o pagamento.</p>
+        <p className="text-xs text-[#888]">Pagamento: {method === 'bank_transfer' ? `transferência bancária${proof ? ' (comprovativo enviado)' : ' (comprovativo a enviar)'}` : method}. Os serviços são activados depois de confirmarmos o pagamento.{quote.needsConfirmation ? ' Há domínios a confirmar pela equipa: só paga depois dessa confirmação.' : ''}</p>
       </div>
       <label className="flex items-start gap-2 text-sm mb-4">
         <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} className="mt-1" />
@@ -473,7 +489,7 @@ function CheckoutContent() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           idempotencyKey, lines: cart.lines.map(toApiLine), acceptedTotal: quote.total, paymentMethod: method,
-          proofFile: proof?.path ?? null, transferRef: transferRef || null, billingDetails: billing,
+          proofFile: quote.needsConfirmation ? null : proof?.path ?? null, transferRef: transferRef || null, billingDetails: billing,
           userData: account.loggedIn ? undefined : guest,
         }),
       })
@@ -497,7 +513,7 @@ function CheckoutContent() {
         <div className={`flex-1 w-full ${card}`} id="cart-step">
           {step === 1 && <CartStep quote={quote} onNext={() => setStep(2)} />}
           {step === 2 && <AccountStep account={account} setAccount={a => { setAccount(a); setBilling(b => ({ name: b.name || a.name || '', ...b })) }} guest={guest} setGuest={setGuest} billing={billing} setBilling={setBilling} onNext={() => setStep(3)} onBack={() => setStep(1)} />}
-          {step === 3 && <PaymentStep methods={methods} method={method} setMethod={setMethod} proof={proof} setProof={setProof} transferRef={transferRef} setTransferRef={setTransferRef} onNext={() => setStep(4)} onBack={() => setStep(2)} />}
+          {step === 3 && <PaymentStep held={!!quote?.needsConfirmation} methods={methods} method={method} setMethod={setMethod} proof={proof} setProof={setProof} transferRef={transferRef} setTransferRef={setTransferRef} onNext={() => setStep(4)} onBack={() => setStep(2)} />}
           {step === 4 && <ReviewStep quote={quote} method={method} proof={proof} submitting={submitting} error={submitError} onSubmit={submit} onBack={() => setStep(3)} />}
         </div>
         {cart.lines.length > 0 && <div className="w-full lg:w-80 shrink-0"><Summary quote={quote} loading={loading} /></div>}

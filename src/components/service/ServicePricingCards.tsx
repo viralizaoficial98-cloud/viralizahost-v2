@@ -45,8 +45,8 @@ export function ServicePricingCards({
 
   const resolvedTitle = title ?? (t('home.plansTitle') !== 'home.plansTitle' ? t('home.plansTitle') : 'Escolha o plano ideal')
   const resolvedSubtitle = subtitle ?? (t('plans.support247') !== 'plans.support247'
-    ? `${t('plans.ssl')} · ${t('plans.backup')} · ${t('plans.moneyBack')}`
-    : 'Todos os planos incluem suporte técnico especializado e garantia de 30 dias.')
+    ? 'Preços em kwanzas. Cada plano mostra o valor a pagar e o valor de renovação.'
+    : 'Preços em kwanzas. Cada plano mostra o valor a pagar e o valor de renovação.')
 
   const gridClass: Record<number, string> = {
     2: 'md:grid-cols-2',

@@ -54,6 +54,7 @@ const STATUS_MAP: Record<string, { label: string; bg: string; color: string; bor
   paid:           { label: 'Pago',        bg: 'rgba(16,185,129,0.08)',  color: '#059669', border: 'rgba(16,185,129,0.20)',  Icon: CheckCircle2 },
   pending:        { label: 'Pendente',    bg: 'rgba(245,183,0,0.08)',   color: '#D9A300', border: 'rgba(245,183,0,0.25)',   Icon: Clock },
   overdue:        { label: 'Vencido',     bg: 'rgba(239,68,68,0.08)',   color: '#DC2626', border: 'rgba(239,68,68,0.20)',   Icon: AlertCircle },
+  draft:          { label: 'A aguardar confirmação', bg: 'rgba(100,116,139,0.08)', color: '#475569', border: 'rgba(100,116,139,0.20)', Icon: Clock },
   under_review:   { label: 'Em análise', bg: 'rgba(59,130,246,0.08)',  color: '#2563EB', border: 'rgba(59,130,246,0.20)',  Icon: Eye },
   partially_paid: { label: 'Parcial',    bg: 'rgba(139,92,246,0.08)', color: '#7C3AED', border: 'rgba(139,92,246,0.20)', Icon: Clock },
   rejected:       { label: 'Rejeitado',  bg: 'rgba(239,68,68,0.08)',   color: '#DC2626', border: 'rgba(239,68,68,0.20)',   Icon: AlertCircle },

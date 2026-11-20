@@ -57,8 +57,8 @@ export function CTASection() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto mb-10">
           {[
             { icon: Shield, text: 'Sem cartão de crédito' },
-            { icon: Clock, text: 'Garantia de 30 dias' },
-            { icon: Zap, text: 'Cancele quando quiser' },
+            { icon: Clock, text: 'Renovação indicada' },
+            { icon: Zap, text: 'Pagamento por transferência' },
             { icon: ArrowRight, text: 'Migração gratuita' },
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center justify-center gap-2 text-white/50 text-sm">

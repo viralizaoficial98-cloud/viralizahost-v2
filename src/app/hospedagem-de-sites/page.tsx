@@ -95,11 +95,11 @@ export default async function HospedagemDeSitesPage() {
           showBillingToggle
           carousel
           title="Hospedagem de Sites — Escolha o seu plano"
-          subtitle="Sem compromisso. Todos os planos com garantia de 30 dias."
+          subtitle="Escolha o plano, depois o domínio e a duração."
           fallbackPlans={fallbackPlans} />
         <IncludedFeatures features={included} hoverBorder />
         <FinalCTA
-          title="Comece hoje com 30 dias de garantia"
+          title="Comece hoje"
           subtitle="Migração gratuita, suporte 24/7 e uptime 99.9% garantido. Sem riscos." />
       </main>
       <Footer />

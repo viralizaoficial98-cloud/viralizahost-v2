@@ -139,7 +139,7 @@ export function ServiceHero({
           {guarantee && (
             <div className="mt-4 flex items-center gap-2 text-gray-500 text-xs">
               <Shield size={12} className="text-green-400 shrink-0" />
-              <span>Garantia de reembolso de 30 dias · Sem contratos · Cancele quando quiser</span>
+              <span>Preços em kwanzas · Renovação indicada em cada plano · Pagamento por transferência bancária</span>
             </div>
           )}
         </div>

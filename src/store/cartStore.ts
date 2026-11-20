@@ -10,9 +10,12 @@ export type Cycle = 'monthly' | '3months' | '6months' | '1year' | '2years' | '3y
 export type DomainMode = 'register' | 'transfer' | 'existing'
 
 export type CartLine =
-  | { key: string; type: 'product'; slug: string; cycle: Cycle; quantity: number; domain?: string; domainMode?: DomainMode }
-  | { key: string; type: 'domain'; domain: string; operation: 'register' | 'transfer' | 'renew'; eppCode?: string }
+  | { key: string; type: 'product'; slug: string; cycle: Cycle; quantity: number; domain?: string; domainMode?: DomainMode; flowId?: string }
+  | { key: string; type: 'domain'; domain: string; operation: 'register' | 'transfer' | 'renew'; eppCode?: string; years?: number; flowId?: string }
   | { key: string; type: 'renewal'; serviceId: string; label?: string }
+
+/** Linha sem chave (Omit distributivo sobre a união). */
+export type NewCartLine = CartLine extends infer T ? (T extends CartLine ? Omit<T, 'key'> : never) : never
 
 interface CartState {
   lines: CartLine[]
@@ -20,6 +23,8 @@ interface CartState {
   addProduct: (slug: string, cycle?: Cycle) => void
   addDomain: (domain: string, operation: 'register' | 'transfer' | 'renew') => void
   addRenewal: (serviceId: string, label?: string) => void
+  /** Linhas de um percurso de compra (/comprar): substitui as do mesmo percurso e não duplica domínio/plano. */
+  setPurchase: (flowId: string, lines: NewCartLine[]) => void
   update: (key: string, patch: Partial<CartLine>) => void
   remove: (key: string) => void
   clear: () => void
@@ -49,6 +54,12 @@ export const useCart = create<CartState>()(
         if (s.lines.some(l => l.type === 'renewal' && l.serviceId === serviceId)) return s
         return { lines: [...s.lines, { key: newKey(), type: 'renewal', serviceId, label }], idempotencyKey: null }
       }),
+      setPurchase: (flowId, incoming) => set(s => {
+        const ident = (l: NewCartLine | CartLine) => l.type === 'product' ? `p:${l.slug}:${l.domain ?? ''}` : l.type === 'domain' ? `d:${l.domain}` : `r:${l.serviceId}`
+        const ids = new Set(incoming.map(ident))
+        const kept = s.lines.filter(l => (l as { flowId?: string }).flowId !== flowId && !ids.has(ident(l)))
+        return { lines: [...kept, ...incoming.map(l => ({ ...l, key: newKey(), flowId } as CartLine))], idempotencyKey: null }
+      }),
       update: (key, patch) => set(s => ({ lines: s.lines.map(l => (l.key === key ? ({ ...l, ...patch } as CartLine) : l)), idempotencyKey: null })),
       remove: key => set(s => ({ lines: s.lines.filter(l => l.key !== key), idempotencyKey: null })),
       clear: () => set({ lines: [], idempotencyKey: null }),
@@ -74,6 +85,6 @@ export const useCart = create<CartState>()(
 /** Converte uma linha do carrinho no formato da API (o EPP só vai no pedido final). */
 export function toApiLine(l: CartLine) {
   if (l.type === 'renewal') return { type: 'renewal', serviceId: l.serviceId }
-  if (l.type === 'domain') return { type: 'domain', domain: l.domain, operation: l.operation, ...(l.eppCode ? { eppCode: l.eppCode } : {}) }
+  if (l.type === 'domain') return { type: 'domain', domain: l.domain, operation: l.operation, years: l.years ?? 1, ...(l.eppCode ? { eppCode: l.eppCode } : {}) }
   return { type: 'product', slug: l.slug, cycle: l.cycle, quantity: l.quantity, ...(l.domain ? { domain: l.domain, domainMode: l.domainMode ?? 'existing' } : {}) }
 }

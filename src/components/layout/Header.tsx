@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect, useRef } from 'react'
 import { useLocale } from '@/hooks/useLocale'
+import { CartButton } from '@/components/cart/CartButton'
 import {
   Menu, X, ChevronDown, ChevronRight, Server, Globe, Users, Bot, Code, Cpu,
   Workflow, Shield, MessageCircle, HardDrive, Monitor, Zap, Mail, Lock,
@@ -125,9 +126,9 @@ const emailColumns: ColDef[] = [
   {
     title: 'Planos de E-mail',
     items: [
-      { icon: Mail,    label: 'E-mail Starter',         desc: '5 contas, webmail premium e SSL',             href: '/email/starter' },
-      { icon: Zap,     label: 'E-mail Business',        desc: '15 contas, backup diário e DMARC',            href: '/email/business', badge: 'Popular' },
-      { icon: Server,  label: 'E-mail Enterprise',      desc: '50 contas, IP dedicada e SLA garantido',      href: '/email/enterprise' },
+      { icon: Mail,    label: 'E-mail Starter',         desc: 'Plano de entrada, preço por caixa',             href: '/comprar/email-starter' },
+      { icon: Zap,     label: 'E-mail Standard',        desc: 'Mais espaço, preço por caixa',            href: '/comprar/email-standard' },
+      { icon: Server,  label: 'E-mail Premium',         desc: 'Máximo espaço, preço por caixa',            href: '/comprar/email-premium' },
       { icon: Monitor, label: 'Microsoft 365 Outlook',  desc: 'Outlook, Teams e OneDrive 1 TB incluídos',    href: '/email/microsoft-365-outlook', badge: 'Microsoft' },
     ],
   },
@@ -249,7 +250,7 @@ function DarkMegaFooter({ onClose }: { onClose: () => void }) {
       <div className="flex gap-5 text-[11px]">
         <span className="flex items-center gap-1.5 text-green-400"><span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" /> Uptime 99.9%</span>
         <span style={{ color: 'rgba(255,255,255,0.35)' }}>Suporte 24/7</span>
-        <span style={{ color: 'rgba(255,255,255,0.35)' }}>Garantia 30 dias</span>
+        <span style={{ color: 'rgba(255,255,255,0.35)' }}>Preços em Kz</span>
       </div>
       <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.28)' }}>
         Dúvidas?{' '}
@@ -331,6 +332,7 @@ export function Header() {
 
           <div className="hidden lg:flex items-center gap-2.5 shrink-0">
             <CurrencySelector />
+            <CartButton />
             <Link href="/login" className="text-[#3D3D3D] hover:text-[#0A0A0A] px-4 py-2 rounded-xl text-sm font-medium transition-all hover:bg-[#F5F5F5]">
               {t('nav.login')}
             </Link>
@@ -340,8 +342,9 @@ export function Header() {
             </Link>
           </div>
 
+          <CartButton className="lg:hidden ml-auto mr-1" onClick={() => setMobileOpen(false)} />
           <button className="lg:hidden p-2 rounded-xl text-[#444] hover:bg-[#F5F5F5] transition-all"
-            onClick={() => setMobileOpen(!mobileOpen)} aria-label="Menu">
+            onClick={() => setMobileOpen(!mobileOpen)} aria-label="Menu" aria-expanded={mobileOpen}>
             {mobileOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
@@ -809,7 +812,7 @@ export function Header() {
                 <p className="text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.38)' }}>
                   Configure o seu e-mail corporativo em minutos.
                 </p>
-                <Link href="/email/business" onClick={killMega}
+                <Link href="/email-corporativo#planos" onClick={killMega}
                   className="block text-center text-xs font-bold py-2 rounded-xl transition-all duration-150 w-full"
                   style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.12)' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,183,0,0.15)'; (e.currentTarget as HTMLElement).style.color = '#F5B700' }}

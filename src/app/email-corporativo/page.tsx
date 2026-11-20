@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import { Mail, Shield, Lock, Calendar, Smartphone, Globe, Zap, Archive, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -39,7 +40,7 @@ export default function EmailCorporativoPage() {
               Comunicação empresarial segura com domínio personalizado e alta disponibilidade.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/email/business" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
+              <Link href="#planos" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
                 Ver Planos de E-mail →
               </Link>
               <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
@@ -48,6 +49,10 @@ export default function EmailCorporativoPage() {
             </div>
           </div>
         </section>
+
+        <DynamicServicePricing category="email" cols={3} showBillingToggle
+          title="Planos de e-mail corporativo"
+          subtitle="Preço por caixa de correio. Escolha o plano, depois o domínio, o número de caixas e a duração." />
 
         <section className="py-20 bg-white">
           <div className="container mx-auto px-4 lg:px-8">
@@ -73,7 +78,7 @@ export default function EmailCorporativoPage() {
             <p className="text-base mb-8" style={{ color: 'rgba(255,255,255,0.55)' }}>
               Junte-se a milhares de empresas que confiam na ViralizaHost.
             </p>
-            <Link href="/email/business" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
+            <Link href="#planos" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200" style={{ background: '#F5B700', color: '#090909' }}>
               Ver Planos de E-mail →
             </Link>
           </div>
