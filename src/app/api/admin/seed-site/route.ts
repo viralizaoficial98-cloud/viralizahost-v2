@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { getPool } from '@/lib/db/pool'
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { adminGuard } from '@/lib/api/require-admin'
@@ -37,60 +39,8 @@ const seedBanners = [
   },
 ]
 
-const seedDomains = [
-  { position: 1, extension: '.com',    currency: 'AKZ', price_monthly: 4500,  price_annual: 4500,  popular: false, active: true },
-  { position: 2, extension: '.net',    currency: 'AKZ', price_monthly: 5200,  price_annual: 5200,  popular: false, active: true },
-  { position: 3, extension: '.org',    currency: 'AKZ', price_monthly: 4800,  price_annual: 4800,  popular: false, active: true },
-  { position: 4, extension: '.ao',     currency: 'AKZ', price_monthly: 8000,  price_annual: 8000,  popular: true,  active: true },
-  { position: 5, extension: '.com.br', currency: 'BRL', price_monthly: 49,    price_annual: 49,    popular: false, active: true },
-  { position: 6, extension: '.io',     currency: 'AKZ', price_monthly: 18000, price_annual: 18000, popular: false, active: true },
-]
 
-const seedEmailPlans = [
-  {
-    slug: 'webmail-start', position: 1, active: true, popular: false, color: 'blue',
-    name: 'Webmail Start', price_monthly: 6800, storage_gb: 5, accounts: 1,
-    features: ['1 conta de email', '5 GB de armazenamento', 'Webmail incluído', 'Suporte básico'],
-  },
-  {
-    slug: 'webmail-business', position: 2, active: true, popular: true, color: 'violet',
-    name: 'Webmail Business', price_monthly: 14800, storage_gb: 20, accounts: 5,
-    features: ['5 contas de email', '20 GB de armazenamento', 'Webmail incluído', 'Anti-spam avançado', 'Suporte prioritário'],
-  },
-  {
-    slug: 'webmail-enterprise', position: 3, active: true, popular: false, color: 'emerald',
-    name: 'Webmail Enterprise', price_monthly: 28000, storage_gb: 50, accounts: 20,
-    features: ['20 contas de email', '50 GB de armazenamento', 'Webmail incluído', 'Anti-spam avançado', 'Backup diário', 'Suporte 24/7'],
-  },
-  {
-    slug: 'microsoft-365', position: 4, active: true, popular: false, color: 'orange',
-    name: 'Microsoft 365 Outlook', price_monthly: 52000, storage_gb: 50, accounts: 1,
-    features: ['1 conta Microsoft 365', '50 GB de armazenamento', 'Outlook, Teams, Word, Excel', 'OneDrive 1 TB', 'Suporte Microsoft', 'Integração completa Office'],
-  },
-]
 
-const seedHostingPlans = [
-  {
-    slug: 'starter', position: 1, active: true, featured: false,
-    name: 'Starter Host', price_monthly: 4500, price_annual: 4500, currency: 'AKZ',
-    features: ['10 GB SSD', '100 GB Tráfego', '1 Domínio', 'SSL Grátis', 'cPanel', '1-click WordPress'],
-  },
-  {
-    slug: 'business', position: 2, active: true, featured: true,
-    name: 'Business Cloud', price_monthly: 9500, price_annual: 9500, currency: 'AKZ',
-    features: ['25 GB SSD NVMe', '500 GB Tráfego', '5 Domínios', 'SSL Grátis', 'cPanel', 'Backups Diários', 'Email Profissional'],
-  },
-  {
-    slug: 'premium', position: 3, active: true, featured: false,
-    name: 'Cloud Pro', price_monthly: 19500, price_annual: 19500, currency: 'AKZ',
-    features: ['60 GB SSD NVMe', 'Tráfego Ilimitado', '20 Domínios', 'SSL Grátis', 'cPanel', 'Backups Diários', 'IP Dedicado', 'Suporte Prioritário'],
-  },
-  {
-    slug: 'reseller', position: 4, active: true, featured: false,
-    name: 'Revenda WHM', price_monthly: 35000, price_annual: 35000, currency: 'AKZ',
-    features: ['150 GB SSD NVMe', 'Tráfego Ilimitado', 'Domínios Ilimitados', 'WHM/cPanel', 'WHMCS', 'IP Dedicado', 'Suporte 24/7'],
-  },
-]
 
 const seedTeam = [
   {
@@ -142,23 +92,11 @@ const UPSERT_CONFLICT: Record<string, string> = {
 
 // Helpers -----------------------------------------------------------------
 
-const TABLES = ['site_banners', 'site_domains', 'site_email_plans', 'site_hosting_plans', 'site_team'] as const
-const DATASETS = [seedBanners, seedDomains, seedEmailPlans, seedHostingPlans, seedTeam]
+// Só conteúdo editorial. Planos, preços e domínios vêm do catálogo (product_prices /
+// domain_prices, «Catálogo e Preços»): nunca se semeiam preços por omissão.
+const TABLES = ['site_banners', 'site_team'] as const
+const DATASETS = [seedBanners, seedTeam]
 
-async function getCount(
-  db: Awaited<ReturnType<typeof createAdminClient>>,
-  table: string,
-): Promise<{ count: number; error?: string }> {
-  const { count, error } = await (db as any)
-    .from(table)
-    .select('*', { count: 'exact', head: true })
-
-  if (error) {
-    console.error(`[seed-site] count error on ${table}:`, JSON.stringify(error))
-    return { count: 0, error: `count failed: ${error.message}` }
-  }
-  return { count: count ?? 0 }
-}
 
 async function upsertTable(
   db: Awaited<ReturnType<typeof createAdminClient>>,
@@ -195,18 +133,24 @@ export async function POST() {
   return NextResponse.json({ ok: errorCount === 0, summary, seededCount, errorCount })
 }
 
+/** Contagens do painel «Gestão do Site»: { counts, errors } — um erro nunca aparece como 0. */
 export async function GET() {
   const denied = await adminGuard()
   if (denied) return denied
-
-  const db = await createAdminClient()
-
-  const results = await Promise.all(TABLES.map(t => getCount(db, t)))
-
-  const counts = TABLES.reduce((acc, t, i) => {
-    acc[t] = results[i].count
-    return acc
-  }, {} as Record<string, number>)
-
-  return NextResponse.json(counts)
+  const db = getPool()
+  const Q: Record<string, string> = {
+    site_banners: 'SELECT COUNT(*) n FROM site_banners',
+    site_team: 'SELECT COUNT(*) n FROM site_team',
+    banner_pages: 'SELECT COUNT(*) n FROM banner_pages',
+    hosting_plans: "SELECT COUNT(*) n FROM products WHERE active = 1 AND sale_status <> 'draft' AND category IN ('hosting','wordpress','website-builder','reseller')",
+    email_plans: "SELECT COUNT(*) n FROM products WHERE active = 1 AND sale_status <> 'draft' AND category = 'email'",
+    domain_extensions: "SELECT COUNT(DISTINCT extension) n FROM domain_prices WHERE status <> 'draft'",
+    products: 'SELECT COUNT(*) n FROM products',
+    product_prices: 'SELECT COUNT(*) n FROM product_prices WHERE active = 1',
+  }
+  const counts: Record<string, number> = {}, errors: Record<string, string> = {}
+  await Promise.all(Object.entries(Q).map(async ([k, sql]) => {
+    try { const [[r]] = await db.query(sql) as any; counts[k] = Number(r.n) } catch (e) { errors[k] = (e as Error).message.slice(0, 200) }
+  }))
+  return NextResponse.json({ counts, errors })
 }

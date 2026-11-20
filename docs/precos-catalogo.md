@@ -44,7 +44,7 @@ Gerado por `scripts/commerce/build-catalog.mjs` a partir de `database/mariadb/pr
 | `vps-evolution-scale` | [Hostinger KVM 8](https://www.hostinger.com/vps-hosting) | US$ 25.99/mês (pré-pago 24 meses: US$ 623.76) | US$ 49.99/mês | 49.99 × 2 × 913 = 91 281,74 → 91 300 | **91 300 Kz** | 1 095 600 Kz | 1 095 600 Kz |
 | `vps-ai-cloud-enterprise` | [Hostinger KVM 8](https://www.hostinger.com/vps-hosting) | US$ 25.99/mês (pré-pago 24 meses: US$ 623.76) | US$ 49.99/mês | 49.99 × 2 × 913 = 91 281,74 → 91 300 | **91 300 Kz** | 1 095 600 Kz | 1 095 600 Kz |
 
-Todos os ciclos (mensal, 6 meses, 1, 2 e 3 anos) cobram preço/mês × meses; a renovação comunicada é igual ao valor do ciclo.
+Todos os ciclos (mensal, trimestral, 6 meses, 1, 2 e 3 anos) cobram preço/mês × meses; a renovação comunicada é igual ao valor do ciclo.
 
 ## Sob consulta
 

@@ -60,7 +60,7 @@ interface Props {
   carousel?: boolean
 }
 
-const CYCLE_KEYS: BillingCycle[] = ['monthly', '6months', '1year', '2years', '3years']
+const CYCLE_KEYS: BillingCycle[] = ['monthly', '3months', '6months', '1year', '2years', '3years']
 
 function PlansWrap({ carousel, gridClass, children }: { carousel: boolean; gridClass: string; children: ReactNode }) {
   return carousel
@@ -81,6 +81,7 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
 
   const CYCLE_LABELS: Record<BillingCycle, string> = {
     monthly:   t('billing.monthly'),
+    '3months': 'Trimestral',
     '6months': t('billing.6months'),
     '1year':   t('billing.1year'),
     '2years':  t('billing.2years'),

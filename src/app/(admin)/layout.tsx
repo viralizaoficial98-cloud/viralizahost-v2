@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Users, CreditCard, MessageSquare, Settings,
-  Server, Globe, Activity, LogOut, ChevronRight, Monitor, ShoppingBag, Menu, X, Bot, Package, Plug, Receipt,
+  Server, Globe, Activity, LogOut, ChevronRight, Monitor, ShoppingBag, Menu, X, Bot, Package, Plug, Receipt, FileQuestion,
 } from 'lucide-react'
 import { createAuthClient } from '@/lib/supabase/client'
 
@@ -18,6 +18,7 @@ const adminNav = [
   { href: '/admin/domains',   icon: Globe,           label: 'Domínios',       exact: false },
   { href: '/admin/activity',  icon: Activity,        label: 'Atividade',      exact: false },
   { href: '/admin/orders',    icon: ShoppingBag,     label: 'Pedidos',        exact: false },
+  { href: '/admin/quotes',    icon: FileQuestion,    label: 'Cotações',       exact: false },
   { href: '/admin/site',      icon: Monitor,         label: 'Gestão do Site', exact: false },
   { href: '/admin/agent',     icon: Bot,             label: 'Agente IA',      exact: false },
   { href: '/admin/site/catalog', icon: Package,      label: 'Catálogo e Preços', exact: false },

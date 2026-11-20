@@ -1,21 +1,19 @@
 import { createClient } from '@/lib/supabase/client'
 
-export type BillingCycle = 'monthly' | '6months' | '1year' | '2years' | '3years'
+export type BillingCycle = 'monthly' | '3months' | '6months' | '1year' | '2years' | '3years'
 
 export const BILLING_LABELS: Record<BillingCycle, string> = {
   monthly: 'Mensal',
+  '3months': 'Trimestral',
   '6months': '6 Meses',
   '1year': 'Anual',
   '2years': '2 Anos',
   '3years': '3 Anos',
 }
 
+/** Sem descontos por ciclo: o catálogo aprovado cobra preço/mês × meses (docs/precos-catalogo.md). */
 export const BILLING_DISCOUNTS: Record<BillingCycle, number> = {
-  monthly: 0,
-  '6months': 15,
-  '1year': 30,
-  '2years': 45,
-  '3years': 55,
+  monthly: 0, '3months': 0, '6months': 0, '1year': 0, '2years': 0, '3years': 0,
 }
 
 export type Product = {
@@ -41,10 +39,11 @@ export type Product = {
 export function getPriceForCycle(product: Product, cycle: BillingCycle): number | null {
   switch (cycle) {
     case 'monthly':   return product.price_monthly ?? null
-    case '6months':   return product.price_6months ?? (product.price_monthly ? Math.round(product.price_monthly * 0.85) : null)
-    case '1year':     return product.price_1year   ?? (product.price_monthly ? Math.round(product.price_monthly * 0.70) : null)
-    case '2years':    return product.price_2years  ?? (product.price_monthly ? Math.round(product.price_monthly * 0.55) : null)
-    case '3years':    return product.price_3years  ?? (product.price_monthly ? Math.round(product.price_monthly * 0.45) : null)
+    case '3months':   return null
+    case '6months':   return product.price_6months ?? null
+    case '1year':     return product.price_1year   ?? null
+    case '2years':    return product.price_2years  ?? null
+    case '3years':    return product.price_3years  ?? null
   }
 }
 

@@ -28,7 +28,7 @@ const F = R.markup_factor
 const ceil100 = v => Math.ceil(v / 100) * 100
 const akz = (v, cur) => ceil100((cur === 'USD' ? v * RATE : v) * F)
 
-export const CYCLES = [['monthly', 1], ['6months', 6], ['1year', 12], ['2years', 24], ['3years', 36]]
+export const CYCLES = [['monthly', 1], ['3months', 3], ['6months', 6], ['1year', 12], ['2years', 24], ['3years', 36]]
 
 // Produtos que ainda não existem na base (anunciados nas páginas). Família → dados.
 const NEW_PRODUCTS = {
@@ -103,7 +103,7 @@ for (const o of offers) {
   const r = o.ref
   md += `| \`${o.slug}\` | [${r.provider} ${r.plan}](${r.url}) | ${usd(r.promo_monthly)}/mês (pré-pago ${r.promo_term_months} meses: ${usd(r.billed_total_promo)}) | ${usd(r.renewal_monthly)}/mês | ${r.renewal_monthly} × ${F} × ${RATE} = ${fmt(r.renewal_monthly * F * RATE)} → ${fmt(o.monthly)} | **${fmt(o.monthly)} Kz** | ${fmt(o.monthly * 12)} Kz | ${fmt(o.monthly * 12)} Kz |\n`
 }
-md += `\nTodos os ciclos (mensal, 6 meses, 1, 2 e 3 anos) cobram preço/mês × meses; a renovação comunicada é igual ao valor do ciclo.\n\n`
+md += `\nTodos os ciclos (mensal, trimestral, 6 meses, 1, 2 e 3 anos) cobram preço/mês × meses; a renovação comunicada é igual ao valor do ciclo.\n\n`
 md += `## Sob consulta\n\n| Planos | Motivo |\n|---|---|\n`
 for (const o of R.on_request) md += `| ${o.slugs.map(s => `\`${s}\``).join(', ')} | ${o.reason} |\n`
 md += `\n## Domínios (1 ano)\n\n| Extensão | Operação | Fonte | Referência | Promo 1.º ano (só registo) | Cálculo | Preço ViralizaHost |\n|---|---|---|---|---|---|---|\n`

@@ -42,6 +42,7 @@ export interface OrderSummary {
   status: string
   payment_status: string
   activation_status: string
+  hold_reason: string | null
   replayed?: boolean
 }
 
@@ -58,9 +59,9 @@ async function nextNumber(db: Queryable, table: 'orders' | 'invoices', col: stri
 }
 
 async function summary(db: Queryable, orderId: string, replayed = false): Promise<OrderSummary> {
-  const [o] = await rows(db, 'SELECT id, order_number, amount, status, payment_status, activation_status FROM orders WHERE id = ?', [orderId])
+  const [o] = await rows(db, 'SELECT id, order_number, amount, status, payment_status, activation_status, hold_reason FROM orders WHERE id = ?', [orderId])
   const [i] = await rows(db, 'SELECT id, invoice_number FROM invoices WHERE order_id = ?', [orderId])
-  return { id: o.id, order_number: o.order_number, invoice_id: i?.id ?? null, invoice_number: i?.invoice_number ?? null, total: Number(o.amount), currency: 'AKZ', status: o.status, payment_status: o.payment_status, activation_status: o.activation_status, ...(replayed ? { replayed: true } : {}) }
+  return { id: o.id, order_number: o.order_number, invoice_id: i?.id ?? null, invoice_number: i?.invoice_number ?? null, total: Number(o.amount), currency: 'AKZ', status: o.status, payment_status: o.payment_status, activation_status: o.activation_status, hold_reason: o.hold_reason ?? null, ...(replayed ? { replayed: true } : {}) }
 }
 
 export async function createOrder(input: CreateOrderInput, attempt = 1): Promise<{ order: OrderSummary; quote: Quote }> {
@@ -91,14 +92,18 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
     const firstDomainLine = quote.lines.find(l => l.type === 'domain')
     const ns = input.nameservers?.ns ?? []
     const cycle = quote.lines.find(l => l.cycle)?.cycle ?? '1year'
+    const held = quote.needsConfirmation
+    if (held && input.proofFile) {
+      throw new OrderError('payment_after_confirmation', 'Há domínios a confirmar pela equipa: o pagamento só é pedido depois dessa confirmação.', 409, { quote })
+    }
     const hasProof = !!input.proofFile
 
     await conn.query(
       `INSERT INTO orders (id, user_id, idempotency_key, order_number, billing_cycle, domain_name, domain_action, payment_method, amount, currency,
-         subtotal, tax_rate, tax_amount, status, payment_status, activation_status, proof_file, transfer_ref, use_default_ns, ns1, ns2, ns3, ns4, billing_details)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'AKZ', ?, ?, ?, 'pending', ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+         subtotal, tax_rate, tax_amount, status, payment_status, activation_status, hold_reason, proof_file, transfer_ref, use_default_ns, ns1, ns2, ns3, ns4, billing_details)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'AKZ', ?, ?, ?, 'pending', ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [orderId, input.userId, input.idempotencyKey, orderNumber, cycle, firstDomain, firstDomainLine?.operation ?? null, input.paymentMethod,
-        quote.total, quote.subtotal, quote.taxRate, quote.tax, hasProof ? 'proof_submitted' : 'unpaid', input.proofFile ?? null, input.transferRef ?? null,
+        quote.total, quote.subtotal, quote.taxRate, quote.tax, hasProof ? 'proof_submitted' : 'unpaid', held ? 'domain_confirmation' : null, input.proofFile ?? null, input.transferRef ?? null,
         input.nameservers?.useDefault === false ? 0 : 1, ns[0] || 'ns1.viralizahost.com', ns[1] || 'ns2.viralizahost.com', ns[2] || null, ns[3] || null,
         input.billingDetails ? JSON.stringify(input.billingDetails) : null],
     )
@@ -111,10 +116,11 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
       const epp = l.type === 'domain' && l.operation === 'transfer' && raw?.eppCode ? secretEpp(String(raw.eppCode)) : null
       await conn.query(
         `INSERT INTO order_items (id, order_id, service_name, service_type, price, quantity, product_id, product_slug, billing_cycle, months,
-           unit_price, line_total, renewal_price, domain_name, domain_operation, epp_code_enc, renews_service_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           unit_price, line_total, renewal_price, domain_name, domain_operation, epp_code_enc, renews_service_id, years, availability)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [itemId, orderId, l.name, l.serviceType, l.unitPrice, l.quantity, l.productId ?? null, l.slug ?? null, l.cycle ?? null, l.months ?? null,
-          l.unitPrice, l.lineTotal, l.renewalPrice, l.domain ?? null, l.type === 'domain' ? l.operation : (l.domainMode ?? null), epp, l.renewsServiceId ?? null],
+          l.unitPrice, l.lineTotal, l.renewalPrice, l.domain ?? null, l.type === 'domain' ? l.operation : (l.domainMode ?? null), epp, l.renewsServiceId ?? null,
+          l.type === 'domain' ? (l.years ?? 1) : null, l.type === 'domain' ? (l.availability?.status ?? null) : null],
       )
       // Serviço (um por item) — a activação acontece só depois do pagamento confirmado
       const serviceType = l.type === 'domain' ? 'domain' : l.serviceType
@@ -144,7 +150,7 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
       `INSERT INTO invoices (id, profile_id, order_id, invoice_number, status, currency, subtotal, discount, tax, total, amount_paid,
          due_date, issue_date, notes, proof_file, items)
        VALUES (?, ?, ?, ?, ?, 'AKZ', ?, 0, ?, ?, 0, CURRENT_DATE + INTERVAL 7 DAY, CURRENT_DATE, ?, ?, ?)`,
-      [invoiceId, input.userId, orderId, invoiceNumber, hasProof ? 'under_review' : 'pending', quote.subtotal, quote.tax, quote.total,
+      [invoiceId, input.userId, orderId, invoiceNumber, held ? 'draft' : hasProof ? 'under_review' : 'pending', quote.subtotal, quote.tax, quote.total,
         `Encomenda ${orderNumber}`, input.proofFile ?? null, JSON.stringify(invoiceItems)],
     )
     for (const [pos, it] of invoiceItems.entries()) {

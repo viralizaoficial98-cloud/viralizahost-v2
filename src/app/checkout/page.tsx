@@ -20,9 +20,9 @@ interface QuoteLine {
 interface Quote { currency: 'AKZ'; lines: QuoteLine[]; subtotal: number; taxRate: number; taxLabel: string; tax: number; total: number; valid: boolean }
 interface PayMethod { id: string; label: string; available: boolean; reason?: string; requiresProof?: boolean; bank?: Record<string, string | null> }
 
-const CYCLE_LABEL: Record<Cycle, string> = { monthly: 'Mensal', '6months': '6 meses', '1year': '1 ano', '2years': '2 anos', '3years': '3 anos' }
-const CYCLE_PER: Record<Cycle, string> = { monthly: 'mês', '6months': '6 meses', '1year': 'ano', '2years': '2 anos', '3years': '3 anos' }
-const LEGACY_BILLING: Record<string, Cycle> = { monthly: 'monthly', mensal: 'monthly', '6months': '6months', semiannual: '6months', '1year': '1year', annual: '1year', anual: '1year', '2years': '2years', '3years': '3years' }
+const CYCLE_LABEL: Record<Cycle, string> = { monthly: 'Mensal', '3months': 'Trimestral', '6months': '6 meses', '1year': '1 ano', '2years': '2 anos', '3years': '3 anos' }
+const CYCLE_PER: Record<Cycle, string> = { monthly: 'mês', '3months': 'trimestre', '6months': '6 meses', '1year': 'ano', '2years': '2 anos', '3years': '3 anos' }
+const LEGACY_BILLING: Record<string, Cycle> = { monthly: 'monthly', mensal: 'monthly', '3months': '3months', quarterly: '3months', trimestral: '3months', '6months': '6months', semiannual: '6months', '1year': '1year', annual: '1year', anual: '1year', '2years': '2years', '3years': '3years' }
 const STEPS = ['Carrinho', 'Conta', 'Pagamento', 'Revisão']
 
 const kz = (n: number) => `Kz ${n.toLocaleString('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/ /g, ' ')}`

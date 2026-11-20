@@ -5,9 +5,9 @@ import { checkAvailability, normalizeDomain, splitDomain, type Availability } fr
 // Cotação calculada SEMPRE no servidor a partir da base (product_prices / domain_prices).
 // O cliente só envia escolhas (produto, ciclo, quantidade, domínio, operação).
 
-export const CYCLES = ['monthly', '6months', '1year', '2years', '3years'] as const
+export const CYCLES = ['monthly', '3months', '6months', '1year', '2years', '3years'] as const
 export type Cycle = (typeof CYCLES)[number]
-export const CYCLE_LABEL: Record<Cycle, string> = { monthly: 'Mensal', '6months': '6 meses', '1year': '1 ano', '2years': '2 anos', '3years': '3 anos' }
+export const CYCLE_LABEL: Record<Cycle, string> = { monthly: 'Mensal', '3months': 'Trimestral', '6months': '6 meses', '1year': '1 ano', '2years': '2 anos', '3years': '3 anos' }
 
 export type DomainMode = 'register' | 'transfer' | 'existing'
 export type CartLineInput =
@@ -38,6 +38,7 @@ export interface QuoteLine {
   extension?: string
   availability?: Availability
   hasEppCode?: boolean
+  years?: number
   cycles?: { cycle: Cycle; months: number; price: number; renewal: number }[]
   error?: { code: string; message: string }
 }
@@ -51,8 +52,13 @@ export interface Quote {
   tax: number
   total: number
   valid: boolean
+  /** Há domínios «A confirmar pela equipa»: a encomenda fica retida e o pagamento só é pedido depois. */
+  needsConfirmation: boolean
 }
 
+/** Extensões cuja transferência não exige código EPP (registos nacionais de Angola). */
+export const EPP_OPTIONAL = ['.ao']
+export const MAX_DOMAIN_YEARS = 3
 const round2 = (n: number) => Math.round(n * 100) / 100
 const rows = async <T = any>(db: Queryable, sql: string, p: unknown[] = []) => (await db.query(sql, p))[0] as T[] // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -69,6 +75,7 @@ const MSG: Record<string, string> = {
   extension_unavailable: 'Extensão sem preço publicado (sob consulta).',
   epp_required: 'Indique o código de autorização (EPP) para transferir o domínio.',
   domain_not_owned: 'Só pode renovar domínios da sua conta.',
+  years_invalid: 'Duração de registo indisponível para esta extensão.',
   domain_line_missing: 'Adicione ao carrinho o registo ou a transferência deste domínio.',
   login_required: 'Inicie sessão para renovar os seus serviços.',
   service_not_owned: 'Serviço inexistente ou de outra conta.',
@@ -122,25 +129,31 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
     if (raw?.type === 'domain') {
       const domain = normalizeDomain(raw.domain)
       const op = raw.operation
-      const base: QuoteLine = { index, type: 'domain', name: `Domínio ${domain ?? raw.domain}`, serviceType: 'domain', provisioning: 'registrar', quantity: 1, unitPrice: 0, lineTotal: 0, renewalPrice: 0, domain: domain ?? undefined, operation: op, months: 12, hasEppCode: !!raw.eppCode }
+      const base: QuoteLine = { index, type: 'domain', name: `Domínio ${domain ?? raw.domain}`, serviceType: 'domain', provisioning: 'registrar', quantity: 1, unitPrice: 0, lineTotal: 0, renewalPrice: 0, domain: domain ?? undefined, operation: op, months: 12, years: 1, hasEppCode: !!raw.eppCode }
       if (!domain || !['register', 'transfer', 'renew'].includes(op)) { lines.push({ ...base, error: err('domain_invalid') }); continue }
       const parts = splitDomain(domain, exts)
       if (!parts) { lines.push({ ...base, error: err('extension_unavailable') }); continue }
       base.extension = parts.extension
-      base.name = `${op === 'register' ? 'Registo' : op === 'transfer' ? 'Transferência' : 'Renovação'} de domínio ${domain} (1 ano)`
+      // Registo/renovação: 1 a MAX_DOMAIN_YEARS anos = preço da operação + renovações publicadas. Transferência: 1 ano.
+      const years = op === 'transfer' ? 1 : Number(raw.years ?? 1)
+      if (!Number.isInteger(years) || years < 1 || years > MAX_DOMAIN_YEARS) { lines.push({ ...base, error: err('years_invalid') }); continue }
+      base.years = years; base.months = 12 * years
+      base.name = `${op === 'register' ? 'Registo' : op === 'transfer' ? 'Transferência' : 'Renovação'} de domínio ${domain} (${years} ${years === 1 ? 'ano' : 'anos'})`
       const [p] = await rows(db, 'SELECT price, status FROM domain_prices WHERE extension = ? AND operation = ? AND years = 1', [parts.extension, op])
       const [r] = await rows(db, "SELECT price FROM domain_prices WHERE extension = ? AND operation = 'renew' AND years = 1 AND status = 'active'", [parts.extension])
       if (!p || p.status !== 'active' || p.price == null) { lines.push({ ...base, error: err('extension_unavailable') }); continue }
-      base.unitPrice = Number(p.price); base.lineTotal = Number(p.price); base.renewalPrice = Number(r?.price ?? p.price)
-      if (op === 'transfer' && !raw.eppCode && !parts.extension.endsWith('.ao')) { lines.push({ ...base, error: err('epp_required') }); continue }
+      if (years > 1 && !r) { lines.push({ ...base, error: err('years_invalid') }); continue }
+      const renew = Number(r?.price ?? p.price)
+      base.unitPrice = Number(p.price); base.lineTotal = round2(Number(p.price) + renew * (years - 1)); base.renewalPrice = renew
+      if (op === 'transfer' && !raw.eppCode && !EPP_OPTIONAL.some(x => parts.extension.endsWith(x))) { lines.push({ ...base, error: err('epp_required') }); continue }
       if (op === 'renew') {
         const [own] = opts.userId ? await rows(db, 'SELECT id FROM domains WHERE profile_id = ? AND name = ? AND extension = ?', [opts.userId, parts.name, parts.extension]) : []
         if (!own) { lines.push({ ...base, error: err('domain_not_owned') }); continue }
       } else if (opts.checkAvailability !== false) {
         const a = await checkAvailability(domain)
         base.availability = a
-        if (op === 'register' && !a.available) { lines.push({ ...base, error: err('domain_unavailable') }); continue }
-        if (op === 'transfer' && a.verified && a.available) { lines.push({ ...base, error: err('domain_registered_required') }); continue }
+        if (op === 'register' && a.status === 'unavailable') { lines.push({ ...base, error: err('domain_unavailable') }); continue }
+        if (op === 'transfer' && a.status === 'available') { lines.push({ ...base, error: err('domain_registered_required') }); continue }
       }
       lines.push(base)
       continue
@@ -184,5 +197,6 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
   return {
     currency: 'AKZ', lines, subtotal, taxRate: tax.rate, taxLabel: tax.label, tax: taxAmount,
     total: round2(subtotal + taxAmount), valid: lines.length > 0 && lines.every(l => !l.error),
+    needsConfirmation: lines.some(l => !l.error && l.type === 'domain' && l.availability?.status === 'confirm'),
   }
 }

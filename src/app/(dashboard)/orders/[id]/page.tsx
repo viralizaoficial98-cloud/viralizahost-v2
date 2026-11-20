@@ -7,7 +7,7 @@ import { ACTIVATION_STATUS, PAYMENT_STATUS, TONE_CLASS, kz } from '@/lib/commerc
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Encomenda' }
 
-const CYCLE: Record<string, string> = { monthly: 'mês', '6months': '6 meses', '1year': 'ano', '2years': '2 anos', '3years': '3 anos' }
+const CYCLE: Record<string, string> = { monthly: 'mês', '3months': 'trimestre', '6months': '6 meses', '1year': 'ano', '2years': '2 anos', '3years': '3 anos' }
 const SERVICE_STATUS: Record<string, string> = {
   pending: 'Aguarda confirmação do pagamento', in_progress: 'Em activação', active: 'Activo',
   manual_required: 'A equipa está a activar manualmente', failed: 'Activação falhou — a equipa vai resolver sem nova cobrança',

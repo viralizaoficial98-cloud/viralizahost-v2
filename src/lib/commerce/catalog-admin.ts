@@ -8,8 +8,8 @@ import { withTransaction, getPool, type Queryable } from '@/lib/db/pool'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const rows = async <T = any>(db: Queryable, sql: string, p: unknown[] = []) => (await db.query(sql, p))[0] as T[]
 
-export const CYCLES = ['monthly', '6months', '1year', '2years', '3years'] as const
-const MONTHS: Record<string, number> = { monthly: 1, '6months': 6, '1year': 12, '2years': 24, '3years': 36 }
+export const CYCLES = ['monthly', '3months', '6months', '1year', '2years', '3years'] as const
+const MONTHS: Record<string, number> = { monthly: 1, '3months': 3, '6months': 6, '1year': 12, '2years': 24, '3years': 36 }
 
 export async function loadCatalog() {
   const db = getPool()
@@ -86,4 +86,19 @@ export async function updateDomainPrice(id: string, patch: { price: number | nul
     }
   })
   revalidateTag('catalog', { expire: 0 })
+}
+
+/** Nova extensão: registo, renovação e transferência em rascunho (sem preço) até a equipa publicar. */
+export async function createExtension(extRaw: string) {
+  const ext = String(extRaw ?? '').trim().toLowerCase().replace(/^([^.])/, '.$1')
+  if (!/^\.[a-z0-9]{2,24}(\.[a-z]{2,10})?$/.test(ext)) throw new Error('Extensão inválida (ex.: .ao, .co.ao, .com).')
+  await withTransaction(async conn => {
+    const [ex] = await rows(conn, 'SELECT 1 FROM domain_prices WHERE extension = ? LIMIT 1', [ext])
+    if (ex) throw new Error('Essa extensão já existe no catálogo.')
+    for (const op of ['register', 'renew', 'transfer']) {
+      await conn.query("INSERT INTO domain_prices (id, extension, operation, years, price, currency, status, reference) VALUES (UUID(), ?, ?, 1, NULL, 'AKZ', 'draft', JSON_OBJECT('created_by_admin', TRUE))", [ext, op])
+    }
+  })
+  revalidateTag('catalog', { expire: 0 })
+  return ext
 }

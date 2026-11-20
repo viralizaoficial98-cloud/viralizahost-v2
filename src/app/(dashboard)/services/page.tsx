@@ -11,7 +11,7 @@ export const metadata = { title: 'Serviços' }
 
 const ICON = { hosting: Server, email: Mail, domain: Globe, server: HardDrive, other: Package }
 const KIND = { hosting: 'Alojamento', email: 'E-mail', domain: 'Domínio', server: 'Servidor', other: 'Serviço' }
-const CYCLE: Record<string, string> = { monthly: 'mês', '6months': '6 meses', '1year': 'ano', '2years': '2 anos', '3years': '3 anos' }
+const CYCLE: Record<string, string> = { monthly: 'mês', '3months': 'trimestre', '6months': '6 meses', '1year': 'ano', '2years': '2 anos', '3years': '3 anos' }
 const STATE: Record<string, { label: string; tone: 'gray' | 'amber' | 'green' | 'red' }> = {
   pending: { label: 'A aguardar pagamento', tone: 'gray' },
   in_progress: { label: 'Em activação', tone: 'amber' },

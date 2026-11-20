@@ -6,7 +6,7 @@ import { persist } from 'zustand/middleware'
 // da cotação do servidor (/api/checkout/quote). O código EPP de transferência
 // nunca é persistido.
 
-export type Cycle = 'monthly' | '6months' | '1year' | '2years' | '3years'
+export type Cycle = 'monthly' | '3months' | '6months' | '1year' | '2years' | '3years'
 export type DomainMode = 'register' | 'transfer' | 'existing'
 
 export type CartLine =

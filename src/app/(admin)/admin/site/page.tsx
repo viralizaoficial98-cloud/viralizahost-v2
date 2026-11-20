@@ -3,20 +3,23 @@ import Link from 'next/link'
 import { Monitor, Image, Globe, Mail, Users, Server, RefreshCw, Sparkles, Package, LayoutTemplate, Film } from 'lucide-react'
 import { useEffect, useState, useCallback } from 'react'
 
-const modules: { href: string; icon: typeof Image; label: string; desc: string; color: string; table: string | null }[] = [
-  { href: '/admin/site/catalog',       icon: Package,        label: 'Catálogo e Preços',    desc: 'Preços por ciclo, renovação, estado de venda, pacote WHM', color: '#16A34A', table: 'product_prices' },
-  { href: '/admin/site/hero',          icon: Film,           label: 'Topo da Página Inicial', desc: 'Ativar carrossel ou vídeo',   color: '#0EA5E9', table: null },
-  { href: '/admin/site/banners',       icon: Image,          label: 'Banners / Hero',       desc: 'Slides do carrossel principal',   color: '#F5B700', table: 'site_banners' },
-  { href: '/admin/site/banner-pages',  icon: LayoutTemplate, label: 'Banner das Páginas',   desc: 'Hero de cada página de serviço',  color: '#F97316', table: 'banner_pages' },
-  { href: '/admin/site/domains',       icon: Globe,          label: 'Domínios',             desc: 'Extensões e preços de domínios',  color: '#3B82F6', table: 'site_domains' },
-  { href: '/admin/site/email-plans',   icon: Mail,           label: 'Planos de Email',      desc: 'Planos de email corporativo',     color: '#10B981', table: 'site_email_plans' },
-  { href: '/admin/site/hosting-plans', icon: Server,         label: 'Planos de Hospedagem', desc: 'Planos e preços de hosting',      color: '#EF4444', table: 'site_hosting_plans' },
-  { href: '/admin/site/products',      icon: Package,        label: 'Produtos / Catálogo',  desc: 'WordPress, VPS, Dedicados, etc.', color: '#8B5CF6', table: 'products' },
-  { href: '/admin/site/team',          icon: Users,          label: 'Equipa',               desc: 'Membros e estrutura',             color: '#6B7280', table: 'site_team' },
+// «key» = chave das contagens devolvidas por GET /api/admin/seed-site.
+// Planos, preços e extensões vivem no catálogo (product_prices / domain_prices).
+const modules: { href: string; icon: typeof Image; label: string; desc: string; color: string; key: string | null; unit?: string }[] = [
+  { href: '/admin/site/catalog?cat=hosting', icon: Server,         label: 'Planos de Hospedagem', desc: 'Hospedagem, WordPress, criador de sites e revenda: preços, ciclos e estado', color: '#EF4444', key: 'hosting_plans', unit: 'planos' },
+  { href: '/admin/site/catalog?cat=email',   icon: Mail,           label: 'Planos de E-mail',     desc: 'Preço por caixa, ciclos e estado de venda',  color: '#10B981', key: 'email_plans', unit: 'planos' },
+  { href: '/admin/site/catalog?cat=dominios', icon: Globe,         label: 'Domínios',             desc: 'Extensões, registo, renovação e transferência', color: '#3B82F6', key: 'domain_extensions', unit: 'extensões' },
+  { href: '/admin/site/catalog',             icon: Package,        label: 'Catálogo e Preços',    desc: 'Todos os planos: preços por ciclo, renovação, pacote WHM', color: '#16A34A', key: 'product_prices', unit: 'preços' },
+  { href: '/admin/site/products',            icon: Package,        label: 'Produtos (conteúdo)',  desc: 'Nomes, descrições e recursos dos cartões',   color: '#8B5CF6', key: 'products', unit: 'produtos' },
+  { href: '/admin/site/hero',                icon: Film,           label: 'Topo da Página Inicial', desc: 'Ativar carrossel ou vídeo',                color: '#0EA5E9', key: null },
+  { href: '/admin/site/banners',             icon: Image,          label: 'Banners / Hero',       desc: 'Slides do carrossel principal',              color: '#F5B700', key: 'site_banners' },
+  { href: '/admin/site/banner-pages',        icon: LayoutTemplate, label: 'Banner das Páginas',   desc: 'Hero de cada página de serviço',             color: '#F97316', key: 'banner_pages' },
+  { href: '/admin/site/team',                icon: Users,          label: 'Equipa',               desc: 'Membros e estrutura',                        color: '#6B7280', key: 'site_team' },
 ]
 
 export default function SitePage() {
-  const [counts, setCounts] = useState<number[]>(modules.map(() => 0))
+  const [counts, setCounts] = useState<(number | null)[]>(modules.map(() => null))
+  const [errors, setErrors] = useState<(string | null)[]>(modules.map(() => null))
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
   const [seedMsg, setSeedMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -26,16 +29,21 @@ export default function SitePage() {
     try {
       const res = await fetch('/api/admin/seed-site')
       const data = await res.json()
-      setCounts(modules.map(m => (m.table ? data[m.table] ?? 0 : 0)))
-    } catch {
-      setCounts(modules.map(() => 0))
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
+      setCounts(modules.map(m => (m.key && data.counts?.[m.key] != null ? data.counts[m.key] : null)))
+      setErrors(modules.map(m => (m.key && data.errors?.[m.key]) || null))
+    } catch (e) {
+      // Erro ≠ vazio: mostra «erro» em vez de 0
+      setCounts(modules.map(() => null))
+      setErrors(modules.map(m => (m.key ? (e as Error).message : null)))
     }
     setLoading(false)
   }, [])
 
   useEffect(() => { loadCounts() }, [loadCounts])
 
-  const totalItems = counts.reduce((a, b) => a + b, 0)
+  // Só o conteúdo editorial (banners, equipa) pode ser semeado; nunca planos/preços
+  const editorialEmpty = !loading && counts[modules.findIndex(m => m.key === 'site_banners')] === 0 && counts[modules.findIndex(m => m.key === 'site_team')] === 0
 
   const handleSeed = async () => {
     if (!confirm('Isto irá popular as tabelas vazias com conteúdo padrão. Continuar?')) return
@@ -81,7 +89,7 @@ export default function SitePage() {
             style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0', cursor: 'pointer' }}>
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Atualizar
           </button>
-          {totalItems === 0 && !loading && (
+          {editorialEmpty && (
             <button onClick={handleSeed} disabled={seeding}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold"
               style={{ background: 'linear-gradient(135deg,#F5B700,#D9A300)', color: '#000', boxShadow: '0 4px 14px rgba(245,183,0,0.30)', border: 'none', cursor: 'pointer', opacity: seeding ? 0.7 : 1 }}>
@@ -116,12 +124,16 @@ export default function SitePage() {
                   <Icon size={22} style={{ color: mod.color }} />
                 </div>
                 <span className="text-xs font-bold px-2.5 py-1 rounded-full"
-                  style={loading || !mod.table
+                  data-testid={`count-${mod.key ?? 'def'}`}
+                  title={errors[i] ?? undefined}
+                  style={loading || !mod.key
                     ? { background: '#F1F5F9', color: '#94A3B8' }
-                    : counts[i] > 0
-                      ? { background: `${mod.color}12`, color: mod.color }
-                      : { background: '#FEF3C7', color: '#D9A300' }}>
-                  {!mod.table ? 'Definição' : loading ? '…' : `${counts[i]} itens`}
+                    : errors[i]
+                      ? { background: '#FEE2E2', color: '#B91C1C' }
+                      : (counts[i] ?? 0) > 0
+                        ? { background: `${mod.color}12`, color: mod.color }
+                        : { background: '#FEF3C7', color: '#D9A300' }}>
+                  {!mod.key ? 'Definição' : loading ? '…' : errors[i] ? 'Erro ao contar' : `${counts[i]} ${mod.unit ?? 'itens'}`}
                 </span>
               </div>
               <h2 className="font-black text-base mb-1" style={{ color: '#0B0B0D' }}>{mod.label}</h2>
@@ -135,7 +147,7 @@ export default function SitePage() {
       </div>
 
       {/* Seed prompt when all tables empty */}
-      {totalItems === 0 && !loading && (
+      {editorialEmpty && (
         <div className="p-6 rounded-2xl flex items-center gap-4"
           style={{ background: 'rgba(245,183,0,0.06)', border: '1px solid rgba(245,183,0,0.20)' }}>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"

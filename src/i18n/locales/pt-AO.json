@@ -215,5 +215,90 @@
     "title": "Hospedagem de sites, domínios, e-mail corporativo e servidores VPS",
     "titleHighlight": "em Angola e no Brasil",
     "subtitle": "Hospedagem web premium com LiteSpeed, NVMe SSD, cPanel e suporte 24/7. Uptime 99.9% garantido."
+  },
+  "home": {
+    "heroTitle": "Alojamento web rápido e fiável",
+    "heroSubtitle": "Alojamento com LiteSpeed, SSD NVMe, cPanel e suporte técnico.",
+    "plansTitle": "Escolha o seu plano",
+    "plansSubtitle": "Preços em kwanzas, com o valor de renovação indicado em cada plano.",
+    "featuresTitle": "Porquê a ViralizaHost?",
+    "testimonialsTitle": "O que dizem os nossos clientes",
+    "faqTitle": "Perguntas frequentes",
+    "ctaTitle": "Pronto para começar?",
+    "ctaSubtitle": "Escolha o plano, o domínio e a duração e conclua a encomenda em minutos."
+  },
+  "hosting": {
+    "title": "Hospedagem",
+    "subtitle": "Alojamento rápido e seguro para o seu site.",
+    "websiteHosting": "Hospedagem de Sites",
+    "wordpressHosting": "Hospedagem WordPress",
+    "resellerHosting": "Revenda de Hospedagem",
+    "vpsServer": "Servidor VPS",
+    "dedicatedServer": "Servidor Dedicado",
+    "createSites": "Criar Sites",
+    "siteBuilder": "Criador de Sites com IA",
+    "servers": "Servidores"
+  },
+  "services": {
+    "products": "Produtos",
+    "solutions": "Soluções",
+    "resources": "Recursos",
+    "sslCert": "Certificado SSL",
+    "cloudBackup": "Backup Cloud",
+    "siteProtection": "Protecção de Site",
+    "freeMigration": "Migração Grátis",
+    "cdnPremium": "CDN Premium",
+    "knowledgeBase": "Base de Conhecimento",
+    "blog": "Blog",
+    "tools": "Ferramentas",
+    "partnerships": "Parcerias",
+    "aiAutomation": "IA e Automação",
+    "aiAgents": "Agentes de IA",
+    "managedN8n": "n8n Gerido",
+    "integrations": "Integrações",
+    "aiConsulting": "Consultoria IA"
+  },
+  "support": {
+    "contact": "Contacto",
+    "openTicket": "Abrir ticket",
+    "liveChat": "Chat",
+    "knowledgeBase": "Base de Conhecimento",
+    "serverStatus": "Estado do sistema",
+    "community": "Comunidade"
+  },
+  "company": {
+    "about": "Sobre nós",
+    "team": "Equipa",
+    "careers": "Carreiras",
+    "press": "Imprensa",
+    "partners": "Parceiros",
+    "affiliates": "Afiliados",
+    "privacyPolicy": "Política de Privacidade",
+    "termsOfService": "Termos de Serviço",
+    "refundPolicy": "Política de Reembolso"
+  },
+  "pricing": {
+    "mostPopular": "MAIS POPULAR",
+    "bestValue": "MELHOR VALOR",
+    "perMonth": "/mês",
+    "perYear": "/ano",
+    "startNow": "Começar",
+    "choosePlan": "Escolher plano",
+    "compareAll": "Comparar planos",
+    "billingToggle": "Período de facturação",
+    "saveWithAnnual": "Escolha o período de facturação"
+  },
+  "footer": {
+    "rights": "Todos os direitos reservados.",
+    "hosting": "Hospedagem",
+    "servers": "Servidores",
+    "domains": "Domínios",
+    "email": "E-mail Corporativo",
+    "aiAutomation": "IA e Automação",
+    "resources": "Recursos",
+    "support": "Suporte",
+    "company": "Empresa",
+    "paymentMethods": "Formas de pagamento",
+    "followUs": "Siga-nos"
   }
 }

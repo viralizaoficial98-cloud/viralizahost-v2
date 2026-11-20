@@ -1904,6 +1904,11 @@ export const SCHEMA_META: SchemaMeta = {
         ],
         "hasDefault": true
       },
+      "hold_reason": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
       "paid_at": {
         "kind": "timestamp",
         "hasDefault": true,
@@ -2076,6 +2081,16 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "renews_service_id": {
         "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "availability": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "years": {
+        "kind": "int",
         "hasDefault": true,
         "nullable": true
       }
@@ -2657,6 +2672,7 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "enum",
         "values": [
           "monthly",
+          "3months",
           "6months",
           "1year",
           "2years",
@@ -2950,6 +2966,90 @@ export const SCHEMA_META: SchemaMeta = {
         "many": true
       }
     ]
+  },
+  "quote_requests": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "reference"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "reference": {
+        "kind": "text"
+      },
+      "product_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "product_slug": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "product_name": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "name": {
+        "kind": "text"
+      },
+      "email": {
+        "kind": "text"
+      },
+      "phone": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "company": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "message": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "status": {
+        "kind": "enum",
+        "values": [
+          "new",
+          "contacted",
+          "quoted",
+          "closed"
+        ],
+        "hasDefault": true
+      },
+      "admin_notes": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
   },
   "servers": {
     "pk": [
