@@ -1,0 +1,170 @@
+{
+  "consulted_at": "2026-11-20T09:40:35Z",
+  "markup_factor": 2,
+  "rounding": "arredondamento para cima à centena de kwanzas: ceil(valor / 100) × 100",
+  "tax_note": "Preços sem impostos. A taxa de IVA é configurável no painel (company_billing_settings.tax_rate, 0 por omissão) e aplicada em separado no checkout. A taxa legal não foi confirmada numa fonte oficial nesta consulta (www.agt.minfin.gov.ao recusou a ligação).",
+  "exchange_rate": {
+    "source": "Banco Nacional de Angola — taxa de referência",
+    "page_url": "https://www.bna.ao/",
+    "api_url": "https://www.bna.ao/service/rest/taxas/get/taxa/referencia?moeda=usd&tipocambio=b",
+    "date": "2026-11-19",
+    "usd_aoa": 913,
+    "brl_aoa": 155.04534,
+    "verbatim": "{\"taxa\":913,\"descricaoTipoCambio\":\"Taxa de referencia - VENDA\",\"tipoCambio\":\"B\",\"data\":\"2026-11-19\",\"codigoMoeda\":\"USD\"} (compra G: 913)"
+  },
+  "reference_rule": "Serviços recorrentes: referência = preço de renovação publicado pela Hostinger para o mesmo prazo (preço regular, não promocional). O preço promocional de Black Friday exige pré-pagamento de 48 meses (hospedagem/e-mail) ou 24 meses (VPS) e fica registado só para comparação. A Hostinger só publica esse prazo; os restantes ciclos ViralizaHost usam o mesmo valor mensal × número de meses (sem descontos de ciclo inventados). Domínios internacionais: referência = preço normal do 1.º ano (não o promocional), renovação e transferência publicados. Domínios nacionais: referência AngoWeb em AKZ (sem conversão).",
+  "products": [
+    {
+      "key": "hostinger-premium",
+      "provider": "Hostinger",
+      "url": "https://www.hostinger.com/web-hosting",
+      "plan": "Premium",
+      "resources": "3 websites, 20 GB SSD, backups semanais, CDN, 2 caixas de e-mail por site (1.º ano), domínio grátis 1.º ano",
+      "currency": "USD",
+      "list_monthly": 12.99, "promo_monthly": 1.99, "promo_term_months": 48, "billed_total_promo": 95.52,
+      "renewal_monthly": 10.99,
+      "verbatim": "85% off Premium … $ 12.99 $ 1.99 /mo Choose plan Today you pay $95.52 for 48 months. Renews at $10.99/mo for the same term.",
+      "applies_to": ["hosting-start", "wp-start", "wp-builder-start", "ia-starter"]
+    },
+    {
+      "key": "hostinger-unlimited",
+      "provider": "Hostinger",
+      "url": "https://www.hostinger.com/web-hosting",
+      "plan": "Unlimited",
+      "resources": "websites ilimitados, 50 GB NVMe, backups diários, CDN, caixas de e-mail ilimitadas (1.º ano)",
+      "currency": "USD",
+      "list_monthly": 18.99, "promo_monthly": 2.79, "promo_term_months": 48, "billed_total_promo": 133.92,
+      "renewal_monthly": 16.99,
+      "verbatim": "Special offer • 85% off Unlimited … $ 18.99 $ 2.79 /mo Choose plan Today you pay $133.92 for 48 months. Renews at $16.99/mo for the same term.",
+      "applies_to": ["hosting-business", "wp-pro", "wp-builder-pro", "ia-pro"]
+    },
+    {
+      "key": "hostinger-cloud-startup",
+      "provider": "Hostinger",
+      "url": "https://www.hostinger.com/web-hosting",
+      "plan": "Cloud Startup",
+      "resources": "websites ilimitados, 100 GB NVMe, backups diários e a pedido, CDN",
+      "currency": "USD",
+      "list_monthly": 27.99, "promo_monthly": 7.99, "promo_term_months": 48, "billed_total_promo": 383.52,
+      "renewal_monthly": 25.99,
+      "verbatim": "71% off Cloud Startup … $ 27.99 $ 7.99 /mo Choose plan Today you pay $383.52 for 48 months. Renews at $25.99/mo for the same term.",
+      "applies_to": ["hosting-turbo", "wp-turbo", "wp-builder-turbo", "ia-business"]
+    },
+    {
+      "key": "hostinger-email-starter",
+      "provider": "Hostinger",
+      "url": "https://www.hostinger.com/business-email",
+      "plan": "Business Email Starter (por caixa)",
+      "resources": "1 caixa, 5 GB por caixa, 5 regras de reencaminhamento, 5 aliases",
+      "currency": "USD",
+      "list_monthly": 2.99, "promo_monthly": 0.39, "promo_term_months": 48, "billed_total_promo": 18.72,
+      "renewal_monthly": 1.59,
+      "verbatim": "87% off Starter … $ 2.99 $ 0.39 /mo Choose plan Price per mailbox. Today you pay $18.72 for 48 months. Renews at $1.59/mo for the same term.",
+      "applies_to": ["email-starter"]
+    },
+    {
+      "key": "hostinger-email-standard",
+      "provider": "Hostinger",
+      "url": "https://www.hostinger.com/business-email",
+      "plan": "Business Email Standard (por caixa)",
+      "resources": "1 caixa, 20 GB por caixa",
+      "currency": "USD",
+      "list_monthly": 3.99, "promo_monthly": 0.99, "promo_term_months": 48, "billed_total_promo": 47.52,
+      "renewal_monthly": 2.79,
+      "verbatim": "75% off Standard … $ 3.99 $ 0.99 /mo Choose plan Price per mailbox. Today you pay $47.52 for 48 months. Renews at $2.79/mo for the same term.",
+      "applies_to": ["email-standard"]
+    },
+    {
+      "key": "hostinger-email-premium",
+      "provider": "Hostinger",
+      "url": "https://www.hostinger.com/business-email",
+      "plan": "Business Email Premium (por caixa)",
+      "resources": "1 caixa, 50 GB por caixa, 50 regras de reencaminhamento, 30 aliases",
+      "currency": "USD",
+      "list_monthly": 5.99, "promo_monthly": 1.99, "promo_term_months": 48, "billed_total_promo": 95.52,
+      "renewal_monthly": 3.99,
+      "verbatim": "67% off Premium … $ 5.99 $ 1.99 /mo Choose plan Price per mailbox. Today you pay $95.52 for 48 months. Renews at $3.99/mo for the same term.",
+      "applies_to": ["email-premium"]
+    },
+    {
+      "key": "hostinger-kvm2",
+      "provider": "Hostinger",
+      "url": "https://www.hostinger.com/vps-hosting",
+      "plan": "KVM 2",
+      "resources": "2 vCPU, 8 GB RAM, 100 GB NVMe, 8 TB de tráfego (iguala ou excede: 2 vCPU, 4 GB, 60 GB NVMe)",
+      "currency": "USD",
+      "list_monthly": 24.49, "promo_monthly": 8.79, "promo_term_months": 24, "billed_total_promo": 210.96,
+      "renewal_monthly": 14.99,
+      "verbatim": "MOST POPULAR Special offer • 64% off KVM 2 $ 24.49 $ 8.79 /mo Choose plan Today you pay $210.96 for 24 months. Renews at $14.99/mo for the same term.",
+      "applies_to": ["vps-nvme2", "vps-n8n-start", "vps-openclaw-start", "vps-evolution-start", "vps-ai-cloud-start"]
+    },
+    {
+      "key": "hostinger-kvm4",
+      "provider": "Hostinger",
+      "url": "https://www.hostinger.com/vps-hosting",
+      "plan": "KVM 4",
+      "resources": "4 vCPU, 16 GB RAM, 200 GB NVMe, 16 TB (iguala ou excede: 4 vCPU, 8 GB, 120 GB NVMe)",
+      "currency": "USD",
+      "list_monthly": 42.99, "promo_monthly": 12.99, "promo_term_months": 24, "billed_total_promo": 311.76,
+      "renewal_monthly": 28.99,
+      "verbatim": "70% off KVM 4 $ 42.99 $ 12.99 /mo Choose plan Today you pay $311.76 for 24 months. Renews at $28.99/mo for the same term.",
+      "applies_to": ["vps-nvme4", "vps-n8n-pro", "vps-openclaw-pro", "vps-evolution-pro", "vps-ai-cloud-pro"]
+    },
+    {
+      "key": "hostinger-kvm8",
+      "provider": "Hostinger",
+      "url": "https://www.hostinger.com/vps-hosting",
+      "plan": "KVM 8",
+      "resources": "8 vCPU, 32 GB RAM, 400 GB NVMe, 32 TB (iguala ou excede: 8 vCPU, 16 GB, 240 GB NVMe)",
+      "currency": "USD",
+      "list_monthly": 73.99, "promo_monthly": 25.99, "promo_term_months": 24, "billed_total_promo": 623.76,
+      "renewal_monthly": 49.99,
+      "verbatim": "65% off KVM 8 $ 73.99 $ 25.99 /mo Choose plan Today you pay $623.76 for 24 months. Renews at $49.99/mo for the same term.",
+      "applies_to": ["vps-nvme8", "vps-n8n-scale", "vps-openclaw-scale", "vps-evolution-scale", "vps-ai-cloud-enterprise"]
+    }
+  ],
+  "on_request": [
+    { "slugs": ["reseller-start", "reseller-growth", "reseller-business", "reseller-enterprise"], "reason": "A Hostinger não publica planos de revenda (WHM) equivalentes." },
+    { "slugs": ["ded-16", "ded-32", "ded-64", "win-black", "win-sapphire", "win-diamond"], "reason": "A Hostinger não vende servidores dedicados; não há preço público equivalente." },
+    { "slugs": ["microsoft-365-outlook"], "reason": "Sem equivalente com plano e recursos publicados nas fontes consultadas (a AngoWeb mostra apenas «a partir de»)." },
+    { "slugs": ["ssl-dv", "ssl-ov", "ssl-ev", "ssl-wildcard"], "reason": "A Hostinger inclui SSL gratuito nos planos e não publica certificados OV/EV/Wildcard pagos." },
+    { "slugs": ["backup-100", "backup-500", "backup-2000"], "reason": "Sem produto de backup equivalente com preço público nas fontes consultadas." },
+    { "slugs": ["protection-basic", "protection-pro", "protection-premium"], "reason": "Sem produto de protecção equivalente com preço público nas fontes consultadas." }
+  ],
+  "domains": {
+    "international": {
+      "provider": "Hostinger",
+      "url": "https://www.hostinger.com/domains",
+      "currency": "USD",
+      "columns": "Domain extension | Type | First year | Renews at | Transfer",
+      "rows": [
+        { "ext": ".com", "register": 19.99, "promo_first_year": 0.01, "promo_note": "With 3-year term", "renew": 19.99, "transfer": 9.99, "verbatim": ".com … | gTLD | $ 19.99 /1st yr $ 0.01 With 3-year term | $19.99/yr | $9.99" },
+        { "ext": ".net", "register": 17.99, "promo_first_year": 11.99, "promo_note": "With 2-year term", "renew": 17.99, "transfer": 14.99, "verbatim": ".net … | gTLD | $ 17.99 /1st yr $ 11.99 With 2-year term | $17.99/yr | $14.99" },
+        { "ext": ".org", "register": 17.99, "promo_first_year": 7.99, "renew": 17.99, "transfer": 12.99, "verbatim": ".org … | gTLD | $ 17.99 /1st yr $ 7.99 | $17.99/yr | $12.99" },
+        { "ext": ".online", "register": 35.99, "promo_first_year": 0.99, "renew": 35.99, "transfer": 30.99, "verbatim": ".online … | gTLD | $ 35.99 /1st yr $ 0.99 | $35.99/yr | $30.99" },
+        { "ext": ".shop", "register": 39.99, "promo_first_year": 0.99, "renew": 39.99, "transfer": 34.99, "verbatim": ".shop … | gTLD | $ 39.99 /1st yr $ 0.99 | $39.99/yr | $34.99" },
+        { "ext": ".store", "register": 54.99, "promo_first_year": 0.99, "renew": 54.99, "transfer": 46.99, "verbatim": ".store … | gTLD | $ 54.99 /1st yr $ 0.99 | $54.99/yr | $46.99" },
+        { "ext": ".tech", "register": 63.99, "promo_first_year": 6.99, "renew": 63.99, "transfer": 53.99, "verbatim": ".tech … | gTLD | $ 63.99 /1st yr $ 6.99 | $63.99/yr | $53.99" },
+        { "ext": ".ai", "register": 109.99, "promo_first_year": 50, "promo_note": "2-year term only", "renew": 109.99, "transfer": 179.99, "verbatim": ".ai … | ccTLD Anguilla | $ 109.99 /1st yr $ 50 2-year term only | $109.99/yr | $179.99" },
+        { "ext": ".io", "register": 74.99, "promo_first_year": 26.99, "renew": 74.99, "transfer": 54.99, "verbatim": ".io … | ccTLD British Indian Ocean Territory | $ 74.99 /1st yr $ 26.99 | $74.99/yr | $54.99" },
+        { "ext": ".xyz", "register": 19.99, "promo_first_year": 1.29, "renew": 19.99, "transfer": 14.99, "verbatim": ".xyz … | gTLD | $ 19.99 /1st yr $ 1.29 | $19.99/yr | $14.99" }
+      ]
+    },
+    "national": {
+      "provider": "AngoWeb",
+      "url": "https://angoweb.ao/index.php?rp=/domain/pricing",
+      "currency": "AKZ",
+      "tax_note": "A página não indica se os valores incluem IVA.",
+      "rows": [
+        { "ext": ".ao", "register": 24900, "renew": 34900, "transfer": 0, "verbatim": ".ao | Registar Kz 24.900,00 1 Ano | Transferir Kz 0,00 1 Ano | Renovar Kz 34.900,00 1 Ano" },
+        { "ext": ".co.ao", "register": 34900, "renew": 44900, "transfer": 0, "verbatim": ".co.ao | Registar Kz 34.900,00 1 Ano | Transferir Kz 0,00 1 Ano | Renovar Kz 44.900,00 1 Ano" },
+        { "ext": ".org.ao", "register": 34900, "renew": 44900, "transfer": 0, "verbatim": ".org.ao | Registar Kz 34.900,00 1 Ano | Transferir Kz 0,00 1 Ano | Renovar Kz 44.900,00 1 Ano" },
+        { "ext": ".edu.ao", "register": 34900, "renew": 44900, "transfer": 0, "verbatim": ".edu.ao | Registar Kz 34.900,00 1 Ano | Transferir Kz 0,00 1 Ano | Renovar Kz 44.900,00 1 Ano" },
+        { "ext": ".it.ao", "register": 4900, "renew": 9900, "transfer": 0, "verbatim": ".it.ao | Registar Kz 4.900,00 1 Ano | Transferir Kz 0,00 1 Ano | Renovar Kz 9.900,00 1 Ano" }
+      ]
+    },
+    "on_request": [
+      { "ext": ".com.br", "reason": "Não consta da tabela pública da Hostinger consultada; registo .br exige registrador acreditado no Registro.br." }
+    ]
+  }
+}

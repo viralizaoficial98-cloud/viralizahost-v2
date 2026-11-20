@@ -126,6 +126,12 @@ export const POLICIES: Record<string, TablePolicy> = {
   },
   plans: { select: activeOrAdmin('is_active'), insert: checkAdmin, update: admin, delete: admin },
   product_features: { select: () => true, insert: checkAdmin, update: admin, delete: admin },
+  // Preços por ciclo e de domínios: leitura pública dos activos; escrita só admin
+  product_prices: { select: activeOrAdmin('active'), insert: checkAdmin, update: admin, delete: admin },
+  domain_prices: {
+    select: ctx => or(admin(ctx), sql("$t.`status` IN ('active','on_request')")),
+    insert: checkAdmin, update: admin, delete: admin,
+  },
   products: { select: activeOrAdmin('active'), insert: checkAdmin, update: admin, delete: admin },
   profiles: {
     select: ownOrAdmin('id'),

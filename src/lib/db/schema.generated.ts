@@ -1,4 +1,4 @@
-// AUTO-GERADO por scripts/mariadb/generate-schema.mjs — não editar à mão.
+// AUTO-GERADO por scripts/mariadb/generate-meta.mjs (a partir do MariaDB) — não editar à mão.
 // Metadados do schema MariaDB usados pela camada de dados (src/lib/db).
 import type { SchemaMeta } from './types'
 
@@ -11,11 +11,12 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "profile_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "action": {
@@ -33,10 +34,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "entity_type": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "entity_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "description": {
@@ -44,10 +47,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "ip_address": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "user_agent": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "metadata": {
@@ -81,15 +86,17 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "conversation_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "profile_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "tool_name": {
@@ -97,10 +104,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "tool_input": {
         "kind": "json",
+        "hasDefault": true,
         "nullable": true
       },
       "result_summary": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "success": {
@@ -109,10 +118,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "error_message": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "ip_address": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
@@ -141,19 +152,22 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "profile_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "session_token": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "title": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "status": {
@@ -175,8 +189,8 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       }
     },
     "relations": [
@@ -212,8 +226,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "conversation_id": {
         "kind": "uuid"
@@ -226,18 +240,22 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "tool_name": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "tool_input": {
         "kind": "json",
+        "hasDefault": true,
         "nullable": true
       },
       "tool_output": {
         "kind": "json",
+        "hasDefault": true,
         "nullable": true
       },
       "tokens_used": {
         "kind": "int",
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
@@ -270,8 +288,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "page_slug": {
         "kind": "text"
@@ -281,18 +299,22 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "breadcrumb": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "breadcrumb_parent": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "breadcrumb_parent_href": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "tag": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "title": {
@@ -305,6 +327,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "bg_image": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "bg_color": {
@@ -325,14 +348,17 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "button_secondary_text": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "button_secondary_link": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "price_text": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "show_guarantee": {
@@ -353,8 +379,8 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       }
     },
     "relations": []
@@ -371,38 +397,45 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "profile_id": {
         "kind": "uuid"
       },
       "company_name": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "tax_id": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "address": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "city": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "state": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "postal_code": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "notes": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "credit_balance": {
@@ -424,8 +457,8 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       }
     },
     "relations": [
@@ -449,8 +482,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "company_name": {
         "kind": "text",
@@ -458,6 +491,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "logo_url": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "email": {
@@ -470,34 +504,42 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "phone": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "address": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "bank_name": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "account_holder": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "account_number": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "iban": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "swift": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "payment_instructions": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "footer_text": {
@@ -516,6 +558,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "email_body_template": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "auto_email_on_create": {
@@ -528,17 +571,31 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       },
       "updated_by": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "active_unique_key": {
-        "kind": "int",
+        "kind": "bool",
         "generated": true,
         "hidden": true
+      },
+      "tax_rate": {
+        "kind": "number",
+        "hasDefault": true
+      },
+      "tax_label": {
+        "kind": "text",
+        "hasDefault": true
+      },
+      "payment_methods": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": []
@@ -556,8 +613,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "base_currency": {
         "kind": "text",
@@ -604,14 +661,15 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "profile_id": {
         "kind": "uuid"
       },
       "service_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "name": {
@@ -661,10 +719,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "expires_at": {
         "kind": "timestamp",
+        "hasDefault": true,
         "nullable": true
       },
       "price_paid": {
         "kind": "number",
+        "hasDefault": true,
         "nullable": true
       },
       "currency": {
@@ -674,6 +734,7 @@ export const SCHEMA_META: SchemaMeta = {
           "BRL",
           "USD"
         ],
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
@@ -682,11 +743,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       },
       "order_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "registered": {
@@ -738,6 +800,157 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
+  "domain_prices": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "extension",
+        "operation",
+        "years"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "defaultUuid": true
+      },
+      "extension": {
+        "kind": "text"
+      },
+      "operation": {
+        "kind": "enum",
+        "values": [
+          "register",
+          "renew",
+          "transfer"
+        ]
+      },
+      "years": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "price": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "currency": {
+        "kind": "enum",
+        "values": [
+          "AKZ",
+          "BRL",
+          "USD"
+        ],
+        "hasDefault": true
+      },
+      "status": {
+        "kind": "enum",
+        "values": [
+          "active",
+          "draft",
+          "on_request"
+        ],
+        "hasDefault": true
+      },
+      "registrar": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "reference": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
+  "emails": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "email_address"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "defaultUuid": true
+      },
+      "hosting_id": {
+        "kind": "uuid"
+      },
+      "profile_id": {
+        "kind": "uuid"
+      },
+      "email_address": {
+        "kind": "text"
+      },
+      "display_name": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "quota_mb": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "used_mb": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "status": {
+        "kind": "text",
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": [
+      {
+        "columns": [
+          "hosting_id"
+        ],
+        "table": "hosting_accounts",
+        "refColumns": [
+          "id"
+        ],
+        "name": "emails_hosting_id_fkey"
+      },
+      {
+        "columns": [
+          "profile_id"
+        ],
+        "table": "profiles",
+        "refColumns": [
+          "id"
+        ],
+        "name": "emails_profile_id_fkey"
+      }
+    ]
+  },
   "email_logs": {
     "pk": [
       "id"
@@ -746,19 +959,22 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "profile_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "invoice_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "order_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "recipient": {
@@ -770,6 +986,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "subject": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "provider": {
@@ -778,6 +995,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "provider_message_id": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "status": {
@@ -796,6 +1014,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "error_message": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "attempts": {
@@ -808,18 +1027,22 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "initiated_by": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "sent_at": {
         "kind": "timestamp",
+        "hasDefault": true,
         "nullable": true
       },
       "delivered_at": {
         "kind": "timestamp",
+        "hasDefault": true,
         "nullable": true
       },
       "failed_at": {
         "kind": "timestamp",
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
@@ -828,8 +1051,8 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       }
     },
     "relations": [
@@ -865,79 +1088,6 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
-  "emails": {
-    "pk": [
-      "id"
-    ],
-    "unique": [
-      [
-        "email_address"
-      ]
-    ],
-    "columns": {
-      "id": {
-        "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
-      },
-      "hosting_id": {
-        "kind": "uuid"
-      },
-      "profile_id": {
-        "kind": "uuid"
-      },
-      "email_address": {
-        "kind": "text"
-      },
-      "display_name": {
-        "kind": "text",
-        "nullable": true
-      },
-      "quota_mb": {
-        "kind": "int",
-        "hasDefault": true
-      },
-      "used_mb": {
-        "kind": "int",
-        "hasDefault": true
-      },
-      "status": {
-        "kind": "text",
-        "hasDefault": true
-      },
-      "created_at": {
-        "kind": "timestamp",
-        "hasDefault": true
-      },
-      "updated_at": {
-        "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
-      }
-    },
-    "relations": [
-      {
-        "columns": [
-          "hosting_id"
-        ],
-        "table": "hosting_accounts",
-        "refColumns": [
-          "id"
-        ],
-        "name": "emails_hosting_id_fkey"
-      },
-      {
-        "columns": [
-          "profile_id"
-        ],
-        "table": "profiles",
-        "refColumns": [
-          "id"
-        ],
-        "name": "emails_profile_id_fkey"
-      }
-    ]
-  },
   "hosting_accounts": {
     "pk": [
       "id"
@@ -950,8 +1100,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "service_id": {
         "kind": "uuid"
@@ -961,6 +1111,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "server_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "cpanel_username": {
@@ -1011,35 +1162,52 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       },
       "disk_limit_mb": {
         "kind": "int",
+        "hasDefault": true,
         "nullable": true
       },
       "package_name": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "ip_address": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "suspension_reason": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "last_synced_at": {
         "kind": "timestamp",
+        "hasDefault": true,
         "nullable": true
       },
       "cpanel_url": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       }
     },
     "relations": [
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "emails",
+        "refColumns": [
+          "hosting_id"
+        ],
+        "name": "emails_hosting_id_fkey",
+        "many": true
+      },
       {
         "columns": [
           "profile_id"
@@ -1074,17 +1242,6 @@ export const SCHEMA_META: SchemaMeta = {
         "columns": [
           "id"
         ],
-        "table": "emails",
-        "refColumns": [
-          "hosting_id"
-        ],
-        "name": "emails_hosting_id_fkey",
-        "many": true
-      },
-      {
-        "columns": [
-          "id"
-        ],
         "table": "sso_audit_logs",
         "refColumns": [
           "hosting_account_id"
@@ -1105,6 +1262,293 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
+  "invoices": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "invoice_number"
+      ],
+      [
+        "order_id"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "defaultUuid": true
+      },
+      "invoice_number": {
+        "kind": "text",
+        "appDefault": "((('INV-'::text || to_char(now(), 'YYYY'::text)) || '-'::text) || lpad((floor((random() * (99999)::double precision)))::text, 5, '0'::text))",
+        "hasDefault": true
+      },
+      "profile_id": {
+        "kind": "uuid"
+      },
+      "service_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "status": {
+        "kind": "enum",
+        "values": [
+          "pending",
+          "paid",
+          "overdue",
+          "cancelled",
+          "refunded",
+          "under_review",
+          "partially_paid",
+          "rejected",
+          "draft",
+          "sending",
+          "sent",
+          "generated",
+          "failed"
+        ],
+        "hasDefault": true
+      },
+      "currency": {
+        "kind": "enum",
+        "values": [
+          "AKZ",
+          "BRL",
+          "USD"
+        ],
+        "hasDefault": true
+      },
+      "subtotal": {
+        "kind": "number",
+        "hasDefault": true
+      },
+      "discount": {
+        "kind": "number",
+        "hasDefault": true
+      },
+      "tax": {
+        "kind": "number",
+        "hasDefault": true
+      },
+      "total": {
+        "kind": "number",
+        "hasDefault": true
+      },
+      "items": {
+        "kind": "json",
+        "hasDefault": true
+      },
+      "due_date": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "paid_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "notes": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      },
+      "order_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "amount_paid": {
+        "kind": "number",
+        "hasDefault": true
+      },
+      "ticket_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "issue_date": {
+        "kind": "date",
+        "hasDefault": true
+      },
+      "pdf_storage_path": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "emailed_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "email_to": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "email_from": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "email_provider": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "email_provider_id": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "email_sent_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "email_last_error": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "email_attempts": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "email_delivered_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "email_bounced_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "email_status": {
+        "kind": "text",
+        "hasDefault": true
+      },
+      "proof_file": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      }
+    },
+    "relations": [
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "email_logs",
+        "refColumns": [
+          "invoice_id"
+        ],
+        "name": "email_logs_invoice_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
+          "order_id"
+        ],
+        "table": "orders",
+        "refColumns": [
+          "id"
+        ],
+        "name": "invoices_order_id_fkey"
+      },
+      {
+        "columns": [
+          "profile_id"
+        ],
+        "table": "profiles",
+        "refColumns": [
+          "id"
+        ],
+        "name": "invoices_profile_id_fkey"
+      },
+      {
+        "columns": [
+          "service_id"
+        ],
+        "table": "services",
+        "refColumns": [
+          "id"
+        ],
+        "name": "invoices_service_id_fkey"
+      },
+      {
+        "columns": [
+          "ticket_id"
+        ],
+        "table": "tickets",
+        "refColumns": [
+          "id"
+        ],
+        "name": "invoices_ticket_id_fkey"
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "invoice_items",
+        "refColumns": [
+          "invoice_id"
+        ],
+        "name": "invoice_items_invoice_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "invoice_send_logs",
+        "refColumns": [
+          "invoice_id"
+        ],
+        "name": "invoice_send_logs_invoice_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "payments",
+        "refColumns": [
+          "invoice_id"
+        ],
+        "name": "payments_invoice_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "ticket_attachments",
+        "refColumns": [
+          "invoice_id"
+        ],
+        "name": "ticket_attachments_invoice_id_fkey",
+        "many": true
+      }
+    ]
+  },
   "invoice_items": {
     "pk": [
       "id"
@@ -1113,14 +1557,15 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "invoice_id": {
         "kind": "uuid"
       },
       "product_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "description": {
@@ -1178,18 +1623,20 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "invoice_id": {
         "kind": "uuid"
       },
       "order_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "ticket_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "customer_id": {
@@ -1204,6 +1651,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "provider_message_id": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "status": {
@@ -1212,10 +1660,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "error_message": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "initiated_by": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "initiated_by_agent": {
@@ -1228,8 +1678,8 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       }
     },
     "relations": [
@@ -1245,277 +1695,6 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
-  "invoices": {
-    "pk": [
-      "id"
-    ],
-    "unique": [
-      [
-        "invoice_number"
-      ],
-      [
-        "order_id"
-      ]
-    ],
-    "columns": {
-      "id": {
-        "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
-      },
-      "invoice_number": {
-        "kind": "text",
-        "appDefault": "((('INV-'::text || to_char(now(), 'YYYY'::text)) || '-'::text) || lpad((floor((random() * (99999)::double precision)))::text, 5, '0'::text))",
-        "hasDefault": true
-      },
-      "profile_id": {
-        "kind": "uuid"
-      },
-      "service_id": {
-        "kind": "uuid",
-        "nullable": true
-      },
-      "status": {
-        "kind": "enum",
-        "values": [
-          "pending",
-          "paid",
-          "overdue",
-          "cancelled",
-          "refunded",
-          "under_review",
-          "partially_paid",
-          "rejected",
-          "draft",
-          "sending",
-          "sent",
-          "generated",
-          "failed"
-        ],
-        "hasDefault": true
-      },
-      "currency": {
-        "kind": "enum",
-        "values": [
-          "AKZ",
-          "BRL",
-          "USD"
-        ],
-        "hasDefault": true
-      },
-      "subtotal": {
-        "kind": "number",
-        "hasDefault": true
-      },
-      "discount": {
-        "kind": "number",
-        "hasDefault": true
-      },
-      "tax": {
-        "kind": "number",
-        "hasDefault": true
-      },
-      "total": {
-        "kind": "number",
-        "hasDefault": true
-      },
-      "items": {
-        "kind": "json",
-        "hasDefault": true
-      },
-      "due_date": {
-        "kind": "timestamp",
-        "hasDefault": true
-      },
-      "paid_at": {
-        "kind": "timestamp",
-        "nullable": true
-      },
-      "notes": {
-        "kind": "text",
-        "nullable": true
-      },
-      "created_at": {
-        "kind": "timestamp",
-        "hasDefault": true
-      },
-      "updated_at": {
-        "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
-      },
-      "order_id": {
-        "kind": "uuid",
-        "nullable": true
-      },
-      "amount_paid": {
-        "kind": "number",
-        "hasDefault": true
-      },
-      "ticket_id": {
-        "kind": "uuid",
-        "nullable": true
-      },
-      "issue_date": {
-        "kind": "date",
-        "hasDefault": true
-      },
-      "pdf_storage_path": {
-        "kind": "text",
-        "nullable": true
-      },
-      "emailed_at": {
-        "kind": "timestamp",
-        "nullable": true
-      },
-      "created_by": {
-        "kind": "uuid",
-        "nullable": true
-      },
-      "email_to": {
-        "kind": "text",
-        "nullable": true
-      },
-      "email_from": {
-        "kind": "text",
-        "nullable": true
-      },
-      "email_provider": {
-        "kind": "text",
-        "hasDefault": true,
-        "nullable": true
-      },
-      "email_provider_id": {
-        "kind": "text",
-        "nullable": true
-      },
-      "email_sent_at": {
-        "kind": "timestamp",
-        "nullable": true
-      },
-      "email_last_error": {
-        "kind": "text",
-        "nullable": true
-      },
-      "email_attempts": {
-        "kind": "int",
-        "hasDefault": true
-      },
-      "email_delivered_at": {
-        "kind": "timestamp",
-        "nullable": true
-      },
-      "email_bounced_at": {
-        "kind": "timestamp",
-        "nullable": true
-      },
-      "email_status": {
-        "kind": "text",
-        "hasDefault": true
-      },
-      "proof_file": {
-        "kind": "text",
-        "nullable": true
-      }
-    },
-    "relations": [
-      {
-        "columns": [
-          "order_id"
-        ],
-        "table": "orders",
-        "refColumns": [
-          "id"
-        ],
-        "name": "invoices_order_id_fkey"
-      },
-      {
-        "columns": [
-          "profile_id"
-        ],
-        "table": "profiles",
-        "refColumns": [
-          "id"
-        ],
-        "name": "invoices_profile_id_fkey"
-      },
-      {
-        "columns": [
-          "service_id"
-        ],
-        "table": "services",
-        "refColumns": [
-          "id"
-        ],
-        "name": "invoices_service_id_fkey"
-      },
-      {
-        "columns": [
-          "ticket_id"
-        ],
-        "table": "tickets",
-        "refColumns": [
-          "id"
-        ],
-        "name": "invoices_ticket_id_fkey"
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "email_logs",
-        "refColumns": [
-          "invoice_id"
-        ],
-        "name": "email_logs_invoice_id_fkey",
-        "many": true
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "invoice_items",
-        "refColumns": [
-          "invoice_id"
-        ],
-        "name": "invoice_items_invoice_id_fkey",
-        "many": true
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "invoice_send_logs",
-        "refColumns": [
-          "invoice_id"
-        ],
-        "name": "invoice_send_logs_invoice_id_fkey",
-        "many": true
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "payments",
-        "refColumns": [
-          "invoice_id"
-        ],
-        "name": "payments_invoice_id_fkey",
-        "many": true
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "ticket_attachments",
-        "refColumns": [
-          "invoice_id"
-        ],
-        "name": "ticket_attachments_invoice_id_fkey",
-        "many": true
-      }
-    ]
-  },
   "notifications": {
     "pk": [
       "id"
@@ -1524,8 +1703,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "profile_id": {
         "kind": "uuid"
@@ -1548,6 +1727,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "link": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "is_read": {
@@ -1572,67 +1752,28 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
-  "order_items": {
-    "pk": [
-      "id"
-    ],
-    "unique": [],
-    "columns": {
-      "id": {
-        "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
-      },
-      "order_id": {
-        "kind": "uuid"
-      },
-      "service_name": {
-        "kind": "text"
-      },
-      "service_type": {
-        "kind": "text",
-        "hasDefault": true
-      },
-      "price": {
-        "kind": "number",
-        "hasDefault": true
-      },
-      "quantity": {
-        "kind": "int",
-        "hasDefault": true
-      },
-      "created_at": {
-        "kind": "timestamp",
-        "hasDefault": true,
-        "nullable": true
-      }
-    },
-    "relations": [
-      {
-        "columns": [
-          "order_id"
-        ],
-        "table": "orders",
-        "refColumns": [
-          "id"
-        ],
-        "name": "order_items_order_id_fkey"
-      }
-    ]
-  },
   "orders": {
     "pk": [
       "id"
     ],
-    "unique": [],
+    "unique": [
+      [
+        "user_id",
+        "idempotency_key"
+      ],
+      [
+        "order_number"
+      ]
+    ],
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "user_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "billing_cycle": {
@@ -1641,10 +1782,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "domain_name": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "domain_action": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "payment_method": {
@@ -1661,14 +1804,17 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "proof_file": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "transfer_ref": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "notes": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
@@ -1687,18 +1833,88 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "ns1": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "ns2": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "ns3": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "ns4": {
         "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "idempotency_key": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "order_number": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "currency": {
+        "kind": "enum",
+        "values": [
+          "AKZ",
+          "BRL",
+          "USD"
+        ],
+        "hasDefault": true
+      },
+      "subtotal": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "tax_rate": {
+        "kind": "number",
+        "hasDefault": true
+      },
+      "tax_amount": {
+        "kind": "number",
+        "hasDefault": true
+      },
+      "payment_status": {
+        "kind": "enum",
+        "values": [
+          "unpaid",
+          "proof_submitted",
+          "paid",
+          "failed",
+          "refunded"
+        ],
+        "hasDefault": true
+      },
+      "activation_status": {
+        "kind": "enum",
+        "values": [
+          "pending",
+          "in_progress",
+          "active",
+          "partial",
+          "manual_required",
+          "failed",
+          "cancelled"
+        ],
+        "hasDefault": true
+      },
+      "paid_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "billing_details": {
+        "kind": "json",
+        "hasDefault": true,
         "nullable": true
       }
     },
@@ -1771,7 +1987,7 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
-  "payments": {
+  "order_items": {
     "pk": [
       "id"
     ],
@@ -1779,8 +1995,116 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
+        "hasDefault": true,
+        "defaultUuid": true
+      },
+      "order_id": {
+        "kind": "uuid"
+      },
+      "service_name": {
+        "kind": "text"
+      },
+      "service_type": {
+        "kind": "text",
         "hasDefault": true
+      },
+      "price": {
+        "kind": "number",
+        "hasDefault": true
+      },
+      "quantity": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "product_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "product_slug": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "billing_cycle": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "months": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "unit_price": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "line_total": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "renewal_price": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "domain_name": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "domain_operation": {
+        "kind": "enum",
+        "values": [
+          "register",
+          "transfer",
+          "existing",
+          "renew"
+        ],
+        "hasDefault": true,
+        "nullable": true
+      },
+      "epp_code_enc": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      }
+    },
+    "relations": [
+      {
+        "columns": [
+          "order_id"
+        ],
+        "table": "orders",
+        "refColumns": [
+          "id"
+        ],
+        "name": "order_items_order_id_fkey"
+      }
+    ]
+  },
+  "payments": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "gateway_event_id"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "invoice_id": {
         "kind": "uuid"
@@ -1819,6 +2143,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "gateway_ref": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "gateway_data": {
@@ -1828,6 +2153,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "paid_at": {
         "kind": "timestamp",
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
@@ -1836,50 +2162,67 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "order_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "proof_url": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "proof_filename": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "proof_mime": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "transfer_ref": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "transfer_date": {
         "kind": "date",
+        "hasDefault": true,
         "nullable": true
       },
       "payer_name": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "payer_bank": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "declared_amount": {
         "kind": "number",
+        "hasDefault": true,
         "nullable": true
       },
       "rejection_reason": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "reviewed_at": {
         "kind": "timestamp",
+        "hasDefault": true,
         "nullable": true
       },
       "reviewed_by": {
         "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "gateway_event_id": {
+        "kind": "text",
+        "hasDefault": true,
         "nullable": true
       }
     },
@@ -1928,8 +2271,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "slug": {
         "kind": "text"
@@ -1949,6 +2292,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "description": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "features": {
@@ -2009,8 +2353,8 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       }
     },
     "relations": [
@@ -2038,6 +2382,217 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
+  "products": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "slug"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "defaultUuid": true
+      },
+      "slug": {
+        "kind": "text"
+      },
+      "category": {
+        "kind": "text"
+      },
+      "name": {
+        "kind": "text"
+      },
+      "description": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "badge": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "popular": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "active": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "position": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "price_monthly": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "price_6months": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "price_1year": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "price_2years": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "price_3years": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "color": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "href_override": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "meta": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "subcategory": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "cta_label": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "cta_url": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "currency": {
+        "kind": "text",
+        "hasDefault": true
+      },
+      "price_aoa": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "price_brl": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "price_usd": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "use_auto_conversion": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "sale_status": {
+        "kind": "enum",
+        "values": [
+          "active",
+          "draft",
+          "on_request"
+        ],
+        "hasDefault": true
+      },
+      "service_type": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "provisioning": {
+        "kind": "enum",
+        "values": [
+          "whm",
+          "registrar",
+          "manual"
+        ],
+        "hasDefault": true
+      },
+      "whm_package": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "quantity_unit": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "max_quantity": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "pricing_note": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      }
+    },
+    "relations": [
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "invoice_items",
+        "refColumns": [
+          "product_id"
+        ],
+        "name": "invoice_items_product_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "product_features",
+        "refColumns": [
+          "product_id"
+        ],
+        "name": "product_features_product_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "product_prices",
+        "refColumns": [
+          "product_id"
+        ],
+        "name": "product_prices_product_id_fkey",
+        "many": true
+      }
+    ]
+  },
   "product_features": {
     "pk": [
       "id"
@@ -2046,8 +2601,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "product_id": {
         "kind": "uuid"
@@ -2077,79 +2632,58 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
-  "products": {
+  "product_prices": {
     "pk": [
       "id"
     ],
     "unique": [
       [
-        "slug"
+        "product_id",
+        "cycle"
       ]
     ],
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
-      "slug": {
-        "kind": "text"
+      "product_id": {
+        "kind": "uuid"
       },
-      "category": {
-        "kind": "text"
+      "cycle": {
+        "kind": "enum",
+        "values": [
+          "monthly",
+          "6months",
+          "1year",
+          "2years",
+          "3years"
+        ]
       },
-      "name": {
-        "kind": "text"
+      "months": {
+        "kind": "int"
       },
-      "description": {
-        "kind": "text",
-        "nullable": true
+      "price": {
+        "kind": "number"
       },
-      "badge": {
-        "kind": "text",
-        "nullable": true
+      "renewal_price": {
+        "kind": "number"
       },
-      "popular": {
-        "kind": "bool",
+      "currency": {
+        "kind": "enum",
+        "values": [
+          "AKZ",
+          "BRL",
+          "USD"
+        ],
         "hasDefault": true
       },
       "active": {
         "kind": "bool",
         "hasDefault": true
       },
-      "position": {
-        "kind": "int",
-        "hasDefault": true
-      },
-      "price_monthly": {
-        "kind": "number",
-        "nullable": true
-      },
-      "price_6months": {
-        "kind": "number",
-        "nullable": true
-      },
-      "price_1year": {
-        "kind": "number",
-        "nullable": true
-      },
-      "price_2years": {
-        "kind": "number",
-        "nullable": true
-      },
-      "price_3years": {
-        "kind": "number",
-        "nullable": true
-      },
-      "color": {
-        "kind": "text",
-        "nullable": true
-      },
-      "href_override": {
-        "kind": "text",
-        "nullable": true
-      },
-      "meta": {
+      "reference": {
         "kind": "json",
         "hasDefault": true,
         "nullable": true
@@ -2160,63 +2694,20 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "hasDefault": true
-      },
-      "subcategory": {
-        "kind": "text",
-        "nullable": true
-      },
-      "cta_label": {
-        "kind": "text",
-        "nullable": true
-      },
-      "cta_url": {
-        "kind": "text",
-        "nullable": true
-      },
-      "currency": {
-        "kind": "text",
-        "hasDefault": true
-      },
-      "price_aoa": {
-        "kind": "number",
-        "nullable": true
-      },
-      "price_brl": {
-        "kind": "number",
-        "nullable": true
-      },
-      "price_usd": {
-        "kind": "number",
-        "nullable": true
-      },
-      "use_auto_conversion": {
-        "kind": "bool",
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       }
     },
     "relations": [
       {
         "columns": [
-          "id"
-        ],
-        "table": "invoice_items",
-        "refColumns": [
           "product_id"
         ],
-        "name": "invoice_items_product_id_fkey",
-        "many": true
-      },
-      {
-        "columns": [
+        "table": "products",
+        "refColumns": [
           "id"
         ],
-        "table": "product_features",
-        "refColumns": [
-          "product_id"
-        ],
-        "name": "product_features_product_id_fkey",
-        "many": true
+        "name": "product_prices_product_id_fkey"
       }
     ]
   },
@@ -2242,6 +2733,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "phone": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "country": {
@@ -2268,6 +2760,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "avatar_url": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "is_active": {
@@ -2284,8 +2777,8 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       }
     },
     "relations": [
@@ -2326,22 +2819,22 @@ export const SCHEMA_META: SchemaMeta = {
         "columns": [
           "id"
         ],
-        "table": "email_logs",
+        "table": "emails",
         "refColumns": [
           "profile_id"
         ],
-        "name": "email_logs_profile_id_fkey",
+        "name": "emails_profile_id_fkey",
         "many": true
       },
       {
         "columns": [
           "id"
         ],
-        "table": "emails",
+        "table": "email_logs",
         "refColumns": [
           "profile_id"
         ],
-        "name": "emails_profile_id_fkey",
+        "name": "email_logs_profile_id_fkey",
         "many": true
       },
       {
@@ -2414,17 +2907,6 @@ export const SCHEMA_META: SchemaMeta = {
         "columns": [
           "id"
         ],
-        "table": "ticket_messages",
-        "refColumns": [
-          "profile_id"
-        ],
-        "name": "ticket_messages_profile_id_fkey",
-        "many": true
-      },
-      {
-        "columns": [
-          "id"
-        ],
         "table": "tickets",
         "refColumns": [
           "assigned_to"
@@ -2441,6 +2923,17 @@ export const SCHEMA_META: SchemaMeta = {
           "profile_id"
         ],
         "name": "tickets_profile_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "ticket_messages",
+        "refColumns": [
+          "profile_id"
+        ],
+        "name": "ticket_messages_profile_id_fkey",
         "many": true
       },
       {
@@ -2464,8 +2957,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "name": {
         "kind": "text"
@@ -2482,10 +2975,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "whm_url": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "whm_api_token": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "whm_username": {
@@ -2507,6 +3002,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "notes": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
@@ -2515,8 +3011,8 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       }
     },
     "relations": [
@@ -2570,22 +3066,28 @@ export const SCHEMA_META: SchemaMeta = {
     "pk": [
       "id"
     ],
-    "unique": [],
+    "unique": [
+      [
+        "order_item_id"
+      ]
+    ],
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "profile_id": {
         "kind": "uuid"
       },
       "plan_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "server_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "status": {
@@ -2619,10 +3121,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "started_at": {
         "kind": "timestamp",
+        "hasDefault": true,
         "nullable": true
       },
       "expires_at": {
         "kind": "timestamp",
+        "hasDefault": true,
         "nullable": true
       },
       "auto_renew": {
@@ -2631,6 +3135,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "notes": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
@@ -2639,23 +3144,114 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       },
       "order_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "service_type": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "service_name": {
         "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "product_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "order_item_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "domain": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "renewal_price": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "provisioning_status": {
+        "kind": "enum",
+        "values": [
+          "pending",
+          "in_progress",
+          "active",
+          "manual_required",
+          "failed"
+        ],
+        "hasDefault": true
+      },
+      "provisioning_error": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "provisioning_attempts": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "provisioned_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "external_ref": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "next_due_date": {
+        "kind": "date",
+        "hasDefault": true,
         "nullable": true
       }
     },
     "relations": [
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "domains",
+        "refColumns": [
+          "service_id"
+        ],
+        "name": "domains_service_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "hosting_accounts",
+        "refColumns": [
+          "service_id"
+        ],
+        "name": "hosting_accounts_service_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "invoices",
+        "refColumns": [
+          "service_id"
+        ],
+        "name": "invoices_service_id_fkey",
+        "many": true
+      },
       {
         "columns": [
           "order_id"
@@ -2695,39 +3291,6 @@ export const SCHEMA_META: SchemaMeta = {
           "id"
         ],
         "name": "services_server_id_fkey"
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "domains",
-        "refColumns": [
-          "service_id"
-        ],
-        "name": "domains_service_id_fkey",
-        "many": true
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "hosting_accounts",
-        "refColumns": [
-          "service_id"
-        ],
-        "name": "hosting_accounts_service_id_fkey",
-        "many": true
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "invoices",
-        "refColumns": [
-          "service_id"
-        ],
-        "name": "invoices_service_id_fkey",
-        "many": true
       },
       {
         "columns": [
@@ -2776,8 +3339,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "position": {
         "kind": "int",
@@ -2789,6 +3352,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "bg_image": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "bg_color": {
@@ -2803,34 +3367,42 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "tag": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "title": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "subtitle": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "cta_text": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "cta_href": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "cta_secondary_text": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "cta_secondary_href": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "features": {
         "kind": "array",
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
@@ -2858,18 +3430,20 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "extension": {
         "kind": "text"
       },
       "price_monthly": {
         "kind": "number",
+        "hasDefault": true,
         "nullable": true
       },
       "price_annual": {
         "kind": "number",
+        "hasDefault": true,
         "nullable": true
       },
       "currency": {
@@ -2912,26 +3486,30 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "name": {
         "kind": "text"
       },
       "description": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "badge": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "price_monthly": {
         "kind": "number",
+        "hasDefault": true,
         "nullable": true
       },
       "price_annual": {
         "kind": "number",
+        "hasDefault": true,
         "nullable": true
       },
       "discount_annual": {
@@ -2941,6 +3519,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "features": {
         "kind": "array",
+        "hasDefault": true,
         "nullable": true
       },
       "active": {
@@ -2990,6 +3569,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "slug": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       }
     },
@@ -3011,27 +3591,32 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "video_url": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "video_storage_path": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "video_file_name": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "video_size_bytes": {
         "kind": "int",
+        "hasDefault": true,
         "nullable": true
       },
       "updated_at": {
         "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "autoUpdate": true
       },
       "updated_by": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       }
     },
@@ -3049,26 +3634,30 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "name": {
         "kind": "text"
       },
       "description": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "badge": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "price_monthly": {
         "kind": "number",
+        "hasDefault": true,
         "nullable": true
       },
       "price_annual": {
         "kind": "number",
+        "hasDefault": true,
         "nullable": true
       },
       "discount_annual": {
@@ -3078,6 +3667,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "features": {
         "kind": "array",
+        "hasDefault": true,
         "nullable": true
       },
       "active": {
@@ -3107,6 +3697,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "slug": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       }
     },
@@ -3124,8 +3715,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "is_ceo": {
         "kind": "bool",
@@ -3137,6 +3728,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "role": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "title": {
@@ -3146,18 +3738,22 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "bio": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "photo_url": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "flag": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "country": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "accent_color": {
@@ -3182,22 +3778,27 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "country_code": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "specialty": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "secondary_flag": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "secondary_country_code": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "secondary_country_name": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       }
     },
@@ -3211,18 +3812,20 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "profile_id": {
         "kind": "uuid"
       },
       "service_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "hosting_account_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "access_type": {
@@ -3230,10 +3833,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "ip_address": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "user_agent": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "success": {
@@ -3242,6 +3847,7 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "error_message": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
@@ -3282,6 +3888,167 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
+  "tickets": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "ticket_number"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "defaultUuid": true
+      },
+      "profile_id": {
+        "kind": "uuid"
+      },
+      "subject": {
+        "kind": "text"
+      },
+      "status": {
+        "kind": "enum",
+        "values": [
+          "open",
+          "in_progress",
+          "resolved",
+          "closed"
+        ],
+        "hasDefault": true
+      },
+      "priority": {
+        "kind": "enum",
+        "values": [
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ],
+        "hasDefault": true
+      },
+      "department": {
+        "kind": "text",
+        "hasDefault": true
+      },
+      "assigned_to": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "service_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "closed_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      },
+      "ticket_number": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "category": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "domain_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      }
+    },
+    "relations": [
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "invoices",
+        "refColumns": [
+          "ticket_id"
+        ],
+        "name": "invoices_ticket_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
+          "assigned_to"
+        ],
+        "table": "profiles",
+        "refColumns": [
+          "id"
+        ],
+        "name": "tickets_assigned_to_fkey"
+      },
+      {
+        "columns": [
+          "domain_id"
+        ],
+        "table": "domains",
+        "refColumns": [
+          "id"
+        ],
+        "name": "tickets_domain_id_fkey"
+      },
+      {
+        "columns": [
+          "profile_id"
+        ],
+        "table": "profiles",
+        "refColumns": [
+          "id"
+        ],
+        "name": "tickets_profile_id_fkey"
+      },
+      {
+        "columns": [
+          "service_id"
+        ],
+        "table": "services",
+        "refColumns": [
+          "id"
+        ],
+        "name": "tickets_service_id_fkey"
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "ticket_attachments",
+        "refColumns": [
+          "ticket_id"
+        ],
+        "name": "ticket_attachments_ticket_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "ticket_messages",
+        "refColumns": [
+          "ticket_id"
+        ],
+        "name": "ticket_messages_ticket_id_fkey",
+        "many": true
+      }
+    ]
+  },
   "ticket_attachments": {
     "pk": [
       "id"
@@ -3290,18 +4057,20 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "ticket_id": {
         "kind": "uuid"
       },
       "message_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "invoice_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "file_name": {
@@ -3316,10 +4085,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "file_size": {
         "kind": "int",
+        "hasDefault": true,
         "nullable": true
       },
       "uploaded_by": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
@@ -3368,8 +4139,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "ticket_id": {
         "kind": "uuid"
@@ -3401,6 +4172,17 @@ export const SCHEMA_META: SchemaMeta = {
     "relations": [
       {
         "columns": [
+          "id"
+        ],
+        "table": "ticket_attachments",
+        "refColumns": [
+          "message_id"
+        ],
+        "name": "ticket_attachments_message_id_fkey",
+        "many": true
+      },
+      {
+        "columns": [
           "profile_id"
         ],
         "table": "profiles",
@@ -3418,172 +4200,6 @@ export const SCHEMA_META: SchemaMeta = {
           "id"
         ],
         "name": "ticket_messages_ticket_id_fkey"
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "ticket_attachments",
-        "refColumns": [
-          "message_id"
-        ],
-        "name": "ticket_attachments_message_id_fkey",
-        "many": true
-      }
-    ]
-  },
-  "tickets": {
-    "pk": [
-      "id"
-    ],
-    "unique": [
-      [
-        "ticket_number"
-      ]
-    ],
-    "columns": {
-      "id": {
-        "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
-      },
-      "profile_id": {
-        "kind": "uuid"
-      },
-      "subject": {
-        "kind": "text"
-      },
-      "status": {
-        "kind": "enum",
-        "values": [
-          "open",
-          "in_progress",
-          "resolved",
-          "closed"
-        ],
-        "hasDefault": true
-      },
-      "priority": {
-        "kind": "enum",
-        "values": [
-          "low",
-          "medium",
-          "high",
-          "critical"
-        ],
-        "hasDefault": true
-      },
-      "department": {
-        "kind": "text",
-        "hasDefault": true
-      },
-      "assigned_to": {
-        "kind": "uuid",
-        "nullable": true
-      },
-      "service_id": {
-        "kind": "uuid",
-        "nullable": true
-      },
-      "closed_at": {
-        "kind": "timestamp",
-        "nullable": true
-      },
-      "created_at": {
-        "kind": "timestamp",
-        "hasDefault": true
-      },
-      "updated_at": {
-        "kind": "timestamp",
-        "autoUpdate": true,
-        "hasDefault": true
-      },
-      "ticket_number": {
-        "kind": "text",
-        "nullable": true
-      },
-      "category": {
-        "kind": "text",
-        "nullable": true
-      },
-      "domain_id": {
-        "kind": "uuid",
-        "nullable": true
-      }
-    },
-    "relations": [
-      {
-        "columns": [
-          "assigned_to"
-        ],
-        "table": "profiles",
-        "refColumns": [
-          "id"
-        ],
-        "name": "tickets_assigned_to_fkey"
-      },
-      {
-        "columns": [
-          "domain_id"
-        ],
-        "table": "domains",
-        "refColumns": [
-          "id"
-        ],
-        "name": "tickets_domain_id_fkey"
-      },
-      {
-        "columns": [
-          "profile_id"
-        ],
-        "table": "profiles",
-        "refColumns": [
-          "id"
-        ],
-        "name": "tickets_profile_id_fkey"
-      },
-      {
-        "columns": [
-          "service_id"
-        ],
-        "table": "services",
-        "refColumns": [
-          "id"
-        ],
-        "name": "tickets_service_id_fkey"
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "invoices",
-        "refColumns": [
-          "ticket_id"
-        ],
-        "name": "invoices_ticket_id_fkey",
-        "many": true
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "ticket_attachments",
-        "refColumns": [
-          "ticket_id"
-        ],
-        "name": "ticket_attachments_ticket_id_fkey",
-        "many": true
-      },
-      {
-        "columns": [
-          "id"
-        ],
-        "table": "ticket_messages",
-        "refColumns": [
-          "ticket_id"
-        ],
-        "name": "ticket_messages_ticket_id_fkey",
-        "many": true
       }
     ]
   },
@@ -3604,8 +4220,8 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "server_id": {
         "kind": "uuid"
@@ -3618,22 +4234,27 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "contact_email": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "package_name": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "ip_address": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "owner": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "partition": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "disk_used_mb": {
@@ -3642,14 +4263,17 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "disk_limit_mb": {
         "kind": "int",
+        "hasDefault": true,
         "nullable": true
       },
       "unix_startdate": {
         "kind": "int",
+        "hasDefault": true,
         "nullable": true
       },
       "account_created_at": {
         "kind": "timestamp",
+        "hasDefault": true,
         "nullable": true
       },
       "is_suspended": {
@@ -3658,46 +4282,57 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "suspension_reason": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "theme": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "php_version": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "max_pop": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "max_sub": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "max_sql": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "max_ftp": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "profile_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "service_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "hosting_account_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "raw_metadata": {
         "kind": "json",
+        "hasDefault": true,
         "nullable": true
       },
       "status": {
@@ -3730,6 +4365,22 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "notes": {
         "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "whm_uuid": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "link_candidate_profile_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "link_candidate_reason": {
+        "kind": "text",
+        "hasDefault": true,
         "nullable": true
       }
     },
@@ -3789,11 +4440,12 @@ export const SCHEMA_META: SchemaMeta = {
     "columns": {
       "id": {
         "kind": "uuid",
-        "defaultUuid": true,
-        "hasDefault": true
+        "hasDefault": true,
+        "defaultUuid": true
       },
       "server_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "whm_package_name": {
@@ -3801,10 +4453,12 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "plan_id": {
         "kind": "uuid",
+        "hasDefault": true,
         "nullable": true
       },
       "label": {
         "kind": "text",
+        "hasDefault": true,
         "nullable": true
       },
       "created_at": {
