@@ -63,7 +63,7 @@ async function summary(db: Queryable, orderId: string, replayed = false): Promis
   return { id: o.id, order_number: o.order_number, invoice_id: i?.id ?? null, invoice_number: i?.invoice_number ?? null, total: Number(o.amount), currency: 'AKZ', status: o.status, payment_status: o.payment_status, activation_status: o.activation_status, ...(replayed ? { replayed: true } : {}) }
 }
 
-export async function createOrder(input: CreateOrderInput): Promise<{ order: OrderSummary; quote: Quote }> {
+export async function createOrder(input: CreateOrderInput, attempt = 1): Promise<{ order: OrderSummary; quote: Quote }> {
   if (!/^[A-Za-z0-9-]{16,64}$/.test(input.idempotencyKey)) throw new OrderError('idempotency_key_invalid', 'Chave de pedido inválida.')
   if (!PAYMENT_METHODS_AVAILABLE.includes(input.paymentMethod as any)) {
     throw new OrderError('payment_method_unavailable', 'Método de pagamento indisponível.', 400)
@@ -126,8 +126,8 @@ export async function createOrder(input: CreateOrderInput): Promise<{ order: Ord
         const [taken] = await rows(conn, 'SELECT profile_id FROM domains WHERE name = ? AND extension = ?', [parts.name, parts.extension])
         if (taken && taken.profile_id !== input.userId) throw new OrderError('domain_unavailable', 'O domínio já está associado a outra conta.', 409)
         await conn.query(
-          `INSERT INTO domains (id, profile_id, name, extension, status, order_id, registrar, price_paid, currency)
-           VALUES (?, ?, ?, ?, 'pending', ?, NULL, ?, 'AKZ')
+          `INSERT INTO domains (id, profile_id, name, extension, status, order_id, price_paid, currency)
+           VALUES (?, ?, ?, ?, 'pending', ?, ?, 'AKZ')
            ON DUPLICATE KEY UPDATE status = 'pending', order_id = VALUES(order_id), price_paid = VALUES(price_paid), updated_at = CURRENT_TIMESTAMP(6)`,
           [randomUUID(), input.userId, parts.name, parts.extension, orderId, l.lineTotal],
         )
@@ -157,7 +157,9 @@ export async function createOrder(input: CreateOrderInput): Promise<{ order: Ord
     }
     return { order: await summary(conn, orderId), quote }
   }).catch(async e => {
-    // Corrida entre duas submissões com a mesma chave: devolve a que ganhou
+    // Corrida entre duas submissões com a mesma chave: o MariaDB pode abortar uma
+    // por deadlock (bloqueio de intervalo) — repete; a repetição encontra a vencedora.
+    if ((e as { errno?: number }).errno === 1213 && attempt < 4) return createOrder(input, attempt + 1)
     if ((e as { errno?: number }).errno === 1062 && /idempotency/.test(String((e as Error).message))) {
       const pool = (await import('@/lib/db/pool')).getPool()
       const [prev] = await rows(pool, 'SELECT id FROM orders WHERE user_id = ? AND idempotency_key = ?', [input.userId, input.idempotencyKey])
