@@ -4207,10 +4207,6 @@ export const SCHEMA_META: SchemaMeta = {
     "unique": [
       [
         "server_id",
-        "primary_domain"
-      ],
-      [
-        "server_id",
         "whm_username"
       ]
     ],

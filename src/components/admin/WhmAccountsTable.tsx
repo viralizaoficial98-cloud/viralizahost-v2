@@ -21,6 +21,9 @@ interface WhmRow {
   service_id?: string | null
   profile_id?: string | null
   profiles?: { full_name?: string; email?: string } | null
+  link_status?: string | null
+  link_candidate_reason?: string | null
+  candidate?: { id: string; full_name?: string; email?: string } | null
 }
 
 interface Props {
@@ -83,6 +86,17 @@ function fmtDate(iso: string | null | undefined) {
 }
 
 export default function WhmAccountsTable({ rows }: Props) {
+  const [busy, setBusy] = useState<string | null>(null)
+  // Confirma (associa ao cliente sugerido) ou recusa a candidata da importação
+  async function resolve(id: string, profileId: string | null) {
+    setBusy(id)
+    const res = profileId
+      ? await fetch(`/api/admin/whm/accounts/${id}/link`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile_id: profileId }) })
+      : await fetch(`/api/admin/whm/accounts/${id}/candidate`, { method: 'POST' })
+    setBusy(null)
+    if (res.ok) window.location.reload()
+    else alert((await res.json().catch(() => ({}))).error ?? 'Falhou.')
+  }
   const [modalAccount, setModalAccount] = useState<WhmRow | null>(null)
 
   return (
@@ -106,7 +120,7 @@ export default function WhmAccountsTable({ rows }: Props) {
             )}
             {rows.map((row, idx) => {
               const prof = row.profiles
-              const isPending = row.sync_status === 'pending_email'
+              const isPending = row.sync_status === 'pending_email' || row.link_status === 'pending_validation' || row.link_status === 'unlinked'
               return (
                 <tr key={row.id}
                   style={{ borderBottom: idx < rows.length - 1 ? '1px solid #F8FAFC' : 'none',
@@ -178,6 +192,15 @@ export default function WhmAccountsTable({ rows }: Props) {
                           title="Abrir cliente">
                           <ExternalLink size={13} />
                         </Link>
+                      )}
+                      {row.link_status === 'pending_validation' && row.candidate && (
+                        <span className="flex flex-col gap-1 text-[11px]" style={{ color: '#B45309' }}>
+                          <span title={row.link_candidate_reason ?? ''}>Candidata: {row.candidate.email}</span>
+                          <span className="flex gap-1">
+                            <button disabled={busy === row.id} onClick={() => resolve(row.id, row.candidate!.id)} className="px-2 py-1 rounded-lg font-bold text-white" style={{ background: '#15803D' }}>Confirmar</button>
+                            <button disabled={busy === row.id} onClick={() => resolve(row.id, null)} className="px-2 py-1 rounded-lg font-bold" style={{ border: '1px solid #E2E8F0', color: '#475569' }}>Recusar</button>
+                          </span>
+                        </span>
                       )}
                       {isPending && (
                         <button
