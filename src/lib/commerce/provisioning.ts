@@ -81,17 +81,25 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
 
     const [profile] = await rows(db, 'SELECT email FROM profiles WHERE id = ?', [s.profile_id])
     // Procura conta existente com o mesmo domínio no servidor (repetição após falha parcial)
-    let username = cpanelUsername(s.domain)
-    for (let i = 0; i < 5; i++) {
-      const acct = await getAccount(cfg.config, username)
-      if (!acct) break
+    // Um utilizador cPanel já registado na base para OUTRO serviço nunca é reutilizado
+    // (mesmo que tenha desaparecido do WHM): evita reatribuir a conta de outro cliente.
+    const takenLocally = async (u: string) => (await rows(db,
+      `SELECT 1 FROM hosting_accounts WHERE cpanel_username = ? AND (service_id IS NULL OR service_id <> ?)
+       UNION SELECT 1 FROM whm_accounts WHERE whm_username = ? AND server_id = ? AND (service_id IS NULL OR service_id <> ?) LIMIT 1`,
+      [u, serviceId, u, cfg.serverId, serviceId])).length > 0
+    let username: string | null = null
+    for (let i = 0; i < 8; i++) {
+      const candidate = cpanelUsername(s.domain, i ? String(i + 1) : '')
+      if (await takenLocally(candidate)) continue
+      const acct = await getAccount(cfg.config, candidate)
+      if (!acct) { username = candidate; break }
       if (acct.domain === s.domain) {
-        // Conta já criada numa tentativa anterior — associa sem recriar
-        await linkAccount(db, s, cfg.serverId, username, acct.domain, s.whm_package)
-        return await done('active', 'Conta WHM existente associada.', { external_ref: username, next_due_date: due })
+        // Conta criada numa tentativa anterior deste serviço — associa sem recriar
+        await linkAccount(db, s, cfg.serverId, candidate, acct.domain, s.whm_package)
+        return await done('active', 'Conta WHM existente associada.', { external_ref: candidate, next_due_date: due })
       }
-      username = cpanelUsername(s.domain, String(i + 2))
     }
+    if (!username) return await done('manual_required', 'Não foi possível escolher um utilizador cPanel livre: atribuir manualmente.')
     await createAccount(cfg.config, {
       username, domain: s.domain, plan: s.whm_package, email: profile?.email ?? '',
       // Sem senha: o WHM gera uma; o cliente entra por SSO (nunca guardada nem registada)

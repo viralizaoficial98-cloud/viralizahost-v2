@@ -9,8 +9,11 @@ export const dynamic = 'force-dynamic'
 // Criação da encomenda. Preços, disponibilidade e impostos são recalculados no
 // servidor; o cliente só confirma o total que viu (acceptedTotal). Repetir o
 // pedido com a mesma idempotencyKey devolve a mesma encomenda.
+// Limite por IP (10 min). Configurável só para o processo de ensaio (ORDER_RATE_LIMIT); produção usa 20.
+const ORDER_LIMIT = Math.min(1000, Math.max(1, Number(process.env.ORDER_RATE_LIMIT) || 20))
+
 export async function POST(req: NextRequest) {
-  if (!rateLimit(`order:${clientIp(req)}`, 20, 10 * 60_000)) {
+  if (!rateLimit(`order:${clientIp(req)}`, ORDER_LIMIT, 10 * 60_000)) {
     return NextResponse.json({ error: 'Demasiados pedidos. Tente novamente dentro de alguns minutos.' }, { status: 429 })
   }
   let body: Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any

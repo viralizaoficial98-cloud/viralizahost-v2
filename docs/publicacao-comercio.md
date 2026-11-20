@@ -65,11 +65,11 @@ DB_NAME=$E node --env-file=.env.local scripts/mariadb/migrate-schema.mjs        
 DB_NAME=$E node --env-file=.env.local scripts/commerce/build-catalog.mjs --apply
 DB_NAME=$E node --env-file=.env.local scripts/mariadb/rehearsal/prepare-server-rehearsal.mjs --whm-port=12087
 pm2 start scripts/mariadb/rehearsal/mock-whm.mjs --name viralizahost-whm-simulado -- --port=12087 --cert=$W/whm-cert.pem --key=$W/whm-key.pem --log=$W/whm-pedidos.log
-DB_NAME=$E STORAGE_DIR=$W/storage NODE_EXTRA_CA_CERTS=$W/whm-cert.pem AUTH_EMAIL_CONFIRMATION=false \
+DB_NAME=$E STORAGE_DIR=$W/storage NODE_EXTRA_CA_CERTS=$W/whm-cert.pem AUTH_EMAIL_CONFIRMATION=false ORDER_RATE_LIMIT=200 \
   pm2 start npm --name viralizahost-ensaio --cwd "$REL" -- start -- -p 3100
 sleep 6 && curl -s -o /dev/null -w "ensaio %{http_code}\n" http://127.0.0.1:3100/
 ```
-`DB_NAME=` antes do comando tem prioridade sobre o `.env.local`: o processo de ensaio só vê a base de ensaio. `prepare-server-rehearsal.mjs` e `run-all.sh` recusam correr se o nome da base não contiver «ensaio».
+`DB_NAME=` antes do comando tem prioridade sobre o `.env.local`: o processo de ensaio só vê a base de ensaio. `ORDER_RATE_LIMIT=200` só no processo de ensaio (os testes criam dezenas de encomendas do mesmo IP; produção mantém 20 por 10 min). `prepare-server-rehearsal.mjs` e `run-all.sh` recusam correr se o nome da base não contiver «ensaio».
 
 Testes (sem Chromium no servidor, `SKIP_UI=1`; a interface desktop/iPhone e os links já foram ensaiados no ambiente de desenvolvimento):
 ```bash
