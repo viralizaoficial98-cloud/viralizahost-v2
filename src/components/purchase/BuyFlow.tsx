@@ -286,7 +286,7 @@ function CycleStep({ plan, sel, update, exts, onBack, onAdd, adding }: {
               <div className="grid sm:grid-cols-3 gap-1 mt-2 text-xs text-[#555]">
                 <span>Duração: {DURATION(p.months)}</span>
                 <span>A pagar agora: <strong className="text-[#0A0A0A]">{kz(p.price * qty)}</strong></span>
-                <span>Renova por {kz(p.renewal * qty)} a cada {DURATION(p.months).split(' (')[0]}</span>
+                <span>Renova por {kz(p.renewal * qty)} {p.months === 1 ? 'todos os meses' : `a cada ${DURATION(p.months).split(' (')[0]}`}</span>
               </div>
               {plan.quantityUnit && <p className="text-[11px] text-[#888] mt-1">{kz(p.price / p.months)} por {plan.quantityUnit}/mês</p>}
             </button>
