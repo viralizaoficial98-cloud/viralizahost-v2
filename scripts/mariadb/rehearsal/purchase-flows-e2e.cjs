@@ -259,7 +259,7 @@ async function main() {
   ok(true, 'confirmação: «Ainda não pague», domínio a confirmar')
   await shot(p, 'desktop-08-confirmacao-retida')
   const heldId = p.url().split('/orders/')[1].split('?')[0]
-  ok((await one('SELECT COUNT(*) n FROM orders WHERE user_id = (SELECT user_id FROM orders WHERE id = ?) AND created_at > NOW() - INTERVAL 2 MINUTE AND hold_reason = ?', [heldId, 'domain_confirmation'])).n == 1, 'duplo clique → uma só encomenda')
+  ok((await one('SELECT COUNT(DISTINCT order_id) n FROM order_items WHERE domain_name = ?', [`${aoName}.ao`])).n == 1, 'duplo clique → uma só encomenda')
   const adm = await b.newContext(); const ap = await adm.newPage()
   await ap.request.post(BASE + '/api/auth/login', { data: { email: 'admin@ensaio.test', password: 'Admin#Teste2026' } })
   await ap.goto(BASE + '/admin/orders', { waitUntil: 'domcontentloaded' })
