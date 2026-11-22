@@ -9,27 +9,45 @@ import {
 } from 'lucide-react'
 import { createAuthClient } from '@/lib/supabase/client'
 
+// `match`: prefixos de rota que cada item representa. O item activo é o de prefixo MAIS
+// ESPECÍFICO que corresponde à rota actual — só um item fica seleccionado
+// (ex.: /admin/site/catalog → «Catálogo e Preços», não «Gestão do Site»).
 const adminNav = [
-  { href: '/admin',           icon: LayoutDashboard, label: 'Dashboard',      exact: true  },
-  { href: '/admin/clients',   icon: Users,           label: 'Clientes',       exact: false },
-  { href: '/admin/financial', icon: CreditCard,      label: 'Financeiro',     exact: false },
-  { href: '/admin/tickets',   icon: MessageSquare,   label: 'Tickets',        exact: false },
-  { href: '/admin/servers',   icon: Server,          label: 'Servidores',     exact: false },
-  { href: '/admin/domains',   icon: Globe,           label: 'Domínios',       exact: false },
-  { href: '/admin/activity',  icon: Activity,        label: 'Atividade',      exact: false },
-  { href: '/admin/orders',    icon: ShoppingBag,     label: 'Pedidos',        exact: false },
-  { href: '/admin/quotes',    icon: FileQuestion,    label: 'Cotações',       exact: false },
-  { href: '/admin/site',      icon: Monitor,         label: 'Gestão do Site', exact: false },
-  { href: '/admin/agent',     icon: Bot,             label: 'Agente IA',      exact: false },
-  { href: '/admin/site/catalog', icon: Package,      label: 'Catálogo e Preços', exact: false },
-  { href: '/admin/settings/integrations', icon: Plug, label: 'Integrações',    exact: false },
-  { href: '/admin/settings/billing', icon: Receipt,   label: 'Facturação',     exact: false },
-  { href: '/admin/settings',  icon: Settings,        label: 'Configurações',  exact: true },
+  { href: '/admin',           icon: LayoutDashboard, label: 'Dashboard',      match: ['=/admin'] },
+  { href: '/admin/clients',   icon: Users,           label: 'Clientes',       match: ['/admin/clients'] },
+  { href: '/admin/financial', icon: CreditCard,      label: 'Financeiro',     match: ['/admin/financial'] },
+  { href: '/admin/tickets',   icon: MessageSquare,   label: 'Tickets',        match: ['/admin/tickets'] },
+  { href: '/admin/servers',   icon: Server,          label: 'Servidores',     match: ['/admin/servers'] },
+  { href: '/admin/domains',   icon: Globe,           label: 'Domínios',       match: ['/admin/domains'] },
+  { href: '/admin/activity',  icon: Activity,        label: 'Atividade',      match: ['/admin/activity', '/admin/email-logs'] },
+  { href: '/admin/orders',    icon: ShoppingBag,     label: 'Pedidos',        match: ['/admin/orders'] },
+  { href: '/admin/quotes',    icon: FileQuestion,    label: 'Cotações',       match: ['/admin/quotes'] },
+  { href: '/admin/site',      icon: Monitor,         label: 'Gestão do Site', match: ['/admin/site'] },
+  { href: '/admin/agent',     icon: Bot,             label: 'Agente IA',      match: ['/admin/agent'] },
+  { href: '/admin/site/catalog', icon: Package,      label: 'Catálogo e Preços', match: ['/admin/site/catalog', '/admin/site/products', '/admin/site/hosting-plans', '/admin/site/email-plans', '/admin/site/domains'] },
+  { href: '/admin/settings/integrations', icon: Plug, label: 'Integrações',    match: ['/admin/settings/integrations'] },
+  { href: '/admin/settings/billing', icon: Receipt,   label: 'Facturação',     match: ['/admin/settings/billing'] },
+  { href: '/admin/settings',  icon: Settings,        label: 'Configurações',  match: ['/admin/settings'] },
 ]
+
+/** href do item activo para a rota (o prefixo correspondente mais longo; '=' exige rota exacta). */
+function activeNavHref(pathname: string): string | null {
+  let best: { href: string; len: number } | null = null
+  for (const item of adminNav) {
+    for (const m of item.match) {
+      const exact = m.startsWith('=')
+      const prefix = exact ? m.slice(1) : m
+      const hit = exact ? pathname === prefix : pathname === prefix || pathname.startsWith(prefix + '/')
+      if (hit && (!best || prefix.length > best.len)) best = { href: item.href, len: prefix.length }
+    }
+  }
+  return best?.href ?? null
+}
 
 function AdminSidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const router   = useRouter()
+  const activeHref = activeNavHref(pathname)
 
   const handleLogout = async () => {
     const supabase = createAuthClient()
@@ -78,30 +96,17 @@ function AdminSidebar({ onClose }: { onClose?: () => void }) {
 
       {/* Nav */}
       <nav className="flex-1 px-3 pb-4 space-y-0.5 overflow-y-auto">
-        {adminNav.map(({ href, icon: Icon, label, exact }) => {
-          const active = exact ? pathname === href : (pathname === href || pathname.startsWith(href + '/'))
+        {adminNav.map(({ href, icon: Icon, label }) => {
+          const active = activeHref === href
           return (
             <Link
               key={href}
               href={href}
               onClick={onClose}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200"
-              style={{
-                background: active ? '#F5B700' : 'transparent',
-                color:      active ? '#111111' : '#6B7280',
-              }}
-              onMouseEnter={e => {
-                if (!active) {
-                  (e.currentTarget as HTMLElement).style.background = '#FFF8E1'
-                  ;(e.currentTarget as HTMLElement).style.color = '#111111'
-                }
-              }}
-              onMouseLeave={e => {
-                if (!active) {
-                  (e.currentTarget as HTMLElement).style.background = 'transparent'
-                  ;(e.currentTarget as HTMLElement).style.color = '#6B7280'
-                }
-              }}
+              aria-current={active ? 'page' : undefined}
+              data-testid="admin-nav-item"
+              // Hover só por CSS: o realce de passagem nunca fica preso depois de navegar
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors duration-200 ${active ? 'bg-[#F5B700] text-[#111111]' : 'bg-transparent text-[#6B7280] hover:bg-[#FFF8E1] hover:text-[#111111]'}`}
             >
               <Icon size={17} className="shrink-0" />
               <span className="font-medium text-sm">{label}</span>
@@ -157,6 +162,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname()
 
   // Close drawer on route change
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- fecha a gaveta quando a rota muda
   useEffect(() => { setSidebarOpen(false) }, [pathname])
 
   // Lock body scroll when drawer open

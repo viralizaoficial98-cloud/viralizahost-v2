@@ -702,3 +702,14 @@ export async function createEmailAccount(config: WHMConfig, domain: string, emai
   })
   return res.json()
 }
+
+// ─── Pacotes (planos) do WHM — só leitura (ACL list-pkgs) ────────────────────
+export interface WHMPackage { name: string; quota: string; bwlimit: string; maxpop: string; maxsql: string; maxaddon: string }
+export async function listPackages(config: WHMConfig): Promise<WHMPackage[]> {
+  const data = await whmRequest(config, 'listpkgs')
+  const pkgs = (data?.data?.pkg ?? []) as Record<string, unknown>[]
+  return pkgs.map(p => ({
+    name: String(p.name ?? ''), quota: String(p.QUOTA ?? ''), bwlimit: String(p.BWLIMIT ?? ''),
+    maxpop: String(p.MAXPOP ?? ''), maxsql: String(p.MAXSQL ?? ''), maxaddon: String(p.MAXADDON ?? ''),
+  })).filter(p => p.name)
+}

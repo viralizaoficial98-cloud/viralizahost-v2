@@ -1,10 +1,12 @@
 import 'server-only'
+import { registrarAvailability } from '@/lib/registrar/operations'
 
 // Disponibilidade de domínios via RDAP (bootstrap oficial da IANA).
 // Três estados:
 //   available   — o registo respondeu 404 (não existe)          → pode ser comprado
 //   unavailable — o registo devolveu o objecto do domínio        → não pode ser registado
 //   confirm     — extensão sem RDAP (ex.: .ao), timeout ou erro  → «A confirmar pela equipa»
+// Se a extensão estiver automatizada no registrador (Integrações → Registrador), consulta-o primeiro.
 // Uma falha, um timeout ou a falta de integração NUNCA contam como disponível.
 // RDAP_BOOTSTRAP_URL permite apontar para outro bootstrap (ex.: RDAP simulado no ensaio).
 
@@ -49,6 +51,11 @@ export async function checkAvailability(domainRaw: string): Promise<Availability
   const domain = normalizeDomain(domainRaw)
   if (!domain) return { domain: String(domainRaw ?? ''), status: 'unavailable', available: false, verified: true, note: 'invalid' }
   const unverified = (note: string): Availability => ({ domain, status: 'confirm', available: false, verified: false, note })
+  // Extensões automatizadas no registrador: a resposta do fornecedor tem prioridade sobre o RDAP
+  const reg = await registrarAvailability(domain)
+  if (reg === 'available') return { domain, status: 'available', available: true, verified: true, note: 'registrar' }
+  if (reg === 'unavailable') return { domain, status: 'unavailable', available: false, verified: true, note: 'registrar' }
+  if (reg === 'confirm') return unverified('registrar_inconclusive')
   const map = await loadBootstrap()
   if (!map) return unverified('bootstrap_unavailable')
   const base = rdapBaseFor(domain, map)

@@ -3,7 +3,7 @@ import { createAdminWriteClient, createServiceClient } from '@/lib/supabase/serv
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { getPool } from '@/lib/db/pool'
 import { confirmPayment, rejectProof, resolveDomainAvailability, PaymentError } from '@/lib/commerce/payments'
-import { markServiceActive, provisionOrder, provisionService, refreshOrderActivation } from '@/lib/commerce/provisioning'
+import { ActivationError, markServiceActive, provisionOrder, provisionService, refreshOrderActivation } from '@/lib/commerce/provisioning'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +12,7 @@ export async function GET() {
   try { await requireAdminRole() } catch { return NextResponse.json({ orders: [], error: 'Unauthorized' }, { status: 401 }) }
   const db = createAdminWriteClient()
   const { data: orders, error } = await db.from('orders')
-    .select(`id, order_number, user_id, status, payment_status, activation_status, hold_reason, amount, subtotal, tax_amount, billing_cycle, payment_method,
+    .select(`id, order_number, user_id, status, payment_status, activation_status, hold_reason, review_flag, review_note, review_at, amount, currency, subtotal, tax_amount, billing_cycle, payment_method,
       domain_name, proof_file, transfer_ref, notes, created_at, updated_at, paid_at,
       order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, years)`)
     .order('created_at', { ascending: false }).limit(300)
@@ -20,10 +20,10 @@ export async function GET() {
   const ids = (orders ?? []).map((o: any) => o.id)
   const userIds = [...new Set((orders ?? []).map((o: any) => o.user_id).filter(Boolean))]
   const [{ data: services }, { data: profiles }, { data: invoices }, { data: payments }] = await Promise.all([
-    ids.length ? db.from('services').select('id, order_id, order_item_id, service_name, service_type, provisioning_status, provisioning_error, provisioning_attempts, external_ref, domain').in('order_id', ids) : { data: [] },
-    userIds.length ? db.from('profiles').select('id, full_name, email, phone').in('id', userIds) : { data: [] },
+    ids.length ? db.from('services').select('id, order_id, order_item_id, service_name, service_type, provisioning_status, provisioning_error, provisioning_attempts, external_ref, domain, activation_source, provisioned_at').in('order_id', ids) : { data: [] },
+    userIds.length ? db.from('profiles').select('id, full_name, email, phone, role').in('id', userIds) : { data: [] },
     ids.length ? db.from('invoices').select('id, order_id, invoice_number, status, total, amount_paid').in('order_id', ids) : { data: [] },
-    ids.length ? db.from('payments').select('id, order_id, invoice_id, status, amount, proof_url, transfer_ref, created_at').in('order_id', ids).order('created_at', { ascending: false }) : { data: [] },
+    ids.length ? db.from('payments').select('id, order_id, invoice_id, status, amount, currency, proof_url, transfer_ref, created_at, paid_at, reviewed_by').in('order_id', ids).order('created_at', { ascending: false }) : { data: [] },
   ])
   const storage = createServiceClient().storage.from('payment-proofs')
   const out = await Promise.all((orders ?? []).map(async (o: any) => {
@@ -46,7 +46,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   let adminId: string
   try { adminId = await requireAdminRole() } catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  const body = await req.json().catch(() => ({})) as { orderItemId?: string; available?: boolean; orderId?: string; serviceId?: string; paymentId?: string; action?: string; notes?: string; reason?: string; externalRef?: string }
+  const body = await req.json().catch(() => ({})) as { orderItemId?: string; available?: boolean; orderId?: string; serviceId?: string; paymentId?: string; action?: string; notes?: string; reason?: string; externalRef?: string; flag?: string | null }
   const db = getPool()
   const log = (action: string, entity: string, id: string, description: string) =>
     db.query("INSERT INTO activity_logs (id, profile_id, action, entity_type, entity_id, description) VALUES (UUID(), ?, 'update', ?, ?, ?)", [adminId, entity, id, `${action}: ${description}`]).catch(() => {})
@@ -96,9 +96,18 @@ export async function POST(req: NextRequest) {
         await log('domain_availability', 'order_item', body.orderItemId!, body.available ? 'disponível' : 'indisponível')
         return NextResponse.json({ ok: true, ...r })
       }
+      // Marcação manual autorizada: para domínios exige a referência do registo
       case 'mark_active': {
-        await markServiceActive(body.serviceId!, body.notes ?? null, body.externalRef ?? null)
-        await log('mark_active', 'service', body.serviceId!, body.externalRef ?? '')
+        await markServiceActive(body.serviceId!, body.notes ?? null, body.externalRef ?? null, adminId)
+        await log('mark_active', 'service', body.serviceId!, `ref. ${body.externalRef ?? ''}`)
+        return NextResponse.json({ ok: true })
+      }
+      // Identificação de encomenda de teste/real pela equipa. Não altera facturas nem pagamentos.
+      case 'review': {
+        const flag = body.flag === 'test' || body.flag === 'real' ? body.flag : null
+        const [r] = await db.query('UPDATE orders SET review_flag = ?, review_note = ?, review_by = ?, review_at = CURRENT_TIMESTAMP(6) WHERE id = ?', [flag, (body.notes ?? '').slice(0, 500) || null, adminId, body.orderId]) as any
+        if (!r.affectedRows) return NextResponse.json({ error: 'Encomenda inexistente.' }, { status: 404 })
+        await log('review', 'order', body.orderId!, `${flag ?? 'sem marcação'}${body.notes ? `: ${body.notes}` : ''}`)
         return NextResponse.json({ ok: true })
       }
       default:
@@ -106,6 +115,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (e) {
     if (e instanceof PaymentError) return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })
+    if (e instanceof ActivationError) return NextResponse.json({ error: e.message }, { status: e.status })
     console.error('[admin/orders]', body.action, (e as Error).message)
     return NextResponse.json({ error: (e as Error).message }, { status: 400 })
   }

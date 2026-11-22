@@ -507,7 +507,7 @@ export default function AdminSettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* ── WHM / cPanel ─────────────────────────────────────────────────── */}
-        <div style={card}>
+        <div id="whm" style={{ ...card, scrollMarginTop: 80 }}>
           <div className="flex items-center gap-2 mb-5">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center"
               style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.20)' }}>

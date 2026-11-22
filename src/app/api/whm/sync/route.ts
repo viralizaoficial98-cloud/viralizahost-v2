@@ -1,51 +1,33 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { requireAdminRole } from '@/lib/api/require-admin'
+import { getPool } from '@/lib/db/pool'
 import { getAccount, getDiskUsage } from '@/lib/whm/client'
+import { loadWhmConfig } from '@/lib/whm/config'
 
-// Sincroniza uso de disco/bandwidth das contas WHM para a base de dados
+// Sincroniza uso de disco e estado (suspensa/activa) das contas WHM associadas.
+// Credenciais pelo mecanismo único (loadWhmConfig): o token é decifrado só no servidor.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export async function POST() {
-  const supabase = await createAdminClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: profileRaw } = await supabase.from('profiles').select('id, role').eq('id', user.id).single()
-  const profile = profileRaw as any
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const { data: hostingAccountsRaw } = await supabase
-    .from('hosting_accounts')
-    .select('*, servers(*)')
-    .eq('status', 'active' as any)
-  const hostingAccounts = hostingAccountsRaw as any[]
-
-  if (!hostingAccounts?.length) return NextResponse.json({ synced: 0 })
-
+  try { await requireAdminRole() } catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  const db = getPool()
+  const [accounts] = await db.query("SELECT id, cpanel_username, server_id FROM hosting_accounts WHERE status = 'active'") as any
+  if (!accounts.length) return NextResponse.json({ synced: 0, errors: [] })
+  const cache = new Map<string, Awaited<ReturnType<typeof loadWhmConfig>>>()
   let synced = 0
   const errors: string[] = []
-
-  for (const ha of hostingAccounts) {
-    const server = (ha as any).servers
-    if (!server?.whm_url || !server?.whm_api_token) continue
-
-    const config = { url: server.whm_url, token: server.whm_api_token, username: server.whm_username ?? 'root' }
+  for (const ha of accounts as any[]) {
+    const key = ha.server_id ?? ''
+    if (!cache.has(key)) cache.set(key, (key ? await loadWhmConfig(key) : null) ?? await loadWhmConfig())
+    const cfg = cache.get(key)
+    if (!cfg) { errors.push(`${ha.cpanel_username}: servidor WHM sem credenciais`); continue }
     try {
-      const [account, disk] = await Promise.all([
-        getAccount(config, ha.cpanel_username),
-        getDiskUsage(config, ha.cpanel_username),
-      ])
+      const [account, disk] = await Promise.all([getAccount(cfg.config, ha.cpanel_username), getDiskUsage(cfg.config, ha.cpanel_username)])
       if (!account) continue
-
-      await (supabase as any).from('hosting_accounts').update({
-        disk_used_mb: Math.round(disk.used),
-        status: account.suspended ? 'suspended' : 'active',
-        updated_at: new Date().toISOString(),
-      }).eq('id', ha.id)
-
+      await db.query('UPDATE hosting_accounts SET disk_used_mb = ?, status = ? WHERE id = ?', [Math.round(disk.used), account.suspended ? 'suspended' : 'active', ha.id])
       synced++
-    } catch (e: any) {
-      errors.push(`${ha.cpanel_username}: ${e.message}`)
+    } catch (e) {
+      errors.push(`${ha.cpanel_username}: ${String((e as Error).message).replace(/https?:\/\/\S+/g, '[url]').slice(0, 160)}`)
     }
   }
-
   return NextResponse.json({ synced, errors })
 }

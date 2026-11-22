@@ -1918,6 +1918,30 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "json",
         "hasDefault": true,
         "nullable": true
+      },
+      "review_flag": {
+        "kind": "enum",
+        "values": [
+          "test",
+          "real"
+        ],
+        "hasDefault": true,
+        "nullable": true
+      },
+      "review_note": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "review_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "review_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": [
@@ -2572,6 +2596,11 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "text",
         "hasDefault": true,
         "nullable": true
+      },
+      "whm_server_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": [
@@ -3051,6 +3080,165 @@ export const SCHEMA_META: SchemaMeta = {
     },
     "relations": []
   },
+  "registrar_operations": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "client_ref"
+      ],
+      [
+        "service_id",
+        "operation"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "service_id": {
+        "kind": "uuid"
+      },
+      "operation": {
+        "kind": "enum",
+        "values": [
+          "register",
+          "renew",
+          "transfer"
+        ]
+      },
+      "domain": {
+        "kind": "text"
+      },
+      "provider": {
+        "kind": "text"
+      },
+      "mode": {
+        "kind": "enum",
+        "values": [
+          "test",
+          "live"
+        ]
+      },
+      "client_ref": {
+        "kind": "text"
+      },
+      "status": {
+        "kind": "enum",
+        "values": [
+          "pending",
+          "submitted",
+          "succeeded",
+          "failed",
+          "unknown"
+        ],
+        "hasDefault": true
+      },
+      "provider_ref": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "provider_status": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "message": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "attempts": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
+  "registrar_settings": {
+    "pk": [
+      "id"
+    ],
+    "unique": [],
+    "columns": {
+      "id": {
+        "kind": "int"
+      },
+      "provider": {
+        "kind": "text",
+        "hasDefault": true
+      },
+      "mode": {
+        "kind": "enum",
+        "values": [
+          "test",
+          "live"
+        ],
+        "hasDefault": true
+      },
+      "enabled": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "api_url": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "username": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "secret_enc": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "extensions": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "last_test_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "last_test_ok": {
+        "kind": "bool",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "last_test_message": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "updated_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
   "servers": {
     "pk": [
       "id"
@@ -3321,6 +3509,16 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "next_due_date": {
         "kind": "date",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "activation_source": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "activated_by": {
+        "kind": "uuid",
         "hasDefault": true,
         "nullable": true
       }
