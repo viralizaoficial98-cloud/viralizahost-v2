@@ -3,7 +3,7 @@
 #   APP_LOG=/caminho/next.log BASE_URL=http://localhost:3000 bash scripts/mariadb/rehearsal/run-all.sh
 # O processo Next de ensaio deve correr com RDAP_BOOTSTRAP_URL=http://127.0.0.1:12088/dns.json (mock-rdap.mjs),
 # NODE_EXTRA_CA_CERTS=<certificado do WHM simulado>, ORDER_RATE_LIMIT=500, QUOTE_RATE_LIMIT=200,
-# REGISTRAR_TEST_PROVISIONING=1, REGISTRAR_TIMEOUT_MS=2000 e LOGIN_RATE_LIMIT=100 (nunca em produção) (com mock-registrar.mjs --delay=4000 na porta 12089).
+# REGISTRAR_TEST_PROVISIONING=1, REGISTRAR_TIMEOUT_MS=2000 , LOGIN_RATE_LIMIT=100 e SIGNUP_RATE_LIMIT=200 (nunca em produção); RESEND_API_URL=http://127.0.0.1:12090 com mock-resend.mjs e RESEND_API_KEY fictícia «re_…» (com mock-registrar.mjs --delay=4000 na porta 12089).
 set -u
 cd "$(dirname "$0")/../../.."
 case "$(node --env-file=.env.local -p 'process.env.DB_NAME')" in
@@ -22,6 +22,7 @@ run "Compras, pagamentos e activação" node --env-file=.env.local scripts/maria
 run "Área do Cliente, renovações, catálogo" node --env-file=.env.local scripts/mariadb/rehearsal/client-area-e2e.mjs
 run "Importação WHM" node --env-file=.env.local scripts/mariadb/rehearsal/whm-import-e2e.mjs
 run "Associação manual de contas WHM a clientes" node --env-file=.env.local scripts/mariadb/rehearsal/whm-link-e2e.mjs
+run "Contas: verificação de e-mail e eliminação" node --env-file=.env.local scripts/mariadb/rehearsal/account-email-e2e.mjs
 run "Painel: receita, acções pendentes, registrador e WHM" node --env-file=.env.local scripts/mariadb/rehearsal/admin-ops-e2e.mjs
 if [ "${SKIP_UI:-0}" = "1" ]; then
   echo; echo "=== Interface e links: ignorados (SKIP_UI=1, sem Chromium neste servidor)"
@@ -29,6 +30,7 @@ else
   run "Percursos de compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/purchase-flows-e2e.cjs
   run "Interface desktop + iPhone" node scripts/mariadb/rehearsal/ui-e2e.cjs
   run "Painel: menu, acções pendentes, integrações (desktop + iPhone)" node scripts/mariadb/rehearsal/admin-ui-e2e.cjs
+  run "Contas no navegador: registo, verificação e eliminação" node --env-file=.env.local scripts/mariadb/rehearsal/account-ui-e2e.cjs
   run "Links do site" node scripts/mariadb/rehearsal/links-audit.cjs
   run "Links com sessão" node scripts/mariadb/rehearsal/links-audit-auth.cjs
 fi

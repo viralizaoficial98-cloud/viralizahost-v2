@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [unverified, setUnverified] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,8 +23,13 @@ export default function LoginPage() {
       const supabase = createAuthClient()
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
       if (authError) {
+        setUnverified(authError.message === 'Email not confirmed')
         setError(authError.message === 'Invalid login credentials'
           ? 'Email ou senha incorretos. Verifique os seus dados.'
+          : authError.message === 'Email not confirmed'
+          ? 'O seu e-mail ainda não foi confirmado. Abra o link que enviámos para activar a conta.'
+          : authError.message === 'User is banned'
+          ? 'O acesso desta conta está suspenso. Contacte o suporte.'
           : authError.message)
       } else {
         router.push('/dashboard')
@@ -58,8 +64,13 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm" role="alert" data-testid="login-error">
             {error}
+            {unverified && (
+              <Link href={`/verificar-email?email=${encodeURIComponent(email)}`} className="block mt-2 underline text-yellow-400" data-testid="login-resend">
+                Reenviar e-mail de verificação
+              </Link>
+            )}
           </div>
         )}
 

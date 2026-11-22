@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useState } from 'react'
-import { Eye, EyeOff, Mail, Lock, User, Phone, Globe, Loader2, CheckCircle2 } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, Phone, Globe, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { createAuthClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [emailSent, setEmailSent] = useState(true)
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(prev => ({ ...prev, [field]: e.target.value }))
@@ -32,7 +33,7 @@ export default function RegisterPage() {
     setError('')
     try {
       const supabase = createAuthClient()
-      const { error: authError } = await supabase.auth.signUp({
+      const { data, error: authError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
         options: {
@@ -45,8 +46,11 @@ export default function RegisterPage() {
         },
       })
       if (authError) {
-        setError(authError.message)
+        setError(authError.message === 'A user with this email address has already been registered'
+          ? 'Já existe uma conta com este e-mail. Inicie sessão ou recupere a senha.'
+          : authError.message)
       } else {
+        setEmailSent(data.emailSent !== false)
         setSuccess(true)
       }
     } catch {
@@ -59,15 +63,25 @@ export default function RegisterPage() {
   if (success) {
     return (
       <div className="w-full max-w-md">
-        <div className="glass-dark rounded-3xl p-8 border border-green-500/20 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 mb-4">
-            <CheckCircle2 size={32} className="text-green-400" />
+        <div className={`glass-dark rounded-3xl p-8 border text-center ${emailSent ? 'border-green-500/20' : 'border-amber-500/30'}`}>
+          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 border ${emailSent ? 'bg-green-500/10 border-green-500/20' : 'bg-amber-500/10 border-amber-500/30'}`}>
+            {emailSent ? <CheckCircle2 size={32} className="text-green-400" /> : <AlertTriangle size={32} className="text-amber-400" />}
           </div>
-          <h2 className="text-xl font-black text-white mb-2">Conta criada com sucesso!</h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Enviamos um email de confirmação para <strong className="text-white">{form.email}</strong>.
-            Verifique a sua caixa de entrada e clique no link para ativar a conta.
-          </p>
+          <h2 className="text-xl font-black text-white mb-2">Conta criada</h2>
+          {emailSent ? (
+            <p className="text-gray-500 text-sm mb-4" data-testid="signup-sent">
+              Enviámos um e-mail de confirmação para <strong className="text-white">{form.email}</strong>.
+              Abra a mensagem e clique no link para activar a conta (válido durante 24 horas). Verifique também a pasta de spam.
+            </p>
+          ) : (
+            <p className="text-amber-300 text-sm mb-4" data-testid="signup-not-sent">
+              A conta foi criada, mas não conseguimos enviar o e-mail de confirmação para <strong className="text-white">{form.email}</strong>.
+              Peça um novo envio abaixo; se continuar sem chegar, contacte o suporte.
+            </p>
+          )}
+          <Link href={`/verificar-email?email=${encodeURIComponent(form.email)}`} className="block text-sm text-yellow-400 underline mb-6" data-testid="resend-link">
+            Não recebeu? Reenviar e-mail de verificação
+          </Link>
           <Link href="/login" className="btn-primary inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold">
             Ir para o Login →
           </Link>

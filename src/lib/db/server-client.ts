@@ -96,7 +96,7 @@ export async function requestPasswordRecovery(email: string, redirectTo?: string
     })()
     const token = await issueToken(user.id, 'recovery', target)
     const link = `${siteUrl()}/api/auth/verify?type=recovery&token_hash=${encodeURIComponent(token)}`
-    const sent = await sendAuthEmail('recovery', user.email, link)
+    const sent = await sendAuthEmail('recovery', user.email, link, user.id)
     if (!sent.ok) return { data: null, error: authError('Error sending recovery email', 500, 'unexpected_failure') }
   }
   return { data: {}, error: null }

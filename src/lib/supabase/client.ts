@@ -60,10 +60,10 @@ function createAuth() {
       return { data: { user: r.user, session: { user: r.user } }, error: null }
     },
     async signUp(input: { email: string; password: string; options?: { data?: Record<string, unknown>; emailRedirectTo?: string } }) {
-      const r = await postJson<{ user?: any; session?: any; error?: any }>('/api/auth/signup', input)
-      if (r.error) return { data: { user: null, session: null }, error: r.error }
+      const r = await postJson<{ user?: any; session?: any; error?: any; email_sent?: boolean }>('/api/auth/signup', input)
+      if (r.error) return { data: { user: null, session: null, emailSent: undefined as boolean | undefined }, error: r.error }
       if (r.session) emit('SIGNED_IN', r.session)
-      return { data: { user: r.user ?? null, session: r.session ?? null }, error: null }
+      return { data: { user: r.user ?? null, session: r.session ?? null, emailSent: r.email_sent as boolean | undefined }, error: null }
     },
     async signOut() {
       await postJson('/api/auth/logout', {})

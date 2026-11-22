@@ -6,7 +6,7 @@ import {
   Users, UserCheck, UserX, Search, Filter, RefreshCw, ChevronRight,
   Server, Globe, Mail, AlertCircle, CheckCircle2, Clock, Eye,
   MoreVertical, ExternalLink, Lock, Unlock, Key, X, Loader2,
-  ChevronLeft, Building2, ShieldCheck, AlertTriangle,
+  ChevronLeft, Building2, ShieldCheck, AlertTriangle, Trash2, Ban, MailCheck, Send,
 } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -19,6 +19,8 @@ interface Client {
   country: string | null
   role: string
   is_active: boolean
+  email_verified: boolean
+  portal_suspended: boolean
   created_at: string
   company_name: string | null
   cpanel_username: string | null
@@ -49,6 +51,8 @@ interface Stats {
   no_association: number
   pending_payment: number
   open_tickets: number
+  unverified?: number
+  admins?: number
 }
 
 const FILTERS = [
@@ -58,6 +62,8 @@ const FILTERS = [
   { key: 'whm',             label: 'Com WHM' },
   { key: 'no_hosting',      label: 'Sem hospedagem' },
   { key: 'pending_payment', label: 'Pagamento pendente' },
+  { key: 'unverified',      label: 'E-mail por verificar' },
+  { key: 'admins',          label: 'Contas da equipa' },
   { key: 'open_tickets',    label: 'Tickets abertos' },
 ]
 
@@ -124,14 +130,21 @@ function ActionMenu({ client, onAction }: { client: Client; onAction: (action: s
     { id: 'portal_password',label: 'Alterar senha portal', icon: Key },
     { id: 'cpanel_password',label: 'Alterar senha cPanel', icon: Lock, disabled: !client.has_hosting },
     { id: 'sync',           label: 'Sincronizar',          icon: RefreshCw, disabled: !client.has_whm && !client.has_hosting },
-    client.is_whm_suspended || client.is_active === false
+    client.is_whm_suspended
       ? { id: 'unsuspend', label: 'Reativar conta WHM',   icon: Unlock, disabled: !client.has_hosting }
       : { id: 'suspend',   label: 'Suspender conta WHM',  icon: AlertTriangle, disabled: !client.has_hosting, danger: true },
+    ...(client.role === 'client' ? [
+      ...(!client.email_verified ? [{ id: 'resend_verification', label: 'Reenviar e-mail de verificação', icon: Send }] : []),
+      client.portal_suspended
+        ? { id: 'portal_reactivate', label: 'Reactivar acesso ao portal', icon: Unlock }
+        : { id: 'portal_suspend',    label: 'Suspender acesso ao portal', icon: Ban, danger: true },
+      { id: 'delete', label: 'Eliminar conta…', icon: Trash2, danger: true },
+    ] : [{ id: 'protected', label: 'Conta da equipa — protegida', icon: ShieldCheck, disabled: true }]),
   ]
 
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen(o => !o)}
+      <button onClick={() => setOpen(o => !o)} aria-label={`Acções de ${client.email}`} data-testid="client-menu"
         className="p-1.5 rounded-lg transition-colors hover:opacity-70"
         style={{ background: '#F3F4F6', border: '1px solid #E5E7EB' }}>
         <MoreVertical size={14} style={{ color: '#6B7280' }} />
@@ -141,11 +154,11 @@ function ActionMenu({ client, onAction }: { client: Client; onAction: (action: s
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.12 }}
-            className="absolute right-0 mt-1 w-52 rounded-xl overflow-hidden z-20"
+            className="absolute right-0 mt-1 w-60 rounded-xl overflow-hidden z-20"
             style={{ background: '#fff', border: '1px solid #E5E7EB', boxShadow: '0 10px 30px rgba(15,23,42,0.12)' }}>
             {actions.map(a => (
-              <button key={a.id}
-                disabled={a.disabled}
+              <button key={a.id} data-testid={`client-action-${a.id}`}
+                disabled={"disabled" in a ? !!a.disabled : false}
                 onClick={() => { onAction(a.id, client); setOpen(false) }}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-left disabled:opacity-40 transition-colors"
                 style={{ color: (a as any).danger ? '#DC2626' : '#374151' }}
@@ -158,6 +171,94 @@ function ActionMenu({ client, onAction }: { client: Client; onAction: (action: s
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+// ── Modal: Eliminar conta ─────────────────────────────────────────────────────
+// Verifica no servidor se a conta pode ser eliminada e mostra os motivos exactos do bloqueio.
+// Eliminar remove só a conta do portal (autenticação, perfil, sessões); nunca a conta no WHM.
+
+type Assessment = { account: { id: string; email: string; full_name: string; role: string; email_verified: boolean }; eligible: boolean; blockers: { code: string; label: string }[]; canSuspend: boolean }
+
+function DeleteAccountModal({ client, onClose, onDeleted, onSuspend }: { client: Client; onClose: () => void; onDeleted: (msg: string) => void; onSuspend: () => void }) {
+  const [a, setA] = useState<Assessment | null>(null)
+  const [loadErr, setLoadErr] = useState('')
+  const [typed, setTyped] = useState('')
+  const [ack, setAck] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    fetch(`/api/admin/clients/${client.id}/deletion`, { cache: 'no-store', credentials: 'include' })
+      .then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error ?? 'Erro ao verificar a conta.'); if (alive) setA(j) })
+      .catch(e => { if (alive) setLoadErr(e.message) })
+    return () => { alive = false }
+  }, [client.id])
+
+  const submit = async () => {
+    if (!a) return
+    setSaving(true); setErr('')
+    try {
+      const res = await fetch(`/api/admin/clients/${client.id}`, { method: 'DELETE', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm_email: typed }) })
+      const data = await res.json()
+      if (!res.ok) {
+        if (data.blockers) setA({ ...a, eligible: false, blockers: data.blockers, canSuspend: !!data.canSuspend })
+        throw new Error(data.error ?? 'Erro ao eliminar.')
+      }
+      onDeleted(`Conta ${data.email} eliminada do portal. Nenhuma conta WHM foi alterada.`)
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : 'Erro.') } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.50)', backdropFilter: 'blur(4px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }} role="dialog" aria-modal="true" aria-labelledby="del-title" data-testid="delete-dialog">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: '#fff', boxShadow: '0 25px 60px rgba(0,0,0,0.20)' }}>
+        <div className="px-6 pt-5 pb-4 flex items-center justify-between" style={{ borderBottom: '1px solid #F1F5F9' }}>
+          <h3 id="del-title" className="font-black text-base flex items-center gap-2" style={{ color: '#B91C1C' }}><Trash2 size={16} /> Eliminar conta</h3>
+          <button onClick={onClose} aria-label="Fechar" className="p-1.5 rounded-lg" style={{ color: '#94A3B8' }}><X size={16} /></button>
+        </div>
+        <div className="px-6 py-5 space-y-4 text-sm" style={{ color: '#334155' }}>
+          <div className="rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+            <div className="font-bold" style={{ color: '#0B0B0D' }}>{client.full_name || 'Sem nome'}</div>
+            <div className="text-xs" data-testid="delete-email">{client.email}</div>
+          </div>
+          {!a && !loadErr && <div className="flex justify-center py-4"><Loader2 size={18} className="animate-spin" style={{ color: '#F5B700' }} /></div>}
+          {loadErr && <p className="text-sm" style={{ color: '#B91C1C' }} role="alert">{loadErr}</p>}
+          {a && !a.eligible && (
+            <div data-testid="delete-blocked">
+              <p className="font-bold" style={{ color: '#B45309' }}>Eliminação bloqueada:</p>
+              <ul className="list-disc pl-5 mt-1 space-y-0.5 text-xs">{a.blockers.map(b => <li key={b.code} data-testid="delete-blocker">{b.label}</li>)}</ul>
+              <p className="text-xs mt-2" style={{ color: '#64748B' }}>O histórico financeiro, a hospedagem e a conta cPanel são preservados. {a.canSuspend ? 'Para impedir o acesso, suspenda o acesso ao portal (reversível).' : ''}</p>
+              {a.canSuspend && !client.portal_suspended && (
+                <button onClick={onSuspend} className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold" style={{ background: '#FEF2F2', color: '#B91C1C', border: '1px solid #FECACA' }} data-testid="delete-suspend-instead">
+                  <Ban size={13} /> Suspender acesso ao portal
+                </button>
+              )}
+            </div>
+          )}
+          {a && a.eligible && (
+            <>
+              <p className="text-xs">Remove definitivamente a conta do portal: início de sessão, perfil e sessões abertas. Esta conta não tem facturas, pagamentos, encomendas, serviços, hospedagem nem vínculo WHM. <strong>Nenhuma conta no WHM é alterada.</strong> Não é possível desfazer.</p>
+              <label className="block text-xs font-bold" htmlFor="del-confirm">Escreva o e-mail da conta para confirmar</label>
+              <input id="del-confirm" value={typed} onChange={e => setTyped(e.target.value)} autoComplete="off" className="w-full px-3 py-2 rounded-xl text-sm" style={{ border: '1px solid #E2E8F0' }} placeholder={client.email} data-testid="delete-confirm-email" />
+              <label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} className="mt-0.5" data-testid="delete-ack" /> Compreendo que esta acção é definitiva.</label>
+            </>
+          )}
+          {err && <p className="text-xs p-2 rounded-lg" style={{ background: '#FEF2F2', color: '#B91C1C' }} role="alert" data-testid="delete-error">{err}</p>}
+        </div>
+        <div className="px-6 pb-5 flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-bold" style={{ background: '#F1F5F9', color: '#475569' }}>Cancelar</button>
+          {a?.eligible && (
+            <button onClick={submit} disabled={saving || !ack || typed.trim().toLowerCase() !== client.email.toLowerCase()} data-testid="delete-submit"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: '#DC2626' }}>
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Eliminar conta
+            </button>
+          )}
+        </div>
+      </motion.div>
     </div>
   )
 }
@@ -467,6 +568,35 @@ export default function ClientsManager() {
       return
     }
 
+    if (action === 'delete') { setModal({ type: 'delete', client }); return }
+    if (action === 'portal_suspend' || action === 'portal_reactivate') {
+      const suspend = action === 'portal_suspend'
+      if (!confirm(suspend
+        ? `Suspender o acesso de ${client.email} ao portal? As sessões abertas terminam e o cliente deixa de conseguir entrar. Facturas, serviços e a conta WHM não são alterados.`
+        : `Reactivar o acesso de ${client.email} ao portal?`)) return
+      setBusy(client.id + '_access')
+      try {
+        const res = await fetch(`/api/admin/clients/${client.id}/access`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active: !suspend }) })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        showToast('success', suspend ? 'Acesso ao portal suspenso.' : 'Acesso ao portal reactivado.')
+        await load()
+      } catch (e: unknown) { showToast('error', e instanceof Error ? e.message : 'Erro.') }
+      finally { setBusy(null) }
+      return
+    }
+    if (action === 'resend_verification') {
+      setBusy(client.id + '_verify')
+      try {
+        const res = await fetch(`/api/admin/clients/${client.id}/resend-verification`, { method: 'POST', credentials: 'include' })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        showToast('success', data.message)
+      } catch (e: unknown) { showToast('error', e instanceof Error ? e.message : 'Erro.') }
+      finally { setBusy(null) }
+      return
+    }
+
     if (action === 'cpanel_sso') {
       setBusy(client.id + '_sso')
       try {
@@ -510,7 +640,7 @@ export default function ClientsManager() {
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          <StatCard label="Total"           value={stats.total}           color="#7C3AED" bg="rgba(139,92,246,0.06)" border="rgba(139,92,246,0.15)" Icon={Users} />
+          <StatCard label="Clientes"        value={stats.total}           color="#7C3AED" bg="rgba(139,92,246,0.06)" border="rgba(139,92,246,0.15)" Icon={Users} />
           <StatCard label="Ativos"          value={stats.active}          color="#059669" bg="rgba(16,185,129,0.06)" border="rgba(16,185,129,0.15)" Icon={UserCheck} />
           <StatCard label="Suspensos"       value={stats.suspended}       color="#DC2626" bg="rgba(239,68,68,0.06)"  border="rgba(239,68,68,0.15)"  Icon={UserX} />
           <StatCard label="Com WHM"         value={stats.whm}             color="#2563EB" bg="rgba(59,130,246,0.06)" border="rgba(59,130,246,0.15)" Icon={Server} />
@@ -711,8 +841,16 @@ export default function ClientsManager() {
                           style={active
                             ? { background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.20)' }
                             : { background: 'rgba(239,68,68,0.08)', color: '#DC2626', border: '1px solid rgba(239,68,68,0.20)' }}>
-                          {active ? 'Ativo' : c.is_whm_suspended ? 'Suspenso WHM' : 'Inativo'}
+                          {c.portal_suspended ? 'Acesso suspenso' : c.is_whm_suspended ? 'Suspenso WHM' : active ? 'Ativo' : 'Inativo'}
                         </span>
+                        <div className="mt-1.5" data-testid="client-email-status">
+                          {c.email_verified
+                            ? <span className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: '#047857' }}><MailCheck size={11} /> E-mail verificado</span>
+                            : <span className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: '#B45309' }}><Mail size={11} /> E-mail por verificar</span>}
+                        </div>
+                        {c.role !== 'client' && (
+                          <div className="mt-1"><span className="inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(124,58,237,0.08)', color: '#6D28D9' }} data-testid="client-role-badge"><ShieldCheck size={11} /> {c.role === 'admin' ? 'Administrador' : c.role}</span></div>
+                        )}
                         {c.last_synced_at && (
                           <div className="text-xs mt-1" style={{ color: '#94A3B8' }}>
                             Sync: {fmtDate(c.last_synced_at)}
@@ -772,6 +910,11 @@ export default function ClientsManager() {
         {modal?.type === 'cpanel_password' && (
           <CpanelPasswordModal client={modal.client} onClose={() => setModal(null)}
             onSuccess={msg => { showToast('success', msg); setModal(null) }} />
+        )}
+        {modal?.type === 'delete' && (
+          <DeleteAccountModal client={modal.client} onClose={() => setModal(null)}
+            onDeleted={async msg => { showToast('success', msg); setModal(null); await load() }}
+            onSuspend={async () => { const c = modal.client; setModal(null); await handleAction('portal_suspend', c) }} />
         )}
         {modal?.type === 'suspend' && (
           <SuspendModal client={modal.client} onClose={() => setModal(null)}
