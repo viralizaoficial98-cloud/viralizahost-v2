@@ -6,10 +6,13 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, RefreshCw, Send, XCirc
 // Integrações → E-mail transaccional: o que o processo em execução usa para enviar os e-mails
 // de verificação e recuperação, estado do domínio no Resend, teste e estado de entrega.
 type Config = { keyPresent: boolean; fromEmail: string; fromEmailSet: boolean; fromName: string; fromNameSet: boolean; fromDomain: string; confirmationRequired: boolean; linkBase: string; linkBaseOk: boolean; simulated: boolean }
+type DnsCheck = { record: string; ok: boolean; detail: string }
+type Recipient = { email: string; account: { exists: boolean; verified?: boolean; suspended?: boolean; role?: string; eligibleForResend?: boolean; similarAccounts?: number }; domain: { deliverable: boolean | 'unknown'; mx?: string[]; message?: string }; attempts: { kind: string; status: string; error: string | null; last_event: string | null; created_at: string }[] }
 type Row = { id: string; kind: string; recipient: string; provider_id: string | null; status: string; error: string | null; last_event: string | null; created_at: string }
 
 const KIND: Record<string, string> = { signup: 'Verificação', recovery: 'Recuperação', test: 'Teste' }
-const EVENT: Record<string, string> = { sent: 'Enviado (a aguardar entrega)', delivered: 'Entregue', delivery_delayed: 'Entrega atrasada', bounced: 'Devolvido', complained: 'Marcado como spam', opened: 'Aberto', clicked: 'Link aberto', queued: 'Em fila', scheduled: 'Agendado' }
+const EVENT: Record<string, string> = { suppressed: 'Suprimido pelo Resend (endereço devolveu antes)', failed: 'Falhou no Resend', sent: 'Enviado (a aguardar entrega)', delivered: 'Entregue', delivery_delayed: 'Entrega atrasada', bounced: 'Devolvido', complained: 'Marcado como spam', opened: 'Aberto', clicked: 'Link aberto', queued: 'Em fila', scheduled: 'Agendado' }
+const STATUS: Record<string, string> = { accepted: 'Aceite pelo Resend', failed: 'Recusado pelo Resend', not_configured: 'Não enviado (sem chave)', skipped: 'Não enviado (sem conta por verificar)', rate_limited: 'Não enviado (limite de reenvios)', undeliverable: 'Não enviado (domínio sem correio)' }
 const when = (s: string) => new Date(s.replace(' ', 'T').slice(0, 23) + 'Z').toLocaleString('pt-PT')
 
 function Item({ ok, warn, children }: { ok: boolean; warn?: boolean; children: React.ReactNode }) {
@@ -26,7 +29,9 @@ export default function EmailIntegrationPage() {
   const [rows, setRows] = useState<Row[]>([])
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
-  const [domain, setDomain] = useState<{ ok: boolean; message: string } | null>(null)
+  const [domain, setDomain] = useState<{ ok: boolean; message: string; dns?: { checks: DnsCheck[]; skipped: boolean } } | null>(null)
+  const [rcpt, setRcpt] = useState('')
+  const [rcptResult, setRcptResult] = useState<Recipient | null>(null)
   const [to, setTo] = useState('')
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
 
@@ -43,6 +48,7 @@ export default function EmailIntegrationPage() {
       const r = await fetch('/api/admin/integrations/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...extra }) })
       const j = await r.json()
       if (action === 'domain') setDomain(j)
+      if (action === 'recipient') { if (r.ok) setRcptResult(j); else setNotice({ ok: false, text: j.error ?? 'Falhou.' }) }
       if (j.recent) setRows(j.recent)
       if (action === 'test') setNotice(r.ok && j.ok ? { ok: true, text: `Pedido aceite pelo Resend (id ${j.id}). Isto ainda não prova a entrega: use «Actualizar estado de entrega» dentro de alguns segundos.` } : { ok: false, text: j.error ?? 'Falhou.' })
       if (action === 'refresh') setNotice(j.error ? { ok: false, text: `Estado actualizado em ${j.updated} de ${j.checked}; erro: ${j.error}` } : { ok: true, text: `Estado de entrega actualizado (${j.updated} mensagem(ns)).` })
@@ -75,6 +81,37 @@ export default function EmailIntegrationPage() {
           </button>
         </div>
         {domain && <div role="status" data-testid="email-domain-result" className={`mt-3 p-3 rounded-xl text-sm ${domain.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-amber-50 text-amber-900 border border-amber-200'}`}>{domain.message}</div>}
+        {domain?.dns && !domain.dns.skipped && (
+          <ul className="mt-3 space-y-1.5" data-testid="email-dns-checks">
+            {domain.dns.checks.map(c => <Item key={c.record} ok={c.ok}><code>{c.record}</code>: {c.detail}</Item>)}
+          </ul>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-[#E5E7EB] bg-white p-5">
+        <h2 className="font-bold text-[#0B0B0D] mb-2">Diagnosticar um destinatário</h2>
+        <p className="text-xs text-[#64748B] mb-2">Mostra se o endereço exacto tem conta, se está por verificar, se o domínio recebe correio da Internet (MX) e as últimas tentativas — incluindo as que não chegaram ao Resend.</p>
+        <div className="flex flex-wrap gap-2">
+          <input type="email" value={rcpt} onChange={e => setRcpt(e.target.value)} placeholder="cliente@dominio.ao" className="flex-1 min-w-[220px] rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm" data-testid="email-rcpt" />
+          <button onClick={() => post('recipient', { to: rcpt })} disabled={!!busy || !rcpt} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[#E5E7EB] text-sm font-bold disabled:opacity-50" data-testid="email-rcpt-check">
+            {busy === 'recipient' ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Diagnosticar
+          </button>
+        </div>
+        {rcptResult && (
+          <div className="mt-3 space-y-2 text-sm" data-testid="email-rcpt-result">
+            <ul className="space-y-1.5">
+              <Item ok={rcptResult.account.exists}>{rcptResult.account.exists
+                ? <>Conta existe{rcptResult.account.role && rcptResult.account.role !== 'client' ? ` (papel ${rcptResult.account.role})` : ''} · {rcptResult.account.verified ? 'e-mail verificado (o reenvio não envia nada)' : 'e-mail por verificar'}{rcptResult.account.suspended ? ' · acesso suspenso' : ''}</>
+                : <>Não existe conta com <strong>{rcptResult.email}</strong> exactamente{rcptResult.account.similarAccounts ? ` (há ${rcptResult.account.similarAccounts} conta(s) com nome parecido — confirme a grafia)` : ''}: o reenvio não envia nada</>}</Item>
+              <Item ok={rcptResult.domain.deliverable === true} warn={rcptResult.domain.deliverable === 'unknown'}>{rcptResult.domain.deliverable === true ? `Domínio recebe correio (MX: ${rcptResult.domain.mx?.join(', ')})` : rcptResult.domain.message}</Item>
+            </ul>
+            {rcptResult.attempts.length > 0 && (
+              <ul className="text-xs text-[#334155] space-y-1">
+                {rcptResult.attempts.map((a, i) => <li key={i}>{when(a.created_at)} · {KIND[a.kind] ?? a.kind} · {STATUS[a.status] ?? a.status}{a.last_event ? ` · ${EVENT[a.last_event] ?? a.last_event}` : ''}{a.error ? ` — ${a.error}` : ''}</li>)}
+              </ul>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="rounded-2xl border border-[#E5E7EB] bg-white p-5">
@@ -105,7 +142,7 @@ export default function EmailIntegrationPage() {
                     <td className="py-2 pr-2 whitespace-nowrap">{when(r.created_at)}</td>
                     <td className="py-2 pr-2">{KIND[r.kind] ?? r.kind}</td>
                     <td className="py-2 pr-2 break-all">{r.recipient}</td>
-                    <td className="py-2 pr-2">{r.status === 'accepted' ? <span className="text-green-700 font-bold">Aceite</span> : r.status === 'not_configured' ? <span className="text-red-700 font-bold">Não enviado (sem chave)</span> : <span className="text-red-700 font-bold">Recusado</span>}{r.error && <span className="block text-[#B45309]">{r.error}</span>}</td>
+                    <td className="py-2 pr-2">{r.status === 'accepted' ? <span className="text-green-700 font-bold">Aceite</span> : <span className={`font-bold ${r.status === 'skipped' || r.status === 'rate_limited' ? 'text-amber-800' : 'text-red-700'}`}>{STATUS[r.status] ?? r.status}</span>}{r.error && <span className="block text-[#B45309]">{r.error}</span>}</td>
                     <td className="py-2">{r.status !== 'accepted' ? '—' : r.last_event ? <span className={r.last_event === 'delivered' || r.last_event === 'opened' || r.last_event === 'clicked' ? 'text-green-700 font-bold' : r.last_event === 'bounced' || r.last_event === 'complained' ? 'text-red-700 font-bold' : 'text-amber-800'}>{EVENT[r.last_event] ?? r.last_event}</span> : <span className="text-[#94A3B8]">Por consultar</span>}</td>
                   </tr>
                 ))}

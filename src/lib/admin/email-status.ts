@@ -2,6 +2,7 @@ import 'server-only'
 import { getPool } from '@/lib/db/pool'
 import { siteUrl } from '@/lib/auth/server'
 import { emailFrom, fetchDeliveryEvent, resendApi, sendAuthEmail } from '@/lib/auth/email'
+import { checkMailDomain, publicResolver } from '@/lib/auth/mail-domain'
 
 // Diagnóstico do envio de e-mails de autenticação, lido do PROCESSO em execução.
 // Mostra só presença/ausência de segredos — nunca valores, tokens nem links.
@@ -59,4 +60,40 @@ export async function refreshDeliveryEvents(limit = 20) {
 
 export function sendTestEmail(to: string) {
   return sendAuthEmail('test', to, siteUrl())
+}
+
+/**
+ * Registos DNS públicos que o Resend exige para o domínio do remetente (lidos pelo servidor):
+ * MX e SPF (TXT) em send.<domínio> e a chave DKIM em resend._domainkey.<domínio>.
+ * Funciona mesmo com uma chave só de envio.
+ */
+export async function senderDnsRecords() {
+  const domain = emailFrom().email.split('@')[1] ?? ''
+  if (process.env.EMAIL_DNS_CHECK === 'test' || process.env.EMAIL_DNS_CHECK === 'off') return { domain, checks: [] as { record: string; ok: boolean; detail: string }[], skipped: true }
+  const dns = publicResolver()
+  const txt = async (n: string) => (await dns.resolveTxt(n).catch(() => [] as string[][])).map(r => r.join(''))
+  const mx = await dns.resolveMx(`send.${domain}`).catch(() => [])
+  const spf = (await txt(`send.${domain}`)).find(t => t.startsWith('v=spf1'))
+  const dkim = (await txt(`resend._domainkey.${domain}`)).find(t => t.includes('p='))
+  const checks = [
+    { record: `MX send.${domain}`, ok: mx.some(r => /amazonses\.com$/.test(r.exchange)), detail: mx.map(r => r.exchange).join(', ') || 'em falta' },
+    { record: `TXT (SPF) send.${domain}`, ok: !!spf && /include:amazonses\.com/.test(spf), detail: spf ?? 'em falta' },
+    { record: `TXT (DKIM) resend._domainkey.${domain}`, ok: !!dkim, detail: dkim ? 'publicado' : 'em falta' },
+  ]
+  return { domain, checks, skipped: false }
+}
+
+/** Diagnóstico de um destinatário: conta, domínio de correio e últimas tentativas (só administradores). */
+export async function recipientStatus(emailRaw: string) {
+  const email = emailRaw.trim().toLowerCase()
+  const [[u]] = await getPool().query(`SELECT u.id, u.email_confirmed_at, u.banned_until > CURRENT_TIMESTAMP(6) AS banned, p.role
+    FROM auth_users u LEFT JOIN profiles p ON p.id = u.id WHERE u.email = ? LIMIT 1`, [email]) as any
+  const [[similar]] = u ? [[null]] : await getPool().query(`SELECT COUNT(*) n FROM auth_users WHERE email LIKE ?`, [`%${email.split('@')[0].replace(/[\\%_]/g, '')}%`]) as any
+  const [log] = await getPool().query('SELECT kind, status, error, last_event, created_at, provider_id IS NOT NULL AS has_id FROM auth_email_log WHERE recipient = ? ORDER BY created_at DESC LIMIT 10', [email]) as any
+  return {
+    email,
+    account: u ? { exists: true, verified: !!u.email_confirmed_at, suspended: !!Number(u.banned), role: u.role, eligibleForResend: !u.email_confirmed_at && !Number(u.banned) } : { exists: false, similarAccounts: Number(similar?.n ?? 0) },
+    domain: await checkMailDomain(email),
+    attempts: log as any[],
+  }
 }

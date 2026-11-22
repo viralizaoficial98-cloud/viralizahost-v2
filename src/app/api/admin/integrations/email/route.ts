@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
-import { emailConfig, recentEmails, refreshDeliveryEvents, senderDomainStatus, sendTestEmail } from '@/lib/admin/email-status'
+import { emailConfig, recentEmails, recipientStatus, refreshDeliveryEvents, senderDnsRecords, senderDomainStatus, sendTestEmail } from '@/lib/admin/email-status'
 import { clientIp, rateLimit } from '@/lib/auth/rate-limit'
 
 export const dynamic = 'force-dynamic'
@@ -16,7 +16,12 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const a = await admin(); if (typeof a !== 'string') return NextResponse.json({ error: 'Sem permissão.' }, { status: a.status })
   const body = await req.json().catch(() => ({})) as { action?: string; to?: string }
-  if (body.action === 'domain') return NextResponse.json(await senderDomainStatus())
+  if (body.action === 'domain') return NextResponse.json({ ...(await senderDomainStatus()), dns: await senderDnsRecords() })
+  if (body.action === 'recipient') {
+    const to = String(body.to ?? '').trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return NextResponse.json({ error: 'Indique um e-mail válido.' }, { status: 400 })
+    return NextResponse.json(await recipientStatus(to))
+  }
   if (body.action === 'refresh') return NextResponse.json({ ...(await refreshDeliveryEvents()), recent: await recentEmails() })
   if (body.action === 'test') {
     const to = String(body.to ?? '').trim().toLowerCase()

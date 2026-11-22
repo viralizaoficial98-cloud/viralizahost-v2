@@ -1,6 +1,7 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { getPool } from '@/lib/db/pool'
+import { checkMailDomain } from './mail-domain'
 
 // E-mails de autenticação (verificação de conta, recuperação de senha, teste do painel).
 // Variáveis lidas pelo processo em execução: RESEND_API_KEY (obrigatória),
@@ -35,17 +36,28 @@ export const resendApi = () => (process.env.RESEND_API_URL || 'https://api.resen
 export const emailFrom = () => ({ email: process.env.RESEND_FROM_EMAIL || 'comercial@viralizahost.com', name: process.env.RESEND_FROM_NAME || 'ViralizaHost' })
 const clean = (s: unknown) => String(s ?? '').replace(/re_[A-Za-z0-9_]{8,}/g, '[chave]').replace(/https?:\/\/\S+/g, '[url]').slice(0, 300)
 
-async function record(kind: Kind, to: string, userId: string | null, status: 'accepted' | 'failed' | 'not_configured', providerId: string | null, error: string | null) {
+export type LogStatus = 'accepted' | 'failed' | 'not_configured' | 'skipped' | 'rate_limited' | 'undeliverable'
+
+/** Regista uma tentativa (também as que não chegam ao Resend). Nunca guarda o link nem o token. */
+export async function record(kind: Kind, to: string, userId: string | null, status: LogStatus, providerId: string | null, error: string | null) {
   await getPool().query('INSERT INTO auth_email_log (id, user_id, kind, recipient, provider_id, status, error) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [randomUUID(), userId, kind, to.toLowerCase(), providerId, status, error]).catch(e => console.error('[auth/email] registo falhou:', (e as Error).message))
 }
 
-export async function sendAuthEmail(kind: Kind, to: string, link: string, userId: string | null = null): Promise<{ ok: boolean; id?: string; error?: string }> {
+export async function sendAuthEmail(kind: Kind, to: string, link: string, userId: string | null = null): Promise<{ ok: boolean; id?: string; error?: string; undeliverable?: boolean }> {
   const key = process.env.RESEND_API_KEY
   if (!key) {
     console.error(`[auth/email] RESEND_API_KEY em falta — e-mail "${kind}" não enviado`)
     await record(kind, to, userId, 'not_configured', null, 'RESEND_API_KEY em falta no processo')
     return { ok: false, error: 'Serviço de e-mail não configurado.' }
+  }
+  // Domínio de destino sem servidor de correio na Internet: não chamar o Resend (a mensagem
+  // seria devolvida e o endereço ficaria suprimido). A conta continua por verificar.
+  const dest = await checkMailDomain(to)
+  if (dest.deliverable === false) {
+    console.warn(`[auth/email] "${kind}" não enviado: ${dest.message}`)
+    await record(kind, to, userId, 'undeliverable', null, dest.message)
+    return { ok: false, error: dest.message, undeliverable: true }
   }
   const t = TEMPLATES[kind]
   const from = emailFrom()

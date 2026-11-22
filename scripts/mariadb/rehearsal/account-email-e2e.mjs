@@ -195,6 +195,35 @@ try {
   ok(r.json?.clients?.some(c => c.email === em3 && c.portal_suspended), 'aparece como «Acesso suspenso»')
   await adm.req(`/api/admin/clients/${u3.id}/access`, { method: 'POST', body: { active: true } })
   ok((await new S().login(em3, PW)).status === 200, 'reactivar devolve o acesso')
+
+  console.log('\n9. Pedidos que não chegam ao Resend ficam registados (resposta pública igual)')
+  // Registo com domínio sem correio na Internet (EMAIL_DNS_CHECK=test: «semmx» = inexistente)
+  const nx = `cliente@semmx-${tag}.ao`
+  r = await signup(anon, nx)
+  ok(r.status === 400 && r.json?.error?.code === 'email_domain_undeliverable' && !(await one('SELECT id FROM auth_users WHERE email = ?', [nx])), 'registo recusado com explicação quando o domínio não recebe correio (nenhuma conta criada)')
+  // Conta antiga por verificar num domínio sem correio → reenvio não chama o Resend
+  const nxOld = `antiga@semmx-${tag}.ao`; created.push(nxOld)
+  await db.query("INSERT INTO auth_users (id, email, encrypted_password) VALUES (UUID(), ?, NULL)", [nxOld])
+  await db.query("INSERT INTO profiles (id, email, full_name, role) SELECT id, email, 'Conta Antiga', 'client' FROM auth_users WHERE email = ?", [nxOld])
+  r = await anon.req('/api/auth/resend-verification', { method: 'POST', body: { email: nxOld } })
+  const nxLog = await one('SELECT status, error FROM auth_email_log WHERE recipient = ? ORDER BY created_at DESC LIMIT 1', [nxOld])
+  ok(r.status === 200 && r.json?.message === generic && nxLog?.status === 'undeliverable' && /não existe no DNS/.test(nxLog.error ?? '') && (await lastMail(nxOld)).count === 0, 'conta por verificar com domínio inexistente: resposta genérica, Resend não chamado, motivo registado')
+  const ghost = `fantasma-${tag}@ensaio.test`
+  await anon.req('/api/auth/resend-verification', { method: 'POST', body: { email: ghost } })
+  const gl = await one('SELECT status, error FROM auth_email_log WHERE recipient = ? ORDER BY created_at DESC LIMIT 1', [ghost])
+  ok(gl?.status === 'skipped' && /Sem conta/.test(gl.error ?? ''), 'endereço sem conta: registado «sem conta» (a resposta pública não o revela)')
+  const vl = await one("SELECT status, error FROM auth_email_log WHERE recipient = ? AND status = 'skipped' ORDER BY created_at DESC LIMIT 1", [em])
+  ok(vl && /já verificado/.test(vl.error ?? ''), 'conta já verificada: registado «já verificado»')
+  const rlRows = (await db.query("SELECT COUNT(*) n FROM auth_email_log WHERE recipient = ? AND status = 'rate_limited'", [rl]))[0][0].n
+  await anon.req('/api/auth/resend-verification', { method: 'POST', body: { email: rl } })
+  const rlRows2 = (await db.query("SELECT COUNT(*) n FROM auth_email_log WHERE recipient = ? AND status = 'rate_limited'", [rl]))[0][0].n
+  ok(Number(rlRows) === 1 && Number(rlRows2) === 1, 'limite atingido registado uma vez por hora (não enche o registo)')
+  r = await adm.req('/api/admin/integrations/email', { method: 'POST', body: { action: 'recipient', to: nxOld } })
+  ok(r.status === 200 && r.json?.account?.exists && r.json.account.eligibleForResend && r.json.domain?.deliverable === false && r.json.attempts?.some(a => a.status === 'undeliverable'), 'painel: diagnóstico do destinatário (conta por verificar, domínio sem correio, tentativas)')
+  r = await adm.req('/api/admin/integrations/email', { method: 'POST', body: { action: 'recipient', to: ghost } })
+  ok(r.json?.account?.exists === false && r.json.attempts?.[0]?.status === 'skipped', 'painel: endereço sem conta identificado')
+  r = await c1.req('/api/admin/integrations/email', { method: 'POST', body: { action: 'recipient', to: em } })
+  ok([401, 403].includes(r.status), 'cliente não usa o diagnóstico')
 } finally {
   // Remove as contas fictícias deste ensaio (nenhuma tem dependências)
   for (const e of created) {
