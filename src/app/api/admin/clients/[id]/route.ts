@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { AccountError, deleteClientAccount } from '@/lib/admin/client-account'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { createAdminWriteClient } from '@/lib/supabase/server'
 
@@ -102,4 +103,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   })).catch(() => {})
 
   return NextResponse.json({ success: true })
+}
+
+// ── DELETE /api/admin/clients/[id] — elimina a conta do portal (nunca o WHM) ──
+// Corpo: { confirm_email } igual ao e-mail da conta. Bloqueada com dependências.
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let adminId: string
+  try { adminId = await requireAdminRole() } catch (e) { const s = (e as { status?: number })?.status === 403 ? 403 : 401; return NextResponse.json({ error: 'Sem permissão.' }, { status: s }) }
+  const { id } = await params
+  const body = await req.json().catch(() => ({})) as { confirm_email?: string }
+  try {
+    return NextResponse.json(await deleteClientAccount(id, adminId, String(body.confirm_email ?? '')))
+  } catch (e) {
+    if (e instanceof AccountError) return NextResponse.json({ error: e.message, code: e.code, ...e.extra }, { status: e.status })
+    console.error('[admin/clients DELETE]', (e as Error).message)
+    return NextResponse.json({ error: 'Não foi possível eliminar a conta. Nada foi alterado — tente novamente ou suspenda o acesso.' }, { status: 500 })
+  }
 }

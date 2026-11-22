@@ -50,8 +50,8 @@ async function checks(): Promise<Check[]> {
     ? { area: 'Registrador de domínios', state: registrar.mode === 'live' ? 'ok' : 'warn', text: `${registrar.mode === 'live' ? 'Activo em produção' : 'Activo só em modo de ensaio'} (${registrar.provider}): ${regExts.length ? regExts.join(', ') : 'nenhuma extensão'} com registo automático; as restantes ${Math.max(0, Number(domainsNoApi?.n ?? 0) - regExts.length)} ficam manuais.`, href: '/admin/settings/integrations/registrar' }
     : { area: 'Registrador de domínios', state: 'missing', text: `Sem integração activa: ${domainsNoApi?.n ?? 0} extensões à venda com registo/renovação/transferência feitos manualmente pela equipa. Disponibilidade .ao/.co.ao confirmada manualmente.`, need: 'Contrato com registrador/revendedor com API + credenciais', href: '/admin/settings/integrations/registrar' })
   list.push(env('RESEND_API_KEY') && env('RESEND_FROM_EMAIL')
-    ? { area: 'E-mail transaccional', state: 'ok', text: 'Envio de e-mails configurado.' }
-    : { area: 'E-mail transaccional', state: 'warn', text: 'Facturas e avisos não são enviados por e-mail (ficam na Área do Cliente).', need: 'RESEND_API_KEY, RESEND_FROM_EMAIL, RESEND_FROM_NAME' })
+    ? { area: 'E-mail transaccional', state: 'ok', text: 'Chave e remetente configurados. Confirme o domínio no Resend e o estado de entrega na página de diagnóstico.', href: '/admin/settings/integrations/email' }
+    : { area: 'E-mail transaccional', state: 'missing', text: 'Sem envio de e-mails: a verificação de conta e a recuperação de senha não chegam aos clientes; facturas ficam só na Área do Cliente.', need: 'RESEND_API_KEY, RESEND_FROM_EMAIL, RESEND_FROM_NAME', href: '/admin/settings/integrations/email' })
   list.push(Number(billing?.tax_rate ?? 0) > 0
     ? { area: 'Imposto (IVA)', state: 'ok', text: `Taxa aplicada: ${billing.tax_rate}%.` }
     : { area: 'Imposto (IVA)', state: 'warn', text: 'Taxa 0%: os preços não somam IVA. Confirmar com o contabilista o regime aplicável.', need: 'Configurações → Facturação (taxa)', href: '/admin/settings/billing' })

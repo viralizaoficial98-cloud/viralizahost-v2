@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { createAdminWriteClient } from '@/lib/supabase/server'
+import { getPool } from '@/lib/db/pool'
 
 export const dynamic   = 'force-dynamic'
 export const revalidate = 0
@@ -69,6 +70,11 @@ export async function GET(req: NextRequest) {
   if (tErr)  console.error('[ADMIN CLIENTS ERROR] tickets',          { message: tErr.message,  code: tErr.code  })
   if (iErr)  console.error('[ADMIN CLIENTS ERROR] invoices',         { message: iErr.message,  code: iErr.code  })
 
+  // Estado do e-mail (verificado ou não) e suspensão do acesso ao portal, por conta
+  const marks = profileIds.map(() => '?').join(',')
+  const [authRows] = await getPool().query(`SELECT id, email_confirmed_at IS NOT NULL AS verified, banned_until IS NOT NULL AND banned_until > CURRENT_TIMESTAMP(6) AS banned FROM auth_users WHERE id IN (${marks})`, profileIds) as any // eslint-disable-line @typescript-eslint/no-explicit-any
+  const authMap = new Map<string, { verified: boolean; banned: boolean }>((authRows as { id: string; verified: number; banned: number }[]).map(r => [r.id, { verified: !!Number(r.verified), banned: !!Number(r.banned) }]))
+
   // ── 3. Index by profile_id ────────────────────────────────────────────────
   function idx<T extends { profile_id: string }>(rows: T[] | null): Map<string, T[]> {
     const m = new Map<string, T[]>()
@@ -112,6 +118,8 @@ export async function GET(req: NextRequest) {
       country:          p.country,
       role:             p.role,
       is_active:        p.is_active,
+      email_verified:   authMap.get(p.id)?.verified ?? false,
+      portal_suspended: (authMap.get(p.id)?.banned ?? false) || p.is_active === false,
       created_at:       p.created_at,
       company_name:     cl?.company_name   ?? null,
       cpanel_username:  ha?.cpanel_username ?? wa?.whm_username   ?? null,
@@ -167,16 +175,24 @@ export async function GET(req: NextRequest) {
     case 'open_tickets':
       list = list.filter(c => c.open_tickets > 0)
       break
+    case 'unverified':
+      list = list.filter(c => c.role === 'client' && !c.email_verified)
+      break
+    case 'admins':
+      list = list.filter(c => c.role !== 'client')
+      break
   }
 
   // ── 7. Stats (from full merged list, before filter) ───────────────────────
-  const all = (profiles ?? []).map(p => {
+  // Contadores só de contas de cliente (contas administrativas aparecem na lista, assinaladas)
+  const all = (profiles ?? []).filter(p => p.role === 'client').map(p => {
     const ha = haMap.get(p.id)?.[0]
     const wa = waMap.get(p.id)?.[0]
     const invs = invoiceMap.get(p.id) ?? []
     const tkts = ticketMap.get(p.id)  ?? []
     return {
       is_active:       p.is_active,
+      email_verified:  authMap.get(p.id)?.verified ?? false,
       is_whm_suspended: wa?.is_suspended ?? false,
       has_hosting:     !!(ha || wa),
       has_whm:         !!wa,
@@ -193,6 +209,8 @@ export async function GET(req: NextRequest) {
     no_association:  all.filter(c => !c.has_hosting).length,
     pending_payment: all.filter(c => c.pending_invoices > 0).length,
     open_tickets:    all.filter(c => c.open_tickets > 0).length,
+    unverified:      all.filter(c => !c.email_verified).length,
+    admins:          (profiles ?? []).filter(p => p.role !== 'client').length,
   }
 
   // ── 8. Paginate ────────────────────────────────────────────────────────────
