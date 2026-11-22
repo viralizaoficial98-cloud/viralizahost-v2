@@ -3,7 +3,7 @@
 #   APP_LOG=/caminho/next.log BASE_URL=http://localhost:3000 bash scripts/mariadb/rehearsal/run-all.sh
 # O processo Next de ensaio deve correr com RDAP_BOOTSTRAP_URL=http://127.0.0.1:12088/dns.json (mock-rdap.mjs),
 # NODE_EXTRA_CA_CERTS=<certificado do WHM simulado>, ORDER_RATE_LIMIT=500, QUOTE_RATE_LIMIT=200,
-# REGISTRAR_TEST_PROVISIONING=1, REGISTRAR_TIMEOUT_MS=2000 , LOGIN_RATE_LIMIT=100 e SIGNUP_RATE_LIMIT=200 (nunca em produção); RESEND_API_URL=http://127.0.0.1:12090 com mock-resend.mjs e RESEND_API_KEY fictícia «re_…» (com mock-registrar.mjs --delay=4000 na porta 12089).
+# REGISTRAR_TEST_PROVISIONING=1, REGISTRAR_TIMEOUT_MS=2000 , LOGIN_RATE_LIMIT=100, SIGNUP_RATE_LIMIT=200 e EMAIL_DNS_CHECK=test (nunca em produção); RESEND_API_URL=http://127.0.0.1:12090 com mock-resend.mjs e RESEND_API_KEY fictícia «re_…» (com mock-registrar.mjs --delay=4000 na porta 12089).
 set -u
 cd "$(dirname "$0")/../../.."
 case "$(node --env-file=.env.local -p 'process.env.DB_NAME')" in

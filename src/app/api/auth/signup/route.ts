@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSession, createUser, setSessionCookie, authError } from '@/lib/auth/server'
 import { sendVerificationEmail } from '@/lib/auth/verification'
 import { clientIp, rateLimit } from '@/lib/auth/rate-limit'
+import { checkMailDomain } from '@/lib/auth/mail-domain'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,14 @@ export async function POST(req: Request) {
   // O papel nunca vem do navegador (no Supabase, raw_user_meta_data.role permitia escolher 'admin').
   meta.role = 'client'
   const confirm = process.env.AUTH_EMAIL_CONFIRMATION !== 'false'
+  // Domínio do e-mail que não existe/não recebe correio na Internet: a confirmação nunca chegaria.
+  // Erros temporários de DNS não bloqueiam (resultado «unknown»).
+  if (confirm) {
+    const dest = await checkMailDomain(String(body.email ?? ''))
+    if (dest.deliverable === false) {
+      return NextResponse.json({ error: authError(`Não é possível enviar e-mails para este endereço: ${dest.message} Use outro e-mail ou peça ao responsável do domínio para publicar os registos de correio (MX).`, 400, 'email_domain_undeliverable') }, { status: 400 })
+    }
+  }
   const r = await createUser({ email: String(body.email ?? ''), password: String(body.password ?? ''), user_metadata: meta, email_confirm: !confirm })
   if ('error' in r) return NextResponse.json({ error: r.error }, { status: 400 })
   if (confirm) {
