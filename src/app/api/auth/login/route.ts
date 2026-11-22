@@ -7,7 +7,9 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({})) as { email?: string; password?: string }
   const email = String(body.email ?? '').trim().toLowerCase()
-  if (!rateLimit(`login:${clientIp(req)}`, 30, 15 * 60_000) || !rateLimit(`login:${email}`, 10, 15 * 60_000)) {
+  // LOGIN_RATE_LIMIT só para o servidor de ensaio (muitos logins da mesma conta de teste); produção usa 10/30
+  const perEmail = Number(process.env.LOGIN_RATE_LIMIT) || 10
+  if (!rateLimit(`login:${clientIp(req)}`, Math.max(30, perEmail * 3), 15 * 60_000) || !rateLimit(`login:${email}`, perEmail, 15 * 60_000)) {
     return NextResponse.json({ error: authError('Too many requests. Please try again later.', 429, 'over_request_rate_limit') }, { status: 429 })
   }
   const r = await signInWithPassword(email, String(body.password ?? ''))

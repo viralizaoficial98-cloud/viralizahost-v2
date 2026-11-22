@@ -4683,6 +4683,21 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "text",
         "hasDefault": true,
         "nullable": true
+      },
+      "linked_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "linked_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "link_method": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": [

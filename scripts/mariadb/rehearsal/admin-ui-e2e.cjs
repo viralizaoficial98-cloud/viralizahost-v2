@@ -126,6 +126,32 @@ async function run(label, ctxOpts, shots) {
   ok(true, '«Abrir» do registrador leva à configuração do registrador')
   if (shots) await p.screenshot({ path: `${OUT}/${label}-registrador.png`, fullPage: true })
 
+  if (!mobile) {
+  // Servidores → Contas WHM: «Associar cliente» com pesquisa, resumo e confirmação explícita
+    await p.goto(BASE + '/admin/servers/whm-accounts?linked=false', { waitUntil: 'load' })
+    const rowT = p.locator('[data-testid="whm-row"][data-domain="testeadmin.ao"]')
+    if (await rowT.count()) {
+      await rowT.getByTestId('whm-link-btn').click()
+      const dlg = p.getByTestId('link-dialog')
+      await dlg.waitFor()
+      ok((await dlg.getByTestId('sum-domain').textContent()) === 'testeadmin.ao' && (await dlg.getByTestId('sum-user').textContent()) === 'testeadm' && (await dlg.getByTestId('sum-contact').textContent()) === 'admin@ensaio.test', 'diálogo mostra domínio, utilizador cPanel e contacto do WHM')
+      await dlg.getByTestId('client-search').fill('admin@ensaio')
+      await dlg.getByTestId('no-clients').waitFor({ timeout: 10000 })
+      ok(true, 'conta administrativa não aparece no selector')
+      await dlg.getByTestId('client-search').fill('cliente1@ensaio')
+      await dlg.getByTestId('client-option').first().waitFor({ timeout: 10000 })
+      await dlg.getByTestId('client-option').first().click()
+      ok(await dlg.getByTestId('link-save').isDisabled(), '«Associar cliente» bloqueado até confirmar a titularidade')
+      if (shots) await p.screenshot({ path: `${OUT}/${label}-associar-cliente.png` })
+      await dlg.getByTestId('link-confirm').check()
+      await dlg.getByTestId('link-save').click()
+      await p.waitForLoadState('load'); await p.waitForTimeout(1500)
+      await p.goto(BASE + '/admin/servers/whm-accounts?linked=true', { waitUntil: 'load' })
+      const linkedRow = p.locator('[data-testid="whm-row"][data-domain="testeadmin.ao"]')
+      ok(/cliente1@ensaio\.test/.test(await linkedRow.getByTestId('whm-client').textContent()), 'depois de gravar aparece em «Com cliente» com o titular')
+    } else ok(true, 'conta testeadm indisponível neste ensaio (associação já testada em whm-link-e2e)')
+
+  }
   ok(errors.length === 0, 'sem erros de JavaScript', errors.join(' | '))
   await b.close()
 }

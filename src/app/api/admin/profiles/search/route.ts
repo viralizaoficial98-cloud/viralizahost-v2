@@ -1,29 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminRole } from '@/lib/api/require-admin'
-import { createAdminWriteClient } from '@/lib/supabase/server'
+import { adminGuard } from '@/lib/api/require-admin'
+import { searchClients } from '@/lib/whm/link'
 
+export const dynamic = 'force-dynamic'
+
+// Pesquisa de clientes (nome ou e-mail) para associar a contas WHM.
+// Contas administrativas nunca aparecem; clientes não elegíveis vêm com o motivo.
 export async function GET(req: NextRequest) {
-  try {
-    await requireAdminRole()
-    const q = req.nextUrl.searchParams.get('q')?.trim() ?? ''
-
-    if (q.length < 2) {
-      return NextResponse.json({ data: [] })
-    }
-
-    const db = createAdminWriteClient()
-    const { data, error } = await db
-      .from('profiles')
-      .select('id, full_name, email')
-      .eq('role', 'client')
-      .or(`email.ilike.%${q}%,full_name.ilike.%${q}%`)
-      .limit(10)
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    return NextResponse.json({ data: data ?? [] })
-  } catch (err: unknown) {
-    const e = err as { message?: string; status?: number }
-    return NextResponse.json({ error: e.message ?? 'Erro interno' }, { status: e.status ?? 500 })
-  }
+  const denied = await adminGuard(); if (denied) return denied
+  const q = req.nextUrl.searchParams.get('q') ?? ''
+  try { return NextResponse.json({ data: await searchClients(q) }) }
+  catch (e) { console.error('[profiles/search]', (e as Error).message); return NextResponse.json({ error: 'Erro na pesquisa.' }, { status: 500 }) }
 }

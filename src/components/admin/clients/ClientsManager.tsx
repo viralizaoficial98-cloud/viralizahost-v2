@@ -400,6 +400,7 @@ export default function ClientsManager() {
   const [modal, setModal]       = useState<{ type: string; client: Client } | null>(null)
   const [busy, setBusy]         = useState<string | null>(null)
   const [pendingWhm, setPendingWhm] = useState(0)
+  const [whmCounts, setWhmCounts] = useState<{ unlinked: number; candidates: number; unlinkedWithEmail: number } | null>(null)
 
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg }); setTimeout(() => setToast(null), 5000)
@@ -423,9 +424,10 @@ export default function ClientsManager() {
 
   useEffect(() => {
     load()
-    fetch('/api/admin/whm/accounts?linked=pending&limit=1', { credentials: 'include' })
+    // Contas WHM sem cliente associado (com ou sem candidata por e-mail)
+    fetch('/api/admin/whm/accounts?linked=false', { credentials: 'include' })
       .then(r => r.json())
-      .then(d => setPendingWhm(d.total ?? 0))
+      .then(d => { if (d.counts) { setWhmCounts(d.counts); setPendingWhm(d.counts.unlinked) } })
       .catch(() => {})
   }, [load])
 
@@ -524,15 +526,16 @@ export default function ClientsManager() {
           style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.30)' }}>
           <AlertTriangle size={17} style={{ color: '#D9A300', flexShrink: 0, marginTop: 1 }} />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold" style={{ color: '#92720A' }}>
-              {pendingWhm} conta{pendingWhm > 1 ? 's' : ''} WHM aguarda{pendingWhm === 1 ? '' : 'm'} associação manual
+            <p className="text-sm font-bold" style={{ color: '#92720A' }} data-testid="whm-unlinked-banner">
+              {pendingWhm} conta{pendingWhm > 1 ? 's' : ''} WHM sem cliente associado
             </p>
             <p className="text-xs mt-0.5" style={{ color: '#B45309' }}>
-              Estas contas foram importadas do WHM mas não têm e-mail válido e não aparecem na lista de clientes.
-              Aceda a Servidores → Contas WHM para as associar a um cliente.
+              Uma conta importada só fica ligada a um cliente quando um administrador confirma a titularidade — o e-mail de contacto do WHM não basta
+              {whmCounts && whmCounts.unlinkedWithEmail > 0 ? ` (${whmCounts.unlinkedWithEmail} têm e-mail de contacto no WHM)` : ''}.
+              {whmCounts && whmCounts.candidates > 0 ? ` ${whmCounts.candidates} têm um cliente sugerido por e-mail a validar.` : ''} Use «Associar cliente» em Servidores → Contas WHM.
             </p>
           </div>
-          <a href="/admin/servers/whm-accounts?linked=pending"
+          <a href="/admin/servers/whm-accounts?linked=false"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0"
             style={{ background: 'rgba(245,158,11,0.15)', color: '#92720A', border: '1px solid rgba(245,158,11,0.30)' }}>
             <ExternalLink size={12} /> Ver pendentes

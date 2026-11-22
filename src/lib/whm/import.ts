@@ -2,6 +2,7 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { getPool, withTransaction, type Queryable } from '@/lib/db/pool'
 import { loadWhmConfig } from './config'
+import { ELIGIBLE_SQL } from './link'
 import { listAccountsFull, type WHMAccountFull } from './client'
 
 // Importação de contas WHM (cPanel) — conta de hospedagem ≠ cliente ViralizaHost.
@@ -62,7 +63,8 @@ export async function planImport(accountsOverride?: WHMAccountFull[]): Promise<I
   const db = getPool()
   const existing = new Map((await rows(db, 'SELECT * FROM whm_accounts WHERE server_id = ?', [cfg.serverId])).map(r => [r.whm_username, r]))
   const hosting = new Map((await rows(db, 'SELECT cpanel_username, profile_id, primary_domain FROM hosting_accounts WHERE server_id = ? OR server_id IS NULL', [cfg.serverId])).map(r => [r.cpanel_username, r]))
-  const profilesByEmail = new Map((await rows(db, 'SELECT id, email FROM profiles')).map(r => [String(r.email).toLowerCase(), r.id]))
+  // Candidatas por e-mail: só clientes elegíveis (contas administrativas e não confirmadas excluídas)
+  const profilesByEmail = new Map((await rows(db, `SELECT p.id, p.email FROM profiles p LEFT JOIN auth_users u ON u.id = p.id WHERE ${ELIGIBLE_SQL}`)).map(r => [String(r.email).toLowerCase(), r.id]))
   const domainOwners = await rows(db, 'SELECT profile_id, CONCAT(name, extension) AS d FROM domains')
   const domainCount = new Map<string, number>()
   for (const a of accounts) domainCount.set(a.domain, (domainCount.get(a.domain) ?? 0) + 1)

@@ -200,9 +200,36 @@ Fonte: https://docs.cpanel.net/whm/development/manage-api-tokens-in-whm/
    - contas do portal que já não estão no WHM.
 2. **Aplicar importação.** Pode repetir-se sem duplicar e preserva as contas existentes.
 3. **Candidatas:** um e-mail coincidente **não** associa a conta ao cliente. A equipa confirma ou rejeita cada candidata em **Servidores → Contas WHM**.
+   - Só clientes elegíveis podem ser candidatos: papel cliente, conta activa e e-mail confirmado no portal. Contas administrativas nunca são sugeridas.
 4. O cliente só vê e abre (cPanel/Webmail) as contas associadas ao seu perfil. Um pedido para a conta de outro cliente devolve 404.
 
-### 2.7 Mecanismo único de credenciais
+### 2.7 Associar manualmente uma conta a um cliente
+
+Para contas «Sem cliente», com ou sem candidata. Também funciona quando o contacto no WHM (ex.: `comercial@…`) é diferente do e-mail do cliente no portal.
+
+1. **Servidores → Contas WHM → Sem cliente → Associar cliente** (na linha da conta).
+2. Pesquisar o cliente por nome ou e-mail.
+   - Só aparecem clientes registados. As contas administrativas não aparecem.
+   - Clientes inactivos ou com o e-mail por confirmar aparecem com o motivo e não podem ser escolhidos.
+   - Sem cliente registado e confirmado, a conta fica «Sem cliente»: o painel não cria contas de cliente.
+3. Rever o resumo: domínio, utilizador cPanel, servidor, contacto no WHM e cliente seleccionado.
+4. Confirmar a titularidade (caixa obrigatória) e clicar **Associar cliente**.
+
+O servidor volta a validar tudo:
+
+- permissões de administrador;
+- elegibilidade do cliente;
+- a conta WHM fica bloqueada durante a gravação: se dois administradores gravarem ao mesmo tempo, o segundo recebe o conflito com o titular actual;
+- vínculos incompatíveis (outro cliente, serviço de outro cliente, domínio de outro cliente) são mostrados para revisão. Nada é substituído.
+
+O que fica gravado:
+
+- quem associou, quando e o método (`linked_by`, `linked_at`, `link_method`), mais uma entrada no histórico (`activity_logs`);
+- se a conta não tinha serviço, um serviço de alojamento «importado» sem preço nem renovação (nenhuma factura) e a conta de alojamento. É por aí que a Área do Cliente e o acesso ao cPanel/Webmail encontram a hospedagem.
+
+O contacto do WHM fica como veio. A sincronização seguinte preserva o vínculo e continua a actualizar uso, pacote e estado.
+
+### 2.8 Mecanismo único de credenciais
 
 Todas as rotas que falam com o WHM obtêm e decifram o token pela mesma função, `loadWhmConfig()` (`src/lib/whm/config.ts`):
 

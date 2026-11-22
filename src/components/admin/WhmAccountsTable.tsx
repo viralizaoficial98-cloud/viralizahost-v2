@@ -24,6 +24,9 @@ interface WhmRow {
   link_status?: string | null
   link_candidate_reason?: string | null
   candidate?: { id: string; full_name?: string; email?: string } | null
+  linked_at?: string | null
+  link_method?: string | null
+  server_label?: string | null
 }
 
 interface Props {
@@ -87,12 +90,11 @@ function fmtDate(iso: string | null | undefined) {
 
 export default function WhmAccountsTable({ rows }: Props) {
   const [busy, setBusy] = useState<string | null>(null)
-  // Confirma (associa ao cliente sugerido) ou recusa a candidata da importação
-  async function resolve(id: string, profileId: string | null) {
+  // Recusa a candidata sugerida pela importação (a confirmação abre o diálogo de associação)
+  async function refuse(id: string) {
+    if (!window.confirm('Recusar o cliente sugerido por e-mail? A conta fica «Sem cliente».')) return
     setBusy(id)
-    const res = profileId
-      ? await fetch(`/api/admin/whm/accounts/${id}/link`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile_id: profileId }) })
-      : await fetch(`/api/admin/whm/accounts/${id}/candidate`, { method: 'POST' })
+    const res = await fetch(`/api/admin/whm/accounts/${id}/candidate`, { method: 'POST' })
     setBusy(null)
     if (res.ok) window.location.reload()
     else alert((await res.json().catch(() => ({}))).error ?? 'Falhou.')
@@ -120,9 +122,10 @@ export default function WhmAccountsTable({ rows }: Props) {
             )}
             {rows.map((row, idx) => {
               const prof = row.profiles
-              const isPending = row.sync_status === 'pending_email' || row.link_status === 'pending_validation' || row.link_status === 'unlinked'
+              const isPending = !row.profile_id
+              const canLink = !row.profile_id && row.status !== 'missing_from_whm'
               return (
-                <tr key={row.id}
+                <tr key={row.id} data-testid="whm-row" data-domain={row.primary_domain}
                   style={{ borderBottom: idx < rows.length - 1 ? '1px solid #F8FAFC' : 'none',
                     background: isPending ? 'rgba(245,158,11,0.03)' : undefined }}
                   className="hover:bg-slate-50 transition-colors">
@@ -136,12 +139,16 @@ export default function WhmAccountsTable({ rows }: Props) {
                   {/* Client */}
                   <td className="px-4 py-3">
                     {prof ? (
-                      <Link href="/admin/clients"
-                        className="font-medium text-blue-600 hover:underline text-xs">
-                        {prof.full_name ?? '—'}
-                      </Link>
+                      <span data-testid="whm-client">
+                        <Link href={`/admin/clients?q=${encodeURIComponent(prof.email ?? '')}`}
+                          className="font-medium text-blue-600 hover:underline text-xs">
+                          {prof.full_name || prof.email || '—'}
+                        </Link>
+                        {prof.email && <span className="block text-[11px]" style={{ color: '#64748B' }}>{prof.email}</span>}
+                        {row.linked_at && <span className="block text-[10px]" style={{ color: '#94A3B8' }}>Associado {fmtDate(row.linked_at)}{row.link_method === 'manual' ? ' (manual)' : row.link_method === 'candidate' ? ' (candidata confirmada)' : ''}</span>}
+                      </span>
                     ) : (
-                      <span style={{ color: '#F59E0B' }} className="text-[11px] font-medium">Sem cliente</span>
+                      <span style={{ color: '#F59E0B' }} className="text-[11px] font-medium" data-testid="whm-client">Sem cliente</span>
                     )}
                   </td>
 
@@ -193,22 +200,23 @@ export default function WhmAccountsTable({ rows }: Props) {
                           <ExternalLink size={13} />
                         </Link>
                       )}
-                      {row.link_status === 'pending_validation' && row.candidate && (
+                      {canLink && row.link_status === 'pending_validation' && row.candidate && (
                         <span className="flex flex-col gap-1 text-[11px]" style={{ color: '#B45309' }}>
-                          <span title={row.link_candidate_reason ?? ''}>Candidata: {row.candidate.email}</span>
+                          <span title={row.link_candidate_reason ?? ''}>Sugerido: {row.candidate.email}</span>
                           <span className="flex gap-1">
-                            <button disabled={busy === row.id} onClick={() => resolve(row.id, row.candidate!.id)} className="px-2 py-1 rounded-lg font-bold text-white" style={{ background: '#15803D' }}>Confirmar</button>
-                            <button disabled={busy === row.id} onClick={() => resolve(row.id, null)} className="px-2 py-1 rounded-lg font-bold" style={{ border: '1px solid #E2E8F0', color: '#475569' }}>Recusar</button>
+                            <button disabled={busy === row.id} onClick={() => setModalAccount(row)} className="px-2 py-1 rounded-lg font-bold text-white" style={{ background: '#15803D' }}>Rever e confirmar</button>
+                            <button disabled={busy === row.id} onClick={() => refuse(row.id)} className="px-2 py-1 rounded-lg font-bold" style={{ border: '1px solid #E2E8F0', color: '#475569' }}>Recusar</button>
                           </span>
                         </span>
                       )}
-                      {isPending && (
+                      {canLink && !(row.link_status === 'pending_validation' && row.candidate) && (
                         <button
-                          onClick={() => setModalAccount(row)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all"
+                          onClick={() => setModalAccount({ ...row, candidate: null })}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all"
                           style={{ background: 'rgba(245,158,11,0.12)', color: '#B45309', border: '1px solid rgba(245,158,11,0.30)', cursor: 'pointer' }}
-                          title="Associar cliente a esta conta WHM">
-                          <Link2 size={11} /> Associar
+                          data-testid="whm-link-btn"
+                          title="Escolher o cliente titular desta conta WHM">
+                          <Link2 size={11} /> Associar cliente
                         </button>
                       )}
                     </div>
