@@ -1,12 +1,17 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Loader2, FileQuestion } from 'lucide-react'
 
 // Pedidos de cotação dos planos «sob consulta» (formulário público).
 type Quote = { id: string; reference: string; product_slug: string | null; product_name: string | null; name: string; email: string; phone: string | null; company: string | null; message: string | null; status: string; admin_notes: string | null; created_at: string }
 const STATUS: Record<string, string> = { new: 'Novo', contacted: 'Contactado', quoted: 'Proposta enviada', closed: 'Fechado' }
 
-export default function QuotesPage() {
+function QuotesInner() {
+  const params = useSearchParams()
+  const estado = params.get('estado')
+  const focus = params.get('ref')
   const [quotes, setQuotes] = useState<Quote[] | null>(null)
   const [error, setError] = useState('')
   const load = useCallback(() => {
@@ -28,9 +33,13 @@ export default function QuotesPage() {
       {quotes && !quotes.length && (
         <div className="rounded-2xl border border-[#E5E7EB] bg-white p-10 text-center"><FileQuestion className="mx-auto text-[#94A3B8] mb-2" /><p className="text-sm text-[#334155]">Ainda não há pedidos de cotação.</p></div>
       )}
+      {estado && STATUS[estado] && (
+        <p className="text-sm text-[#334155]">A mostrar: <strong>{STATUS[estado]}</strong> · <Link href="/admin/quotes" className="underline">ver todos</Link></p>
+      )}
       <ul className="space-y-3">
-        {quotes?.map(q => (
-          <li key={q.id} className="rounded-xl border border-[#E5E7EB] bg-white p-4" data-testid="quote-row">
+        {quotes?.filter(q => !estado || !STATUS[estado] || q.status === estado).map(q => (
+          <li key={q.id} id={`quote-${q.reference}`} ref={el => { if (el && focus === q.reference) el.scrollIntoView({ block: 'center' }) }}
+            className={`rounded-xl border bg-white p-4 ${focus === q.reference ? 'border-[#F5B700] ring-2 ring-[#F5B700]/40' : 'border-[#E5E7EB]'}`} data-testid="quote-row">
             <div className="flex flex-wrap items-center gap-2 justify-between">
               <p className="font-bold text-[#0B0B0D]">{q.reference} · {q.product_name ?? q.product_slug ?? 'Sem plano'}</p>
               <select aria-label={`Estado de ${q.reference}`} className="border border-[#E5E7EB] rounded-lg px-2 py-1 text-sm" value={q.status} onChange={e => update(q.id, { status: e.target.value })}>
@@ -45,4 +54,8 @@ export default function QuotesPage() {
       </ul>
     </div>
   )
+}
+
+export default function QuotesPage() {
+  return <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#F5B700]" /></div>}><QuotesInner /></Suspense>
 }

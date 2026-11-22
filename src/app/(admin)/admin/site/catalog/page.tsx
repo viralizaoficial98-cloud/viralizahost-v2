@@ -168,7 +168,7 @@ function Catalog() {
         <div className="space-y-6">
           <div className="flex flex-wrap gap-2" role="tablist" aria-label="Categoria">
             {Object.entries(CAT_GROUPS).map(([k, g]) => (
-              <button key={k} role="tab" aria-selected={cat === k} onClick={() => router.replace(k === 'all' ? '/admin/site/catalog' : `/admin/site/catalog?cat=${k}`)}
+              <button key={k} role="tab" aria-selected={cat === k} onClick={() => router.push(k === 'all' ? '/admin/site/catalog' : `/admin/site/catalog?cat=${k}`, { scroll: false })}
                 className={`px-3 py-1.5 rounded-lg text-sm font-bold border ${cat === k ? 'bg-[#F5B700] border-[#F5B700] text-black' : 'bg-white border-[#E5E7EB] text-[#334155]'}`}>{g.label}</button>
             ))}
           </div>
