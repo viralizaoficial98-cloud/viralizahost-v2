@@ -23,6 +23,8 @@ const accounts = new Map([
   ['mariaacu', acct('mariaacu', 'mariaacucar.com', 'cliente2@ensaio.test', 'business')],       // e-mail coincide com cliente → só candidata
   ['semdono', acct('semdono', 'semdono.co.ao', 'desconhecido@exemplo.invalid', 'start')],      // sem cliente → pendente
   ['dupdom', acct('dupdom', 'joaoconceicao.ao', 'outro@exemplo.invalid', 'start', { suspended: 1, suspendreason: 'Falta de pagamento' })], // conflito de domínio
+  ['comerc', acct('comerc', 'lojacomercial.ao', 'comercial@ensaio.test', 'business')],        // contacto comercial ≠ e-mail do cliente → associação manual
+  ['testeadm', acct('testeadm', 'testeadmin.ao', 'admin@ensaio.test', 'start')],              // e-mail de conta administrativa → nunca candidata
 ])
 
 const failedOnce = new Set()

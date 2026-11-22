@@ -154,7 +154,7 @@ ALTER TABLE viralizahost.services
       id, whm_username, primary_domain, contact_email, package_name,
       ip_address, disk_used_mb, disk_limit_mb, is_suspended, suspension_reason,
       status, sync_status, requires_manual_link, link_status, link_candidate_profile_id, link_candidate_reason,
-      last_synced_at, profile_id, service_id, hosting_account_id,
+      last_synced_at, profile_id, service_id, hosting_account_id, linked_at, link_method, server_id,
       profiles(id, full_name, email)
     `, { count: 'exact' })
     .order('primary_domain', { ascending: true })
@@ -164,13 +164,16 @@ ALTER TABLE viralizahost.services
   if (pkg)    q = q.eq('package_name', pkg)
   if (linked === 'true')    q = q.not('profile_id', 'is', null)
   if (linked === 'false')   q = q.is('profile_id', null)
-  if (linked === 'pending') q = q.in('link_status', ['pending_validation', 'unlinked'])
+  if (linked === 'pending') q = q.is('profile_id', null).eq('link_status', 'pending_validation')
 
   const { data: rawData, count } = await q
   const rowsRaw = (rawData ?? []) as Record<string, unknown>[]
   // Candidatas sugeridas pela importação (e-mail coincidente, por validar)
   const candIds = [...new Set(rowsRaw.map(r => r.link_candidate_profile_id).filter(Boolean) as string[])]
-  const { data: cands } = candIds.length ? await db.from('profiles').select('id, full_name, email').in('id', candIds) : { data: [] }
+  // Só clientes: contas administrativas nunca são sugeridas (mesmo que uma importação antiga as tenha guardado)
+  const { data: cands } = candIds.length ? await db.from('profiles').select('id, full_name, email').in('id', candIds).eq('role', 'client') : { data: [] }
+  const { data: servers } = await db.from('servers').select('id, name, hostname')
+  const serverLabel = (id: unknown) => { const sv = (servers ?? []).find((x: { id: string }) => x.id === id) as { name: string; hostname: string } | undefined; return sv ? (sv.name === '__whm_config__' ? sv.hostname : sv.name) : '—' }
   const rows = rowsRaw.map(r => ({ ...r, candidate: (cands ?? []).find((c: { id: string }) => c.id === r.link_candidate_profile_id) ?? null })) as Record<string, any>[] // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const filtered = search
@@ -188,15 +191,17 @@ ALTER TABLE viralizahost.services
   // Summary counts
   const { data: summaryRaw } = await db
     .from('whm_accounts')
-    .select('status, is_suspended, profile_id, sync_status')
-  const all = (summaryRaw ?? []) as Array<{ status: string; is_suspended: boolean; profile_id: string | null; sync_status: string }>
+    .select('status, is_suspended, profile_id, sync_status, link_status, contact_email')
+  const all = (summaryRaw ?? []) as Array<{ status: string; is_suspended: boolean; profile_id: string | null; sync_status: string; link_status: string; contact_email: string | null }>
   const summary = {
-    total:     all.length,
-    active:    all.filter(r => !r.is_suspended && r.status === 'active' && r.sync_status !== 'pending_email').length,
-    suspended: all.filter(r => r.is_suspended || r.status === 'suspended').length,
-    missing:   all.filter(r => r.status === 'missing_from_whm').length,
-    unlinked:  all.filter(r => !r.profile_id && r.sync_status !== 'pending_email').length,
-    pending:   all.filter(r => r.sync_status === 'pending_email').length,
+    total:      all.length,
+    active:     all.filter(r => !r.is_suspended && r.status === 'active').length,
+    suspended:  all.filter(r => r.is_suspended || r.status === 'suspended').length,
+    missing:    all.filter(r => r.status === 'missing_from_whm').length,
+    linked:     all.filter(r => !!r.profile_id).length,
+    unlinked:   all.filter(r => !r.profile_id).length,
+    candidates: all.filter(r => !r.profile_id && r.link_status === 'pending_validation').length,
+    unlinkedWithEmail: all.filter(r => !r.profile_id && !!r.contact_email).length,
   }
 
   function filterUrl(extra: Record<string, string>) {
@@ -226,6 +231,12 @@ ALTER TABLE viralizahost.services
     last_synced_at:       r.last_synced_at != null ? String(r.last_synced_at) : null,
     service_id:           r.service_id  != null ? String(r.service_id)  : null,
     profile_id:           r.profile_id  != null ? String(r.profile_id)  : null,
+    link_status:          r.link_status != null ? String(r.link_status) : null,
+    link_candidate_reason: r.link_candidate_reason != null ? String(r.link_candidate_reason) : null,
+    candidate:            (r.candidate as { id: string; full_name?: string; email?: string } | null) ?? null,
+    linked_at:            r.linked_at != null ? String(r.linked_at) : null,
+    link_method:          r.link_method != null ? String(r.link_method) : null,
+    server_label:         serverLabel(r.server_id),
     profiles: (() => {
       const prof = r.profiles as Record<string, unknown> | null
       if (!prof) return null
@@ -265,40 +276,42 @@ ALTER TABLE viralizahost.services
       <WhmImportPanel />
 
       {/* Summary stats */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
         {[
-          { label: 'Total',        value: summary.total,     color: '#475569', href: filterUrl({ status: '', linked: '' }) },
-          { label: 'Ativos',       value: summary.active,    color: '#059669', href: filterUrl({ status: 'active', linked: '' }) },
-          { label: 'Suspensos',    value: summary.suspended, color: '#DC2626', href: filterUrl({ status: 'suspended', linked: '' }) },
-          { label: 'Pendentes',    value: summary.pending,   color: '#B45309', href: filterUrl({ linked: 'pending', status: '' }) },
-          { label: 'Sem cliente',  value: summary.unlinked,  color: '#D9A300', href: filterUrl({ linked: 'false', status: '' }) },
-          { label: 'Ausentes WHM', value: summary.missing,   color: '#94A3B8', href: filterUrl({ status: 'missing_from_whm', linked: '' }) },
+          { label: 'Total',        value: summary.total,      color: '#475569', href: filterUrl({ status: '', linked: '' }) },
+          { label: 'Ativos',       value: summary.active,     color: '#059669', href: filterUrl({ status: 'active', linked: '' }) },
+          { label: 'Suspensos',    value: summary.suspended,  color: '#DC2626', href: filterUrl({ status: 'suspended', linked: '' }) },
+          { label: 'Com cliente',  value: summary.linked,     color: '#2563EB', href: filterUrl({ linked: 'true', status: '' }) },
+          { label: 'Sem cliente',  value: summary.unlinked,   color: '#D9A300', href: filterUrl({ linked: 'false', status: '' }) },
+          { label: 'Candidatas',   value: summary.candidates, color: '#B45309', href: filterUrl({ linked: 'pending', status: '' }) },
+          { label: 'Ausentes WHM', value: summary.missing,    color: '#94A3B8', href: filterUrl({ status: 'missing_from_whm', linked: '' }) },
         ].map(s => (
-          <Link key={s.label} href={s.href} className="rounded-2xl p-4 text-center transition-all hover:shadow-md" style={card}>
+          <Link key={s.label} href={s.href} className="rounded-2xl p-4 text-center transition-all hover:shadow-md" style={card} data-testid={`whm-count-${s.label}`}>
             <div className="text-2xl font-black" style={{ color: s.color }}>{s.value}</div>
             <div className="text-xs mt-0.5" style={{ color: '#64748B' }}>{s.label}</div>
           </Link>
         ))}
       </div>
 
-      {/* Pending accounts warning */}
-      {summary.pending > 0 && (
+      {/* Contas sem cliente: o motivo é a falta de confirmação de titularidade, não o e-mail */}
+      {summary.unlinked > 0 && (
         <div className="rounded-2xl p-4 flex items-start gap-3"
           style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.30)' }}>
           <AlertTriangle size={18} style={{ color: '#D9A300', flexShrink: 0, marginTop: 1 }} />
           <div className="flex-1">
             <p className="text-sm font-bold" style={{ color: '#92720A' }}>
-              {summary.pending} conta{summary.pending > 1 ? 's' : ''} aguardando associação manual
+              {summary.unlinked} conta{summary.unlinked > 1 ? 's' : ''} sem cliente associado
             </p>
             <p className="text-xs mt-0.5" style={{ color: '#B45309' }}>
-              Estas contas foram importadas do WHM mas não possuem e-mail válido.
-              Clique em &quot;Associar&quot; na tabela para ligar cada conta a um cliente.
+              A sincronização importa os dados do WHM, mas não decide o titular: {summary.unlinkedWithEmail} destas contas têm e-mail de contacto no WHM,
+              que não basta para as ligar a um cliente. Use «Associar cliente» para escolher o titular e confirmar.
+              {summary.candidates > 0 ? ` ${summary.candidates} têm um cliente sugerido por e-mail para validar.` : ''}
             </p>
           </div>
-          <Link href={filterUrl({ linked: 'pending', status: '' })}
+          <Link href={filterUrl({ linked: 'false', status: '' })}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap"
             style={{ background: 'rgba(245,158,11,0.15)', color: '#92720A', border: '1px solid rgba(245,158,11,0.30)' }}>
-            <ExternalLink size={12} /> Ver pendentes
+            <ExternalLink size={12} /> Ver sem cliente
           </Link>
         </div>
       )}
@@ -343,13 +356,13 @@ ALTER TABLE viralizahost.services
                 { label: 'Todos',        href: filterUrl({ status: '', linked: '' }) },
                 { label: 'Ativos',       href: filterUrl({ status: 'active' }) },
                 { label: 'Suspensos',    href: filterUrl({ status: 'suspended' }) },
-                { label: 'Pendentes',    href: filterUrl({ linked: 'pending', status: '' }) },
-                { label: 'Sem cliente',  href: filterUrl({ linked: 'false', status: '' }) },
-                { label: 'Com cliente',  href: filterUrl({ linked: 'true',  status: '' }) },
+                { label: 'Candidatas',   href: filterUrl({ linked: 'pending', status: '' }), on: linked === 'pending' },
+                { label: 'Sem cliente',  href: filterUrl({ linked: 'false', status: '' }), on: linked === 'false' },
+                { label: 'Com cliente',  href: filterUrl({ linked: 'true',  status: '' }), on: linked === 'true' },
               ].map(f => (
-                <Link key={f.label} href={f.href}
+                <Link key={f.label} href={f.href} aria-current={'on' in f && f.on ? 'true' : undefined}
                   className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-                  style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid transparent' }}>
+                  style={'on' in f && f.on ? { background: '#F5B700', color: '#111', border: '1px solid transparent' } : { background: '#F1F5F9', color: '#64748B', border: '1px solid transparent' }}>
                   {f.label}
                 </Link>
               ))}

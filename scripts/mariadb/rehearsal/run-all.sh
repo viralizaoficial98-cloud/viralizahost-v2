@@ -3,7 +3,7 @@
 #   APP_LOG=/caminho/next.log BASE_URL=http://localhost:3000 bash scripts/mariadb/rehearsal/run-all.sh
 # O processo Next de ensaio deve correr com RDAP_BOOTSTRAP_URL=http://127.0.0.1:12088/dns.json (mock-rdap.mjs),
 # NODE_EXTRA_CA_CERTS=<certificado do WHM simulado>, ORDER_RATE_LIMIT=500, QUOTE_RATE_LIMIT=200,
-# REGISTRAR_TEST_PROVISIONING=1 e REGISTRAR_TIMEOUT_MS=2000 (com mock-registrar.mjs --delay=4000 na porta 12089).
+# REGISTRAR_TEST_PROVISIONING=1, REGISTRAR_TIMEOUT_MS=2000 e LOGIN_RATE_LIMIT=100 (nunca em produção) (com mock-registrar.mjs --delay=4000 na porta 12089).
 set -u
 cd "$(dirname "$0")/../../.."
 case "$(node --env-file=.env.local -p 'process.env.DB_NAME')" in
@@ -21,6 +21,7 @@ run() { echo; echo "=== $1"; shift; "$@" || fail=$((fail+1)); }
 run "Compras, pagamentos e activação" node --env-file=.env.local scripts/mariadb/rehearsal/commerce-e2e.mjs
 run "Área do Cliente, renovações, catálogo" node --env-file=.env.local scripts/mariadb/rehearsal/client-area-e2e.mjs
 run "Importação WHM" node --env-file=.env.local scripts/mariadb/rehearsal/whm-import-e2e.mjs
+run "Associação manual de contas WHM a clientes" node --env-file=.env.local scripts/mariadb/rehearsal/whm-link-e2e.mjs
 run "Painel: receita, acções pendentes, registrador e WHM" node --env-file=.env.local scripts/mariadb/rehearsal/admin-ops-e2e.mjs
 if [ "${SKIP_UI:-0}" = "1" ]; then
   echo; echo "=== Interface e links: ignorados (SKIP_UI=1, sem Chromium neste servidor)"

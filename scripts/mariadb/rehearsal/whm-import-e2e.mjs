@@ -54,8 +54,8 @@ ok(await n("SELECT COUNT(*) FROM whm_accounts WHERE raw_metadata LIKE '%pass%'")
 
 console.log('\nValidação pelo administrador')
 const mid = (await db.query("SELECT id, link_candidate_profile_id c FROM whm_accounts WHERE whm_username = 'mariaacu'"))[0][0]
-r = await req(`/api/admin/whm/accounts/${mid.id}/link`, 'POST', { profile_id: mid.c })
-ok(r.status === 200, 'admin confirma a candidata', JSON.stringify(r.json))
+r = await req(`/api/admin/whm/accounts/${mid.id}/link`, 'POST', { profile_id: mid.c, confirmed: true })
+ok(r.status === 200, 'admin confirma a candidata (com confirmação explícita)', JSON.stringify(r.json))
 ok((await db.query("SELECT link_status FROM whm_accounts WHERE id = ?", [mid.id]))[0][0].link_status === 'linked' && await n("SELECT COUNT(*) FROM hosting_accounts WHERE cpanel_username = 'mariaacu'") === 1, 'conta associada e visível como serviço do cliente')
 const sid = (await db.query("SELECT id FROM whm_accounts WHERE whm_username = 'semdono'"))[0][0].id
 r = await req('/api/admin/whm/import', 'POST')
