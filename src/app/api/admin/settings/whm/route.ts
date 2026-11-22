@@ -103,6 +103,11 @@ export async function POST(req: NextRequest) {
       activeToken = rawToken.trim()
     }
 
+    // O token só é guardado cifrado: sem chave de cifra, recusa (nunca grava em claro)
+    if ((process.env.WHM_ENCRYPTION_KEY?.length ?? 0) < 64) {
+      return NextResponse.json({ error: 'WHM_ENCRYPTION_KEY não configurada no servidor: o token não pode ser guardado cifrado.' }, { status: 503 })
+    }
+
     // ── 3. Test connection ────────────────────────────────────────────────────
     console.log('[settings/whm POST] testing connection to', normalizedUrl, 'as', username)
 

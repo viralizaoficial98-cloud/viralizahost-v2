@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminWriteClient } from '@/lib/supabase/server'
-import { decryptSecret } from '@/lib/crypto'
+import { loadWhmConfig } from './config'
 import { createUserSession } from '@/lib/whm/client'
 
-const WHM_CONFIG_NAME = '__whm_config__'
 
 export async function handleSso(
   req: NextRequest,
@@ -38,7 +37,7 @@ export async function handleSso(
     // ── 3. Get hosting account (also verifies profile_id) ────────────────────
     const { data: ha } = await db
       .from('hosting_accounts')
-      .select('id, cpanel_username, status, profile_id')
+      .select('id, cpanel_username, status, profile_id, server_id')
       .eq('service_id', serviceId)
       .eq('profile_id', user.id)
       .maybeSingle()
@@ -47,32 +46,23 @@ export async function handleSso(
       return NextResponse.json({ error: 'Conta de hospedagem não encontrada.' }, { status: 404 })
     }
 
-    const haTyped = ha as { id: string; cpanel_username: string; status: string; profile_id: string }
+    const haTyped = ha as { id: string; cpanel_username: string; status: string; profile_id: string; server_id: string | null }
 
     if (haTyped.status === 'suspended') {
       return NextResponse.json({ error: 'Esta conta de hospedagem está suspensa.' }, { status: 403 })
     }
 
-    // ── 4. Load WHM config ────────────────────────────────────────────────────
-    const { data: serverRow } = await db
-      .from('servers')
-      .select('whm_url, whm_api_token, whm_username')
-      .eq('name', WHM_CONFIG_NAME)
-      .maybeSingle()
-
-    if (!serverRow?.whm_url || !serverRow?.whm_api_token) {
+    // ── 4. Credenciais do servidor da conta (mecanismo único: loadWhmConfig) ──
+    // Contas antigas podem apontar para um servidor sem credenciais próprias: usa a configuração principal
+    const whmCfg = (haTyped.server_id ? await loadWhmConfig(haTyped.server_id) : null) ?? await loadWhmConfig()
+    if (!whmCfg) {
       return NextResponse.json({ error: 'Integração WHM não configurada.' }, { status: 503 })
-    }
-
-    const token = decryptSecret(serverRow.whm_api_token as string)
-    if (!token) {
-      return NextResponse.json({ error: 'Erro interno de configuração.' }, { status: 503 })
     }
 
     // ── 5. Call WHM to create session ─────────────────────────────────────────
     const whmService = accessType === 'cpanel' ? 'cpaneld' : 'webmaild'
     const session = await createUserSession(
-      { url: serverRow.whm_url as string, token, username: (serverRow.whm_username as string) ?? 'root' },
+      whmCfg.config,
       haTyped.cpanel_username,
       whmService,
     )

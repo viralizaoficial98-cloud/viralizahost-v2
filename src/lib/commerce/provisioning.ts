@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { getPool, type Queryable } from '@/lib/db/pool'
 import { loadWhmConfig } from '@/lib/whm/config'
 import { createAccount, getAccount } from '@/lib/whm/client'
+import { runDomainOperation } from '@/lib/registrar/operations'
 
 // Activação de serviços depois do pagamento confirmado.
 // Nunca cobra: só lê a encomenda paga e cria/associa o recurso no fornecedor.
@@ -43,7 +44,7 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
   ) as any
   if (!claim.affectedRows) return { serviceId, status: 'skipped', message: 'Já activo ou em curso.' }
 
-  const [s] = await rows(db, `SELECT s.*, o.payment_status, oi.months, oi.domain_operation, p.provisioning, p.whm_package, p.slug
+  const [s] = await rows(db, `SELECT s.*, o.payment_status, o.ns1, o.ns2, o.ns3, o.ns4, oi.months, oi.years, oi.domain_operation, oi.epp_code_enc, p.provisioning, p.whm_package, p.whm_server_id, p.slug
     FROM services s JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id LEFT JOIN products p ON p.id = s.product_id
     WHERE s.id = ?`, [serviceId])
   const done = async (status: ProvisionOutcome['status'], message: string, extra: Record<string, unknown> = {}) => {
@@ -57,27 +58,48 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
   try {
     if (s.renews_service_id) {
       // Renovação paga: serviços no nosso WHM prolongam já; os restantes dependem do fornecedor
-      const [orig] = await rows(db, 'SELECT p.provisioning FROM services o LEFT JOIN products p ON p.id = o.product_id WHERE o.id = ?', [s.renews_service_id])
+      const [orig] = await rows(db, 'SELECT o.service_type, o.domain, p.provisioning FROM services o LEFT JOIN products p ON p.id = o.product_id WHERE o.id = ?', [s.renews_service_id])
       if (orig?.provisioning === 'whm') {
         await extendService(db, s.renews_service_id, Number(s.months ?? 12))
-        return await done('active', 'Renovação aplicada.', { next_due_date: null })
+        return await done('active', 'Renovação aplicada.', { next_due_date: null, activation_source: 'whm' })
+      }
+      if (orig?.service_type === 'domain' && orig.domain) {
+        const r = await runDomainOperation(serviceId, 'renew', orig.domain, { years: Math.max(1, Number(s.years ?? 1)) })
+        if (r.handled) {
+          if (r.outcome === 'succeeded') {
+            await extendService(db, s.renews_service_id, Math.max(1, Number(s.years ?? 1)) * 12)
+            await db.query("UPDATE domains SET expires_at = GREATEST(COALESCE(expires_at, CURRENT_TIMESTAMP(6)), CURRENT_TIMESTAMP(6)) + INTERVAL ? YEAR WHERE service_id = ?", [Math.max(1, Number(s.years ?? 1)), s.renews_service_id])
+            return await done('active', 'Renovação confirmada pelo registrador.', { external_ref: r.providerRef, activation_source: 'registrar' })
+          }
+          return await done(r.outcome === 'failed' ? 'failed' : 'manual_required', r.message)
+        }
       }
       return await done('manual_required', 'Renovação paga: confirmar a renovação no fornecedor e marcar como concluída.')
     }
     if (s.service_type === 'domain') {
-      return await done('manual_required', `${s.domain_operation === 'transfer' ? 'Transferência' : s.domain_operation === 'renew' ? 'Renovação' : 'Registo'} manual no registrador: integração de registrador não configurada.`)
+      const op = s.domain_operation === 'transfer' ? 'transfer' : s.domain_operation === 'renew' ? 'renew' : 'register'
+      const label = op === 'transfer' ? 'Transferência' : op === 'renew' ? 'Renovação' : 'Registo'
+      if (!s.domain) return await done('manual_required', `${label} sem domínio associado.`)
+      const ns = [s.ns1, s.ns2, s.ns3, s.ns4].filter(Boolean)
+      const r = await runDomainOperation(serviceId, op, s.domain, { years: Math.max(1, Number(s.years ?? 1)), eppEnc: s.epp_code_enc, nameservers: ns })
+      if (!r.handled) return await done('manual_required', `${label} manual no registrador: extensão sem integração automática activa. Marque como activo só com a referência do registo.`)
+      if (r.outcome === 'succeeded') {
+        await activateDomainRecord(db, s)
+        return await done('active', `${label} confirmado pelo registrador.`, { external_ref: r.providerRef, next_due_date: addMonths(12 * Math.max(1, Number(s.years ?? 1))), activation_source: 'registrar' })
+      }
+      return await done(r.outcome === 'failed' ? 'failed' : 'manual_required', r.message)
     }
     if (s.provisioning !== 'whm') {
       return await done('manual_required', `Activação manual (${s.service_type}): sem API de fornecedor configurada para este serviço.`)
     }
-    if (!s.whm_package) return await done('manual_required', `Defina o pacote WHM do produto ${s.slug} no painel para activar automaticamente.`)
+    if (!s.whm_package) return await done('manual_required', `Defina o pacote WHM do plano ${s.slug} em Integrações → WHM/cPanel para activar automaticamente.`)
     if (!s.domain) return await done('manual_required', 'Serviço sem domínio associado.')
-    const cfg = await loadWhmConfig()
-    if (!cfg) return await done('manual_required', 'WHM não configurado (Configurações → WHM).')
+    const cfg = await loadWhmConfig(s.whm_server_id ?? undefined)
+    if (!cfg) return await done('manual_required', 'Servidor WHM do plano não configurado ou token ilegível (Integrações → WHM/cPanel).')
 
     // Já existe conta associada a este serviço?
     const [ha] = await rows(db, 'SELECT id, cpanel_username FROM hosting_accounts WHERE service_id = ?', [serviceId])
-    if (ha) return await done('active', 'Conta já associada.', { external_ref: ha.cpanel_username, next_due_date: due })
+    if (ha) return await done('active', 'Conta já associada.', { external_ref: ha.cpanel_username, next_due_date: due, activation_source: 'whm' })
 
     const [profile] = await rows(db, 'SELECT email FROM profiles WHERE id = ?', [s.profile_id])
     // Procura conta existente com o mesmo domínio no servidor (repetição após falha parcial)
@@ -96,7 +118,7 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
       if (acct.domain === s.domain) {
         // Conta criada numa tentativa anterior deste serviço — associa sem recriar
         await linkAccount(db, s, cfg.serverId, candidate, acct.domain, s.whm_package)
-        return await done('active', 'Conta WHM existente associada.', { external_ref: candidate, next_due_date: due })
+        return await done('active', 'Conta WHM existente associada.', { external_ref: candidate, next_due_date: due, activation_source: 'whm' })
       }
     }
     if (!username) return await done('manual_required', 'Não foi possível escolher um utilizador cPanel livre: atribuir manualmente.')
@@ -106,7 +128,7 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
       password: '',
     })
     await linkAccount(db, s, cfg.serverId, username, s.domain, s.whm_package)
-    return await done('active', 'Conta cPanel criada.', { external_ref: username, next_due_date: due })
+    return await done('active', 'Conta cPanel criada.', { external_ref: username, next_due_date: due, activation_source: 'whm' })
   } catch (e) {
     return done('failed', `Falha na activação: ${safeError(e)}`)
   }
@@ -154,25 +176,37 @@ async function extendService(db: Queryable, serviceId: string, months: number) {
     status = IF(status = 'expired', 'active', status) WHERE id = ?`, [months || 12, serviceId])
 }
 
-/** Activação manual concluída pelo administrador (ex.: domínio registado no registrador). */
-export async function markServiceActive(serviceId: string, note: string | null, externalRef: string | null) {
+/** Domínio confirmado (registrador ou equipa): passa o registo local a activo. */
+async function activateDomainRecord(db: Queryable, s: any) {
+  // registered_at é avaliado antes de status (MariaDB aplica as atribuições por ordem)
+  await db.query(`UPDATE domains SET registered_at = IF(status = 'pending', CURRENT_TIMESTAMP(6), registered_at), status = 'active',
+    expires_at = GREATEST(COALESCE(expires_at, CURRENT_TIMESTAMP(6)), CURRENT_TIMESTAMP(6)) + INTERVAL ? YEAR, service_id = COALESCE(service_id, ?)
+    WHERE profile_id = ? AND CONCAT(name, extension) = ?`, [Math.max(1, Number(s.years ?? 1)), s.id, s.profile_id, s.domain])
+}
+
+export class ActivationError extends Error { constructor(message: string, public status = 400) { super(message) } }
+
+/**
+ * Activação manual concluída pelo administrador (ex.: domínio registado no painel do registrador).
+ * Para domínios a referência do registo é obrigatória: sem ela o domínio não passa a «Activo».
+ */
+export async function markServiceActive(serviceId: string, note: string | null, externalRef: string | null, adminId: string | null = null) {
   const db = getPool()
   const [s] = await rows(db, 'SELECT s.id, s.order_id, s.service_type, s.domain, s.profile_id, s.renews_service_id, s.provisioning_status, oi.months, oi.years, o.payment_status FROM services s JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id WHERE s.id = ?', [serviceId])
-  if (!s) throw new Error('Serviço inexistente.')
-  if (s.payment_status !== 'paid') throw new Error('A encomenda ainda não está paga.')
+  if (!s) throw new ActivationError('Serviço inexistente.', 404)
+  if (s.payment_status !== 'paid') throw new ActivationError('A encomenda ainda não está paga.', 409)
+  if (s.provisioning_status === 'active') throw new ActivationError('Este serviço já está activo.', 409)
+  const ref = (externalRef ?? '').trim()
+  if (s.service_type === 'domain' && ref.length < 3) throw new ActivationError('Indique a referência do registo no registrador (n.º da operação ou do domínio) para marcar o domínio como activo.')
   if (s.renews_service_id) {
     // Atómico: só a primeira confirmação prolonga o serviço original
-    const [r] = await db.query("UPDATE services SET provisioning_status = 'active', provisioning_error = NULL, status = 'active', provisioned_at = CURRENT_TIMESTAMP(6), notes = ? WHERE id = ? AND provisioning_status <> 'active'", [note, serviceId]) as any
+    const [r] = await db.query("UPDATE services SET provisioning_status = 'active', provisioning_error = NULL, status = 'active', provisioned_at = CURRENT_TIMESTAMP(6), notes = ?, external_ref = ?, activation_source = 'manual', activated_by = ? WHERE id = ? AND provisioning_status <> 'active'", [note, ref || null, adminId, serviceId]) as any
     if (r.affectedRows) await extendService(db, s.renews_service_id, Number(s.months ?? 12))
     await refreshOrderActivation(s.order_id)
     return
   }
-  const due = addMonths(Number(s.months ?? 12))
-  await setStatus(serviceId, 'active', null, { external_ref: externalRef, next_due_date: due, notes: note })
-  if (s.service_type === 'domain' && s.domain) {
-    await db.query(`UPDATE domains SET status = 'active', registered_at = COALESCE(registered_at, CURRENT_TIMESTAMP(6)),
-      expires_at = GREATEST(COALESCE(expires_at, CURRENT_TIMESTAMP(6)), CURRENT_TIMESTAMP(6)) + INTERVAL ? YEAR, service_id = COALESCE(service_id, ?)
-      WHERE profile_id = ? AND CONCAT(name, extension) = ?`, [Math.max(1, Number(s.years ?? 1)), serviceId, s.profile_id, s.domain])
-  }
+  const due = addMonths(s.service_type === 'domain' ? 12 * Math.max(1, Number(s.years ?? 1)) : Number(s.months ?? 12))
+  await setStatus(serviceId, 'active', null, { external_ref: ref || null, next_due_date: due, notes: note, activation_source: 'manual', activated_by: adminId })
+  if (s.service_type === 'domain' && s.domain) await activateDomainRecord(db, s)
   await refreshOrderActivation(s.order_id)
 }
