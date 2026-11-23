@@ -2,7 +2,7 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { getPool } from '@/lib/db/pool'
 import { decryptSecret } from '@/lib/crypto'
-import { adapterForDomain } from './settings'
+import { PROVIDERS, adapterForDomain } from './settings'
 import { RegistrarTimeout, type OperationResult, type RegistrarOperation } from './types'
 
 // Execução de registo/renovação/transferência de domínio depois do pagamento confirmado.
@@ -24,6 +24,8 @@ export async function runDomainOperation(serviceId: string, operation: Registrar
   const target = await adapterForDomain(domain)
   if (!target) return { handled: false }
   const { adapter, provider, mode } = target
+  // Fornecedores com autorização por encomenda (Hostinger) nunca são accionados automaticamente
+  if (PROVIDERS.find(p => p.id === provider)?.authorizePerOrder) return { handled: false }
   const db = getPool()
   const clientRef = `vh-${operation}-${serviceId}`.slice(0, 64)
   await db.query(

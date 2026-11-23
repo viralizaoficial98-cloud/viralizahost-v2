@@ -2,10 +2,12 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check, ExternalLink, FlaskConical, Loader2, RefreshCw, RotateCcw, X } from 'lucide-react'
+import { HostingerRegisterDialog } from '@/components/admin/HostingerRegisterDialog'
 import { ACTIVATION_STATUS, PAYMENT_STATUS, TONE_CLASS, kz } from '@/lib/commerce/status'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type Service = { id: string; order_item_id: string; service_name: string; service_type: string; provisioning_status: string; provisioning_error: string | null; provisioning_attempts: number; external_ref: string | null; domain: string | null; activation_source: string | null }
+type Service = { id: string; order_item_id: string; service_name: string; service_type: string; provisioning_status: string; provisioning_error: string | null; provisioning_attempts: number; external_ref: string | null; domain: string | null; activation_source: string | null
+  registrar_op?: { provider: string; status: string; provider_status: string | null; provider_order_id: string | null; ns_status: string | null; dns_status: string | null; cost_amount: number | null; cost_currency: string | null } | null }
 type Order = {
   id: string; order_number: string | null; created_at: string; paid_at: string | null; status: string; payment_status: string; activation_status: string; hold_reason?: string | null
   review_flag: 'test' | 'real' | null; review_note: string | null
@@ -44,6 +46,8 @@ function OrdersInner() {
   const [error, setError] = useState('')
   const [acting, setActing] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
+  const [registrar, setRegistrar] = useState<{ provider: string; enabled: boolean; extensions: string[] } | null>(null)
+  const [hostinger, setHostinger] = useState<string | null>(null)
   const scrolled = useRef<string | null>(null)
 
   const load = useCallback(async () => {
@@ -52,6 +56,7 @@ function OrdersInner() {
       const res = await fetch('/api/admin/orders', { cache: 'no-store' }); const j = await res.json()
       if (!res.ok || j.error) setError(j.error ?? `HTTP ${res.status}`)
       setOrders(j.orders ?? [])
+      setRegistrar(j.registrar ?? null)
     } catch { setError('Falha de rede.') } finally { setLoading(false) }
   }, [])
   // eslint-disable-next-line react-hooks/set-state-in-effect -- carregamento inicial dos dados
@@ -93,6 +98,9 @@ function OrdersInner() {
     act(s.id + 'm', { action: 'mark_active', serviceId: s.id, externalRef: ref.trim() || null, notes: `Activação manual (${o.order_number})` })
   }
 
+  // «Registar na Hostinger»: domínio com extensão autorizada, integração activa, encomenda paga
+  const hostingerEligible = (o: Order, s: Service) => !!registrar && registrar.provider === 'hostinger' && registrar.enabled && s.service_type === 'domain' && o.payment_status === 'paid'
+    && !!s.domain && registrar.extensions.some(e => s.domain!.endsWith(e) && !s.domain!.slice(0, -e.length).includes('.')) && !/\.ao$/.test(s.domain)
   const counts = useMemo(() => Object.fromEntries(Object.entries(FILTERS).map(([k, f]) => [k, orders.filter(f.test).length])), [orders])
   const filtered = orders.filter(FILTERS[filter].test)
 
@@ -113,6 +121,7 @@ function OrdersInner() {
           </button>
         ))}
       </div>
+      {hostinger && <HostingerRegisterDialog serviceId={hostinger} onClose={changed => { setHostinger(null); if (changed) void load() }} />}
       {notice && <div role="status" className={`mb-4 p-3 rounded-xl text-sm ${notice.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{notice.text}</div>}
       {error && <div className="mb-4 p-3 rounded-xl text-sm bg-red-50 text-red-700" role="alert">Falha ao carregar: {error}</div>}
       {loading && !orders.length ? <div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#F5B700]" /></div>
@@ -177,8 +186,18 @@ function OrdersInner() {
                               {s?.external_ref && <span className="block text-xs text-[#555]">Ref.: {s.external_ref}</span>}
                               {s?.provisioning_error && s.provisioning_status !== 'active' && <span className="block text-xs text-[#B45309]">{s.provisioning_error}</span>}
                               {s && s.provisioning_attempts > 1 && <span className="block text-[11px] text-[#999]">{s.provisioning_attempts} tentativas</span>}
+                              {s?.registrar_op?.provider === 'hostinger' && s.registrar_op.status !== 'succeeded' && s.registrar_op.status !== 'pending' && (
+                                <span className="block text-xs text-[#1D4ED8]" data-testid="hostinger-op">Hostinger: {s.registrar_op.provider_status === 'payment_pending' ? 'pagamento ao fornecedor pendente' : s.registrar_op.provider_status === 'awaiting_setup' ? 'pago, a aguardar configuração' : s.registrar_op.status === 'unknown' ? 'inconclusivo — revisão manual' : s.registrar_op.status === 'failed' ? 'recusado' : 'pedido enviado'}</span>
+                              )}
+                              {s?.registrar_op?.status === 'succeeded' && s.registrar_op.ns_status === 'failed' && <span className="block text-xs text-red-700" data-testid="ns-failed">Nameservers por aplicar</span>}
+                              {s?.registrar_op?.status === 'succeeded' && s.registrar_op.dns_status !== 'confirmed' && <span className="block text-xs text-amber-800" data-testid="dns-pending">DNS pendente</span>}
                             </td>
                             <td className="py-2 text-right whitespace-nowrap">
+                              {s && hostingerEligible(o, s) && (s.provisioning_status !== 'active' || s.registrar_op?.status === 'succeeded') && (
+                                <button disabled={!!acting} onClick={() => setHostinger(s.id)} className="mr-1 mb-1 px-2 py-1 rounded-lg bg-[#673DE6] text-white text-xs font-bold" data-testid="hostinger-open">
+                                  {s.provisioning_status === 'active' ? 'Hostinger…' : s.registrar_op && !['pending', 'failed'].includes(s.registrar_op.status) ? 'Hostinger: estado…' : 'Registar na Hostinger…'}
+                                </button>
+                              )}
                               {s && o.payment_status === 'paid' && s.provisioning_status !== 'active' && (
                                 <span className="inline-flex gap-1">
                                   <button disabled={!!acting} onClick={() => act(s.id + 'p', { action: 'provision', serviceId: s.id }, s.service_type === 'domain' ? 'Repetir o registo automático? O estado no registrador é consultado antes de qualquer novo pedido.' : 'Repetir a activação automática? Nenhuma conta é criada em duplicado e nada é cobrado.')}

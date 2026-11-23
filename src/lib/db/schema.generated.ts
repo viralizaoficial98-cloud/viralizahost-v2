@@ -3085,6 +3085,44 @@ export const SCHEMA_META: SchemaMeta = {
     },
     "relations": []
   },
+  "registrar_contacts": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "provider",
+        "profile_id",
+        "tld",
+        "details_hash"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "provider": {
+        "kind": "text"
+      },
+      "profile_id": {
+        "kind": "uuid"
+      },
+      "tld": {
+        "kind": "text"
+      },
+      "details_hash": {
+        "kind": "text"
+      },
+      "provider_contact_id": {
+        "kind": "text"
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      }
+    },
+    "relations": []
+  },
   "registrar_operations": {
     "pk": [
       "id"
@@ -3167,6 +3205,112 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "timestamp",
         "hasDefault": true,
         "autoUpdate": true
+      },
+      "authorized_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "authorized_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "cost_amount": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "cost_currency": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "item_id": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "provider_order_id": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "ns_status": {
+        "kind": "enum",
+        "values": [
+          "pending",
+          "applied",
+          "failed"
+        ],
+        "hasDefault": true,
+        "nullable": true
+      },
+      "ns_message": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "dns_status": {
+        "kind": "enum",
+        "values": [
+          "pending",
+          "confirmed"
+        ],
+        "hasDefault": true,
+        "nullable": true
+      },
+      "dns_checked_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "locked_until": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      }
+    },
+    "relations": []
+  },
+  "registrar_operation_events": {
+    "pk": [
+      "id"
+    ],
+    "unique": [],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "operation_id": {
+        "kind": "uuid"
+      },
+      "kind": {
+        "kind": "text"
+      },
+      "http_status": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "outcome": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "message": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "actor_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
       }
     },
     "relations": []
