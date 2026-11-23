@@ -10,7 +10,7 @@ type Owner = Record<string, string>
 interface Preview {
   serviceId: string; orderNumber: string; domain: string; years: number; extension: string | null
   owner: Owner; ownerMissing: string[]; nameservers: string[]; nsDefault: boolean
-  cost: { amount: number; renewal: number; currency: string; itemId: string; label: string } | null
+  cost: { amountMinor: number; renewalMinor: number; amount: number; renewal: number; currency: string; itemId: string; label: string; product: string } | null
   paymentMethod: { id: number; label: string } | null
   availability: string | null
   portfolio: { status: string | null; registered: boolean; verification: string | null } | null
@@ -78,7 +78,7 @@ export function HostingerRegisterDialog({ serviceId, onClose }: { serviceId: str
                 <dd data-testid="hostinger-owner">{[`${p.owner.first_name} ${p.owner.last_name}`.trim(), p.owner.company_name].filter(Boolean).join(' · ')}<span className="block text-xs text-[#555]">{[p.owner.email, p.owner.phone].filter(Boolean).join(' · ')}</span><span className="block text-xs text-[#555]">{[p.owner.address, p.owner.city, p.owner.state, p.owner.zip, p.owner.country].filter(Boolean).join(', ')}</span></dd>
                 <dt className="text-[#64748B]">Nameservers</dt><dd className="font-mono text-xs" data-testid="hostinger-ns">{p.nameservers.join(', ')}{p.nsDefault ? ' (padrão ViralizaHost)' : ' (do cliente)'}</dd>
                 <dt className="text-[#64748B]">Custo na Hostinger</dt>
-                <dd data-testid="hostinger-cost">{p.cost ? <><strong>{money(p.cost.amount, p.cost.currency)}</strong> <span className="text-xs text-[#555]">(sem IVA; renovação {money(p.cost.renewal, p.cost.currency)}) · {p.cost.itemId}</span></> : p.next === 'purchase' || p.next === 'blocked' ? <span className="text-amber-800">Não confirmado</span> : <span className="text-[#888]">Sem nova compra</span>}</dd>
+                <dd data-testid="hostinger-cost">{p.cost ? <><strong>{money(p.cost.amount, p.cost.currency)}</strong> <span className="text-xs text-[#555]">(sem IVA; renovação {money(p.cost.renewal, p.cost.currency)}) · {p.cost.product} · {p.cost.itemId}</span></> : p.next === 'purchase' || p.next === 'blocked' ? <span className="text-amber-800">Não confirmado</span> : <span className="text-[#888]">Sem nova compra</span>}</dd>
                 <dt className="text-[#64748B]">Pagamento</dt><dd data-testid="hostinger-payment">{p.paymentMethod ? `${p.paymentMethod.label} (predefinido na conta Hostinger)` : '—'}</dd>
               </dl>
 

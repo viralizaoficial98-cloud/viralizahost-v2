@@ -52,8 +52,8 @@ const regBefore = await one('SELECT * FROM registrar_settings WHERE id = 1')
 const c2Before = await one('SELECT p.country, c.postal_code FROM profiles p LEFT JOIN clients c ON c.profile_id = p.id WHERE p.email = ?', ['cliente2@ensaio.test'])
 
 /** Encomenda de domínio .com do cliente (opcionalmente renomeada depois, para cenários do fornecedor). */
-async function order(s, label, { pay = true, rename } = {}) {
-  const dn = `${label}-${rnd()}.com`
+async function order(s, label, { pay = true, rename, ext = '.com' } = {}) {
+  const dn = `${label}-${rnd()}${ext}`
   const lines = [{ type: 'domain', domain: dn, operation: 'register', years: 1 }]
   const q = await s.req('/api/checkout/quote', { method: 'POST', body: { lines } })
   if (!q.json?.quote?.valid) return { error: JSON.stringify(q.json?.quote?.lines?.map(l => l.error)) }
@@ -120,7 +120,7 @@ try {
   console.log('\n3. Compra autorizada, duplo clique, nameservers e DNS')
   p = await pv(unpaid.svc.id)
   ok(p?.next === 'purchase', `pré-visualização: ${p?.next}`, JSON.stringify(p?.blockers))
-  ok(p?.cost?.amount === 9.99 && p.cost.currency === 'USD' && p.cost.itemId === 'hostingercom-domain-com-usd-1y', `custo confirmado no catálogo: ${p?.cost?.amount} ${p?.cost?.currency} (${p?.cost?.itemId})`)
+  ok(p?.cost?.amountMinor === 999 && p.cost.amount === 9.99 && p.cost.currency === 'USD' && p.cost.itemId === 'hostingercom-domain-com-usd-1y' && p.cost.product === '.COM Domain', `custo confirmado no catálogo: «${p?.cost?.product}» ${p?.cost?.amountMinor} ${p?.cost?.currency} (${p?.cost?.itemId})`)
   ok(p?.paymentMethod?.label === 'Visa **** 4242' && p.paymentMethod.id === 7001, 'método de pagamento predefinido da conta (só o rótulo)')
   ok(p?.owner?.email === 'cliente1@ensaio.test' && p.owner.city && p.nameservers.length >= 2, 'titular da encomenda e nameservers mostrados')
   r = await hst('purchase', unpaid.svc.id, { confirmToken: 'token-antigo' })
@@ -258,6 +258,26 @@ try {
   st = await stats()
   ok(r.status === 200 && svc.provisioning_status === 'active' && svc.activation_source === 'manual' && st.purchaseCalls === pc2 && st.setupCalls === sc2, '«Marcar como registado…» activa sem chamar a Hostinger')
 
+  // ── 10b. Catálogo: produto exacto por extensão (o filtro real é por prefixo) ──
+  console.log('\n10b. Catálogo: produto exacto por extensão')
+  r = await reg({ action: 'save', provider: 'hostinger', mode: 'test', apiUrl: SIM, extensions: ['.com', '.ai'], enabled: true })
+  ok(r.status === 400 && /\.ai/.test(r.json?.error) && /período/.test(r.json?.error), `.ai fica fora da automação («${r.json?.error}»)`)
+  r = await reg({ action: 'save', provider: 'hostinger', mode: 'test', apiUrl: SIM, extensions: ['.com', '.net', '.org', '.shop'], enabled: true })
+  ok(r.status === 200, '.com, .net, .org e .shop autorizadas', r.text)
+  for (const [ext, product, item] of [['.com', '.COM Domain', 'hostingercom-domain-com-usd-1y'], ['.net', '.NET Domain', 'hostingercom-domain-net-usd-1y'], ['.org', '.ORG Domain', 'hostingercom-domain-org-usd-1y'], ['.shop', '.SHOP Domain', 'hostingercom-domain-shop-usd-1y']]) {
+    const x = await order(c1, 'catalogo', { ext })
+    const pp = await pv(x.svc.id)
+    ok(pp?.next === 'purchase' && pp.cost?.product === product && pp.cost.itemId === item && Number.isInteger(pp.cost.amountMinor) && pp.cost.currency === 'USD',
+      `${ext} → «${pp?.cost?.product}» (${pp?.cost?.itemId}, ${pp?.cost?.amountMinor} ${pp?.cost?.currency}) — não .COM.BR/.NETWORK/.ORG.UK/.SHOPPING`, JSON.stringify(pp?.blockers))
+    if (ext === '.org') {
+      r = await hst('purchase', x.svc.id, { confirmToken: pp.confirmToken })
+      const op2 = await one('SELECT cost_minor, cost_currency, item_id FROM registrar_operations WHERE service_id = ?', [x.svc.id])
+      ok(r.json?.outcome === 'registered' && Number(op2.cost_minor) === pp.cost.amountMinor && op2.cost_currency === 'USD' && op2.item_id === item, `.org comprado no simulador com o item exacto; custo guardado em unidades menores (${op2.cost_minor} ${op2.cost_currency})`)
+    }
+  }
+  ok(!(await rawStats()).wrongItem, 'a API simulada nunca recebeu um item de outra extensão')
+  await reg({ action: 'save', provider: 'hostinger', mode: 'test', apiUrl: SIM, extensions: ['.com'], enabled: true })
+
   // ── 11. Sem fugas do token ──
   if (process.env.APP_LOG) {
     const log = readFileSync(process.env.APP_LOG, 'utf8')
@@ -298,6 +318,8 @@ try {
     await pg.goto(`${BASE}/admin/settings/integrations/registrar`, { waitUntil: 'domcontentloaded' })
     await pg.getByTestId('registrar-authorize-note').waitFor()
     ok(await pg.getByTestId('registrar-ext-.ao').isDisabled() && await pg.getByTestId('registrar-ext-.co.ao').isDisabled(), 'integrações: .ao e .co.ao desactivadas (manual)')
+    ok(await pg.getByTestId('registrar-ext-.ai').isDisabled() && /por confirmar/.test(await pg.getByTestId('registrar-ext-.ai').locator('xpath=..').innerText()), 'integrações: .ai desactivada «(por confirmar)»')
+    for (const e of ['.com', '.net', '.org', '.shop', '.io', '.online', '.store', '.tech', '.xyz']) if (await pg.getByTestId(`registrar-ext-${e}`).isDisabled()) ok(false, `integrações: ${e} deveria ser activável`)
     ok(!(await pg.content()).includes(TOKEN), 'integrações: token nunca presente na página')
     await pg.screenshot({ path: `${OUT}/desktop-03-integracao-hostinger.png`, fullPage: true })
     await ctx.close()

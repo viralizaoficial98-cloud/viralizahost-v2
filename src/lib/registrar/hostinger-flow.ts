@@ -5,7 +5,8 @@ import { getPool } from '@/lib/db/pool'
 import { getDefaultNameservers } from '@/lib/commerce/nameserver-settings'
 import { RegistrarTimeout } from './types'
 import { hostingerForDomain } from './settings'
-import { HostingerError, hostingerAdapter, type CatalogItem, type CatalogPrice, type DomainDetails, type HostingerClient, type PortfolioDomain } from './hostinger'
+import { selectDomainPrice } from './hostinger-catalog'
+import { HostingerError, hostingerAdapter, type DomainDetails, type HostingerClient, type PortfolioDomain } from './hostinger'
 
 // Registo na Hostinger a partir de uma encomenda PAGA, sempre com autorização explícita de um
 // administrador, item a item. Regras:
@@ -131,25 +132,6 @@ const unlock = (opId: string) => getPool().query('UPDATE registrar_operations SE
 
 /* ───────────── Fornecedor: preço, portefólio, contactos ───────────── */
 
-/** Preço do registo no catálogo (cêntimos → unidades). null se não for possível confirmar. */
-export function pickPrice(items: CatalogItem[], ext: string, years: number): { item: CatalogItem; price: CatalogPrice; amount: number; renewal: number } | { issue: string } {
-  const tld = ext.replace(/^\./, '').toLowerCase()
-  // Item de registo da extensão: nome «.COM …» ou id com «-com-»/«-com»; exclui transferências/renovações
-  const cands = items.filter(i => {
-    const name = String(i.name ?? '').toLowerCase(), id = String(i.id ?? '').toLowerCase()
-    const isDomain = /domain/.test(`${i.category ?? ''} ${name} ${id}`)
-    const forTld = new RegExp(`(^|\\s)\\.${tld.replace('.', '\\.')}(\\s|$)`).test(name) || new RegExp(`-${tld.replace('.', '-')}(-|$)`).test(id)
-    return isDomain && forTld && !/transfer|renew/.test(`${name} ${id}`)
-  })
-  if (!cands.length) return { issue: `Sem item de registo .${tld} no catálogo da Hostinger.` }
-  const matches = cands.flatMap(item => (item.prices ?? []).filter(p => /^year/i.test(p.period_unit ?? '') && Number(p.period) === years || /^month/i.test(p.period_unit ?? '') && Number(p.period) === years * 12).map(price => ({ item, price })))
-  if (matches.length !== 1) return { issue: matches.length ? `Vários preços possíveis para ${years} ano(s) .${tld}: confirmar manualmente.` : `Sem preço para ${years} ano(s) .${tld} no catálogo.` }
-  const { item, price } = matches[0]
-  const cents = price.first_period_price ?? price.price
-  if (!Number.isFinite(Number(cents)) || Number(cents) <= 0 || !price.currency) return { issue: 'Preço do catálogo incompleto.' }
-  return { item, price, amount: Number(cents) / 100, renewal: Number(price.price) / 100 }
-}
-
 const isRegistered = (d: DomainDetails | null) => !!d && (!!d.registered_at || /^(active|registered)$/i.test(String(d.status ?? '')))
 const VERIFY_MSG: Record<string, string> = {
   manual_review: 'A Hostinger está a rever a encomenda (verificação interna). Não há nada a fazer: consulte o estado mais tarde.',
@@ -184,7 +166,8 @@ export interface Preview {
   serviceId: string; orderNumber: string; domain: string; years: number; extension: string | null
   owner: Owner; ownerMissing: (keyof Owner)[]
   nameservers: string[]; nsDefault: boolean
-  cost: { amount: number; renewal: number; currency: string; itemId: string; label: string } | null
+  /** Valores da API em unidades menores (cêntimos) e moeda tal como devolvida; amount/renewal = minor / 100 só para mostrar. */
+  cost: { amountMinor: number; renewalMinor: number; amount: number; renewal: number; currency: string; itemId: string; label: string; product: string } | null
   paymentMethod: { id: number; label: string } | null
   availability: 'available' | 'unavailable' | 'unknown' | null
   portfolio: { status: string | null; registered: boolean; verification: string | null } | null
@@ -197,7 +180,7 @@ export interface Preview {
 
 const tokenKey = () => process.env.WHM_ENCRYPTION_KEY || process.env.STORAGE_SIGNING_SECRET || 'vh'
 function confirmTokenFor(p: Omit<Preview, 'confirmToken'>) {
-  const payload = JSON.stringify([p.serviceId, p.domain, p.years, p.cost?.itemId, p.cost?.amount, p.cost?.currency, p.nameservers, sha(JSON.stringify(p.owner)), p.paymentMethod?.id, p.next])
+  const payload = JSON.stringify([p.serviceId, p.domain, p.years, p.cost?.itemId, p.cost?.amountMinor, p.cost?.currency, p.nameservers, sha(JSON.stringify(p.owner)), p.paymentMethod?.id, p.next])
   return createHmac('sha256', tokenKey()).update(payload).digest('hex').slice(0, 32)
 }
 
@@ -243,9 +226,9 @@ export async function preview(serviceId: string): Promise<Preview> {
       c.catalog(`${h.extension.toUpperCase()}*`),
       c.paymentMethods().catch(() => []),
     ])
-    const pr = pickPrice(cat, h.extension, years)
-    if ('issue' in pr) base.blockers.push(`Custo não confirmado: ${pr.issue} Registe manualmente no hPanel e use «Marcar como registado…».`)
-    else base.cost = { amount: pr.amount, renewal: pr.renewal, currency: pr.price.currency, itemId: pr.price.id, label: pr.price.name ?? pr.item.name }
+    const pr = selectDomainPrice(cat, h.extension, years)
+    if (!pr.ok) base.blockers.push(`Custo não confirmado: ${pr.issue} Revisão manual: registe no hPanel e use «Marcar como registado…».`)
+    else base.cost = { amountMinor: pr.amountMinor, renewalMinor: pr.renewalMinor, amount: pr.amountMinor / 100, renewal: pr.renewalMinor / 100, currency: pr.currency, itemId: pr.price.id, label: pr.price.name ?? pr.item.name, product: pr.item.name }
     const def = methods.find(m => m.is_default && !m.is_expired && !m.is_suspended)
     if (def) base.paymentMethod = { id: def.id, label: [def.name, def.identifier].filter(Boolean).join(' ') || `Método ${def.id}` }
     else base.blockers.push('A conta Hostinger não tem um método de pagamento predefinido válido (configure-o no hPanel).')
@@ -309,10 +292,10 @@ export async function purchase(serviceId: string, confirmToken: string, adminId:
     }
     // Passa a «submitted» de forma atómica: só um pedido de compra por item, para sempre
     const [claim] = await getPool().query(`UPDATE registrar_operations SET status = 'submitted', attempts = attempts + 1, authorized_by = ?, authorized_at = CURRENT_TIMESTAMP(6),
-      cost_amount = ?, cost_currency = ?, item_id = ?, provider_status = 'requested', message = 'Compra pedida à Hostinger.' WHERE id = ? AND status IN ('pending','failed')`,
-    [adminId, p.cost!.amount, p.cost!.currency, p.cost!.itemId, op.id]) as any
+      cost_amount = ?, cost_minor = ?, cost_currency = ?, item_id = ?, provider_status = 'requested', message = 'Compra pedida à Hostinger.' WHERE id = ? AND status IN ('pending','failed')`,
+    [adminId, p.cost!.amount, p.cost!.amountMinor, p.cost!.currency, p.cost!.itemId, op.id]) as any
     if (!claim.affectedRows) return { ok: false, outcome: 'busy', message: 'Outro pedido já foi enviado para este item.' }
-    await event(op.id, 'purchase_request', { outcome: 'submitted', message: `${p.domain} · ${p.years} ano(s) · ${p.cost!.amount} ${p.cost!.currency} · ${p.cost!.itemId}`, actor: adminId })
+    await event(op.id, 'purchase_request', { outcome: 'submitted', message: `${p.domain} · ${p.years} ano(s) · ${p.cost!.product} · ${p.cost!.amountMinor} (unid. menores) ${p.cost!.currency} · ${p.cost!.itemId}`, actor: adminId })
     const contacts = { owner_id: w.id, admin_id: w.id, billing_id: w.id, tech_id: w.id }
     let r
     try {

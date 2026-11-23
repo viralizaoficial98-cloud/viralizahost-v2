@@ -3221,6 +3221,11 @@ export const SCHEMA_META: SchemaMeta = {
         "hasDefault": true,
         "nullable": true
       },
+      "cost_minor": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
       "cost_currency": {
         "kind": "text",
         "hasDefault": true,
