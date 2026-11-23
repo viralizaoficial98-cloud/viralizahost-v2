@@ -7,7 +7,9 @@ import { ACTIVATION_STATUS, PAYMENT_STATUS, TONE_CLASS, kz } from '@/lib/commerc
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Service = { id: string; order_item_id: string; service_name: string; service_type: string; provisioning_status: string; provisioning_error: string | null; provisioning_attempts: number; external_ref: string | null; domain: string | null; activation_source: string | null
-  registrar_op?: { provider: string; status: string; provider_status: string | null; provider_order_id: string | null; ns_status: string | null; dns_status: string | null; cost_amount: number | null; cost_currency: string | null } | null }
+  registrar_op?: { provider: string; status: string; provider_status: string | null; provider_order_id: string | null; ns_status: string | null; dns_status: string | null; cost_amount: number | null; cost_currency: string | null } | null
+  /** Calculado no servidor com a configuração actual do registrador. */
+  hostinger?: { eligible: boolean; reason: string | null } | null }
 type Order = {
   id: string; order_number: string | null; created_at: string; paid_at: string | null; status: string; payment_status: string; activation_status: string; hold_reason?: string | null
   review_flag: 'test' | 'real' | null; review_note: string | null
@@ -46,7 +48,6 @@ function OrdersInner() {
   const [error, setError] = useState('')
   const [acting, setActing] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
-  const [registrar, setRegistrar] = useState<{ provider: string; enabled: boolean; extensions: string[] } | null>(null)
   const [hostinger, setHostinger] = useState<string | null>(null)
   const scrolled = useRef<string | null>(null)
 
@@ -56,7 +57,6 @@ function OrdersInner() {
       const res = await fetch('/api/admin/orders', { cache: 'no-store' }); const j = await res.json()
       if (!res.ok || j.error) setError(j.error ?? `HTTP ${res.status}`)
       setOrders(j.orders ?? [])
-      setRegistrar(j.registrar ?? null)
     } catch { setError('Falha de rede.') } finally { setLoading(false) }
   }, [])
   // eslint-disable-next-line react-hooks/set-state-in-effect -- carregamento inicial dos dados
@@ -98,9 +98,11 @@ function OrdersInner() {
     act(s.id + 'm', { action: 'mark_active', serviceId: s.id, externalRef: ref.trim() || null, notes: `Activação manual (${o.order_number})` })
   }
 
-  // «Registar na Hostinger»: domínio com extensão autorizada, integração activa, encomenda paga
-  const hostingerEligible = (o: Order, s: Service) => !!registrar && registrar.provider === 'hostinger' && registrar.enabled && s.service_type === 'domain' && o.payment_status === 'paid'
-    && !!s.domain && registrar.extensions.some(e => s.domain!.endsWith(e) && !s.domain!.slice(0, -e.length).includes('.')) && !/\.ao$/.test(s.domain)
+  // «Registar na Hostinger»: decidido no servidor (GET /api/admin/orders → services[].hostinger), com a
+  // configuração actual e o domínio normalizado. A interface não repete a regra.
+  const hostingerEligible = (o: Order, s: Service) => !!s.hostinger?.eligible && o.payment_status === 'paid'
+  // Mensagem gravada numa tentativa anterior (antes de a Hostinger estar activa) já não se aplica
+  const staleManual = (s: Service) => !!s.hostinger?.eligible && s.provisioning_status === 'manual_required' && /sem integração automática activa/.test(s.provisioning_error ?? '')
   const counts = useMemo(() => Object.fromEntries(Object.entries(FILTERS).map(([k, f]) => [k, orders.filter(f.test).length])), [orders])
   const filtered = orders.filter(FILTERS[filter].test)
 
@@ -184,7 +186,8 @@ function OrdersInner() {
                             <td className="py-2 pr-2">
                               {s && <span className={`text-xs font-bold ${s.provisioning_status === 'active' ? 'text-green-700' : s.provisioning_status === 'failed' ? 'text-red-700' : 'text-amber-800'}`} data-testid="service-status">{svcLabel(s)}</span>}
                               {s?.external_ref && <span className="block text-xs text-[#555]">Ref.: {s.external_ref}</span>}
-                              {s?.provisioning_error && s.provisioning_status !== 'active' && <span className="block text-xs text-[#B45309]">{s.provisioning_error}</span>}
+                              {s?.provisioning_error && s.provisioning_status !== 'active' && <span className="block text-xs text-[#B45309]" data-testid="service-error">{staleManual(s) ? 'Aguarda autorização: use «Registar na Hostinger…» (o custo é confirmado antes da compra).' : s.provisioning_error}</span>}
+                              {s?.hostinger && !s.hostinger.eligible && s.hostinger.reason && s.provisioning_status !== 'active' && <span className="block text-xs text-[#64748B]" data-testid="hostinger-reason">Hostinger: {s.hostinger.reason}</span>}
                               {s && s.provisioning_attempts > 1 && <span className="block text-[11px] text-[#999]">{s.provisioning_attempts} tentativas</span>}
                               {s?.registrar_op?.provider === 'hostinger' && s.registrar_op.status !== 'succeeded' && s.registrar_op.status !== 'pending' && (
                                 <span className="block text-xs text-[#1D4ED8]" data-testid="hostinger-op">Hostinger: {s.registrar_op.provider_status === 'payment_pending' ? 'pagamento ao fornecedor pendente' : s.registrar_op.provider_status === 'awaiting_setup' ? 'pago, a aguardar configuração' : s.registrar_op.status === 'unknown' ? 'inconclusivo — revisão manual' : s.registrar_op.status === 'failed' ? 'recusado' : 'pedido enviado'}</span>
