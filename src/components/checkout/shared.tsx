@@ -12,7 +12,8 @@ export interface QuoteLine {
   operation?: 'register' | 'transfer' | 'renew'; extension?: string
   availability?: { status: 'available' | 'unavailable' | 'confirm'; available: boolean; verified: boolean; note?: string }; years?: number
   nameservers?: { useDefault: boolean; ns: string[] }
-  cycles?: { cycle: Cycle; months: number; price: number; renewal: number }[]
+  cycles?: { cycle: Cycle; months: number; price: number; renewal: number; discount?: number }[]
+  discountPct?: number; listTotal?: number | null; renewalDiscountPct?: number
   error?: { code: string; message: string }
 }
 export interface Quote { currency: 'AKZ'; lines: QuoteLine[]; subtotal: number; taxRate: number; taxLabel: string; tax: number; total: number; valid: boolean; needsConfirmation?: boolean }
@@ -59,10 +60,17 @@ export function useQuote(lines: CartLine[], enabled = true) {
   return { quote, setQuote, loading, error, refresh }
 }
 
-/** Período de um item: anos (domínios) ou ciclo (serviços). */
+/** Período de um item: anos (domínios) ou ciclo (serviços); períodos de vários meses são pagos antecipadamente. */
 export function periodOf(l: QuoteLine) {
   if (l.type === 'domain') return l.operation === 'transfer' ? 'Transferência (inclui 1 ano)' : yearsLabel(l.years ?? 1)
-  return l.cycle ? CYCLE_LABEL[l.cycle] : '—'
+  if (!l.cycle) return '—'
+  return l.months && l.months > 1 ? `${CYCLE_LABEL[l.cycle]} — ${l.months} meses pagos antecipadamente` : CYCLE_LABEL[l.cycle]
+}
+/** Desconto do período (só quando existe): «Desconto 70% (−Kz 19 908)». */
+export function discountOf(l: QuoteLine): string | null {
+  if (!l.discountPct || l.discountPct <= 0) return null
+  const saved = l.listTotal != null ? l.listTotal - l.lineTotal : null
+  return `Desconto ${l.discountPct}%${saved != null && saved > 0 ? ` (−${kz(saved)})` : ''}`
 }
 export function renewalOf(l: QuoteLine) {
   if (l.type === 'domain') return `${kz(l.renewalPrice)}/ano`
@@ -78,7 +86,7 @@ export function Summary({ quote, loading, title = 'Resumo' }: { quote: Quote | n
           <ul className="space-y-3 mb-4">
             {quote.lines.filter(l => !l.error).map(l => (
               <li key={l.index} className="flex justify-between gap-3 text-sm">
-                <span className="text-[#333] min-w-0 break-words">{l.name}{l.quantity > 1 ? ` × ${l.quantity}` : ''}<span className="block text-xs text-[#999]">{periodOf(l)} · renova por {renewalOf(l)}</span></span>
+                <span className="text-[#333] min-w-0 break-words">{l.name}{l.quantity > 1 ? ` × ${l.quantity}` : ''}<span className="block text-xs text-[#999]">{periodOf(l)} · renova por {renewalOf(l)}</span>{discountOf(l) && <span className="block text-xs text-green-700" data-testid="summary-discount">{discountOf(l)}</span>}</span>
                 <span className="font-bold whitespace-nowrap">{kz(l.lineTotal)}</span>
               </li>
             ))}

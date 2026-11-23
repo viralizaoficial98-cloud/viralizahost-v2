@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { EmailPlansSection } from '@/components/service/EmailPlansSection'
 import { Mail, Shield, Lock, Calendar, Smartphone, Globe, Zap, Archive, Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -50,7 +50,7 @@ export default function EmailCorporativoPage() {
           </div>
         </section>
 
-        <DynamicServicePricing category="email" cols={3} showBillingToggle
+        <EmailPlansSection
           title="Planos de e-mail corporativo"
           subtitle="Preço por caixa de correio. Escolha o plano, depois o domínio, o número de caixas e a duração." />
 

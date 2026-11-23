@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { AlertCircle, ChevronRight, Clock, Globe, Loader2, Minus, Pencil, Plus, Server, ShoppingCart, Trash2 } from 'lucide-react'
 import { useCart, type CartLine, type Cycle, type DomainMode } from '@/store/cartStore'
 import { flushCart } from '@/store/cartSync'
-import { CYCLE_LABEL, PurchaseSteps, Summary, btnGhost, btnPrimary, card, input, kz, periodOf, renewalOf, useCartHydrated, useQuote, type QuoteLine } from '@/components/checkout/shared'
+import { CYCLE_LABEL, PurchaseSteps, Summary, btnGhost, btnPrimary, card, discountOf, input, kz, periodOf, renewalOf, useCartHydrated, useQuote, type QuoteLine } from '@/components/checkout/shared'
 
 // Carrinho: todos os itens (domínios, alojamento, e-mail, renovações) com período, preço agora e
 // renovação calculados no servidor. Editar, remover, continuar a comprar, esvaziar e «Finalizar»
@@ -35,7 +35,8 @@ function Line({ l, q, onRemove }: { l: CartLine; q?: QuoteLine; onRemove: () => 
             <dl className="mt-1 grid grid-cols-2 sm:flex sm:flex-wrap gap-x-5 gap-y-0.5 text-xs text-[#666]">
               <div><dt className="inline">Período: </dt><dd className="inline font-semibold text-[#333]" data-testid="line-period">{periodOf(q)}</dd></div>
               {q.type !== 'renewal' && <div><dt className="inline">Renovação: </dt><dd className="inline font-semibold text-[#333]" data-testid="line-renewal">{renewalOf(q)}</dd></div>}
-              {q.quantity > 1 && <div><dt className="inline">Quantidade: </dt><dd className="inline font-semibold text-[#333]">{q.quantity}</dd></div>}
+              {(q.quantity > 1 || q.quantityUnit) && <div><dt className="inline">Quantidade: </dt><dd className="inline font-semibold text-[#333]" data-testid="line-quantity">{q.quantity}{q.quantityUnit === 'caixa' ? ` ${q.quantity === 1 ? 'caixa de correio' : 'caixas de correio'}` : ''}</dd></div>}
+              {discountOf(q) && <div><dt className="sr-only">Desconto: </dt><dd className="inline font-semibold text-green-700" data-testid="line-discount">{discountOf(q)}</dd></div>}
             </dl>
           )}
           {q?.error && (
@@ -64,7 +65,7 @@ function Line({ l, q, onRemove }: { l: CartLine; q?: QuoteLine; onRemove: () => 
               <label className="text-xs text-[#888]">Ciclo de facturação
                 <select className={`${input} mt-1`} value={l.cycle} onChange={e => update(l.key, { cycle: e.target.value as Cycle })} aria-label={`Ciclo de ${lineTitle(l, q)}`}>
                   {(q?.cycles?.length ? q.cycles : [{ cycle: l.cycle, months: 0, price: 0, renewal: 0 }]).map(c => (
-                    <option key={c.cycle} value={c.cycle}>{CYCLE_LABEL[c.cycle as Cycle]}{c.price ? ` — ${kz(c.price * (l.quantity || 1))}` : ''}</option>
+                    <option key={c.cycle} value={c.cycle}>{CYCLE_LABEL[c.cycle as Cycle]}{c.price ? ` — ${kz(c.price * (l.quantity || 1))}` : ''}{c.discount ? ` (−${c.discount}%)` : ''}</option>
                   ))}
                 </select>
               </label>

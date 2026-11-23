@@ -2665,6 +2665,21 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "uuid",
         "hasDefault": true,
         "nullable": true
+      },
+      "base_monthly_price": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "storage_gb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "send_limit_hour": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": [
@@ -2807,6 +2822,14 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "timestamp",
         "hasDefault": true,
         "autoUpdate": true
+      },
+      "discount_pct": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "renewal_discount_pct": {
+        "kind": "int",
+        "hasDefault": true
       }
     },
     "relations": [
