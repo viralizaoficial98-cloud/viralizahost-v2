@@ -14,7 +14,7 @@ interface Preview {
   paymentMethod: { id: number; label: string } | null
   availability: string | null
   portfolio: { status: string | null; registered: boolean; verification: string | null } | null
-  operation: { status: string; providerStatus: string | null; providerOrderId: string | null; providerRef: string | null; nsStatus: string | null; nsMessage: string | null; dnsStatus: string | null; attempts: number; message: string | null; authorizedAt: string | null } | null
+  operation: { provider: string; status: string; providerStatus: string | null; providerOrderId: string | null; providerRef: string | null; nsStatus: string | null; nsMessage: string | null; dnsStatus: string | null; attempts: number; message: string | null; authorizedAt: string | null } | null
   next: 'purchase' | 'setup' | 'reconcile' | 'link' | 'blocked' | 'done'
   blockers: string[]; notes: string[]; confirmToken: string | null
 }
@@ -136,10 +136,10 @@ export function HostingerRegisterDialog({ serviceId, onClose }: { serviceId: str
               <div className="flex flex-wrap gap-2">
                 {p.next === 'setup' && <button disabled={!!busy} onClick={() => act('setup')} className={`${btn} bg-[#F5B700] text-black`} data-testid="hostinger-setup">{busy === 'setup' && <Loader2 size={14} className="animate-spin" />} Concluir registo (sem nova compra)</button>}
                 {p.next === 'link' && <button disabled={!!busy} onClick={() => act('link')} className={`${btn} bg-[#F5B700] text-black`} data-testid="hostinger-link">{busy === 'link' && <Loader2 size={14} className="animate-spin" />} Associar domínio já registado (sem nova compra)</button>}
-                {(p.next === 'reconcile' || op?.status === 'unknown' || op?.status === 'submitted') && <button disabled={!!busy} onClick={() => act('reconcile')} className={`${btn} border border-[#E2E8F0]`} data-testid="hostinger-reconcile">{busy === 'reconcile' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Consultar estado na Hostinger</button>}
+                {(p.next === 'reconcile' || ((op?.status === 'unknown' || op?.status === 'submitted') && op?.provider === 'hostinger')) && <button disabled={!!busy} onClick={() => act('reconcile')} className={`${btn} border border-[#E2E8F0]`} data-testid="hostinger-reconcile">{busy === 'reconcile' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Consultar estado na Hostinger</button>}
                 {op?.status === 'succeeded' && op.nsStatus !== 'applied' && <button disabled={!!busy} onClick={() => act('nameservers')} className={`${btn} border border-[#E2E8F0]`} data-testid="hostinger-apply-ns">Aplicar nameservers</button>}
                 {op?.status === 'succeeded' && op.dnsStatus !== 'confirmed' && <button disabled={!!busy} onClick={() => act('dns')} className={`${btn} border border-[#E2E8F0]`} data-testid="hostinger-check-dns">Verificar DNS</button>}
-                {op?.status === 'unknown' && <button disabled={!!busy} onClick={() => { const note = window.prompt('Confirme o que verificou no hPanel (ex.: «sem encomenda nem domínio na conta»):'); if (note) act('release', { note }) }} className={`${btn} border border-amber-400 text-amber-900`} data-testid="hostinger-release">Libertar nova tentativa…</button>}
+                {(op?.status === 'unknown' || (op && op.provider !== 'hostinger' && op.status === 'submitted')) && <button disabled={!!busy} onClick={() => { const note = window.prompt(op?.provider !== 'hostinger' ? `Confirme que no fornecedor «${op?.provider}» não houve registo de ${p.domain}:` : 'Confirme o que verificou no hPanel (ex.: «sem encomenda nem domínio na conta»):'); if (note) act('release', { note }) }} className={`${btn} border border-amber-400 text-amber-900`} data-testid="hostinger-release">Libertar nova tentativa…</button>}
                 {p.ownerMissing.length === 0 && !owner && p.next !== 'done' && <button onClick={() => setOwner({ ...p.owner })} className={`${btn} border border-[#E2E8F0] text-[#555]`}>Editar titular</button>}
                 <button disabled={!!busy} onClick={load} className={`${btn} border border-[#E2E8F0] text-[#555]`}><RefreshCw size={14} /> Actualizar</button>
               </div>

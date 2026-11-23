@@ -3,6 +3,7 @@ import { getPool } from '@/lib/db/pool'
 import { decryptSecret, encryptSecret } from '@/lib/crypto'
 import type { RegistrarAdapter } from './types'
 import { simulatedAdapter } from './simulated'
+import { normalizeDomain } from '@/lib/commerce/domains'
 import { HOSTINGER_API, hostingerAdapter, hostingerClient, type HostingerClient } from './hostinger'
 
 // Configuração do registrador de domínios (linha única registrar_settings.id = 1).
@@ -73,6 +74,9 @@ export async function saveRegistrarSettings(input: { provider: string; mode: 'te
   if (!['test', 'live'].includes(input.mode)) throw new RegistrarConfigError('Modo inválido.')
   if (p.testOnly && input.mode === 'live') throw new RegistrarConfigError('O simulador só pode ser usado em modo de ensaio.')
   const apiUrl = (input.apiUrl ?? '').trim() || null
+  // Campos vazios contam como «sem valor» (a página envia '' para campos escondidos, ex.: utilizador na Hostinger).
+  // Antes, '' ≠ NULL guardado marcava a configuração como alterada e activar era sempre recusado.
+  const username = p.id === 'hostinger' ? null : (input.username ?? '').trim() || null
   if (apiUrl && !/^https?:\/\/[^\s]+$/.test(apiUrl)) throw new RegistrarConfigError('Endereço da API inválido.')
   if (apiUrl?.startsWith('http://') && input.mode === 'live') throw new RegistrarConfigError('Em produção a API tem de usar HTTPS.')
   let secretEnc: string | undefined
@@ -93,16 +97,20 @@ export async function saveRegistrarSettings(input: { provider: string; mode: 'te
   // Qualquer alteração de fornecedor/endereço/credenciais obriga a testar de novo antes de activar
   const providerChanged = !!prev && prev.provider !== input.provider
   const storedUrl = p.id === 'hostinger' && input.mode === 'live' ? null : apiUrl
-  const changed = !prev || prev.provider !== input.provider || prev.mode !== input.mode || (prev.api_url ?? null) !== storedUrl || (prev.username ?? null) !== (input.username ?? null) || !!secretEnc
+  const changed = !prev || prev.provider !== input.provider || prev.mode !== input.mode || (prev.api_url ?? null) !== storedUrl || ((prev.username ?? '').trim() || null) !== username || !!secretEnc
   const enabled = input.enabled === true && input.provider !== 'none'
-  if (enabled && (changed || prev?.last_test_ok !== 1)) throw new RegistrarConfigError('Teste a ligação com sucesso antes de activar a integração.')
+  if (enabled && (changed || prev?.last_test_ok !== 1)) {
+    throw new RegistrarConfigError(changed
+      ? 'Teste a ligação com sucesso antes de activar a integração: guarde primeiro as alterações (fornecedor, modo, endereço ou credencial), teste e só depois active.'
+      : 'Teste a ligação com sucesso antes de activar a integração.')
+  }
   await getPool().query(
     `INSERT INTO registrar_settings (id, provider, mode, enabled, api_url, username, secret_enc, extensions, updated_by, last_test_ok, last_test_at, last_test_message)
      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
      ON DUPLICATE KEY UPDATE provider = VALUES(provider), mode = VALUES(mode), enabled = VALUES(enabled), api_url = VALUES(api_url), username = VALUES(username),
        secret_enc = IF(?, ?, COALESCE(?, secret_enc)), extensions = VALUES(extensions), updated_by = VALUES(updated_by),
        last_test_ok = IF(?, NULL, last_test_ok), last_test_at = IF(?, NULL, last_test_at), last_test_message = IF(?, NULL, last_test_message)`,
-    [input.provider, input.mode, enabled ? 1 : 0, storedUrl, input.username || null, secretEnc ?? null, JSON.stringify(extensions), adminId,
+    [input.provider, input.mode, enabled ? 1 : 0, storedUrl, username, secretEnc ?? null, JSON.stringify(extensions), adminId,
       // Credencial própria de cada fornecedor: mudar de fornecedor sem novo segredo apaga o anterior
       providerChanged ? 1 : 0, secretEnc ?? null, secretEnc ?? null, changed ? 1 : 0, changed ? 1 : 0, changed ? 1 : 0],
   )
@@ -138,13 +146,44 @@ export async function hostingerForDomain(domain: string): Promise<{ client: Host
   if (!r || r.provider !== 'hostinger') return { error: 'A Hostinger não é o fornecedor configurado (Integrações → Registrador).' }
   if (!r.enabled) return { error: 'Integração com a Hostinger inactiva: teste a ligação e active-a em Integrações → Registrador.' }
   if (r.mode === 'test' && process.env.REGISTRAR_TEST_PROVISIONING !== '1') return { error: 'Hostinger em modo de ensaio: só o servidor de ensaio executa compras simuladas.' }
-  const exts = parseExt(r.extensions).sort((a, b) => b.length - a.length)
-  const ext = exts.find(e => domain.endsWith(e) && domain.length > e.length && !domain.slice(0, -e.length).includes('.'))
-  if (!ext) return { error: 'Extensão não autorizada para a Hostinger: registo manual.' }
+  const d = registrarDomain(domain)
+  if (!d) return { error: 'Domínio inválido para registo.' }
+  const ext = matchExtension(d, parseExt(r.extensions))
+  if (!ext) return { error: `Extensão ${extensionOf(d)} não autorizada para a Hostinger (Integrações → Registrador): registo manual.` }
   if (isManualForProvider('hostinger', ext)) return { error: `${ext} fica em registo manual: ${manualReason('hostinger', ext)}.` }
   const client = hostingerClientFor(r, r.secret_enc ? decryptSecret(r.secret_enc) : '')
   if (!client) return { error: 'Token da Hostinger não configurado.' }
   return { client, mode: r.mode, extension: ext }
+}
+
+/** Domínio normalizado (minúsculas, sem espaços, «www.», protocolo, caminho nem ponto final). */
+export const registrarDomain = (raw: unknown) => normalizeDomain(String(raw ?? '').trim().replace(/\.+$/, ''))
+/** Extensão autorizada (a mais longa) que corresponde exactamente ao domínio, ou null. */
+export function matchExtension(domain: string, extensions: string[]): string | null {
+  const list = extensions.map(e => String(e).trim().toLowerCase()).filter(Boolean).sort((a, b) => b.length - a.length)
+  return list.find(e => domain.endsWith(e) && domain.length > e.length && !domain.slice(0, -e.length).includes('.')) ?? null
+}
+const extensionOf = (d: string) => d.slice(d.indexOf('.'))
+
+/**
+ * Elegibilidade para «Registar na Hostinger» com a configuração ACTUAL (nunca com o estado manual
+ * gravado numa tentativa anterior). Sem chamadas ao fornecedor: serve a lista de encomendas.
+ */
+export function hostingerEligibility(
+  reg: { provider: string; enabled: boolean; extensions: string[] } | null,
+  svc: { serviceType: string; domain: string | null; operation: string | null; renews: boolean; paid: boolean },
+): { eligible: boolean; reason: string | null } {
+  if (!reg || reg.provider !== 'hostinger' || svc.serviceType !== 'domain') return { eligible: false, reason: null }
+  if (!reg.enabled) return { eligible: false, reason: 'Hostinger inactiva: em Integrações → Registrador marque «Activar integração» e guarde.' }
+  if (svc.renews || (svc.operation && svc.operation !== 'register')) return { eligible: false, reason: 'Só registos novos são feitos na Hostinger (renovação/transferência manual).' }
+  if (!svc.paid) return { eligible: false, reason: 'Pagamento do cliente por validar.' }
+  const d = registrarDomain(svc.domain)
+  if (!d) return { eligible: false, reason: 'Domínio do item inválido ou em falta.' }
+  const manual = manualReason('hostinger', extensionOf(d)) ?? manualReason('hostinger', `.${d.split('.').slice(-1)[0]}`)
+  const ext = matchExtension(d, reg.extensions)
+  if (!ext) return { eligible: false, reason: manual ? `${extensionOf(d)} em registo manual: ${manual}.` : `Extensão ${extensionOf(d)} não autorizada para a Hostinger (Integrações → Registrador).` }
+  if (isManualForProvider('hostinger', ext)) return { eligible: false, reason: `${ext} em registo manual: ${manualReason('hostinger', ext)}.` }
+  return { eligible: true, reason: null }
 }
 
 /** Fornecedor activo exige autorização por encomenda (Hostinger)? */

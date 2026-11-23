@@ -25,6 +25,7 @@ run "Associação manual de contas WHM a clientes" node --env-file=.env.local sc
 run "Contas: verificação de e-mail e eliminação" node --env-file=.env.local scripts/mariadb/rehearsal/account-email-e2e.mjs
 run "Painel: receita, acções pendentes, registrador e WHM" node --env-file=.env.local scripts/mariadb/rehearsal/admin-ops-e2e.mjs
 run "Registrador Hostinger (API simulada): compra autorizada, 202, timeout, recuperação" node --env-file=.env.local scripts/mariadb/rehearsal/hostinger-e2e.mjs
+run "Hostinger activada depois da encomenda: botão em Encomendas" node --env-file=.env.local scripts/mariadb/rehearsal/hostinger-activation-e2e.cjs
 if [ "${SKIP_UI:-0}" = "1" ]; then
   echo; echo "=== Interface e links: ignorados (SKIP_UI=1, sem Chromium neste servidor)"
 else

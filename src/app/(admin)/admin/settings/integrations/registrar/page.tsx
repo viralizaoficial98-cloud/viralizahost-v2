@@ -39,7 +39,11 @@ export default function RegistrarIntegrationPage() {
     try {
       const r = await fetch('/api/admin/integrations/registrar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const j = await r.json()
-      if (!r.ok) setNotice({ ok: false, text: j.error ?? 'Falhou.' })
+      if (!r.ok) {
+        setNotice({ ok: false, text: j.error ?? 'Falhou.' })
+        // A gravação falhou: o formulário volta a mostrar o estado guardado (não parecer activo quando não está)
+        if (kind === 'save' && st) setForm(f => ({ ...f, enabled: st.settings.enabled }))
+      }
       else {
         apply(j.state)
         setNotice(kind === 'test' ? { ok: j.ok, text: j.message } : { ok: true, text: kind === 'ns' ? 'Nameservers padrão guardados.' : 'Configuração guardada.' })
@@ -138,7 +142,9 @@ export default function RegistrarIntegrationPage() {
         <label className="flex items-center gap-2 text-sm font-semibold text-[#334155]">
           <input type="checkbox" checked={form.enabled} disabled={form.provider === 'none'} onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} data-testid="registrar-enabled" />
           Activar integração (exige um teste de ligação bem-sucedido com esta configuração)
+          <span className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${st.settings.enabled ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-800'}`} data-testid="registrar-saved-state">{st.settings.enabled ? 'activa' : 'inactiva'}</span>
         </label>
+        {!st.settings.enabled && st.settings.provider !== 'none' && lt.ok && <p className="text-xs text-amber-800" data-testid="registrar-enable-hint">Ligação testada com sucesso, mas a integração ainda está inactiva: marque «Activar integração» e carregue em «Guardar».</p>}
 
         {notice && <div role="status" className={`p-3 rounded-xl text-sm ${notice.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{notice.text}</div>}
         <div className="flex flex-wrap gap-2">

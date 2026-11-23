@@ -4,7 +4,7 @@ import { Resolver } from 'node:dns/promises'
 import { getPool } from '@/lib/db/pool'
 import { getDefaultNameservers } from '@/lib/commerce/nameserver-settings'
 import { RegistrarTimeout } from './types'
-import { hostingerForDomain } from './settings'
+import { hostingerForDomain, registrarDomain } from './settings'
 import { selectDomainPrice } from './hostinger-catalog'
 import { HostingerError, hostingerAdapter, type DomainDetails, type HostingerClient, type PortfolioDomain } from './hostinger'
 
@@ -78,9 +78,11 @@ export async function saveOwner(serviceId: string, input: Partial<Record<keyof O
 async function loadService(serviceId: string) {
   const [[s]] = await getPool().query(
     `SELECT s.id, s.order_id, s.profile_id, s.service_type, s.domain, s.provisioning_status, s.renews_service_id,
-       oi.years, oi.domain_operation, oi.nameservers AS item_ns, o.order_number, o.payment_status, o.ns1, o.ns2, o.ns3, o.ns4
+       oi.years, oi.domain_operation, oi.domain_name AS item_domain, oi.nameservers AS item_ns, o.order_number, o.payment_status, o.ns1, o.ns2, o.ns3, o.ns4
      FROM services s JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id WHERE s.id = ?`, [serviceId]) as any
   if (!s) throw new FlowError('Serviço inexistente.', 404)
+  // Encomendas antigas: domínio com maiúsculas/espaços ou só no item → forma normalizada
+  s.domain = registrarDomain(s.domain || s.item_domain) ?? s.domain
   return s
 }
 
@@ -171,7 +173,7 @@ export interface Preview {
   paymentMethod: { id: number; label: string } | null
   availability: 'available' | 'unavailable' | 'unknown' | null
   portfolio: { status: string | null; registered: boolean; verification: string | null } | null
-  operation: { status: string; providerStatus: string | null; providerOrderId: string | null; providerRef: string | null; nsStatus: string | null; nsMessage: string | null; dnsStatus: string | null; attempts: number; message: string | null; authorizedAt: string | null } | null
+  operation: { provider: string; status: string; providerStatus: string | null; providerOrderId: string | null; providerRef: string | null; nsStatus: string | null; nsMessage: string | null; dnsStatus: string | null; attempts: number; message: string | null; authorizedAt: string | null } | null
   next: NextStep
   blockers: string[]
   notes: string[]
@@ -193,7 +195,7 @@ export async function preview(serviceId: string): Promise<Preview> {
   const base: Omit<Preview, 'confirmToken'> = {
     serviceId, orderNumber: s.order_number, domain: s.domain, years, extension: null, owner, ownerMissing: ownerMissing(owner), nameservers: ns, nsDefault: useDefault,
     cost: null, paymentMethod: null, availability: null, portfolio: null, next: 'blocked', blockers: [], notes: [],
-    operation: op ? { status: op.status, providerStatus: op.provider_status, providerOrderId: op.provider_order_id, providerRef: op.provider_ref, nsStatus: op.ns_status, nsMessage: op.ns_message, dnsStatus: op.dns_status, attempts: Number(op.attempts ?? 0), message: op.message, authorizedAt: op.authorized_at } : null,
+    operation: op ? { provider: op.provider, status: op.status, providerStatus: op.provider_status, providerOrderId: op.provider_order_id, providerRef: op.provider_ref, nsStatus: op.ns_status, nsMessage: op.ns_message, dnsStatus: op.dns_status, attempts: Number(op.attempts ?? 0), message: op.message, authorizedAt: op.authorized_at } : null,
   }
   const done = (p: Omit<Preview, 'confirmToken'>): Preview => ({ ...p, confirmToken: ['purchase', 'setup', 'link'].includes(p.next) ? confirmTokenFor(p) : null })
   if (s.service_type !== 'domain' || s.renews_service_id || (s.domain_operation && s.domain_operation !== 'register')) return done({ ...base, blockers: ['Só os registos de domínio novos podem ser feitos aqui.'] })
@@ -203,6 +205,10 @@ export async function preview(serviceId: string): Promise<Preview> {
   if ('error' in h) return done({ ...base, blockers: [h.error] })
   base.extension = h.extension
   const c = h.client
+  // Tentativa anterior noutro fornecedor ainda por resolver: nunca comprar por cima dela
+  if (op && op.provider !== 'hostinger' && ['submitted', 'unknown'].includes(op.status)) {
+    return done({ ...base, blockers: [`Há uma tentativa anterior no fornecedor «${op.provider}» por resolver (${op.status}). Confirme nesse fornecedor se houve registo: se houve, use «Marcar como registado…»; se não houve, use «Libertar nova tentativa…».`] })
+  }
   // Pedido já enviado ou resposta perdida: consultar antes de tudo
   if (op && (['submitted', 'unknown'].includes(op.status))) {
     return done({ ...base, next: 'reconcile', notes: [op.provider_status === 'payment_pending' ? 'Pagamento à Hostinger em processamento (HTTP 202). Consulte o estado: nenhuma nova compra é feita.' : 'Já existe um pedido enviado à Hostinger. Consulte o estado antes de qualquer nova tentativa.'] })
@@ -445,7 +451,8 @@ export async function releaseAfterReview(serviceId: string, note: string, adminI
   const h = await hostingerForDomain(s.domain)
   if ('error' in h) throw new FlowError(h.error, 409)
   const op = await getOperation(serviceId)
-  if (!op || op.status !== 'unknown') throw new FlowError('Só uma operação inconclusiva pode ser libertada.', 409)
+  const otherPending = op && op.provider !== 'hostinger' && ['submitted', 'unknown'].includes(op.status)
+  if (!op || (op.status !== 'unknown' && !otherPending)) throw new FlowError('Só uma operação inconclusiva (ou pendente noutro fornecedor) pode ser libertada.', 409)
   await lock(op.id)
   try {
     // Última verificação: se entretanto aparecer na conta, não liberta

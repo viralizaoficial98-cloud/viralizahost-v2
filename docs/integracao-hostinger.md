@@ -170,3 +170,30 @@ PUBLICAR
 Depois seguir «Configurar em produção (só leitura)», acima.
 
 **Reversão:** repor `/var/backups/viralizahost-prod-<TS>.tgz`, compilar e reiniciar `viralizahost`. A migração só acrescenta colunas e tabelas, por isso a versão anterior continua a funcionar.
+
+## Activar e diagnosticar «Registar na Hostinger»
+
+**Correcção do PR seguinte ao #39.** Activar a integração pelo painel era sempre recusado com «Teste a ligação com sucesso antes de activar a integração»:
+- A página envia o campo «Utilizador», que fica escondido para a Hostinger, como `''`, e o servidor comparava esse valor com o `NULL` guardado. A configuração contava como «alterada» e o teste de ligação deixava de valer.
+- A caixa «Activar integração» ficava marcada depois do erro, por isso a integração parecia activa com `enabled = 0` na base.
+- Com `enabled = 0`, a lista de encomendas escondia o botão e «Repetir» gravava «extensão sem integração automática activa».
+
+Agora:
+- Os campos vazios contam como «sem valor».
+- Se a gravação falhar, a caixa volta ao estado guardado, com a etiqueta «activa/inactiva» e um aviso «ligação testada, mas inactiva».
+- A elegibilidade é calculada no servidor com a configuração actual e o domínio normalizado (`GET /api/admin/orders` → `services[].hostinger`), com o motivo visível quando não é elegível.
+- As encomendas antigas com acções pendentes aparecem sempre na lista, mesmo fora das 300 mais recentes.
+
+**Consulta só de leitura** em produção (não altera nada):
+
+```bash
+mysql --defaults-extra-file="$HOME/.vh-my.cnf" viralizahost_viralizaHost -e "
+SELECT provider, mode, enabled, extensions, last_test_ok, last_test_at FROM registrar_settings WHERE id = 1;
+SELECT o.order_number, o.payment_status, s.service_type, CONCAT('[', s.domain, ']') dominio, s.provisioning_status, s.provisioning_error, oi.domain_operation
+  FROM orders o JOIN services s ON s.order_id = o.id LEFT JOIN order_items oi ON oi.id = s.order_item_id WHERE o.order_number = 'VH-ORD-202611-0002';
+SELECT ro.provider, ro.status, ro.provider_status, ro.attempts FROM registrar_operations ro JOIN services s ON s.id = ro.service_id JOIN orders o ON o.id = s.order_id WHERE o.order_number = 'VH-ORD-202611-0002';"
+```
+
+Interpretação:
+- **`enabled = 0` com `last_test_ok = 1`:** é o bug acima. Depois de publicar, marque «Activar integração» e «Guardar».
+- **Linha em `registrar_operations` de outro fornecedor com estado `submitted`/`unknown`:** resolva-a com «Libertar nova tentativa…» ou «Marcar como registado…».

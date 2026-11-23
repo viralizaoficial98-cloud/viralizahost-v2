@@ -4,7 +4,7 @@ import { requireAdminRole } from '@/lib/api/require-admin'
 import { getPool } from '@/lib/db/pool'
 import { confirmPayment, rejectProof, resolveDomainAvailability, PaymentError } from '@/lib/commerce/payments'
 import { operationsByService } from '@/lib/registrar/hostinger-flow'
-import { loadRegistrarSettings } from '@/lib/registrar/settings'
+import { hostingerEligibility, loadRegistrarSettings } from '@/lib/registrar/settings'
 import { ActivationError, markServiceActive, provisionOrder, provisionService, refreshOrderActivation } from '@/lib/commerce/provisioning'
 
 export const dynamic = 'force-dynamic'
@@ -13,16 +13,26 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try { await requireAdminRole() } catch { return NextResponse.json({ orders: [], error: 'Unauthorized' }, { status: 401 }) }
   const db = createAdminWriteClient()
-  const { data: orders, error } = await db.from('orders')
-    .select(`id, order_number, user_id, status, payment_status, activation_status, hold_reason, review_flag, review_note, review_at, amount, currency, subtotal, tax_amount, billing_cycle, payment_method,
+  const COLS = `id, order_number, user_id, status, payment_status, activation_status, hold_reason, review_flag, review_note, review_at, amount, currency, subtotal, tax_amount, billing_cycle, payment_method,
       domain_name, proof_file, transfer_ref, notes, created_at, updated_at, paid_at,
-      order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, years, nameservers)`)
-    .order('created_at', { ascending: false }).limit(300)
+      order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, years, nameservers)`
+  const { data: recent, error } = await db.from('orders').select(COLS).order('created_at', { ascending: false }).limit(300)
   if (error) return NextResponse.json({ orders: [], error: error.message })
+  // Encomendas mais antigas com acções pendentes (activação por fazer, comprovativo, domínio por confirmar)
+  // entram sempre: uma encomenda antiga paga não pode desaparecer da lista só por ser antiga.
+  const [pendingRows] = await getPool().query(
+    `SELECT DISTINCT o.id FROM orders o LEFT JOIN services s ON s.order_id = o.id LEFT JOIN order_items i ON i.order_id = o.id
+     WHERE o.status NOT IN ('rejected','cancelled') AND (
+       (o.payment_status = 'paid' AND s.provisioning_status IN ('pending','in_progress','manual_required','failed'))
+       OR o.payment_status = 'proof_submitted' OR i.availability = 'confirm')`) as any
+  const have = new Set((recent ?? []).map((o: any) => o.id))
+  const missing = (pendingRows as any[]).map(r => r.id).filter(id => !have.has(id))
+  const older = missing.length ? (await db.from('orders').select(COLS).in('id', missing)).data ?? [] : []
+  const orders = [...(recent ?? []), ...older].sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))
   const ids = (orders ?? []).map((o: any) => o.id)
   const userIds = [...new Set((orders ?? []).map((o: any) => o.user_id).filter(Boolean))]
   const [{ data: services }, { data: profiles }, { data: invoices }, { data: payments }] = await Promise.all([
-    ids.length ? db.from('services').select('id, order_id, order_item_id, service_name, service_type, provisioning_status, provisioning_error, provisioning_attempts, external_ref, domain, activation_source, provisioned_at').in('order_id', ids) : { data: [] },
+    ids.length ? db.from('services').select('id, order_id, order_item_id, service_name, service_type, provisioning_status, provisioning_error, provisioning_attempts, external_ref, domain, activation_source, provisioned_at, renews_service_id').in('order_id', ids) : { data: [] },
     userIds.length ? db.from('profiles').select('id, full_name, email, phone, role').in('id', userIds) : { data: [] },
     ids.length ? db.from('invoices').select('id, order_id, invoice_number, status, total, amount_paid').in('order_id', ids) : { data: [] },
     ids.length ? db.from('payments').select('id, order_id, invoice_id, status, amount, currency, proof_url, transfer_ref, created_at, paid_at, reviewed_by').in('order_id', ids).order('created_at', { ascending: false }) : { data: [] },
@@ -38,7 +48,15 @@ export async function GET() {
     return {
       ...o,
       profiles: (profiles ?? []).find((p: any) => p.id === o.user_id) ?? null,
-      services: (services ?? []).filter((s: any) => s.order_id === o.id).map((s: any) => ({ ...s, registrar_op: (ops as any)[s.id] ?? null })),
+      services: (services ?? []).filter((s: any) => s.order_id === o.id).map((s: any) => {
+        const item = (o.order_items ?? []).find((i: any) => i.id === s.order_item_id)
+        // Elegibilidade com a configuração ACTUAL (não com a mensagem gravada numa tentativa anterior)
+        const hostinger = s.service_type === 'domain' ? hostingerEligibility(registrar, {
+          serviceType: s.service_type, domain: s.domain || item?.domain_name || null, operation: item?.domain_operation ?? null,
+          renews: !!s.renews_service_id, paid: o.payment_status === 'paid',
+        }) : null
+        return { ...s, registrar_op: (ops as any)[s.id] ?? null, hostinger }
+      }),
       invoice: (invoices ?? []).find((i: any) => i.order_id === o.id) ?? null,
       payments: pays.map((p: any) => ({ ...p, proof_url: undefined, has_proof: !!p.proof_url })),
       proof_url: signed,
