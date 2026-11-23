@@ -2,6 +2,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { DomainExtensionsEditor, type DomainExtension } from '@/components/admin/DomainExtensionsEditor'
 import { EmailPlansEditor } from '@/components/admin/EmailPlansEditor'
+import { HostingPlansEditor } from '@/components/admin/HostingPlansEditor'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Save, ExternalLink, AlertTriangle } from 'lucide-react'
 import { AdminPageShell } from '@/components/admin/AdminPageShell'
@@ -15,6 +16,7 @@ type Product = { id: string; slug: string; name: string; category: string; subca
 type DomainPrice = { id: string; extension: string; operation: string; years: number; price: number | null; status: 'active' | 'draft' | 'on_request'; reference: any }
 
 const CYCLES = [['monthly', 'Mensal'], ['3months', 'Trimestral'], ['6months', '6 meses'], ['1year', '1 ano'], ['2years', '2 anos'], ['3years', '3 anos']] as const
+const PLAN_CYCLES: string[] = ['monthly', '1year', '2years', '3years']
 const STATUS = { active: 'À venda', on_request: 'Sob consulta', draft: 'Rascunho' }
 const input = 'w-full border border-[#E5E7EB] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-[#F5B700]'
 
@@ -30,7 +32,7 @@ function ProductRow({ p, onSaved }: { p: Product; onSaved: () => void }) {
   async function save() {
     setBusy(true); setMsg(null)
     try {
-      const res = await fetch('/api/admin/catalog', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'product', id: p.id, ...draft, prices: p.category === 'email' ? [] : draft.prices.filter(x => x.active || p.prices.some(y => y.cycle === x.cycle)) }) })
+      const res = await fetch('/api/admin/catalog', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'product', id: p.id, ...draft, prices: p.category === 'email' ? [] : draft.prices.filter(x => (x.active || p.prices.some(y => y.cycle === x.cycle)) && !(p.category === 'hosting' && PLAN_CYCLES.includes(x.cycle))) }) })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error)
       setMsg({ ok: true, text: 'Guardado' }); onSaved()
@@ -60,11 +62,12 @@ function ProductRow({ p, onSaved }: { p: Product; onSaved: () => void }) {
             <input className={input} value={draft.pricing_note} onChange={e => setDraft({ ...draft, pricing_note: e.target.value })} />
           </label>
         </div>
+        {p.category === 'hosting' && <p className="text-xs text-[#64748B]">Ficha, preço base e descontos de 1 mês, 1, 2 e 3 anos: editar em «Planos de Hospedagem Premium» acima. Aqui: estado, pacote WHM (quotas reais), nota e os outros ciclos.</p>}
         {p.category === 'email' ? <p className="text-xs text-[#64748B]">Preços, descontos e ficha deste plano: editar em «Planos de e-mail» acima. Aqui só o estado, o pacote WHM (quota técnica) e a nota.</p> : <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[520px]">
             <thead><tr className="text-left text-[11px] uppercase text-[#64748B]"><th className="py-1">Ciclo</th><th>Preço (Kz)</th><th>Renovação (Kz)</th><th>Activo</th></tr></thead>
             <tbody>
-              {draft.prices.map((x, i) => (
+              {draft.prices.map((x, i) => p.category === 'hosting' && PLAN_CYCLES.includes(x.cycle) ? null : (
                 <tr key={x.cycle} className="border-t border-[#F1F5F9]">
                   <td className="py-1.5 pr-2">{CYCLES[i][1]}</td>
                   <td className="pr-2"><input type="number" min={0} step={100} className={input} value={x.price} onChange={e => setDraft({ ...draft, prices: draft.prices.map((y, j) => j === i ? { ...y, price: Number(e.target.value) } : y) })} aria-label={`Preço ${CYCLES[i][1]}`} /></td>
@@ -154,6 +157,10 @@ function Catalog() {
             ))}
           </div>
           {cat !== 'dominios' && <input className={`${input} max-w-sm`} placeholder="Filtrar planos…" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filtrar planos" />}
+          {(cat === 'all' || cat === 'hosting') && <section data-testid="hosting-plans-admin">
+            <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">Planos de Hospedagem Premium — ficha, preço base e descontos por período</h2>
+            <HostingPlansEditor onSaved={load} />
+          </section>}
           {(cat === 'all' || cat === 'email') && <section data-testid="email-plans-admin">
             <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">Planos de e-mail — ficha, preço base e descontos por período</h2>
             <EmailPlansEditor onSaved={load} />

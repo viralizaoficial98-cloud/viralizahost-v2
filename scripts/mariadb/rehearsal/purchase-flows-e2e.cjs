@@ -332,7 +332,11 @@ async function main() {
   console.log('\n12. Alteração de preço no painel reflectida no site, carrinho e checkout')
   const cat = await (await ap.request.get(BASE + '/api/admin/catalog')).json()
   const hs = cat.products.find(x => x.slug === 'hosting-start'); const mp = hs.prices.find(x => x.cycle === 'monthly')
-  r = await ap.request.patch(BASE + '/api/admin/catalog', { data: { kind: 'product', id: hs.id, prices: [{ cycle: 'monthly', price: mp.price + 100, renewal_price: mp.renewal_price + 100, active: true }] } })
+  // Hospedagem Premium: preço pela ficha do plano (preço base; a tabela genérica recusa os 4 períodos públicos)
+  const hp = (await (await ap.request.get(BASE + '/api/admin/catalog/hosting-plans')).json()).plans.find(x => x.id === hs.id)
+  const hpBody = base => ({ id: hp.id, name: hp.name, description: hp.description, saleStatus: hp.saleStatus, position: hp.position, badge: hp.badge, highlight: hp.highlight, baseMonthly: base,
+    specs: hp.specs, groups: hp.groups, periods: hp.periods.map(x => ({ cycle: x.cycle, discount: x.exists && x.matchesRule ? x.discount : null, publish: x.active, renewal: null })) })
+  r = await ap.request.put(BASE + '/api/admin/catalog/hosting-plans', { data: hpBody(mp.price + 100) })
   ;({ ctx, p } = await ctxFor(b, DESKTOP))
   await p.goto(BASE + '/hospedagem-de-sites', { waitUntil: 'domcontentloaded' }); await p.locator('#planos a[href^="/comprar/"]').first().waitFor()
   const fmt = n => String(n)
@@ -345,7 +349,7 @@ async function main() {
   ok(dg(await p.getByTestId('cycle-monthly').innerText()).includes(fmt(mp.price + 100)), 'percurso de compra mostra o novo preço')
   await p.getByTestId('add-to-cart').click(); await p.waitForURL('**/carrinho'); await p.getByTestId('summary-total').waitFor()
   ok(dg(await p.getByTestId('summary-total').innerText()).includes(fmt(mp.price + 100)), 'carrinho/checkout calcula com o novo preço')
-  await ap.request.patch(BASE + '/api/admin/catalog', { data: { kind: 'product', id: hs.id, prices: [{ cycle: 'monthly', price: mp.price, renewal_price: mp.renewal_price, active: true }] } })
+  await ap.request.put(BASE + '/api/admin/catalog/hosting-plans', { data: hpBody(mp.price) })
   await ctx.close()
 
   // ── 13. Cotação de plano sob consulta ──
