@@ -14,6 +14,8 @@ export interface ProviderInfo { id: string; label: string; testOnly?: boolean; n
   authorizePerOrder?: boolean
   /** Extensões que ficam em registo manual até o suporte ser confirmado no fornecedor. */
   manualSuffixes?: string[]
+  /** Extensões exactas em registo manual, com o motivo (mostrado no painel e nas mensagens). */
+  manualExtensions?: Record<string, string>
   secretLabel?: string
 }
 
@@ -24,11 +26,20 @@ export const PROVIDERS: ProviderInfo[] = [
   { id: 'simulado', label: 'Simulador de ensaio (sem registos reais)', testOnly: true, needsUrl: true },
   // API pública da Hostinger (developers.hostinger.com). O cartão fica na conta Hostinger.
   // Em «ensaio» aponta para a API simulada (endereço obrigatório); em produção usa sempre a API oficial.
-  { id: 'hostinger', label: 'Hostinger', authorizePerOrder: true, manualSuffixes: ['.ao'], secretLabel: 'Token da API (hPanel → Conta → API)', docs: 'https://developers.hostinger.com' },
+  { id: 'hostinger', label: 'Hostinger', authorizePerOrder: true, manualSuffixes: ['.ao'],
+    manualExtensions: { '.ai': 'período de registo por confirmar: o catálogo real da Hostinger não mostrou preço de 1 ano para «.AI Domain» (a ViralizaHost vende .ai a partir de 1 ano)' }, secretLabel: 'Token da API (hPanel → Conta → API)', docs: 'https://developers.hostinger.com' },
 ]
 
 /** true se a extensão tem de ficar manual com este fornecedor (ex.: .ao e .co.ao na Hostinger). */
-export const isManualForProvider = (provider: string, ext: string) => (PROVIDERS.find(p => p.id === provider)?.manualSuffixes ?? []).some(s => ext === s || ext.endsWith(s))
+export const isManualForProvider = (provider: string, ext: string) => !!manualReason(provider, ext)
+/** Motivo pelo qual a extensão fica manual com este fornecedor, ou null. */
+export function manualReason(provider: string, ext: string): string | null {
+  const p = PROVIDERS.find(x => x.id === provider)
+  const e = String(ext ?? '').trim().toLowerCase()
+  if (p?.manualExtensions?.[e]) return p.manualExtensions[e]
+  if ((p?.manualSuffixes ?? []).some(s => e === s || e.endsWith(s))) return 'suporte por confirmar na API e na conta'
+  return null
+}
 
 export interface RegistrarSettings {
   provider: string; mode: 'test' | 'live'; enabled: boolean; apiUrl: string | null; username: string | null
@@ -76,7 +87,7 @@ export async function saveRegistrarSettings(input: { provider: string; mode: 'te
   const [known] = await getPool().query('SELECT DISTINCT extension FROM domain_prices') as any
   const valid = new Set((known as any[]).map(k => k.extension))
   const blocked = (input.extensions ?? []).filter(e => isManualForProvider(p.id, e))
-  if (blocked.length) throw new RegistrarConfigError(`${blocked.join(', ')} fica(m) em registo manual com ${p.label} até o suporte ser confirmado na API e na conta.`)
+  if (blocked.length) throw new RegistrarConfigError(`Em registo manual com ${p.label}: ${blocked.map(e => `${e} (${manualReason(p.id, e)})`).join('; ')}.`)
   const extensions = [...new Set((input.extensions ?? []).filter(e => valid.has(e)))]
   const prev = await row()
   // Qualquer alteração de fornecedor/endereço/credenciais obriga a testar de novo antes de activar
@@ -130,7 +141,7 @@ export async function hostingerForDomain(domain: string): Promise<{ client: Host
   const exts = parseExt(r.extensions).sort((a, b) => b.length - a.length)
   const ext = exts.find(e => domain.endsWith(e) && domain.length > e.length && !domain.slice(0, -e.length).includes('.'))
   if (!ext) return { error: 'Extensão não autorizada para a Hostinger: registo manual.' }
-  if (isManualForProvider('hostinger', ext)) return { error: `${ext} fica em registo manual até o suporte ser confirmado.` }
+  if (isManualForProvider('hostinger', ext)) return { error: `${ext} fica em registo manual: ${manualReason('hostinger', ext)}.` }
   const client = hostingerClientFor(r, r.secret_enc ? decryptSecret(r.secret_enc) : '')
   if (!client) return { error: 'Token da Hostinger não configurado.' }
   return { client, mode: r.mode, extension: ext }

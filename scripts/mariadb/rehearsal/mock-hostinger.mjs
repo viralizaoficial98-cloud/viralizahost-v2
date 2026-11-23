@@ -21,6 +21,7 @@
  *   verifica* registo a aguardar verificação do contacto (verification.type = contact_verification)
  *   recupera* já está na conta, PAGO e a aguardar configuração (encomenda antiga)
  *   antigo*   já está registado na conta (registado no hPanel antes da integração)
+ * O filtro do catálogo é por prefixo (como na API real); a compra recusa item_id de outra extensão (stats.wrongItem).
  * WHOIS: país diferente de AO sem «zip» → 422 errors.whois_details.zip.
  * GET /_stats: compras efectivas por domínio, chamadas de compra/setup e leituras.
  */
@@ -47,16 +48,22 @@ function seed(d) {
   if (/^recupera/.test(label(d))) domains.set(d, { id: ++seq, status: 'pending_setup', registered_at: null, verification: null, ns: [] })
   if (/^antigo/.test(label(d))) domains.set(d, { id: ++seq, status: 'active', registered_at: now(), verification: null, ns: ['ns1.dns-parking.com', 'ns2.dns-parking.com'] })
 }
-const PRICES = {
-  com: [[1, 999, 1599], [2, 2598, 3198], [3, 4197, 4797]],
-  net: [[1, 1299, 1799], [2, 3098, 3598]],
-}
+// Catálogo com o comportamento REAL do filtro por prefixo: «.COM*» devolve também .COM.BR, .COM.ES,
+// .COMPANY… Preços fictícios (cêntimos). .AI só tem 2 anos (como no teste real: sem preço de 1 ano).
+const PRODUCTS = [
+  ['com', [[1, 999, 1599], [2, 2598, 3198], [3, 4197, 4797]]], ['com.br', [[1, 4111, 4111]]], ['com.es', [[1, 777, 777]]], ['company', [[1, 333, 3333]]],
+  ['net', [[1, 1299, 1799], [2, 3098, 3598]]], ['net.in', [[1, 555, 555]]], ['network', [[1, 444, 2444]]],
+  ['org', [[1, 1099, 1699]]], ['org.br', [[1, 3999, 3999]]], ['org.uk', [[1, 899, 899]]],
+  ['shop', [[1, 199, 3999]]], ['shopping', [[1, 299, 2999]]],
+  ['ai', [[2, 15998, 15998]]],
+  ['io', [[1, 3499, 5999]]], ['online', [[1, 99, 3499]]], ['store', [[1, 99, 4999]]], ['tech', [[1, 199, 4999]]], ['xyz', [[1, 99, 1499]]],
+]
+const itemId = (tld, y) => `hostingercom-domain-${tld.replace(/\./g, '-')}-usd-${y}y`
 function catalog(name) {
-  const tld = String(name || '').replace(/^\./, '').replace(/\*$/, '').toLowerCase()
-  const t = PRICES[tld] ? [tld] : !tld ? Object.keys(PRICES) : []
-  return t.map(x => ({
-    id: `hostingercom-domain-${x}`, name: `.${x.toUpperCase()} Domain`, category: 'DOMAIN', metadata: {},
-    prices: PRICES[x].map(([y, first, price]) => ({ id: `hostingercom-domain-${x}-usd-${y}y`, name: `.${x.toUpperCase()} ${y} ano(s)`, currency: 'USD', price, first_period_price: first, period: y, period_unit: 'year' })),
+  const prefix = String(name || '').replace(/\*$/, '').toLowerCase()
+  return PRODUCTS.filter(([t]) => `.${t}`.startsWith(prefix)).map(([t, prices]) => ({
+    id: `hostingercom-domain-${t.replace(/\./g, '-')}`, name: `.${t.toUpperCase()} Domain`, category: 'DOMAIN', metadata: {},
+    prices: prices.map(([y, first, price]) => ({ id: itemId(t, y), name: `.${t.toUpperCase()} ${y} ano(s)`, currency: 'USD', price, first_period_price: first, period: y, period_unit: 'year' })),
   }))
 }
 function register(d, extra = {}) {
@@ -115,7 +122,9 @@ http.createServer(async (req, res) => {
   if (req.method === 'POST' && p === '/api/domains/v1/portfolio') {
     stats.purchaseCalls++
     const b = await body(req); const d = String(b.domain || ''); seed(d)
-    if (!b.item_id || !/^hostingercom-domain-/.test(b.item_id)) return send(res, 422, { message: 'Invalid item_id.', errors: { item_id: ['invalid'] } })
+    // O item tem de ser do produto da extensão EXACTA do domínio (apanha a escolha de .COM.BR para .com)
+    const tld = d.slice(d.indexOf('.') + 1)
+    if (!b.item_id || !new RegExp(`^hostingercom-domain-${tld.replace(/\./g, '-')}-usd-\\d+y$`).test(b.item_id)) { stats.wrongItem = (stats.wrongItem ?? 0) + 1; return send(res, 422, { message: 'Item does not match the domain TLD.', errors: { item_id: ['invalid'] } }) }
     if (domains.has(d) || /^ocupado/.test(label(d))) return send(res, 422, { message: 'Domain is not available.', errors: { domain: ['not available'] } })
     const order = { id: ++seq, subscription_id: `sub_${seq}`, status: 'completed', currency: 'USD', subtotal: 999, total: 999, created_at: now(), updated_at: now() }
     const l = label(d)

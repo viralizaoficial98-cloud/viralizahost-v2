@@ -1,6 +1,6 @@
 # Registrador de domínios — Hostinger
 
-Primeiro lançamento: registo de domínios **.com**, com autorização explícita de um administrador em cada encomenda. As outras extensões já podem ser activadas, uma a uma, em Integrações → Registrador. **.ao** e **.co.ao** ficam em registo manual: o painel não as deixa seleccionar. A documentação oficial não confirma o suporte a estas extensões, nem houve consulta à conta.
+Primeiro lançamento: registo de domínios **.com**. A API real respondeu HTTP 200 à disponibilidade e ao catálogo nas 10 extensões internacionais vendidas; **.ai** fica fora da automação até se confirmar um período compatível, com autorização explícita de um administrador em cada encomenda. As outras extensões já podem ser activadas, uma a uma, em Integrações → Registrador. **.ao** e **.co.ao** ficam em registo manual: o painel não as deixa seleccionar. A documentação oficial não confirma o suporte a estas extensões, nem houve consulta à conta.
 
 ## Operações da API
 
@@ -15,7 +15,7 @@ Fonte: SDK oficial `github.com/hostinger/api-python-sdk`, pasta `docs/` (Domains
 | Listar domínios | `GET /api/domains/v1/portfolio` → `id, domain, type, status, created_at, expires_at, verification` | Sim | «Testar ligação»; recuperação depois de timeout ou 202; encomendas antigas |
 | Estado de um domínio | `GET /api/domains/v1/portfolio/{domain}` → `status, registered_at, expires_at, name_servers, …`. Só aparece depois de registado | Sim | «Registado» só com esta confirmação |
 | Disponibilidade | `POST /api/domains/v1/availability` `{domain, tlds[], with_alternatives}` → `is_available, is_premium, restriction`. Limite de 90 pedidos/min | Sim | Pesquisa e revalidação antes da compra. Domínios premium vão para revisão manual |
-| Preços | `GET /api/billing/v1/catalog?name=.COM*` → `prices[]: id, currency, price, first_period_price, period, period_unit` (cêntimos) | Sim (o formato do `id` de domínio e a categoria não são documentados) | Custo mostrado antes de comprar. Sem um preço único para a extensão e o período, a compra não é feita e vai para revisão manual |
+| Preços | `GET /api/billing/v1/catalog?name=.COM*` → `prices[]: id, currency, price, first_period_price, period, period_unit` (cêntimos) | Sim; o filtro é por prefixo (ver «Selecção do produto e do preço») | Produto pela extensão exacta e um só preço do período; caso contrário, revisão manual |
 | Comprar e registar | `POST /api/domains/v1/portfolio` `{domain, item_id, payment_method_id?, domain_contacts{owner_id,admin_id,billing_id,tech_id}, additional_details?, coupons?}` → encomenda `{id, status, currency, subtotal, total}` | Sim | Só a partir do diálogo «Registar na Hostinger». Sem `payment_method_id`, a Hostinger usa o método predefinido; a ViralizaHost envia o id do método predefinido mostrado ao administrador |
 | Pagamento pendente | Resposta **HTTP 202**: o pagamento está em processamento e o domínio **não** foi registado | Sim | Estado «Pagamento ao fornecedor pendente». Só é possível consultar, nunca comprar de novo |
 | Concluir registo já pago | `POST /api/domains/v1/portfolio/{domain}/setup` `{domain_contacts?, additional_details?}`. Sem nova encomenda nem pagamento | Sim | «Concluir registo (sem nova compra)» |
@@ -29,6 +29,39 @@ Fonte: SDK oficial `github.com/hostinger/api-python-sdk`, pasta `docs/` (Domains
 - O `entity_type` é `individual`, ou `organization` quando há empresa.
 - Os nomes das chaves e os valores de `entity_type` não estão na documentação: são inferidos. Se a Hostinger os recusar, o 422 aparece no diálogo para correcção e nada é comprado.
 - A ViralizaHost exige sempre nome, apelido, e-mail, telefone, morada, cidade e país (ISO de 2 letras).
+
+## Selecção do produto e do preço (catálogo)
+
+O filtro `GET /api/billing/v1/catalog?name=.COM*` é por **prefixo**. Respostas reais:
+
+| Filtro | Produtos devolvidos |
+|---|---|
+| `.COM*` | .COM Domain, .COM.BR Domain, .COM.ES Domain, .COMPANY Domain |
+| `.NET*` | .NET Domain, .NET.IN Domain, .NETWORK Domain |
+| `.ORG*` | .ORG Domain, .ORG.BR Domain, .ORG.UK Domain |
+| `.SHOP*` | .SHOP Domain, .SHOPPING Domain |
+| `.AI*` | .AI Domain, sem preço de 1 ano (o teste só listou outro período) |
+
+Regra (`src/lib/registrar/hostinger-catalog.ts`):
+1. O produto escolhe-se pela **extensão exacta do nome** («.COM Domain» → `.com`; «.COM.BR Domain» → `.com.br`). A comparação é normalizada e não distingue maiúsculas. Nunca se escolhe por prefixo nem pelo id. Transferências, renovações e outras categorias ficam excluídas.
+2. Depois escolhe-se **um** preço para o período pedido: `year` × N, ou `month` × 12·N.
+3. Moeda e valores em **unidades menores** ficam tal como a API os devolve (`registrar_operations.cost_minor`, `cost_currency`).
+4. Vai para revisão manual quando:
+   - não há produto exacto;
+   - há mais de um produto exacto;
+   - não há preço para o período;
+   - há mais de um preço para o período;
+   - o preço é inválido.
+
+Testes de regressão com os exemplos reais: `node --test scripts/registrar/hostinger-catalog.test.mjs`.
+
+**Consulta só de leitura** (só faz `GET` ao catálogo). Lista os produtos devolvidos, o produto exacto, todos os seus períodos (unidades menores e moeda) e a selecção. Para confirmar os períodos de «.AI Domain»:
+
+```bash
+read -rsp "Token Hostinger: " HOSTINGER_TOKEN; echo; cd /var/www/viralizahost-main && HOSTINGER_TOKEN="$HOSTINGER_TOKEN" node scripts/registrar/hostinger-catalogo.mjs .ai .com .net .org .shop; unset HOSTINGER_TOKEN
+```
+
+**.ai** está em registo manual (`manualExtensions` da Hostinger em `src/lib/registrar/settings.ts`): o painel mostra-a desactivada «(por confirmar)» e o servidor recusa-a. Só deve sair desta lista quando a consulta acima mostrar um período compatível com a oferta da ViralizaHost (registo de 1 ano a 3 anos). Os preços de venda **não** são alterados com base nestes valores.
 
 ## Comportamento na ViralizaHost
 
