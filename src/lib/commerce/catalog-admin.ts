@@ -50,8 +50,10 @@ export interface ProductPatch {
 
 export async function updateProduct(productId: string, patch: ProductPatch) {
   await withTransaction(async conn => {
-    const [p] = await rows(conn, 'SELECT id, slug FROM products WHERE id = ? FOR UPDATE', [productId])
+    const [p] = await rows(conn, 'SELECT id, slug, category FROM products WHERE id = ? FOR UPDATE', [productId])
     if (!p) throw new Error('Produto inexistente.')
+    // E-mail: preços só pelo preço base + descontos (email-plans.ts), para manter a regra de arredondamento.
+    if (p.category === 'email' && patch.prices?.length) throw new Error('Os preços dos planos de e-mail editam-se na ficha do plano (preço base e descontos por período).')
     if (patch.sale_status && !['active', 'draft', 'on_request'].includes(patch.sale_status)) throw new Error('Estado inválido.')
     if (patch.whm_package !== undefined && patch.whm_package && !/^[\w .@-]{1,64}$/.test(patch.whm_package)) throw new Error('Pacote WHM inválido.')
     for (const pr of patch.prices ?? []) {
@@ -77,7 +79,7 @@ export async function updateProduct(productId: string, patch: ProductPatch) {
   revalidateTag('catalog', { expire: 0 })
 }
 
-async function syncDisplay(conn: Queryable, productId: string, slug: string) {
+export async function syncDisplay(conn: Queryable, productId: string, slug: string) {
   const pp = await rows(conn, 'SELECT cycle, months, price FROM product_prices WHERE product_id = ? AND active = 1', [productId])
   const per = (c: string) => { const r = pp.find(x => x.cycle === c); return r ? Math.round(Number(r.price) / Number(r.months) * 100) / 100 : null }
   await conn.query('UPDATE products SET price_monthly = ?, price_6months = ?, price_1year = ?, price_2years = ?, price_3years = ? WHERE id = ?',

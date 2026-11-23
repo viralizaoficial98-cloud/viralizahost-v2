@@ -16,7 +16,8 @@ import { useCart, type Cycle, type NewCartLine } from '@/store/cartStore'
 export interface BuyPlan {
   slug: string; name: string; description: string | null; category: string; serviceType: string
   quantityUnit: string | null; maxQuantity: number; needsDomain: boolean; features: string[]
-  prices: { cycle: Cycle; months: number; price: number; renewal: number }[]
+  prices: { cycle: Cycle; months: number; price: number; renewal: number; discount?: number; renewalDiscount?: number }[]
+  baseMonthly?: number | null
 }
 type Mode = 'register' | 'transfer' | 'existing'
 type Status = 'available' | 'unavailable' | 'confirm' | 'on_request'
@@ -40,6 +41,7 @@ const useSelections = create<{ by: Record<string, Selection>; set: (slug: string
 
 const kz = (n: number) => kzFmt(Math.round(n))
 export const CYCLE_NAME: Record<Cycle, string> = { monthly: 'Mensal', '3months': 'Trimestral', '6months': 'Semestral', '1year': 'Anual', '2years': '2 anos', '3years': '3 anos' }
+const PERIOD_LABEL: Partial<Record<Cycle, string>> = { monthly: '1 mês', '1year': '1 ano', '2years': '2 anos', '3years': '3 anos' }
 const DURATION = (m: number) => (m === 1 ? '1 mês' : m < 12 ? `${m} meses` : m === 12 ? '12 meses (1 ano)' : `${m} meses (${m / 12} anos)`)
 const NS = ['ns1.viralizahost.com', 'ns2.viralizahost.com']
 const STATUS_UI: Record<Status, { label: string; cls: string }> = {
@@ -276,24 +278,26 @@ function CycleStep({ plan, sel, update, exts, onBack, onAdd, adding }: {
       <div role="radiogroup" aria-label="Duração do plano" className="grid gap-3 mb-6">
         {plan.prices.map(p => {
           const on = sel.cycle === p.cycle
+          const disc = p.discount ?? 0
           return (
             <button key={p.cycle} role="radio" aria-checked={on} onClick={() => update({ cycle: p.cycle })} data-testid={`cycle-${p.cycle}`}
               className={`text-left p-4 rounded-xl border-2 transition-colors ${on ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#EEE] hover:border-[#F5B700]/50'}`}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="font-black text-[#0A0A0A]">{CYCLE_NAME[p.cycle]}</span>
-                <span className="text-sm"><strong className="text-[#0A0A0A]">{kz((p.price / p.months) * qty)}</strong><span className="text-[#888]">/mês{plan.quantityUnit ? ` (${qty} ${qty === 1 ? plan.quantityUnit : plan.quantityUnit + 's'})` : ''}</span></span>
+                <span className="font-black text-[#0A0A0A]">{plan.serviceType === 'email' ? PERIOD_LABEL[p.cycle] ?? CYCLE_NAME[p.cycle] : CYCLE_NAME[p.cycle]}
+                  {disc > 0 && <span className="ml-2 align-middle text-[10px] font-black px-2 py-0.5 rounded-full bg-green-600 text-white" data-testid="cycle-discount">Poupe {disc}%</span>}</span>
+                <span className="text-sm">{disc > 0 && plan.baseMonthly ? <s className="text-[#AAA] mr-1">{kz(plan.baseMonthly * qty)}</s> : null}<strong className="text-[#0A0A0A]">{kz((p.price / p.months) * qty)}</strong><span className="text-[#888]">/mês{plan.quantityUnit ? ` (${qty} ${qty === 1 ? plan.quantityUnit : plan.quantityUnit + 's'})` : ''}</span></span>
               </div>
               <div className="grid sm:grid-cols-3 gap-1 mt-2 text-xs text-[#555]">
-                <span>Duração: {DURATION(p.months)}</span>
+                <span>Duração: {DURATION(p.months)}{p.months > 1 ? ' — pago antecipadamente' : ''}</span>
                 <span>A pagar agora: <strong className="text-[#0A0A0A]">{kz(p.price * qty)}</strong></span>
-                <span>Renova por {kz(p.renewal * qty)} {p.months === 1 ? 'todos os meses' : `a cada ${DURATION(p.months).split(' (')[0]}`}</span>
+                <span>Renova por {kz(p.renewal * qty)} {p.months === 1 ? 'todos os meses' : `a cada ${DURATION(p.months).split(' (')[0]}`}{(p.renewalDiscount ?? 0) > 0 ? ` (com ${p.renewalDiscount}% de desconto)` : ''}</span>
               </div>
-              {plan.quantityUnit && <p className="text-[11px] text-[#888] mt-1">{kz(p.price / p.months)} por {plan.quantityUnit}/mês</p>}
+              {plan.quantityUnit && <p className="text-[11px] text-[#888] mt-1">{kz(p.price / p.months)} por {plan.quantityUnit === 'caixa' ? 'caixa de correio' : plan.quantityUnit}/mês</p>}
             </button>
           )
         })}
       </div>
-      <p className="text-xs text-[#888] mb-6">Sem taxa de activação. Nenhum destes planos inclui domínio grátis: mudar a duração altera apenas o período e o valor a pagar.</p>
+      <p className="text-xs text-[#888] mb-6">Sem taxa de activação. Nenhum destes planos inclui domínio grátis: mudar a duração altera apenas o período e o valor a pagar.{plan.prices.some(p => (p.discount ?? 0) > 0) ? ' Os períodos com desconto são pagos antecipadamente; a renovação é ao preço indicado em cada período.' : ''}</p>
 
       {sel.domain && (
         <div className="mb-6 p-4 rounded-xl bg-[#F8F8F8]">

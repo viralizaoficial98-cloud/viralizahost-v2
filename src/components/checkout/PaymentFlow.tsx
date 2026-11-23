@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { AlertCircle, Check, CheckCircle2, ChevronRight, Copy, Loader2, Lock, ShoppingCart, Upload } from 'lucide-react'
 import { useCart, toApiLine } from '@/store/cartStore'
 import { createAuthClient } from '@/lib/supabase/client'
-import { PurchaseSteps, Summary, btnGhost, btnPrimary, card, input, kz, periodOf, renewalOf, useCartHydrated, useQuote } from './shared'
+import { PurchaseSteps, Summary, btnGhost, btnPrimary, card, discountOf, input, kz, periodOf, renewalOf, useCartHydrated, useQuote } from './shared'
 
 // Pagamento e confirmação (cliente com sessão e dados completos). Reaproveita o pagamento por
 // transferência e a revisão do checkout anterior. Antes de criar a encomenda, o servidor volta a
@@ -152,8 +152,9 @@ export function PaymentFlow({ customer, verified }: { customer: CustomerSummary;
                   <ul className="divide-y divide-[#F0F0F0] mb-4" data-testid="review-lines">
                     {quote.lines.map(l => (
                       <li key={l.index} className="py-3 flex flex-col sm:flex-row sm:justify-between gap-1 text-sm">
-                        <span className="min-w-0 break-words">{l.name}{l.quantity > 1 ? ` × ${l.quantity}` : ''}
+                        <span className="min-w-0 break-words">{l.name}{l.quantity > 1 ? ` × ${l.quantity}${l.quantityUnit === 'caixa' ? ' caixas' : ''}` : ''}
                           <span className="block text-xs text-[#888]">{periodOf(l)} · renova por {renewalOf(l)}{l.nameservers ? ` · NS ${l.nameservers.ns.join(', ')}` : ''}</span>
+                          {discountOf(l) && <span className="block text-xs text-green-700" data-testid="review-discount">{discountOf(l)}</span>}
                           {l.error && <span className="block text-xs text-red-700">{l.error.message}</span>}
                         </span>
                         <strong className="whitespace-nowrap">{kz(l.lineTotal)}</strong>

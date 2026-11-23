@@ -1,6 +1,7 @@
 'use client'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { DomainExtensionsEditor, type DomainExtension } from '@/components/admin/DomainExtensionsEditor'
+import { EmailPlansEditor } from '@/components/admin/EmailPlansEditor'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Save, ExternalLink, AlertTriangle } from 'lucide-react'
 import { AdminPageShell } from '@/components/admin/AdminPageShell'
@@ -29,7 +30,7 @@ function ProductRow({ p, onSaved }: { p: Product; onSaved: () => void }) {
   async function save() {
     setBusy(true); setMsg(null)
     try {
-      const res = await fetch('/api/admin/catalog', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'product', id: p.id, ...draft, prices: draft.prices.filter(x => x.active || p.prices.some(y => y.cycle === x.cycle)) }) })
+      const res = await fetch('/api/admin/catalog', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'product', id: p.id, ...draft, prices: p.category === 'email' ? [] : draft.prices.filter(x => x.active || p.prices.some(y => y.cycle === x.cycle)) }) })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error)
       setMsg({ ok: true, text: 'Guardado' }); onSaved()
@@ -59,7 +60,7 @@ function ProductRow({ p, onSaved }: { p: Product; onSaved: () => void }) {
             <input className={input} value={draft.pricing_note} onChange={e => setDraft({ ...draft, pricing_note: e.target.value })} />
           </label>
         </div>
-        <div className="overflow-x-auto">
+        {p.category === 'email' ? <p className="text-xs text-[#64748B]">Preços, descontos e ficha deste plano: editar em «Planos de e-mail» acima. Aqui só o estado, o pacote WHM (quota técnica) e a nota.</p> : <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[520px]">
             <thead><tr className="text-left text-[11px] uppercase text-[#64748B]"><th className="py-1">Ciclo</th><th>Preço (Kz)</th><th>Renovação (Kz)</th><th>Activo</th></tr></thead>
             <tbody>
@@ -73,7 +74,7 @@ function ProductRow({ p, onSaved }: { p: Product; onSaved: () => void }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </div>}
         {ref && (
           <p className="text-xs text-[#64748B]">Referência: {ref.provider} — {ref.plan} a {ref.ref_monthly} {ref.ref_currency}/mês na renovação ({String(ref.consulted_at).slice(0, 10)}) · ×{ref.factor ?? 2}{ref.rate ? ` · 1 USD = ${ref.rate} Kz` : ''}{ref.edited_by_admin ? ' · editado no painel' : ''} {ref.url && <a href={ref.url} target="_blank" rel="noreferrer" className="underline inline-flex items-center gap-0.5">fonte <ExternalLink size={10} /></a>}</p>
         )}
@@ -153,6 +154,10 @@ function Catalog() {
             ))}
           </div>
           {cat !== 'dominios' && <input className={`${input} max-w-sm`} placeholder="Filtrar planos…" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filtrar planos" />}
+          {(cat === 'all' || cat === 'email') && <section data-testid="email-plans-admin">
+            <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">Planos de e-mail — ficha, preço base e descontos por período</h2>
+            <EmailPlansEditor onSaved={load} />
+          </section>}
           {groups.map(([k, list]) => (
             <section key={k}>
               <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">{k}</h2>

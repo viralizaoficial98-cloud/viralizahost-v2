@@ -43,7 +43,12 @@ export interface QuoteLine {
   years?: number
   /** Registo/transferência: nameservers efectivos (os padrão da plataforma ou os próprios do cliente). */
   nameservers?: { useDefault: boolean; ns: string[] }
-  cycles?: { cycle: Cycle; months: number; price: number; renewal: number }[]
+  cycles?: { cycle: Cycle; months: number; price: number; renewal: number; discount?: number; renewalDiscount?: number }[]
+  /** Desconto do período (%) e preço de tabela da linha sem desconto (preço base × meses × quantidade). */
+  discountPct?: number
+  listTotal?: number | null
+  /** Desconto configurado para a renovação (%); 0 = renova ao preço base. */
+  renewalDiscountPct?: number
   error?: { code: string; message: string }
 }
 
@@ -174,18 +179,20 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
     // Produto
     const slug = String((raw as { slug?: string })?.slug ?? '')
     const cycle = (raw as { cycle?: Cycle })?.cycle as Cycle
-    const [prod] = await rows(db, 'SELECT id, slug, name, active, sale_status, service_type, provisioning, quantity_unit, max_quantity FROM products WHERE slug = ?', [slug])
+    const [prod] = await rows(db, 'SELECT id, slug, name, active, sale_status, service_type, provisioning, quantity_unit, max_quantity, base_monthly_price FROM products WHERE slug = ?', [slug])
     const base: QuoteLine = { index, type: 'product', slug, name: prod?.name ?? slug, serviceType: prod?.service_type ?? 'other', provisioning: prod?.provisioning, quantity: 1, unitPrice: 0, lineTotal: 0, renewalPrice: 0, cycle, quantityUnit: prod?.quantity_unit ?? null, maxQuantity: Number(prod?.max_quantity ?? 1) }
     if (!prod || !prod.active) { lines.push({ ...base, error: err('product_not_found') }); continue }
     base.productId = prod.id
-    base.cycles = (await rows(db, 'SELECT cycle, months, price, renewal_price FROM product_prices WHERE product_id = ? AND active = 1 ORDER BY months', [prod.id]))
-      .map(c => ({ cycle: c.cycle, months: Number(c.months), price: Number(c.price), renewal: Number(c.renewal_price) }))
+    base.cycles = (await rows(db, 'SELECT cycle, months, price, renewal_price, discount_pct, renewal_discount_pct FROM product_prices WHERE product_id = ? AND active = 1 ORDER BY months', [prod.id]))
+      .map(c => ({ cycle: c.cycle, months: Number(c.months), price: Number(c.price), renewal: Number(c.renewal_price), discount: Number(c.discount_pct ?? 0), renewalDiscount: Number(c.renewal_discount_pct ?? 0) }))
     if (prod.sale_status !== 'active') { lines.push({ ...base, error: err(prod.sale_status === 'on_request' ? 'on_request' : 'draft') }); continue }
     const c = base.cycles.find(x => x.cycle === cycle)
     if (!c) { lines.push({ ...base, error: err('cycle_unavailable') }); continue }
     const qty = Number((raw as { quantity?: number }).quantity ?? 1)
     if (!Number.isInteger(qty) || qty < 1 || qty > base.maxQuantity!) { lines.push({ ...base, error: err('quantity_invalid') }); continue }
-    Object.assign(base, { months: c.months, quantity: qty, unitPrice: c.price, lineTotal: round2(c.price * qty), renewalPrice: round2(c.renewal * qty) })
+    Object.assign(base, { months: c.months, quantity: qty, unitPrice: c.price, lineTotal: round2(c.price * qty), renewalPrice: round2(c.renewal * qty),
+      discountPct: c.discount ?? 0, renewalDiscountPct: c.renewalDiscount ?? 0,
+      listTotal: prod.base_monthly_price != null && (c.discount ?? 0) > 0 ? round2(Number(prod.base_monthly_price) * c.months * qty) : null })
     if (base.serviceType === 'hosting' || base.serviceType === 'email') {
       const d = normalizeDomain((raw as { domain?: string }).domain)
       const mode = (raw as { domainMode?: DomainMode }).domainMode ?? 'existing'
