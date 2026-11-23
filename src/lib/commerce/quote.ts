@@ -61,7 +61,7 @@ export interface Quote {
   tax: number
   total: number
   valid: boolean
-  /** Há domínios «A confirmar pela equipa»: a encomenda fica retida e o pagamento só é pedido depois. */
+  /** Há domínios «A confirmar pela equipa»: o cliente pode pagar já; o registo espera pela confirmação. */
   needsConfirmation: boolean
 }
 

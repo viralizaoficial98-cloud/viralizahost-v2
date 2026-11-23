@@ -145,7 +145,7 @@ function ConfigForm({ info }: { info: Info }) {
             </div>
             {info.availability === 'confirm' && (
               <p className="mb-5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900 flex gap-2" data-testid="config-confirm-note">
-                <Clock size={16} className="shrink-0 mt-0.5" /> A extensão {info.extension} não tem consulta automática. A encomenda fica registada e a equipa confirma a disponibilidade; o pagamento só é pedido depois dessa confirmação.
+                <Clock size={16} className="shrink-0 mt-0.5" /> A extensão {info.extension} não tem consulta automática. Pode pagar agora: a nossa equipa vai confirmar a disponibilidade do domínio antes de o registar.
               </p>
             )}
             <div className="grid sm:grid-cols-3 gap-4">

@@ -136,7 +136,7 @@ function DomainStep({ plan, sel, update, exts, extsError, reloadExts, onDone, ep
         <div className="flex-1 min-w-0">
           <p className="font-bold text-[#0A0A0A] break-all">{r.domain}</p>
           <span className={`inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${ui.cls}`}>{ui.label}</span>
-          {r.availability === 'confirm' && <p className="text-xs text-amber-800 mt-1">Esta extensão não tem consulta automática. Pode encomendar já; o pagamento só é pedido depois de a equipa confirmar que está livre.</p>}
+          {r.availability === 'confirm' && <p className="text-xs text-amber-800 mt-1">Esta extensão não tem consulta automática. Pode pagar agora: a nossa equipa confirma a disponibilidade antes de o registar.</p>}
         </div>
         {r.register != null && r.availability !== 'on_request' && (
           <div className="text-sm sm:text-right">
@@ -311,7 +311,7 @@ function CycleStep({ plan, sel, update, exts, onBack, onAdd, adding }: {
                 — <strong className="text-[#0A0A0A]">{kz(domainTotal)}</strong>
               </label>
               <p className="text-xs text-[#888] mt-1">Renova por {kz(ext.renew ?? ext.register ?? 0)}/ano.{(sel.years || 1) > 1 ? ` (${kz(ext.register ?? 0)} no 1.º ano + ${kz(ext.renew ?? 0)} por ano seguinte)` : ''}</p>
-              {sel.availability === 'confirm' && <p className="text-xs text-amber-800 mt-2 flex gap-1"><Clock size={13} className="shrink-0 mt-0.5" /> A confirmar pela equipa: a encomenda fica registada e só paga depois da confirmação (aviso na Área do Cliente).</p>}
+              {sel.availability === 'confirm' && <p className="text-xs text-amber-800 mt-2 flex gap-1"><Clock size={13} className="shrink-0 mt-0.5" /> A confirmar pela equipa. Pode pagar agora: a nossa equipa vai confirmar a disponibilidade do domínio antes de o registar.</p>}
             </>
           )}
           {sel.mode === 'transfer' && <p className="text-sm text-[#555]">Transferência (inclui 1 ano): <strong className="text-[#0A0A0A]">{kz(domainTotal)}</strong></p>}

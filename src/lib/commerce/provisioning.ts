@@ -54,6 +54,17 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
   }
   if (!s) return { serviceId, status: 'failed', message: 'Serviço inexistente.' }
   if (s.payment_status !== 'paid') return done('skipped', 'Pagamento ainda não confirmado.')
+  // Domínio da encomenda por confirmar (ex.: .ao) ou indisponível: o pagamento pode estar validado, mas nem o
+  // registo nem os serviços que usam esse domínio (e-mail, alojamento) avançam antes da decisão da equipa.
+  if (s.domain && !s.renews_service_id) {
+    const [pend] = await rows(db, "SELECT availability FROM order_items WHERE order_id = ? AND domain_name = ? AND availability IN ('confirm','unavailable') LIMIT 1", [s.order_id, s.domain])
+    if (pend) {
+      const msg = pend.availability === 'confirm'
+        ? (s.service_type === 'domain' ? 'A confirmar pela equipa: o registo espera pela confirmação da disponibilidade.' : `Aguarda a confirmação do domínio ${s.domain} pela equipa.`)
+        : `Domínio ${s.domain} indisponível: caso em tratamento manual pela equipa.`
+      return done('skipped', msg)
+    }
+  }
 
   const due = addMonths(Number(s.months ?? 12))
   try {

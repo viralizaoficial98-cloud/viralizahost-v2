@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminWriteClient, createServiceClient } from '@/lib/supabase/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { getPool } from '@/lib/db/pool'
-import { confirmPayment, rejectProof, resolveDomainAvailability, PaymentError } from '@/lib/commerce/payments'
+import { confirmPayment, domainCaseAction, rejectProof, resolveDomainAvailability, PaymentError } from '@/lib/commerce/payments'
 import { operationsByService } from '@/lib/registrar/hostinger-flow'
 import { hostingerEligibility, loadRegistrarSettings } from '@/lib/registrar/settings'
 import { ActivationError, markServiceActive, provisionOrder, provisionService, refreshOrderActivation } from '@/lib/commerce/provisioning'
@@ -15,7 +15,7 @@ export async function GET() {
   const db = createAdminWriteClient()
   const COLS = `id, order_number, user_id, status, payment_status, activation_status, hold_reason, review_flag, review_note, review_at, amount, currency, subtotal, tax_amount, billing_cycle, payment_method,
       domain_name, proof_file, transfer_ref, notes, created_at, updated_at, paid_at,
-      order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, years, nameservers)`
+      order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, years, nameservers, domain_case, domain_case_note, proposed_domain)`
   const { data: recent, error } = await db.from('orders').select(COLS).order('created_at', { ascending: false }).limit(300)
   if (error) return NextResponse.json({ orders: [], error: error.message })
   // Encomendas mais antigas com acções pendentes (activação por fazer, comprovativo, domínio por confirmar)
@@ -24,7 +24,7 @@ export async function GET() {
     `SELECT DISTINCT o.id FROM orders o LEFT JOIN services s ON s.order_id = o.id LEFT JOIN order_items i ON i.order_id = o.id
      WHERE o.status NOT IN ('rejected','cancelled') AND (
        (o.payment_status = 'paid' AND s.provisioning_status IN ('pending','in_progress','manual_required','failed'))
-       OR o.payment_status = 'proof_submitted' OR i.availability = 'confirm')`) as any
+       OR o.payment_status = 'proof_submitted' OR i.availability = 'confirm' OR i.domain_case IN ('manual_review','alternative','refund_manual'))`) as any
   const have = new Set((recent ?? []).map((o: any) => o.id))
   const missing = (pendingRows as any[]).map(r => r.id).filter(id => !have.has(id))
   const older = missing.length ? (await db.from('orders').select(COLS).in('id', missing)).data ?? [] : []
@@ -36,13 +36,20 @@ export async function GET() {
     userIds.length ? db.from('profiles').select('id, full_name, email, phone, role').in('id', userIds) : { data: [] },
     ids.length ? db.from('invoices').select('id, order_id, invoice_number, status, total, amount_paid').in('order_id', ids) : { data: [] },
     ids.length ? db.from('payments').select('id, order_id, invoice_id, status, amount, currency, proof_url, transfer_ref, created_at, paid_at, reviewed_by').in('order_id', ids).order('created_at', { ascending: false }) : { data: [] },
+    // (pagamentos iniciados na Área do Cliente ficam ligados só à factura: juntados abaixo)
   ])
+  // Histórico das decisões sobre domínios (confirmação, indisponibilidade, propostas, reembolso manual)
+  const [events] = ids.length ? await getPool().query(`SELECT e.order_id, e.order_item_id, e.action, e.domain, e.proposed_domain, e.note, e.created_at, p.full_name AS admin_name
+    FROM order_domain_events e LEFT JOIN profiles p ON p.id = e.admin_id WHERE e.order_id IN (${ids.map(() => '?').join(',')}) ORDER BY e.created_at`, ids) as any : [[]]
+  const invIds = (invoices ?? []).map((i: any) => i.id)
+  const extraPays = invIds.length ? ((await db.from('payments').select('id, order_id, invoice_id, status, amount, currency, proof_url, transfer_ref, created_at, paid_at, reviewed_by').in('invoice_id', invIds).is('order_id', null)).data ?? []) : []
+  const allPays = [...(payments ?? []), ...extraPays.map((p: any) => ({ ...p, order_id: (invoices ?? []).find((i: any) => i.id === p.invoice_id)?.order_id }))]
   const ops = await operationsByService((services ?? []).filter((s: any) => s.service_type === 'domain').map((s: any) => s.id)).catch(() => ({} as Record<string, any>))
   const reg = await loadRegistrarSettings().catch(() => null)
   const registrar = reg ? { provider: reg.provider, enabled: reg.enabled, mode: reg.mode, extensions: reg.extensions } : null
   const storage = createServiceClient().storage.from('payment-proofs')
   const out = await Promise.all((orders ?? []).map(async (o: any) => {
-    const pays = (payments ?? []).filter((p: any) => p.order_id === o.id)
+    const pays = allPays.filter((p: any) => p.order_id === o.id)
     const proofPath = pays.find((p: any) => p.proof_url)?.proof_url ?? o.proof_file
     const signed = proofPath ? (await storage.createSignedUrl(proofPath, 3600)).data?.signedUrl ?? null : null
     return {
@@ -59,6 +66,7 @@ export async function GET() {
       }),
       invoice: (invoices ?? []).find((i: any) => i.order_id === o.id) ?? null,
       payments: pays.map((p: any) => ({ ...p, proof_url: undefined, has_proof: !!p.proof_url })),
+      domain_events: (events as any[]).filter(e => e.order_id === o.id),
       proof_url: signed,
     }
   }))
@@ -69,7 +77,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   let adminId: string
   try { adminId = await requireAdminRole() } catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  const body = await req.json().catch(() => ({})) as { orderItemId?: string; available?: boolean; orderId?: string; serviceId?: string; paymentId?: string; action?: string; notes?: string; reason?: string; externalRef?: string; flag?: string | null }
+  const body = await req.json().catch(() => ({})) as { domain?: string; confirmed?: boolean; caseAction?: 'propose' | 'replace' | 'refund' | 'resolve'; orderItemId?: string; available?: boolean; orderId?: string; serviceId?: string; paymentId?: string; action?: string; notes?: string; reason?: string; externalRef?: string; flag?: string | null }
   const db = getPool()
   const log = (action: string, entity: string, id: string, description: string) =>
     db.query("INSERT INTO activity_logs (id, profile_id, action, entity_type, entity_id, description) VALUES (UUID(), ?, 'update', ?, ?, ?)", [adminId, entity, id, `${action}: ${description}`]).catch(() => {})
@@ -113,11 +121,31 @@ export async function POST(req: NextRequest) {
         await log('provision', 'service', body.serviceId!, r.status)
         return NextResponse.json({ ok: r.status === 'active', result: r })
       }
-      // Disponibilidade de domínio confirmada pela equipa (extensões sem consulta automática)
+      // Disponibilidade de domínio decidida pela equipa (extensões sem consulta automática, ex.: .ao).
+      // O pagamento não depende disto. Disponível + encomenda paga → segue o registo e os serviços dependentes.
+      // Indisponível exige motivo; se já houver pagamento/comprovativo, abre um caso manual (sem reembolso automático).
       case 'domain_availability': {
-        const r = await resolveDomainAvailability(body.orderItemId!, body.available === true)
-        await log('domain_availability', 'order_item', body.orderItemId!, body.available ? 'disponível' : 'indisponível')
-        return NextResponse.json({ ok: true, ...r })
+        const r = await resolveDomainAvailability(body.orderItemId!, body.available === true, body.reason ?? body.notes ?? null, adminId)
+        await log('domain_availability', 'order_item', body.orderItemId!, body.available ? 'disponível' : `indisponível: ${body.reason ?? body.notes ?? ''}`)
+        let provisioning = null
+        if (body.available && 'paid' in r && r.paid) {
+          const [[it]] = await db.query('SELECT order_id FROM order_items WHERE id = ?', [body.orderItemId]) as any
+          provisioning = await provisionOrder(it.order_id)
+        }
+        return NextResponse.json({ ok: true, ...r, provisioning })
+      }
+      // Caso manual de domínio indisponível depois do pagamento: propor outro domínio, substituir (aceite pelo
+      // cliente), encaminhar para reembolso manual ou encerrar. Tudo fica no histórico; nada movimenta dinheiro.
+      case 'domain_case': {
+        if (!body.caseAction || !['propose', 'replace', 'refund', 'resolve'].includes(body.caseAction)) return NextResponse.json({ error: 'Acção inválida.' }, { status: 400 })
+        const r = await domainCaseAction({ orderItemId: body.orderItemId!, action: body.caseAction, note: body.notes ?? body.reason ?? null, domain: body.domain ?? null, confirmed: body.confirmed === true, adminId })
+        await log('domain_case', 'order_item', body.orderItemId!, `${body.caseAction}${body.domain ? ` ${body.domain}` : ''}${body.notes ? `: ${body.notes}` : ''}`)
+        let provisioning = null
+        if (body.caseAction === 'replace' && body.confirmed) {
+          const [[it]] = await db.query('SELECT o.id, o.payment_status FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.id = ?', [body.orderItemId]) as any
+          if (it?.payment_status === 'paid') provisioning = await provisionOrder(it.id)
+        }
+        return NextResponse.json({ ...r, provisioning })
       }
       // Marcação manual autorizada: para domínios exige a referência do registo
       case 'mark_active': {

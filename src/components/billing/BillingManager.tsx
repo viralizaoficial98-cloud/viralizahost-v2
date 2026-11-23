@@ -2,6 +2,8 @@
 import Link from 'next/link'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { BankTransferCard } from '@/components/billing/BankTransferCard'
+import { DEFAULT_BANK, type BankDetails } from '@/lib/billing/bank-details'
 import {
   CreditCard, Download, CheckCircle2, Clock, AlertCircle, TrendingUp,
   Banknote, X, ChevronRight, Loader2, RefreshCw, Copy, Check,
@@ -72,11 +74,7 @@ const PAYMENT_METHODS = [
   { id: 'multicaixa',    label: 'Multicaixa Express',        icon: CreditCard, sub: 'Pagamento por Multicaixa' },
 ]
 
-const BANK_INFO = {
-  titular:    'VIRALIZA FÁCIL ANGOLA, LDA',
-  coordenada: '005100002477517910141',
-  banco:      'BIC — Banco BIC Angola',
-}
+// Dados bancários: fonte única (/api/billing/bank-details — os mesmos do checkout e da factura)
 
 const STATUS_FILTER_OPTIONS = [
   { value: '',              label: 'Todos' },
@@ -144,16 +142,6 @@ function Toast({ type, msg, onClose }: { type: 'success' | 'error'; msg: string;
   )
 }
 
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  const copy = async () => { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) }
-  return (
-    <button onClick={copy} className="p-1.5 rounded-lg transition-all hover:opacity-70"
-      style={{ background: copied ? 'rgba(16,185,129,0.10)' : '#F3F4F6', border: '1px solid #E5E7EB' }}>
-      {copied ? <Check size={13} style={{ color: '#059669' }} /> : <Copy size={13} style={{ color: '#6B7280' }} />}
-    </button>
-  )
-}
 
 function ProgressBar({ step }: { step: Step }) {
   const steps: Step[] = ['select', 'review', 'method', 'proof', 'done']
@@ -205,6 +193,8 @@ export default function BillingManager({ currency }: Props) {
   const [payableInvs,  setPayable]      = useState<Invoice[]>([])
   const [loadingPay,   setLoadingPay]   = useState(false)
   const [selected,     setSelected]     = useState<Invoice | null>(null)
+  const [bank,         setBank]         = useState<BankDetails>(DEFAULT_BANK)
+  useEffect(() => { fetch('/api/billing/bank-details').then(r => r.json()).then(j => j.bank && setBank(j.bank)).catch(() => {}) }, [])
   const [method,       setMethod]       = useState('')
   const [paymentId,    setPaymentId]    = useState('')
   const [creating,     setCreating]     = useState(false)
@@ -822,24 +812,7 @@ export default function BillingManager({ currency }: Props) {
                 {step === 'proof' && selected && (
                   <div className="space-y-4">
                     {method === 'bank_transfer' && (
-                      <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(245,183,0,0.04)', border: '1px solid rgba(245,183,0,0.15)' }}>
-                        <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#D9A300' }}>Dados bancários</p>
-                        {[
-                          { label: 'Banco',            value: BANK_INFO.banco },
-                          { label: 'Titular',          value: BANK_INFO.titular },
-                          { label: 'IBAN / Coordenada', value: BANK_INFO.coordenada },
-                          { label: 'Valor exacto',      value: fmtCurrency(selected.outstanding, selected.currency) },
-                          { label: 'Referência',        value: selected.invoice_number },
-                        ].map(r => (
-                          <div key={r.label} className="flex items-center justify-between gap-2">
-                            <div>
-                              <div className="text-xs" style={{ color: '#94A3B8' }}>{r.label}</div>
-                              <div className="text-sm font-bold" style={{ color: '#0B0B0D' }}>{r.value}</div>
-                            </div>
-                            <CopyButton text={r.value} />
-                          </div>
-                        ))}
-                      </div>
+                      <BankTransferCard bank={bank} amount={fmtCurrency(selected.outstanding, selected.currency)} reference={selected.invoice_number} referenceLabel="Referência da factura" />
                     )}
 
                     <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#94A3B8' }}>Dados da transferência</p>
@@ -905,11 +878,11 @@ export default function BillingManager({ currency }: Props) {
                       <CheckCircle2 size={38} style={{ color: '#059669' }} />
                     </motion.div>
                     <h3 className="font-black text-xl mb-2" style={{ color: '#0B0B0D' }}>Comprovativo enviado!</h3>
-                    <p className="text-sm mb-1" style={{ color: '#64748B' }}>O pagamento encontra-se em análise.</p>
+                    <p className="text-sm mb-1" style={{ color: '#64748B' }}>O comprovativo está por validar pela equipa.</p>
                     <p className="text-xs mb-6" style={{ color: '#94A3B8' }}>A nossa equipa irá validar o pagamento e actualizar o estado da fatura em breve.</p>
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold"
                       style={{ background: 'rgba(59,130,246,0.08)', color: '#2563EB', border: '1px solid rgba(59,130,246,0.15)' }}>
-                      <Eye size={14} /> Estado: Em análise
+                      <Eye size={14} /> Estado: Por validar
                     </div>
                     <div className="mt-5">
                       <button onClick={closeModal}
