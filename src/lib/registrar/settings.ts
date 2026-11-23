@@ -3,19 +3,32 @@ import { getPool } from '@/lib/db/pool'
 import { decryptSecret, encryptSecret } from '@/lib/crypto'
 import type { RegistrarAdapter } from './types'
 import { simulatedAdapter } from './simulated'
+import { HOSTINGER_API, hostingerAdapter, hostingerClient, type HostingerClient } from './hostinger'
 
 // Configuração do registrador de domínios (linha única registrar_settings.id = 1).
 // O segredo é cifrado com WHM_ENCRYPTION_KEY e nunca sai do servidor.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export interface ProviderInfo { id: string; label: string; testOnly?: boolean; needsUrl?: boolean; needsUser?: boolean; docs?: string }
+export interface ProviderInfo { id: string; label: string; testOnly?: boolean; needsUrl?: boolean; needsUser?: boolean; docs?: string
+  /** Cada compra exige autorização explícita do administrador na encomenda (nunca automática). */
+  authorizePerOrder?: boolean
+  /** Extensões que ficam em registo manual até o suporte ser confirmado no fornecedor. */
+  manualSuffixes?: string[]
+  secretLabel?: string
+}
 
 // Só aparecem fornecedores cuja integração está implementada e testada.
 // Um fornecedor real (contratado) acrescenta-se com um adaptador em src/lib/registrar/.
 export const PROVIDERS: ProviderInfo[] = [
   { id: 'none', label: 'Nenhum — registo manual pela equipa' },
   { id: 'simulado', label: 'Simulador de ensaio (sem registos reais)', testOnly: true, needsUrl: true },
+  // API pública da Hostinger (developers.hostinger.com). O cartão fica na conta Hostinger.
+  // Em «ensaio» aponta para a API simulada (endereço obrigatório); em produção usa sempre a API oficial.
+  { id: 'hostinger', label: 'Hostinger', authorizePerOrder: true, manualSuffixes: ['.ao'], secretLabel: 'Token da API (hPanel → Conta → API)', docs: 'https://developers.hostinger.com' },
 ]
+
+/** true se a extensão tem de ficar manual com este fornecedor (ex.: .ao e .co.ao na Hostinger). */
+export const isManualForProvider = (provider: string, ext: string) => (PROVIDERS.find(p => p.id === provider)?.manualSuffixes ?? []).some(s => ext === s || ext.endsWith(s))
 
 export interface RegistrarSettings {
   provider: string; mode: 'test' | 'live'; enabled: boolean; apiUrl: string | null; username: string | null
@@ -56,33 +69,77 @@ export async function saveRegistrarSettings(input: { provider: string; mode: 'te
     if ((process.env.WHM_ENCRYPTION_KEY?.length ?? 0) < 64) throw new RegistrarConfigError('Sem WHM_ENCRYPTION_KEY: o segredo não pode ser guardado cifrado.')
     secretEnc = encryptSecret(input.secret)
   }
+  if (p.id === 'hostinger') {
+    if (input.mode === 'live' && apiUrl && apiUrl.replace(/\/+$/, '') !== HOSTINGER_API) throw new RegistrarConfigError(`Em produção a Hostinger usa sempre ${HOSTINGER_API}.`)
+    if (input.mode === 'test' && !apiUrl) throw new RegistrarConfigError('Em modo de ensaio indique o endereço da API simulada.')
+  }
   const [known] = await getPool().query('SELECT DISTINCT extension FROM domain_prices') as any
   const valid = new Set((known as any[]).map(k => k.extension))
+  const blocked = (input.extensions ?? []).filter(e => isManualForProvider(p.id, e))
+  if (blocked.length) throw new RegistrarConfigError(`${blocked.join(', ')} fica(m) em registo manual com ${p.label} até o suporte ser confirmado na API e na conta.`)
   const extensions = [...new Set((input.extensions ?? []).filter(e => valid.has(e)))]
   const prev = await row()
   // Qualquer alteração de fornecedor/endereço/credenciais obriga a testar de novo antes de activar
-  const changed = !prev || prev.provider !== input.provider || prev.mode !== input.mode || (prev.api_url ?? null) !== apiUrl || (prev.username ?? null) !== (input.username ?? null) || !!secretEnc
+  const providerChanged = !!prev && prev.provider !== input.provider
+  const storedUrl = p.id === 'hostinger' && input.mode === 'live' ? null : apiUrl
+  const changed = !prev || prev.provider !== input.provider || prev.mode !== input.mode || (prev.api_url ?? null) !== storedUrl || (prev.username ?? null) !== (input.username ?? null) || !!secretEnc
   const enabled = input.enabled === true && input.provider !== 'none'
   if (enabled && (changed || prev?.last_test_ok !== 1)) throw new RegistrarConfigError('Teste a ligação com sucesso antes de activar a integração.')
   await getPool().query(
     `INSERT INTO registrar_settings (id, provider, mode, enabled, api_url, username, secret_enc, extensions, updated_by, last_test_ok, last_test_at, last_test_message)
      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
      ON DUPLICATE KEY UPDATE provider = VALUES(provider), mode = VALUES(mode), enabled = VALUES(enabled), api_url = VALUES(api_url), username = VALUES(username),
-       secret_enc = COALESCE(?, secret_enc), extensions = VALUES(extensions), updated_by = VALUES(updated_by),
+       secret_enc = IF(?, ?, COALESCE(?, secret_enc)), extensions = VALUES(extensions), updated_by = VALUES(updated_by),
        last_test_ok = IF(?, NULL, last_test_ok), last_test_at = IF(?, NULL, last_test_at), last_test_message = IF(?, NULL, last_test_message)`,
-    [input.provider, input.mode, enabled ? 1 : 0, apiUrl, input.username || null, secretEnc ?? null, JSON.stringify(extensions), adminId,
-      secretEnc ?? null, changed ? 1 : 0, changed ? 1 : 0, changed ? 1 : 0],
+    [input.provider, input.mode, enabled ? 1 : 0, storedUrl, input.username || null, secretEnc ?? null, JSON.stringify(extensions), adminId,
+      // Credencial própria de cada fornecedor: mudar de fornecedor sem novo segredo apaga o anterior
+      providerChanged ? 1 : 0, secretEnc ?? null, secretEnc ?? null, changed ? 1 : 0, changed ? 1 : 0, changed ? 1 : 0],
   )
 }
 
 function build(r: any): RegistrarAdapter | null {
   if (!r || r.provider === 'none') return null
   const secret = r.secret_enc ? decryptSecret(r.secret_enc) : ''
+  if (r.provider === 'hostinger') {
+    const client = hostingerClientFor(r, secret)
+    return client ? hostingerAdapter(client) : null
+  }
   if (r.provider === 'simulado') {
     if (r.mode !== 'test' || !r.api_url) return null
     return simulatedAdapter({ baseUrl: r.api_url, secret, timeoutMs: Number(process.env.REGISTRAR_TIMEOUT_MS) || 8000 })
   }
   return null
+}
+
+function hostingerClientFor(r: any, secret: string): HostingerClient | null {
+  if (!secret) return null
+  const baseUrl = r.mode === 'live' ? HOSTINGER_API : r.api_url
+  if (!baseUrl) return null
+  return hostingerClient({ token: secret, baseUrl, timeoutMs: Number(process.env.REGISTRAR_TIMEOUT_MS) || 15000 })
+}
+
+/**
+ * Hostinger activa para um domínio (extensão autorizada, integração activa), com o cliente HTTP.
+ * Em modo «test» só no servidor de ensaio (REGISTRAR_TEST_PROVISIONING=1), como os restantes.
+ */
+export async function hostingerForDomain(domain: string): Promise<{ client: HostingerClient; mode: 'test' | 'live'; extension: string } | { error: string }> {
+  const r = await row().catch(() => null)
+  if (!r || r.provider !== 'hostinger') return { error: 'A Hostinger não é o fornecedor configurado (Integrações → Registrador).' }
+  if (!r.enabled) return { error: 'Integração com a Hostinger inactiva: teste a ligação e active-a em Integrações → Registrador.' }
+  if (r.mode === 'test' && process.env.REGISTRAR_TEST_PROVISIONING !== '1') return { error: 'Hostinger em modo de ensaio: só o servidor de ensaio executa compras simuladas.' }
+  const exts = parseExt(r.extensions).sort((a, b) => b.length - a.length)
+  const ext = exts.find(e => domain.endsWith(e) && domain.length > e.length && !domain.slice(0, -e.length).includes('.'))
+  if (!ext) return { error: 'Extensão não autorizada para a Hostinger: registo manual.' }
+  if (isManualForProvider('hostinger', ext)) return { error: `${ext} fica em registo manual até o suporte ser confirmado.` }
+  const client = hostingerClientFor(r, r.secret_enc ? decryptSecret(r.secret_enc) : '')
+  if (!client) return { error: 'Token da Hostinger não configurado.' }
+  return { client, mode: r.mode, extension: ext }
+}
+
+/** Fornecedor activo exige autorização por encomenda (Hostinger)? */
+export async function providerRequiresAuthorization(): Promise<boolean> {
+  const r = await row().catch(() => null)
+  return !!r?.enabled && !!PROVIDERS.find(p => p.id === r.provider)?.authorizePerOrder
 }
 
 /** Testa a ligação com uma operação de leitura (nunca regista nem cobra). Guarda o resultado. */

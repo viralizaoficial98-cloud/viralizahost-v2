@@ -4,6 +4,7 @@ import { getPool, type Queryable } from '@/lib/db/pool'
 import { loadWhmConfig } from '@/lib/whm/config'
 import { createAccount, getAccount } from '@/lib/whm/client'
 import { runDomainOperation } from '@/lib/registrar/operations'
+import { hostingerForDomain, providerRequiresAuthorization } from '@/lib/registrar/settings'
 
 // Activação de serviços depois do pagamento confirmado.
 // Nunca cobra: só lê a encomenda paga e cria/associa o recurso no fornecedor.
@@ -83,6 +84,13 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
       // Nameservers escolhidos para este domínio (item); encomendas antigas usam os da encomenda.
       let ns = [s.ns1, s.ns2, s.ns3, s.ns4].filter(Boolean)
       try { const it = s.item_ns ? JSON.parse(s.item_ns) : null; if (Array.isArray(it?.ns) && it.ns.length) ns = it.ns } catch { /* JSON inválido → os da encomenda */ }
+      // Fornecedor com autorização por encomenda (Hostinger): nunca compra ao aprovar o pagamento
+      if (await providerRequiresAuthorization()) {
+        const h = op === 'register' ? await hostingerForDomain(s.domain) : { error: '' }
+        return await done('manual_required', !('error' in h)
+          ? 'Aguarda autorização: use «Registar na Hostinger» (o custo é confirmado antes da compra).'
+          : `${label} manual no registrador: ${'error' in h && h.error ? h.error : 'operação sem automatização.'} Marque como activo só com a referência do registo.`)
+      }
       const r = await runDomainOperation(serviceId, op, s.domain, { years: Math.max(1, Number(s.years ?? 1)), eppEnc: s.epp_code_enc, nameservers: ns })
       if (!r.handled) return await done('manual_required', `${label} manual no registrador: extensão sem integração automática activa. Marque como activo só com a referência do registo.`)
       if (r.outcome === 'succeeded') {
@@ -184,6 +192,16 @@ async function activateDomainRecord(db: Queryable, s: any) {
   await db.query(`UPDATE domains SET registered_at = IF(status = 'pending', CURRENT_TIMESTAMP(6), registered_at), status = 'active',
     expires_at = GREATEST(COALESCE(expires_at, CURRENT_TIMESTAMP(6)), CURRENT_TIMESTAMP(6)) + INTERVAL ? YEAR, service_id = COALESCE(service_id, ?)
     WHERE profile_id = ? AND CONCAT(name, extension) = ?`, [Math.max(1, Number(s.years ?? 1)), s.id, s.profile_id, s.domain])
+}
+
+/** Registo confirmado pelo fornecedor (fluxo autorizado, ex.: Hostinger): activa serviço e domínio. */
+export async function activateFromRegistrar(serviceId: string, providerRef: string | null) {
+  const db = getPool()
+  const [s] = await rows(db, 'SELECT s.id, s.order_id, s.domain, s.profile_id, s.provisioning_status, oi.years FROM services s LEFT JOIN order_items oi ON oi.id = s.order_item_id WHERE s.id = ?', [serviceId])
+  if (!s || s.provisioning_status === 'active') return
+  await setStatus(serviceId, 'active', null, { external_ref: providerRef, next_due_date: addMonths(12 * Math.max(1, Number(s.years ?? 1))), activation_source: 'registrar' })
+  await activateDomainRecord(db, s)
+  await refreshOrderActivation(s.order_id)
 }
 
 export class ActivationError extends Error { constructor(message: string, public status = 400) { super(message) } }

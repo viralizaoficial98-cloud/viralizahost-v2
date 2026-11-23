@@ -5,7 +5,7 @@ import { ArrowLeft, CheckCircle2, Loader2, PlugZap, Save, XCircle } from 'lucide
 
 // Integrações → Registrador de domínios.
 // Sem fornecedor activo, cada extensão continua em registo manual pela equipa.
-type Provider = { id: string; label: string; testOnly?: boolean; needsUrl?: boolean; needsUser?: boolean }
+type Provider = { id: string; label: string; testOnly?: boolean; needsUrl?: boolean; needsUser?: boolean; authorizePerOrder?: boolean; manualSuffixes?: string[]; secretLabel?: string; docs?: string }
 type State = {
   settings: { provider: string; mode: 'test' | 'live'; enabled: boolean; apiUrl: string | null; username: string | null; hasSecret: boolean; extensions: string[]; lastTest: { at: string | null; ok: boolean | null; message: string | null } }
   defaultNameservers: string[]
@@ -94,13 +94,19 @@ export default function RegistrarIntegrationPage() {
           </label>
           {form.provider !== 'none' && (
             <>
-              <label className="text-sm font-semibold text-[#334155] sm:col-span-2">Endereço da API
-                <input className={input} value={form.apiUrl} onChange={e => setForm(f => ({ ...f, apiUrl: e.target.value }))} placeholder="https://…" data-testid="registrar-url" />
-              </label>
-              <label className="text-sm font-semibold text-[#334155]">Utilizador / ID de revendedor
-                <input className={input} value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} autoComplete="off" />
-              </label>
-              <label className="text-sm font-semibold text-[#334155]">Chave da API
+              {form.provider === 'hostinger' && form.mode === 'live' ? (
+                <p className="text-sm text-[#334155] sm:col-span-2">API oficial: <code>https://developers.hostinger.com</code> (fixo em produção).</p>
+              ) : (
+                <label className="text-sm font-semibold text-[#334155] sm:col-span-2">Endereço da API{form.provider === 'hostinger' ? ' simulada (só ensaio)' : ''}
+                  <input className={input} value={form.apiUrl} onChange={e => setForm(f => ({ ...f, apiUrl: e.target.value }))} placeholder="https://…" data-testid="registrar-url" />
+                </label>
+              )}
+              {form.provider !== 'hostinger' && (
+                <label className="text-sm font-semibold text-[#334155]">Utilizador / ID de revendedor
+                  <input className={input} value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} autoComplete="off" />
+                </label>
+              )}
+              <label className="text-sm font-semibold text-[#334155]">{provider?.secretLabel ?? 'Chave da API'}
                 <input className={input} type="password" value={form.secret} onChange={e => setForm(f => ({ ...f, secret: e.target.value }))} autoComplete="new-password"
                   placeholder={st.settings.hasSecret ? 'Guardada — deixe em branco para manter' : 'Cole a chave'} data-testid="registrar-secret" />
               </label>
@@ -112,13 +118,18 @@ export default function RegistrarIntegrationPage() {
           <div>
             <p className="text-sm font-semibold text-[#334155] mb-2">Extensões com registo automático</p>
             <div className="flex flex-wrap gap-2">
-              {st.extensions.map(e => (
-                <label key={e.extension} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-sm cursor-pointer ${form.extensions.includes(e.extension) ? 'border-[#F5B700] bg-[#FFF8E1]' : 'border-[#E5E7EB]'}`}>
-                  <input type="checkbox" checked={form.extensions.includes(e.extension)} onChange={() => toggleExt(e.extension)} data-testid={`registrar-ext-${e.extension}`} />
-                  {e.extension}{!e.onSale && <span className="text-[10px] text-[#94A3B8]">(fora de venda)</span>}
-                </label>
-              ))}
+              {st.extensions.map(e => {
+                const manual = (provider?.manualSuffixes ?? []).some(x => e.extension === x || e.extension.endsWith(x))
+                return (
+                  <label key={e.extension} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-sm ${manual ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} ${form.extensions.includes(e.extension) ? 'border-[#F5B700] bg-[#FFF8E1]' : 'border-[#E5E7EB]'}`}
+                    title={manual ? 'Registo manual até o suporte ser confirmado na API e na conta' : undefined}>
+                    <input type="checkbox" disabled={manual} checked={form.extensions.includes(e.extension)} onChange={() => toggleExt(e.extension)} data-testid={`registrar-ext-${e.extension}`} />
+                    {e.extension}{manual ? <span className="text-[10px] text-[#94A3B8]">(manual)</span> : !e.onSale && <span className="text-[10px] text-[#94A3B8]">(fora de venda)</span>}
+                  </label>
+                )
+              })}
             </div>
+            {provider?.authorizePerOrder && <p className="text-xs text-[#1D4ED8] mt-2" data-testid="registrar-authorize-note">Com a Hostinger nada é comprado automaticamente: cada registo é autorizado por um administrador em Encomendas → «Registar na Hostinger», depois de ver o custo. O pagamento usa o método predefinido da conta Hostinger (o cartão fica na Hostinger; a ViralizaHost não o guarda nem o pede). .ao e .co.ao ficam em registo manual.</p>}
             <p className="text-xs text-[#64748B] mt-2">Seleccione só as extensões que o fornecedor contratado aceita por API (consulta e registo). As restantes ficam «A confirmar pela equipa» e são registadas à mão.</p>
           </div>
         )}

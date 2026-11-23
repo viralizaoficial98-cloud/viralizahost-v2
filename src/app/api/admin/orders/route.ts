@@ -3,6 +3,8 @@ import { createAdminWriteClient, createServiceClient } from '@/lib/supabase/serv
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { getPool } from '@/lib/db/pool'
 import { confirmPayment, rejectProof, resolveDomainAvailability, PaymentError } from '@/lib/commerce/payments'
+import { operationsByService } from '@/lib/registrar/hostinger-flow'
+import { loadRegistrarSettings } from '@/lib/registrar/settings'
 import { ActivationError, markServiceActive, provisionOrder, provisionService, refreshOrderActivation } from '@/lib/commerce/provisioning'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +27,9 @@ export async function GET() {
     ids.length ? db.from('invoices').select('id, order_id, invoice_number, status, total, amount_paid').in('order_id', ids) : { data: [] },
     ids.length ? db.from('payments').select('id, order_id, invoice_id, status, amount, currency, proof_url, transfer_ref, created_at, paid_at, reviewed_by').in('order_id', ids).order('created_at', { ascending: false }) : { data: [] },
   ])
+  const ops = await operationsByService((services ?? []).filter((s: any) => s.service_type === 'domain').map((s: any) => s.id)).catch(() => ({} as Record<string, any>))
+  const reg = await loadRegistrarSettings().catch(() => null)
+  const registrar = reg ? { provider: reg.provider, enabled: reg.enabled, mode: reg.mode, extensions: reg.extensions } : null
   const storage = createServiceClient().storage.from('payment-proofs')
   const out = await Promise.all((orders ?? []).map(async (o: any) => {
     const pays = (payments ?? []).filter((p: any) => p.order_id === o.id)
@@ -33,13 +38,13 @@ export async function GET() {
     return {
       ...o,
       profiles: (profiles ?? []).find((p: any) => p.id === o.user_id) ?? null,
-      services: (services ?? []).filter((s: any) => s.order_id === o.id),
+      services: (services ?? []).filter((s: any) => s.order_id === o.id).map((s: any) => ({ ...s, registrar_op: (ops as any)[s.id] ?? null })),
       invoice: (invoices ?? []).find((i: any) => i.order_id === o.id) ?? null,
       payments: pays.map((p: any) => ({ ...p, proof_url: undefined, has_proof: !!p.proof_url })),
       proof_url: signed,
     }
   }))
-  return NextResponse.json({ orders: out })
+  return NextResponse.json({ orders: out, registrar })
 }
 
 // Acções do administrador. Nenhuma acção de activação cobra o cliente.

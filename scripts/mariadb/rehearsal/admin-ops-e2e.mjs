@@ -291,7 +291,7 @@ try {
   ok(Object.values(p.cats).every(c => typeof c.count === 'number' && !c.error), 'todas as categorias carregadas (sem «falha ao carregar»)')
 } finally {
   // Repor integrações como estavam
-  if (regBefore) await db.query('UPDATE registrar_settings SET provider = ?, mode = ?, enabled = ?, api_url = ?, username = ?, secret_enc = ?, extensions = ? WHERE id = 1', [regBefore.provider, regBefore.mode, regBefore.enabled, regBefore.api_url, regBefore.username, regBefore.secret_enc, regBefore.extensions])
+  if (regBefore) await db.query('UPDATE registrar_settings SET provider = ?, mode = ?, enabled = ?, api_url = ?, username = ?, secret_enc = ?, extensions = ? WHERE id = 1', [regBefore.provider, regBefore.mode, regBefore.enabled, regBefore.api_url, regBefore.username, regBefore.secret_enc, typeof regBefore.extensions === 'string' ? regBefore.extensions : JSON.stringify(regBefore.extensions ?? [])])
   else await db.query('DELETE FROM registrar_settings WHERE id = 1')
   for (const pr of prodBefore) await db.query('UPDATE products SET provisioning = ?, whm_package = ?, whm_server_id = ? WHERE id = ?', [pr.provisioning, pr.whm_package, pr.whm_server_id, pr.id])
   await db.end()
