@@ -2072,6 +2072,51 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
+  "order_domain_events": {
+    "pk": [
+      "id"
+    ],
+    "unique": [],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "order_id": {
+        "kind": "uuid"
+      },
+      "order_item_id": {
+        "kind": "uuid"
+      },
+      "action": {
+        "kind": "text"
+      },
+      "domain": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "proposed_domain": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "note": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "admin_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      }
+    },
+    "relations": []
+  },
   "order_items": {
     "pk": [
       "id"
@@ -2179,6 +2224,21 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "nameservers": {
         "kind": "json",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "domain_case": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "domain_case_note": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "proposed_domain": {
+        "kind": "text",
         "hasDefault": true,
         "nullable": true
       }

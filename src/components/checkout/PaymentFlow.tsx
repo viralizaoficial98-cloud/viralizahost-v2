@@ -2,7 +2,9 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Check, CheckCircle2, ChevronRight, Copy, Loader2, Lock, ShoppingCart, Upload } from 'lucide-react'
+import { AlertCircle, Check, CheckCircle2, ChevronRight, Clock, Loader2, Lock, ShoppingCart, Upload } from 'lucide-react'
+import { BankTransferCard } from '@/components/billing/BankTransferCard'
+import type { BankDetails } from '@/lib/billing/bank-details'
 import { useCart, toApiLine } from '@/store/cartStore'
 import { createAuthClient } from '@/lib/supabase/client'
 import { PurchaseSteps, Summary, btnGhost, btnPrimary, card, discountOf, input, kz, periodOf, renewalOf, useCartHydrated, useQuote } from './shared'
@@ -11,7 +13,7 @@ import { PurchaseSteps, Summary, btnGhost, btnPrimary, card, discountOf, input, 
 // transferência e a revisão do checkout anterior. Antes de criar a encomenda, o servidor volta a
 // calcular preços, períodos e disponibilidade; a chave de idempotência impede encomendas duplicadas.
 
-interface PayMethod { id: string; label: string; available: boolean; reason?: string; requiresProof?: boolean; bank?: Record<string, string | null> }
+interface PayMethod { id: string; label: string; available: boolean; reason?: string; requiresProof?: boolean; bank?: BankDetails }
 export interface CustomerSummary { email: string; name: string; phone: string; address: string; city: string; country: string; nif: string | null; company: string | null }
 
 export function PaymentFlow({ customer, verified }: { customer: CustomerSummary; verified: boolean }) {
@@ -26,7 +28,6 @@ export function PaymentFlow({ customer, verified }: { customer: CustomerSummary;
   const [transferRef, setTransferRef] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadErr, setUploadErr] = useState('')
-  const [copied, setCopied] = useState('')
   const [accepted, setAccepted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -37,6 +38,7 @@ export function PaymentFlow({ customer, verified }: { customer: CustomerSummary;
   // Carrinho vazio neste navegador: dá tempo à recuperação do carrinho guardado na conta
   useEffect(() => { const t = setTimeout(() => setWaited(true), 2500); return () => clearTimeout(t) }, [])
 
+  // Domínios a confirmar pela equipa (ex.: .ao): o cliente pode pagar já; o registo espera pela confirmação
   const held = !!quote?.needsConfirmation
   const bank = methods?.find(m => m.id === 'bank_transfer')?.bank
 
@@ -59,7 +61,7 @@ export function PaymentFlow({ customer, verified }: { customer: CustomerSummary;
     try {
       const res = await fetch('/api/checkout/orders', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idempotencyKey, lines: cart.lines.map(toApiLine), acceptedTotal: quote.total, paymentMethod: method, proofFile: held ? null : proof?.path ?? null, transferRef: transferRef || null }),
+        body: JSON.stringify({ idempotencyKey, lines: cart.lines.map(toApiLine), acceptedTotal: quote.total, paymentMethod: method, proofFile: proof?.path ?? null, transferRef: transferRef || null }),
       })
       const j = await res.json()
       if ((res.status === 401 || j.code === 'customer_incomplete') && j.next) { router.push(j.next); return }
@@ -105,8 +107,9 @@ export function PaymentFlow({ customer, verified }: { customer: CustomerSummary;
             <section className={card} aria-labelledby="pay-title">
               <h1 id="pay-title" className="text-2xl font-black text-[#0A0A0A] mb-5">Pagamento</h1>
               {held && (
-                <p className="mb-5 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3" data-testid="pay-after-confirmation">
-                  Ainda não pague: há domínios a confirmar pela equipa. A encomenda fica registada sem cobrança; depois da confirmação, a factura fica disponível na Área do Cliente para pagar e enviar o comprovativo.
+                <p className="mb-5 text-sm text-[#1E3A5F] bg-[#F0F6FF] border border-[#CFE0F7] rounded-xl p-3 flex gap-2" data-testid="domain-confirm-note">
+                  <Clock size={16} className="shrink-0 mt-0.5 text-[#2563EB]" />
+                  <span>Pode pagar agora. A nossa equipa vai confirmar a disponibilidade do domínio antes de o registar.</span>
                 </p>
               )}
               {!methods ? <Loader2 className="animate-spin text-[#F5B700]" /> : (
@@ -120,19 +123,13 @@ export function PaymentFlow({ customer, verified }: { customer: CustomerSummary;
                   ))}
                 </div>
               )}
-              {method === 'bank_transfer' && bank && !held && (
-                <div className="bg-[#FAFAFA] border border-[#E8E8E8] rounded-xl p-4 sm:p-5 space-y-3 mb-6">
-                  <p className="text-sm font-bold">Dados para transferência — {bank.bank_name}</p>
-                  {[['Titular', bank.account_holder], ['Conta / Coordenada', bank.account_number], ['IBAN', bank.iban], ['SWIFT', bank.swift]].filter(([, v]) => v).map(([k, v]) => (
-                    <div key={k} className="flex items-center justify-between gap-3 bg-white border border-[#EEE] rounded-lg px-3 py-2">
-                      <div className="min-w-0"><p className="text-[10px] font-black text-[#999] uppercase tracking-widest">{k}</p><p className="text-sm font-bold font-mono break-all">{v}</p></div>
-                      <button className="text-[#888] hover:text-[#0A0A0A] p-1" aria-label={`Copiar ${k}`} onClick={() => { navigator.clipboard?.writeText(String(v)); setCopied(String(k)); setTimeout(() => setCopied(''), 1500) }}>{copied === k ? <Check size={14} /> : <Copy size={14} />}</button>
-                    </div>
-                  ))}
-                  {bank.payment_instructions && <p className="text-xs text-[#666]">{bank.payment_instructions}</p>}
-                  <p className="text-xs text-[#888]">A encomenda fica pendente até validarmos o comprovativo. Pode enviá-lo agora ou depois, na Área do Cliente.</p>
-                  <input className={input} placeholder="Referência da transferência (opcional)" value={transferRef} onChange={e => setTransferRef(e.target.value)} />
-                  <button className={`${btnGhost} w-full border-dashed`} onClick={() => fileRef.current?.click()} disabled={uploading}>
+              {method === 'bank_transfer' && bank && (
+                <div className="space-y-3 mb-6">
+                  <BankTransferCard bank={bank} />
+                  {bank.instructions && <p className="text-xs text-[#666]">{bank.instructions}</p>}
+                  <p className="text-xs text-[#888]">Depois de confirmar, a encomenda mostra o montante e a referência a indicar na transferência. Pode enviar o comprovativo agora ou depois, na Área do Cliente; o pagamento fica «Por validar» até a equipa o confirmar.</p>
+                  <input className={input} placeholder="Referência da transferência (opcional)" value={transferRef} onChange={e => setTransferRef(e.target.value)} aria-label="Referência da transferência (opcional)" />
+                  <button className={`${btnGhost} w-full border-dashed`} onClick={() => fileRef.current?.click()} disabled={uploading} data-testid="upload-proof">
                     {uploading ? <Loader2 size={14} className="animate-spin" /> : proof ? <Check size={14} className="text-green-600" /> : <Upload size={14} />}{proof ? `Comprovativo: ${proof.name}` : 'Enviar comprovativo (imagem/PDF)'}
                   </button>
                   <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={upload} />
@@ -164,8 +161,8 @@ export function PaymentFlow({ customer, verified }: { customer: CustomerSummary;
                   <div className="text-sm space-y-1 mb-4">
                     <div className="flex justify-between"><span className="text-[#888]">Subtotal</span><span>{kz(quote.subtotal)}</span></div>
                     {quote.taxRate > 0 && <div className="flex justify-between"><span className="text-[#888]">{quote.taxLabel} ({quote.taxRate}%)</span><span>{kz(quote.tax)}</span></div>}
-                    <div className="flex justify-between text-lg font-black"><span>{held ? 'Total (a pagar depois da confirmação)' : 'Total a pagar'}</span><span data-testid="review-total">{kz(quote.total)}</span></div>
-                    <p className="text-xs text-[#888]">{held ? 'Sem cobrança agora: a equipa confirma primeiro a disponibilidade dos domínios.' : `Pagamento por transferência bancária${proof ? ' (comprovativo enviado)' : ' (comprovativo a enviar)'}. Os serviços são activados depois de confirmarmos o pagamento.`}</p>
+                    <div className="flex justify-between text-lg font-black"><span>Total a pagar</span><span data-testid="review-total">{kz(quote.total)}</span></div>
+                    <p className="text-xs text-[#888]">{`Pagamento por transferência bancária${proof ? ' (comprovativo enviado)' : ' (comprovativo a enviar)'}. Os serviços são activados depois de confirmarmos o pagamento.`}{held ? ' A nossa equipa vai confirmar a disponibilidade do domínio antes de o registar.' : ''}</p>
                   </div>
                   <label className="flex items-start gap-2 text-sm mb-4">
                     <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} className="mt-1" data-testid="accept-terms" />
@@ -177,7 +174,7 @@ export function PaymentFlow({ customer, verified }: { customer: CustomerSummary;
               <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2">
                 <button className={btnGhost} onClick={() => setStage('pay')} disabled={submitting}>Voltar</button>
                 <button className={btnPrimary} disabled={!accepted || submitting || !quote?.valid} onClick={submit} data-testid="confirm-order">
-                  {submitting ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />} {held ? 'Registar encomenda' : 'Confirmar encomenda'}
+                  {submitting ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />} Confirmar encomenda
                 </button>
               </div>
             </section>

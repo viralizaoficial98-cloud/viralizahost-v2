@@ -95,10 +95,10 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
     const ns = nsLine?.nameservers?.ns ?? input.nameservers?.ns ?? []
     const useDefaultNs = nsLine?.nameservers ? nsLine.nameservers.useDefault : input.nameservers?.useDefault !== false
     const cycle = quote.lines.find(l => l.cycle)?.cycle ?? '1year'
+    // Domínios a confirmar pela equipa (ex.: .ao sem consulta automática): o pagamento é aceite já. A marca
+    // hold_reason 'domain_confirmation' só indica que a disponibilidade ainda está por confirmar — o registo do
+    // domínio (e os serviços que dependem dele) espera por essa confirmação, a cobrança não.
     const held = quote.needsConfirmation
-    if (held && input.proofFile) {
-      throw new OrderError('payment_after_confirmation', 'Há domínios a confirmar pela equipa: o pagamento só é pedido depois dessa confirmação.', 409, { quote })
-    }
     const hasProof = !!input.proofFile
 
     await conn.query(
@@ -154,7 +154,7 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
       `INSERT INTO invoices (id, profile_id, order_id, invoice_number, status, currency, subtotal, discount, tax, total, amount_paid,
          due_date, issue_date, notes, proof_file, items)
        VALUES (?, ?, ?, ?, ?, 'AKZ', ?, 0, ?, ?, 0, CURRENT_DATE + INTERVAL 7 DAY, CURRENT_DATE, ?, ?, ?)`,
-      [invoiceId, input.userId, orderId, invoiceNumber, held ? 'draft' : hasProof ? 'under_review' : 'pending', quote.subtotal, quote.tax, quote.total,
+      [invoiceId, input.userId, orderId, invoiceNumber, hasProof ? 'under_review' : 'pending', quote.subtotal, quote.tax, quote.total,
         `Encomenda ${orderNumber}`, input.proofFile ?? null, JSON.stringify(invoiceItems)],
     )
     for (const [pos, it] of invoiceItems.entries()) {

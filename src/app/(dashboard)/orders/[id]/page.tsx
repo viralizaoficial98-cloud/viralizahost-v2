@@ -2,7 +2,9 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { CheckCircle2, Clock, FileText, LifeBuoy } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { ACTIVATION_STATUS, PAYMENT_STATUS, TONE_CLASS, kz } from '@/lib/commerce/status'
+import { PAYMENT_STATUS, TONE_CLASS, activationState, domainState, kz } from '@/lib/commerce/status'
+import { BankTransferCard } from '@/components/billing/BankTransferCard'
+import { loadBankDetails } from '@/lib/billing/load-bank-details'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Encomenda' }
@@ -21,15 +23,23 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   if (!user) redirect('/login')
   // Propriedade: a política de orders só devolve encomendas do próprio cliente
   const { data: order } = await db.from('orders')
-    .select('id, order_number, created_at, amount, subtotal, tax_amount, tax_rate, payment_status, activation_status, hold_reason, status, payment_method, order_items(id, service_name, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, availability)')
+    .select('id, order_number, created_at, amount, subtotal, tax_amount, tax_rate, payment_status, activation_status, hold_reason, status, payment_method, order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, domain_case, proposed_domain)')
     .eq('id', id).eq('user_id', user.id).maybeSingle()
   if (!order) notFound()
-  const [{ data: invoice }, { data: services }] = await Promise.all([
+  const [{ data: invoice }, { data: services }, bank] = await Promise.all([
     db.from('invoices').select('id, invoice_number, status, total, due_date').eq('order_id', id).maybeSingle(),
     db.from('services').select('id, order_item_id, service_name, service_type, provisioning_status, domain, next_due_date').eq('order_id', id),
+    loadBankDetails(),
   ])
   const p = PAYMENT_STATUS[order.payment_status] ?? PAYMENT_STATUS.unpaid
-  const a = ACTIVATION_STATUS[order.activation_status] ?? ACTIVATION_STATUS.pending
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const domainItems = (order.order_items ?? []).filter((i: any) => i.availability != null && i.domain_name)
+  const pendingDomains = domainItems.filter((i: any) => i.availability === 'confirm').map((i: any) => i.domain_name)
+  const reviewItems = domainItems.filter((i: any) => ['manual_review', 'alternative', 'refund_manual'].includes(i.domain_case))
+  const legacyHeld = order.hold_reason === 'domain_confirmation' && invoice?.status === 'draft'
+  const canPay = (order.payment_status === 'unpaid' || order.payment_status === 'failed') && order.status !== 'cancelled' && !legacyHeld && invoice && invoice.status !== 'cancelled'
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+  const a = activationState(order, domainItems)
   const box = 'rounded-2xl border border-[#E5E7EB] bg-white shadow-sm p-5'
   return (
     <div className="max-w-4xl space-y-5">
@@ -52,17 +62,37 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
 
       <div className={box}>
         <p className="text-xs font-black text-[#64748B] uppercase tracking-widest mb-3">Próximos passos</p>
-        {order.hold_reason === 'domain_confirmation' ? (
-          <p className="text-sm text-[#334155] flex gap-2" data-testid="order-held"><Clock size={16} className="text-amber-600 shrink-0" />Ainda não pague. A equipa está a confirmar a disponibilidade de {(order.order_items ?? []).filter((i: any) => i.availability === 'confirm').map((i: any) => i.domain_name).join(', ') /* eslint-disable-line @typescript-eslint/no-explicit-any */}. Quando estiver confirmado, a factura fica disponível aqui e pode pagar.</p>
-        ) : order.hold_reason === 'domain_unavailable' ? (
-          <p className="text-sm text-red-700 flex gap-2" data-testid="order-cancelled-domain"><Clock size={16} className="shrink-0" />O domínio pedido já não está livre, por isso a encomenda foi cancelada sem qualquer cobrança. Pode fazer uma nova encomenda com outro domínio.</p>
-        ) : order.payment_status === 'unpaid' || order.payment_status === 'failed' ? (
-          <p className="text-sm text-[#334155] flex gap-2"><Clock size={16} className="text-amber-600 shrink-0" />
-            {order.payment_status === 'failed' ? 'O comprovativo foi recusado. ' : ''}Faça a transferência de <strong className="text-[#0B0B0D] mx-1">{kz(order.amount)}</strong> e envie o comprovativo na factura{invoice ? <Link href={`/billing/invoices/${invoice.id}`} className="underline text-[#B45309] ml-1">{invoice.invoice_number}</Link> : null}.</p>
-        ) : order.payment_status === 'proof_submitted' ? (
-          <p className="text-sm text-[#334155] flex gap-2"><Clock size={16} className="text-amber-600 shrink-0" />Recebemos o comprovativo. A validação é feita pela equipa; recebe a confirmação na Área do Cliente.</p>
+        {order.hold_reason === 'domain_unavailable' ? (
+          <p className="text-sm text-red-700 flex gap-2" data-testid="order-cancelled-domain"><Clock size={16} className="shrink-0" />O domínio pedido já não está livre, por isso a encomenda foi cancelada sem qualquer cobrança. Pode fazer uma nova encomenda com outro nome.</p>
+        ) : legacyHeld ? (
+          <p className="text-sm text-[#334155] flex gap-2" data-testid="order-held"><Clock size={16} className="text-amber-600 shrink-0" />A equipa está a confirmar a disponibilidade de {pendingDomains.join(', ')}. A factura desta encomenda fica disponível para pagamento depois dessa confirmação.</p>
         ) : (
-          <p className="text-sm text-[#334155] flex gap-2"><CheckCircle2 size={16} className="text-green-600 shrink-0" />Pagamento confirmado. Acompanhe a activação de cada serviço abaixo.</p>
+          <div className="space-y-3">
+            {reviewItems.map((it: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+              <div key={it.id} className="text-sm rounded-xl border border-red-200 bg-red-50 p-3 text-[#7F1D1D]" data-testid="order-domain-review">
+                <p className="font-bold">O domínio {it.domain_name} não está disponível.</p>
+                {it.domain_case === 'alternative' && it.proposed_domain
+                  ? <p className="mt-1" data-testid="order-domain-proposal">A nossa equipa propõe <strong>{it.proposed_domain}</strong>, sem custo adicional. Responda num pedido de suporte para aceitar ou pedir o reembolso.</p>
+                  : it.domain_case === 'refund_manual'
+                    ? <p className="mt-1">O reembolso está a ser tratado pela nossa equipa. Recebe a confirmação na Área do Cliente.</p>
+                    : <p className="mt-1">O seu pagamento está registado. A nossa equipa vai contactá-lo para propor outro domínio ou tratar o reembolso.</p>}
+              </div>
+            ))}
+            {pendingDomains.length > 0 && (
+              <p className="text-sm text-[#1E3A5F] flex gap-2" data-testid="order-domain-confirm"><Clock size={16} className="text-[#2563EB] shrink-0" />{order.payment_status === 'paid' ? `Pagamento confirmado. A nossa equipa vai confirmar a disponibilidade de ${pendingDomains.join(', ')} antes de o registar.` : 'Pode pagar agora. A nossa equipa vai confirmar a disponibilidade do domínio antes de o registar.'}</p>
+            )}
+            {canPay ? (
+              <>
+                <p className="text-sm text-[#334155] flex gap-2"><Clock size={16} className="text-amber-600 shrink-0" />
+                  {order.payment_status === 'failed' ? 'O comprovativo foi recusado. ' : ''}Faça a transferência de <strong className="text-[#0B0B0D] mx-1">{kz(order.amount)}</strong> com a referência <strong className="text-[#0B0B0D] mx-1">{order.order_number}</strong> e envie o comprovativo na factura{invoice ? <Link href={`/billing/invoices/${invoice.id}`} className="underline ml-1">{invoice.invoice_number}</Link> : ''}.</p>
+                {order.payment_method === 'bank_transfer' && <BankTransferCard bank={bank} amount={kz(order.amount)} reference={order.order_number} className="max-w-xl" />}
+              </>
+            ) : order.payment_status === 'proof_submitted' ? (
+              <p className="text-sm text-[#334155] flex gap-2" data-testid="order-proof-pending"><Clock size={16} className="text-amber-600 shrink-0" />Recebemos o comprovativo: está por validar pela equipa. Recebe a confirmação na Área do Cliente.</p>
+            ) : order.payment_status === 'paid' && !reviewItems.length && !pendingDomains.length ? (
+              <p className="text-sm text-[#334155] flex gap-2"><CheckCircle2 size={16} className="text-green-600 shrink-0" />Pagamento confirmado. Acompanhe a activação de cada serviço abaixo.</p>
+            ) : null}
+          </div>
         )}
       </div>
 
@@ -76,6 +106,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
                 <div>
                   <p className="text-[#0B0B0D] font-bold">{it.service_name}{it.quantity > 1 ? ` × ${it.quantity}` : ''}</p>
                   {it.domain_name && <p className="text-xs text-[#64748B]">{it.domain_name}</p>}
+                  {it.availability != null && (() => { const d = domainState(it, svc); return <p className="mt-1"><span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${TONE_CLASS[d.tone]}`} data-testid="order-domain-state">Domínio: {d.label}</span></p> })()}
                   <p className="text-xs text-[#64748B]">Renova por {kz(it.renewal_price)} / {CYCLE[it.billing_cycle] ?? 'ano'}</p>
                   {svc && <p className="text-xs mt-1 text-amber-700">{SERVICE_STATUS[svc.provisioning_status] ?? svc.provisioning_status}</p>}
                 </div>

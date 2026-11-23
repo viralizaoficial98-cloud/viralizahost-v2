@@ -44,7 +44,7 @@ function Line({ l, q, onRemove }: { l: CartLine; q?: QuoteLine; onRemove: () => 
               {q.error.code === 'on_request' && <Link href="/suporte/contactar" className="underline ml-1">Contactar</Link>}</p>
           )}
           {q?.availability?.status === 'confirm' && (
-            <p className="text-xs text-amber-800 mt-2 flex gap-1" data-testid="line-confirm"><Clock size={13} className="shrink-0 mt-0.5" /> A confirmar pela equipa: a encomenda fica registada e só paga depois de confirmarmos que o domínio está livre.</p>
+            <p className="text-xs text-amber-800 mt-2 flex gap-1" data-testid="line-confirm"><Clock size={13} className="shrink-0 mt-0.5" /> A confirmar pela equipa. Pode pagar agora: a nossa equipa vai confirmar a disponibilidade do domínio antes de o registar.</p>
           )}
 
           {l.type === 'domain' && l.operation === 'register' && (

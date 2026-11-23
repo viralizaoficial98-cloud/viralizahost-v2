@@ -49,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (!invoice) return NextResponse.json({ error: 'Fatura não encontrada.' }, { status: 404 })
   if ((invoice as { status?: string }).status === 'draft') {
-    return NextResponse.json({ error: 'Ainda não pague: a equipa está a confirmar a disponibilidade do domínio. Avisamos quando puder pagar.' }, { status: 409 })
+    return NextResponse.json({ error: 'Esta factura (de uma encomenda anterior) ainda aguarda a confirmação do domínio pela equipa. Avisamos quando estiver disponível para pagamento.' }, { status: 409 })
   }
 
   // Validate payment belongs to this user + invoice
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .update({ status: 'under_review', updated_at: new Date().toISOString() })
     .eq('id', invoiceId)
 
-  // A encomenda associada passa a «comprovativo em análise» (o pagamento só é
+  // A encomenda associada passa a «comprovativo por validar» (o pagamento só é
   // confirmado pelo administrador ou por notificação assinada do gateway)
   if ((invoice as any).order_id) {
     await db.from('orders').update({ payment_status: 'proof_submitted' }).eq('id', (invoice as any).order_id).neq('payment_status', 'paid')

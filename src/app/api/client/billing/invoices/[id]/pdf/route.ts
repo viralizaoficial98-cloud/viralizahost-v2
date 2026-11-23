@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadBankDetails } from '@/lib/billing/load-bank-details'
 import { createAuthClient, createAdminWriteClient } from '@/lib/supabase/server'
 import { renderToBuffer, DocumentProps } from '@react-pdf/renderer'
 import { InvoicePDF } from '@/lib/pdf/invoice-pdf'
@@ -15,10 +16,10 @@ const DEFAULT_BILLING = {
   website:             'www.viralizahost.com',
   phone:               '+244 951 008 653',
   address:             'Angola',
-  bank_name:           'BIC — Banco BIC Angola',
-  account_holder:      'VIRALIZA FÁCIL ANGOLA, LDA',
-  account_number:      '005100002477517910141',
-  iban:                null,
+  bank_name:           null as string | null,
+  account_holder:      null as string | null,
+  account_number:      null as string | null,
+  iban:                null as string | null,
   swift:               null,
   payment_instructions: null,
   footer_text:         'ViralizaHost · suporte@viralizahost.com · www.viralizahost.com',
@@ -86,7 +87,10 @@ export async function GET(
     .limit(1)
     .maybeSingle()
 
-  const billing = billingSettings ? { ...DEFAULT_BILLING, ...billingSettings } : DEFAULT_BILLING
+  // Dados bancários: a mesma fonte do checkout e da Área do Cliente (lib/billing)
+  const bank = await loadBankDetails()
+  const billing = { ...DEFAULT_BILLING, ...(billingSettings ?? {}),
+    bank_name: bank.bank, account_holder: bank.holder, iban: bank.iban, account_number: bank.accountNumber, swift: bank.swift, payment_instructions: bank.instructions ?? (billingSettings as { payment_instructions?: string | null } | null)?.payment_instructions ?? null }
 
   // Load order for domain/cycle info
   const { data: order } = inv.order_id

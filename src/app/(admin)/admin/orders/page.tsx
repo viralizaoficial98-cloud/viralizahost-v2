@@ -3,7 +3,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check, ExternalLink, FlaskConical, Loader2, RefreshCw, RotateCcw, X } from 'lucide-react'
 import { HostingerRegisterDialog } from '@/components/admin/HostingerRegisterDialog'
-import { ACTIVATION_STATUS, PAYMENT_STATUS, TONE_CLASS, kz } from '@/lib/commerce/status'
+import { PAYMENT_STATUS, TONE_CLASS, activationState, domainState, kz } from '@/lib/commerce/status'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Service = { id: string; order_item_id: string; service_name: string; service_type: string; provisioning_status: string; provisioning_error: string | null; provisioning_attempts: number; external_ref: string | null; domain: string | null; activation_source: string | null
@@ -15,21 +15,29 @@ type Order = {
   review_flag: 'test' | 'real' | null; review_note: string | null
   amount: number; currency: string | null; payment_method: string | null; transfer_ref: string | null; proof_url: string | null
   profiles: { full_name: string; email: string; role: string } | null
-  order_items: { id: string; service_name: string; quantity: number; line_total: number | null; unit_price: number | null; renewal_price: number | null; billing_cycle: string | null; domain_name: string | null; domain_operation: string | null; availability?: string | null; years?: number | null; nameservers?: unknown }[]
+  order_items: { id: string; service_name: string; quantity: number; line_total: number | null; unit_price: number | null; renewal_price: number | null; billing_cycle: string | null; domain_case?: string | null; domain_case_note?: string | null; proposed_domain?: string | null; domain_name: string | null; domain_operation: string | null; availability?: string | null; years?: number | null; nameservers?: unknown }[]
   services: Service[]; invoice: { invoice_number: string; status: string } | null
   payments: { id: string; status: string; amount: number; currency: string; paid_at: string | null; created_at: string }[]
+  domain_events?: { order_item_id: string; action: string; domain: string | null; proposed_domain: string | null; note: string | null; created_at: string; admin_name: string | null }[]
 }
 
 // Filtros com nome na URL (?filtro=…) para que o dashboard e os favoritos levem à lista certa.
 const FILTERS = {
   'por-pagar': { label: 'Por pagar / validar', test: (o: Order) => o.status !== 'rejected' && o.status !== 'cancelled' && o.payment_status !== 'paid' },
   comprovativos: { label: 'Comprovativos por validar', test: (o: Order) => o.payment_status === 'proof_submitted' && !['rejected', 'cancelled'].includes(o.status) },
-  dominios: { label: 'Domínios a confirmar', test: (o: Order) => !['rejected', 'cancelled'].includes(o.status) && o.order_items.some(i => i.availability === 'confirm') },
+  dominios: { label: 'Domínios a confirmar / em tratamento', test: (o: Order) => !['rejected', 'cancelled'].includes(o.status) && o.order_items.some(i => i.availability === 'confirm' || ['manual_review', 'alternative', 'refund_manual'].includes(i.domain_case ?? '')) },
   activacao: { label: 'Activação pendente', test: (o: Order) => o.payment_status === 'paid' && o.services.some(s => ['pending', 'manual_required', 'failed'].includes(s.provisioning_status)) },
   concluidas: { label: 'Concluídas', test: (o: Order) => o.activation_status === 'active' || ['rejected', 'cancelled'].includes(o.status) },
   todas: { label: 'Todas', test: () => true },
 } as const
 type Filter = keyof typeof FILTERS
+
+const EVENT_LABEL: Record<string, string> = {
+  confirmed_available: 'Disponibilidade confirmada', unavailable_cancelled: 'Indisponível — encomenda cancelada (sem pagamento)',
+  unavailable_manual_review: 'Indisponível após pagamento — caso manual aberto', alternative_proposed: 'Outro domínio proposto',
+  domain_replaced: 'Domínio substituído', refund_forwarded: 'Encaminhado para reembolso (manual)', case_resolved: 'Caso encerrado',
+}
+const OPEN_CASE = ['manual_review', 'alternative', 'refund_manual']
 
 // Estado do serviço (texto) — distinto dos botões de acção
 const svcLabel = (s: Service) => {
@@ -80,7 +88,7 @@ function OrdersInner() {
       if (!res.ok) setNotice({ ok: false, text: j.error ?? 'Falhou.' })
       else if (j.provisioning) {
         const counts = j.provisioning.reduce((a: any, r: any) => ({ ...a, [r.status]: (a[r.status] ?? 0) + 1 }), {})
-        const L: Record<string, string> = { active: 'activo(s)', manual_required: 'manual(is)', failed: 'falhado(s)', skipped: 'sem alteração' }
+        const L: Record<string, string> = { active: 'activo(s)', manual_required: 'manual(is)', failed: 'falhado(s)', skipped: 'em espera' }
         setNotice({ ok: true, text: `Pagamento ${j.payment === 'paid' ? 'confirmado' : 'já estava confirmado'}. Activação: ${Object.entries(counts).map(([k, v]) => `${v} ${L[k] ?? k}`).join(', ')}.` })
       } else if (j.result) setNotice({ ok: j.ok, text: `${j.result.status === 'active' ? 'Activado' : 'Não activado'}: ${j.result.message}` })
       else setNotice({ ok: true, text: 'Feito.' })
@@ -132,7 +140,7 @@ function OrdersInner() {
           <ul className="space-y-4">
             {filtered.map(o => {
               const p = PAYMENT_STATUS[o.payment_status] ?? PAYMENT_STATUS.unpaid
-              const a = ACTIVATION_STATUS[o.activation_status] ?? ACTIVATION_STATUS.pending
+              const a = activationState(o, o.order_items)
               const approved = o.payments?.find(x => x.status === 'approved')
               const staffBuyer = o.profiles?.role === 'admin'
               const focused = focus && (focus === o.order_number || focus === o.id)
@@ -149,8 +157,10 @@ function OrdersInner() {
                       {o.transfer_ref && <p className="text-xs text-[#555] mt-1">Ref. transferência: {o.transfer_ref}</p>}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${TONE_CLASS[p.tone]}`}>{p.label}</span>
-                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${TONE_CLASS[a.tone]}`}>{a.label}</span>
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${TONE_CLASS[p.tone]}`} data-testid="order-payment-state">Pagamento: {p.label}</span>
+                      {o.order_items.filter(i => i.availability != null && i.domain_name).map(i => { const d = domainState(i, o.services.find(x => x.order_item_id === i.id)); return (
+                        <span key={i.id} className={`text-xs font-bold px-2 py-1 rounded-full ${TONE_CLASS[d.tone]}`} data-testid="order-domain-state" data-state={d.key}>Domínio{o.order_items.filter(x => x.availability != null).length > 1 ? ` ${i.domain_name}` : ''}: {d.label}</span>) })}
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${TONE_CLASS[a.tone]}`}>Activação: {a.label}</span>
                       {['rejected', 'cancelled'].includes(o.status) && <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-50 text-red-700">Cancelada</span>}
                       {o.review_flag === 'test' && <span className="text-xs font-bold px-2 py-1 rounded-full bg-purple-50 text-purple-700" data-testid="flag-test">Teste (fora da receita)</span>}
                       {o.review_flag === 'real' && <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-700">Confirmada como real</span>}
@@ -175,9 +185,25 @@ function OrdersInner() {
                               {nsText(it.nameservers) && <span className="block text-[11px] text-[#666] font-mono" data-testid="item-ns">NS: {nsText(it.nameservers)}</span>}
                               {it.availability === 'confirm' && (
                                 <span className="mt-1 flex flex-wrap items-center gap-1" data-testid="domain-confirm">
-                                  <span className="text-xs font-bold text-amber-800">Disponibilidade a confirmar:</span>
-                                  <button disabled={!!acting} onClick={() => act(it.id + 'ok', { action: 'domain_availability', orderItemId: it.id, available: true }, `Confirma que ${it.domain_name} está livre? O cliente passa a poder pagar.`)} className="px-2 py-0.5 rounded bg-green-600 text-white text-xs">Livre</button>
-                                  <button disabled={!!acting} onClick={() => act(it.id + 'no', { action: 'domain_availability', orderItemId: it.id, available: false }, `${it.domain_name} está ocupado? A encomenda é cancelada sem cobrança.`)} className="px-2 py-0.5 rounded bg-red-600 text-white text-xs">Ocupado</button>
+                                  <span className="text-xs font-bold text-amber-800">A confirmar pela equipa:</span>
+                                  <button disabled={!!acting} onClick={() => act(it.id + 'ok', { action: 'domain_availability', orderItemId: it.id, available: true }, `Confirma que ${it.domain_name} está livre? ${o.payment_status === 'paid' ? 'O pagamento já está validado: o registo e os serviços dependentes seguem agora.' : 'O registo segue depois de o pagamento ser validado.'}`)} className="px-2 py-0.5 rounded bg-green-600 text-white text-xs" data-testid="domain-available">Livre</button>
+                                  <button disabled={!!acting} onClick={() => {
+                                    const charged = o.payment_status === 'paid' || o.payment_status === 'proof_submitted'
+                                    const reason = window.prompt(`${it.domain_name} está ocupado. Indique o motivo (fica no histórico).\n${charged ? 'Há pagamento/comprovativo: NÃO é cancelado nem reembolsado — abre um caso para propor outro domínio ou tratar o reembolso manualmente.' : 'Sem pagamento: a encomenda é cancelada sem cobrança.'}`)
+                                    if (reason && reason.trim().length >= 3) act(it.id + 'no', { action: 'domain_availability', orderItemId: it.id, available: false, reason: reason.trim() })
+                                    else if (reason !== null) setNotice({ ok: false, text: 'Indique o motivo (pelo menos 3 caracteres).' })
+                                  }} className="px-2 py-0.5 rounded bg-red-600 text-white text-xs" data-testid="domain-unavailable">Ocupado…</button>
+                                </span>
+                              )}
+                              {OPEN_CASE.includes(it.domain_case ?? '') && (
+                                <span className="mt-2 block rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-[#7F1D1D]" data-testid="domain-case">
+                                  <strong>Caso manual:</strong> {it.domain_case_note}{it.proposed_domain ? <> · Proposta: <strong className="font-mono">{it.proposed_domain}</strong></> : null}
+                                  <span className="mt-1.5 flex flex-wrap gap-1">
+                                    <button disabled={!!acting} onClick={() => { const d = window.prompt(`Outro domínio a propor ao cliente (mesma extensão permite substituir sem diferença de preço):`, it.proposed_domain ?? ''); if (!d) return; const note = window.prompt('Nota para o histórico (opcional):') ?? ''; act(it.id + 'pp', { action: 'domain_case', caseAction: 'propose', orderItemId: it.id, domain: d.trim(), notes: note }) }} className="px-2 py-0.5 rounded border border-[#7F1D1D]/30 bg-white" data-testid="case-propose">Propor outro domínio…</button>
+                                    {it.proposed_domain && <button disabled={!!acting} onClick={() => { if (!window.confirm(`O cliente aceitou ${it.proposed_domain}? O domínio da encomenda e dos serviços passa a ser este.`)) return; const confirmed = window.confirm(`${it.proposed_domain} já foi confirmado como livre?\nOK = sim (o registo segue) · Cancelar = fica «A confirmar pela equipa»`); const note = window.prompt('Nota para o histórico (opcional):') ?? ''; act(it.id + 'rp', { action: 'domain_case', caseAction: 'replace', orderItemId: it.id, domain: it.proposed_domain, confirmed, notes: note }) }} className="px-2 py-0.5 rounded border border-[#7F1D1D]/30 bg-white" data-testid="case-replace">Cliente aceitou: substituir…</button>}
+                                    {it.domain_case !== 'refund_manual' && <button disabled={!!acting} onClick={() => { const note = window.prompt('Encaminhar para reembolso (tratado manualmente pela equipa financeira; nada é reembolsado automaticamente). Nota:'); if (note && note.trim().length >= 3) act(it.id + 'rf', { action: 'domain_case', caseAction: 'refund', orderItemId: it.id, notes: note.trim() }) }} className="px-2 py-0.5 rounded border border-[#7F1D1D]/30 bg-white" data-testid="case-refund">Encaminhar para reembolso…</button>}
+                                    <button disabled={!!acting} onClick={() => { const note = window.prompt('Como foi resolvido? (ex.: «reembolso feito, ref. …»)'); if (note && note.trim().length >= 3) act(it.id + 'rs', { action: 'domain_case', caseAction: 'resolve', orderItemId: it.id, notes: note.trim() }) }} className="px-2 py-0.5 rounded border border-[#7F1D1D]/30 bg-white" data-testid="case-resolve">Encerrar caso…</button>
+                                  </span>
                                 </span>
                               )}
                               {it.availability === 'confirmed' && <span className="block text-xs text-green-700">Disponibilidade confirmada</span>}
@@ -201,7 +227,10 @@ function OrdersInner() {
                                   {s.provisioning_status === 'active' ? 'Hostinger…' : s.registrar_op && !['pending', 'failed'].includes(s.registrar_op.status) ? 'Hostinger: estado…' : 'Registar na Hostinger…'}
                                 </button>
                               )}
-                              {s && o.payment_status === 'paid' && s.provisioning_status !== 'active' && (
+                              {s && o.payment_status === 'paid' && s.provisioning_status !== 'active' && o.order_items.some(x => x.domain_name === s.domain && ['confirm', 'unavailable'].includes(x.availability ?? '')) && (
+                                <span className="text-[11px] text-[#64748B]" data-testid="await-domain">{o.order_items.some(x => x.domain_name === s.domain && x.availability === 'confirm') ? 'Confirme primeiro a disponibilidade do domínio.' : 'Domínio em tratamento manual.'}</span>
+                              )}
+                              {s && o.payment_status === 'paid' && s.provisioning_status !== 'active' && !o.order_items.some(x => x.domain_name === s.domain && ['confirm', 'unavailable'].includes(x.availability ?? '')) && (
                                 <span className="inline-flex gap-1">
                                   <button disabled={!!acting} onClick={() => act(s.id + 'p', { action: 'provision', serviceId: s.id }, s.service_type === 'domain' ? 'Repetir o registo automático? O estado no registrador é consultado antes de qualquer novo pedido.' : 'Repetir a activação automática? Nenhuma conta é criada em duplicado e nada é cobrado.')}
                                     className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[#E8E8E8] text-xs hover:border-[#F5B700]" data-testid="retry-activation">
@@ -218,12 +247,25 @@ function OrdersInner() {
                       })}
                     </tbody>
                   </table>
+                  {!!o.domain_events?.length && (
+                    <details className="mt-3 text-xs" data-testid="domain-history">
+                      <summary className="cursor-pointer font-bold text-[#555]">Histórico do domínio ({o.domain_events.length})</summary>
+                      <ol className="mt-2 space-y-1 border-l-2 border-[#E8E8E8] pl-3">
+                        {o.domain_events.map((e, i) => (
+                          <li key={i} data-testid="domain-event" data-action={e.action}>
+                            <span className="text-[#888]">{new Date(String(e.created_at).replace(' ', 'T').slice(0, 23) + 'Z').toLocaleString('pt-PT')}</span> · <strong>{EVENT_LABEL[e.action] ?? e.action}</strong>
+                            {e.domain ? ` — ${e.domain}` : ''}{e.proposed_domain ? ` → ${e.proposed_domain}` : ''}{e.note ? ` · «${e.note}»` : ''}{e.admin_name ? ` · ${e.admin_name}` : ''}
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
                   <div className="flex flex-wrap items-center gap-2 mt-4">
                     {o.proof_url && <a href={o.proof_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-[#2563EB] underline"><ExternalLink size={14} /> Ver comprovativo</a>}
                     {o.payment_status !== 'paid' && !['rejected', 'cancelled'].includes(o.status) && o.invoice?.status !== 'draft' && (
                       <>
-                        <button disabled={!!acting} onClick={() => act(o.id + 'a', { action: 'approve', orderId: o.id }, `Confirmar que recebeu ${kz(o.amount)} e activar os serviços?`)} className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-bold" data-testid="approve-payment">
-                          {acting === o.id + 'a' ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Confirmar pagamento
+                        <button disabled={!!acting} onClick={() => act(o.id + 'a', { action: 'approve', orderId: o.id }, `Confirmar que recebeu ${kz(o.amount)} e validar o pagamento?${o.order_items.some(i => i.availability === 'confirm') ? ' O domínio continua «A confirmar pela equipa»: o registo só segue depois dessa confirmação.' : ' Os serviços são activados.'}`)} className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-bold" data-testid="approve-payment">
+                          {acting === o.id + 'a' ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} {o.payment_status === 'proof_submitted' ? 'Validar pagamento' : 'Confirmar pagamento'}
                         </button>
                         {o.payment_status === 'proof_submitted' && (
                           <button disabled={!!acting} onClick={() => { const reason = window.prompt('Motivo da rejeição do comprovativo:'); if (reason) act(o.id + 'r', { action: 'reject_proof', orderId: o.id, reason }) }} className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-red-300 text-red-700 text-sm font-bold" data-testid="reject-proof">
@@ -233,7 +275,7 @@ function OrdersInner() {
                         <button disabled={!!acting} onClick={() => act(o.id + 'c', { action: 'cancel', orderId: o.id }, 'Cancelar esta encomenda?')} className="px-4 py-2 rounded-xl border border-[#E8E8E8] text-sm text-[#555]">Cancelar</button>
                       </>
                     )}
-                    {o.invoice?.status === 'draft' && <span className="text-xs text-amber-800">Pagamento só depois de confirmar a disponibilidade do domínio.</span>}
+                    {o.invoice?.status === 'draft' && <span className="text-xs text-amber-800">Encomenda anterior: a factura só fica disponível depois de confirmar a disponibilidade do domínio.</span>}
                     {o.payment_status === 'paid' && o.services.some(s => ['pending', 'failed', 'manual_required'].includes(s.provisioning_status)) && (
                       <button disabled={!!acting} onClick={() => act(o.id + 'a', { action: 'approve', orderId: o.id }, 'Repetir a activação de todos os serviços por activar? Nada é cobrado de novo.')} className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-[#E8E8E8] text-sm"><RotateCcw size={14} /> Repetir activação da encomenda</button>
                     )}

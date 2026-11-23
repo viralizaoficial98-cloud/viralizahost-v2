@@ -5,6 +5,7 @@
  * APENAS o backend deve chamar esta função — nunca expor ao frontend.
  */
 import { renderToBuffer } from '@react-pdf/renderer'
+import { loadBankDetails } from '@/lib/billing/load-bank-details'
 import { Resend } from 'resend'
 import React from 'react'
 import { InvoicePDF } from '@/lib/pdf/invoice-pdf'
@@ -125,13 +126,16 @@ export async function sendInvoiceEmail(opts: SendInvoiceOptions): Promise<SendIn
 
   const items = itemsResult.data ?? []
   const order = orderResult.data ?? null
-  const billing = billingResult.data ?? {
+  const billingRow = billingResult.data ?? {
     company_name: 'ViralizaHost', email: 'comercial@viralizahost.com',
     website: 'viralizahost.com', phone: null, address: null, logo_url: null,
     bank_name: null, account_holder: null, account_number: null,
     iban: null, swift: null, payment_instructions: null, footer_text: null,
     email_subject_template: null, email_body_template: null,
   }
+  // Dados bancários: a mesma fonte do checkout e da Área do Cliente (lib/billing)
+  const bank = await loadBankDetails()
+  const billing = { ...billingRow, bank_name: bank.bank, account_holder: bank.holder, iban: bank.iban, account_number: bank.accountNumber, swift: bank.swift, payment_instructions: bank.instructions ?? billingRow.payment_instructions }
 
   // ── 6. Gerar PDF ──────────────────────────────────────────
   let pdfBuffer: Buffer
@@ -194,8 +198,8 @@ export async function sendInvoiceEmail(opts: SendInvoiceOptions): Promise<SendIn
     <div class="bank-box">
       <p class="bank-title">Dados para Transferência Bancária</p>
       ${billing.bank_name ? `<p><strong>Banco:</strong> ${billing.bank_name}</p>` : ''}
-      ${billing.account_holder ? `<p><strong>Titular:</strong> ${billing.account_holder}</p>` : ''}
-      ${billing.account_number ? `<p><strong>Nº de Conta:</strong> ${billing.account_number}</p>` : ''}
+      ${billing.account_holder ? `<p><strong>Entidade:</strong> ${billing.account_holder}</p>` : ''}
+      ${billing.account_number ? `<p><strong>N.º de conta:</strong> ${billing.account_number}</p>` : ''}
       ${billing.iban ? `<p><strong>IBAN:</strong> ${billing.iban}</p>` : ''}
       ${billing.swift ? `<p><strong>SWIFT/BIC:</strong> ${billing.swift}</p>` : ''}
     </div>

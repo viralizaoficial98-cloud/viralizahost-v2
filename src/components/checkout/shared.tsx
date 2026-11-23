@@ -94,8 +94,8 @@ export function Summary({ quote, loading, title = 'Resumo' }: { quote: Quote | n
           <div className="border-t border-[#F0F0F0] pt-3 space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-[#888]">Subtotal</span><span data-testid="summary-subtotal">{kz(quote.subtotal)}</span></div>
             {quote.taxRate > 0 && <div className="flex justify-between"><span className="text-[#888]">{quote.taxLabel} ({quote.taxRate}%)</span><span>{kz(quote.tax)}</span></div>}
-            <div className="flex justify-between gap-3 text-base font-black pt-1"><span>{quote.needsConfirmation ? "Total (pago após confirmação)" : "Total a pagar agora"}</span><span data-testid="summary-total">{kz(quote.total)}</span></div>
-            {quote.needsConfirmation && <p className="text-[11px] text-amber-800 mt-1" data-testid="summary-held">Há domínios a confirmar pela equipa: o pagamento só é pedido depois dessa confirmação.</p>}
+            <div className="flex justify-between gap-3 text-base font-black pt-1"><span>Total a pagar</span><span data-testid="summary-total">{kz(quote.total)}</span></div>
+            {quote.needsConfirmation && <p className="text-[11px] text-[#1E3A5F] mt-1" data-testid="summary-domain-confirm">Pode pagar agora. A nossa equipa vai confirmar a disponibilidade do domínio antes de o registar.</p>}
             {quote.taxRate === 0 && <p className="text-[11px] text-[#999]">Sem impostos aplicados.</p>}
           </div>
           {loading && <p className="text-xs text-[#999] mt-2 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> A actualizar…</p>}

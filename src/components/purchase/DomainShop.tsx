@@ -94,7 +94,7 @@ export function DomainShop({ initialMode = 'register' }: { initialMode?: 'regist
         <div className="flex-1 min-w-0">
           <p className="font-bold text-[#0A0A0A] break-all">{r.domain}</p>
           <span className={`inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${ui.cls}`}>{ui.label}</span>
-          {r.availability === 'confirm' && <p className="text-xs text-amber-800 mt-1 flex gap-1"><Clock size={12} className="shrink-0 mt-0.5" /> Sem consulta automática nesta extensão: a equipa confirma a disponibilidade e o pagamento só é pedido depois dessa confirmação.</p>}
+          {r.availability === 'confirm' && <p className="text-xs text-amber-800 mt-1 flex gap-1"><Clock size={12} className="shrink-0 mt-0.5" /> Sem consulta automática nesta extensão. Pode pagar agora: a nossa equipa confirma a disponibilidade antes de o registar.</p>}
         </div>
         {r.register != null && r.availability !== 'on_request' && (
           <div className="text-sm sm:text-right"><p className="font-bold">{kz(r.register)} <span className="font-normal text-[#888]">/ 1.º ano</span></p>{r.renew != null && <p className="text-xs text-[#888]">Renova por {kz(r.renew)}/ano</p>}</div>
