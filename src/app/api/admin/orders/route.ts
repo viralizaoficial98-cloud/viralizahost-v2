@@ -14,7 +14,7 @@ export async function GET() {
   const { data: orders, error } = await db.from('orders')
     .select(`id, order_number, user_id, status, payment_status, activation_status, hold_reason, review_flag, review_note, review_at, amount, currency, subtotal, tax_amount, billing_cycle, payment_method,
       domain_name, proof_file, transfer_ref, notes, created_at, updated_at, paid_at,
-      order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, years)`)
+      order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, years, nameservers)`)
     .order('created_at', { ascending: false }).limit(300)
   if (error) return NextResponse.json({ orders: [], error: error.message })
   const ids = (orders ?? []).map((o: any) => o.id)

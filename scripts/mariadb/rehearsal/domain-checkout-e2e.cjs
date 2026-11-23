@@ -1,0 +1,404 @@
+// Compra de domínio avulso no navegador (ensaio): pesquisa → «Registrar Agora» → Configuração do domínio
+// → Carrinho → «Finalizar» → cadastro / dados do cliente / pagamento. Desktop 1440 e iPhone 13.
+// Requer: base de ensaio preparada (prepare-server-rehearsal.mjs), RDAP simulado, Resend simulado e o
+// processo Next de ensaio com AUTH_EMAIL_CONFIRMATION por omissão (verificação obrigatória).
+//   BASE_URL=http://localhost:3000 RESEND_SIM=http://127.0.0.1:12090 OUT=/tmp/dominio \
+//     node --env-file=.env.local scripts/mariadb/rehearsal/domain-checkout-e2e.cjs
+const { chromium, devices } = require('playwright')
+const mysql = require('mysql2/promise')
+const fs = require('fs')
+const BASE = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+const SIM = process.env.RESEND_SIM || 'http://127.0.0.1:12090'
+const OUT = process.env.OUT || './ui-shots-dominio'
+fs.mkdirSync(OUT, { recursive: true })
+let pass = 0, fail = 0
+const results = []
+const ok = (c, n, x = '') => { c ? pass++ : fail++; results.push([!!c, n]); console.log(`  ${c ? '✓' : '✗'} ${n}${!c && x ? ' — ' + String(x).slice(0, 300) : ''}`) }
+const rnd = () => Math.random().toString(36).slice(2, 7)
+const digits = t => Number(String(t).replace(/[^\d]/g, ''))
+const overflow = p => p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+const cartLines = p => p.evaluate(() => JSON.parse(localStorage.getItem('viralizahost-cart-v2') || '{}').state?.lines ?? [])
+const lastLink = async to => { const j = await (await fetch(`${SIM}/_outbox?to=${encodeURIComponent(to)}`)).json(); return ((j.last && j.last.html.match(/href="([^"]+)"/)) || [])[1]?.replace(/&amp;/g, '&') }
+const DESKTOP = { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 }
+const IPHONE = devices['iPhone 13']
+const C2 = { email: 'cliente2@ensaio.test', password: 'Cliente#Dois2026' }
+const C3 = { id: '00000000-0000-4000-8000-00000000c003', email: 'cliente3@ensaio.test', password: 'Cliente#Tres2026' }
+
+async function ctxFor(b, opts) {
+  const ctx = await b.newContext(opts)
+  const p = await ctx.newPage()
+  p.errors = []
+  p.on('pageerror', e => p.errors.push(e.message))
+  p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|status of 40[19]|status of 50[02]/.test(m.text())) p.errors.push(m.text().slice(0, 200)) })
+  return { ctx, p }
+}
+let shotN = 0
+const shot = async (p, label, name, full = false) => { shotN++; await p.screenshot({ path: `${OUT}/${label}-${String(shotN).padStart(2, '0')}-${name}.png`, fullPage: full }) }
+
+async function search(p, q) {
+  await p.goto(BASE + '/dominios/pesquisar', { waitUntil: 'domcontentloaded' })
+  const [name, ...ext] = q.split('.')
+  await p.locator('#sn').fill(name)
+  await p.locator('#sx').selectOption('.' + ext.join('.'))
+  await p.getByRole('button', { name: 'Pesquisar' }).click()
+  await p.locator('[data-testid=domain-result]').first().waitFor()
+}
+async function login(p, who) {
+  const r = await p.request.post(BASE + '/api/auth/login', { data: { email: who.email, password: who.password } })
+  if (!r.ok()) throw new Error('login ' + who.email)
+}
+async function configureAndContinue(p, domain, { years, custom } = {}) {
+  await p.waitForURL(`**/dominios/configurar?dominio=${encodeURIComponent(domain)}`)
+  await p.getByTestId('config-domain').waitFor()
+  if (years) await p.getByTestId('config-years').selectOption(String(years))
+  if (custom) {
+    await p.getByTestId('ns-custom').click()
+    for (const [i, v] of custom.entries()) await p.getByTestId(`ns-input-${i + 1}`).fill(v)
+  }
+  await p.getByTestId('config-continue').click()
+  await p.waitForURL('**/carrinho')
+  await p.getByTestId('summary-total').waitFor()
+}
+async function payAndConfirm(p, { held = false, proof = false } = {}) {
+  await p.getByTestId('summary-total').waitFor()
+  await p.locator('[data-testid=to-review]:not([disabled])').waitFor()
+  if (held) ok(await p.getByTestId('pay-after-confirmation').isVisible() && await p.locator('input[type=file]').count() === 0, 'pagamento: «Ainda não pague», sem envio de comprovativo')
+  if (proof) {
+    await p.locator('input[type=file]').setInputFiles({ name: 'comprovativo.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 ensaio') })
+    await p.getByText(/Comprovativo: comprovativo.pdf/).waitFor()
+  }
+  await p.getByTestId('to-review').click()
+  await p.getByTestId('accept-terms').check()
+}
+
+async function main() {
+  const b = await chromium.launch()
+  const db = await mysql.createConnection({ host: process.env.DB_HOST, port: Number(process.env.DB_PORT), user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME })
+  const one = async (sql, a = []) => (await db.query(sql, a))[0][0]
+  const price = async (ext, op) => Number((await one('SELECT price FROM domain_prices WHERE extension = ? AND operation = ? AND years = 1', [ext, op])).price)
+  const v = await (await fetch(BASE + '/api/version')).json()
+  console.log(`Ambiente: ${BASE} · commit ${v.short ?? '?'} · base ${process.env.DB_NAME}`)
+  const COM_REG = await price('.com', 'register'), COM_REN = await price('.com', 'renew')
+  const AO_REG = await price('.ao', 'register')
+
+  // Cliente 3: dados incompletos mas já com um produto anterior (ter comprado não basta)
+  await db.query("UPDATE profiles SET phone = NULL WHERE id = ?", [C3.id])
+  await db.query("UPDATE clients SET address = NULL, city = NULL WHERE profile_id = ?", [C3.id])
+  await db.query(`INSERT IGNORE INTO services (id, profile_id, status, currency, price, billing_cycle, service_type, service_name, domain, provisioning_status)
+    VALUES ('00000000-0000-4000-8000-0000000005c3', ?, 'active', 'AKZ', 20100, 'monthly', 'hosting', 'Plano Start — rui-anterior.com', 'rui-anterior.com', 'active')`, [C3.id])
+  await db.query("UPDATE services SET renewal_price = 20100 WHERE id = '00000000-0000-4000-8000-0000000005c3'")
+  // renovações por pagar de execuções anteriores bloqueiam uma nova (regra existente): limpa-as
+  await db.query("DELETE FROM services WHERE renews_service_id = '00000000-0000-4000-8000-0000000005c3' AND status = 'pending'")
+
+  for (const [label, opts, mobile] of [['desktop', DESKTOP, false], ['telemovel', IPHONE, true]]) {
+    console.log(`\n══ ${label} ══`)
+    shotN = 0
+    // ── 1. Visitante: domínio disponível → Registrar Agora → configuração → carrinho → Finalizar → cadastro ──
+    console.log('\n1. Domínio disponível: Registrar Agora → Configuração → Continuar → Carrinho → Finalizar')
+    let { ctx, p } = await ctxFor(b, opts)
+    const nm = `loja-${label}-${rnd()}`
+    await search(p, `${nm}.com`)
+    const exact = p.locator('[data-testid=domain-result]').first()
+    ok(await exact.getAttribute('data-status') === 'available', `${nm}.com «Disponível»`)
+    ok(await exact.getByTestId('register-now').innerText().then(t => /Registrar Agora/.test(t)), 'resultado principal: botão «Registrar Agora»')
+    const altAvail = p.locator('[data-testid=domain-result][data-status=available]').nth(1)
+    ok(await altAvail.count() > 0 && await altAvail.getByTestId('register-now').count() === 1, 'alternativas disponíveis: «Registrar Agora»')
+    ok(!/Seleccionar/.test(await p.locator('main').innerText()), 'já não aparece «Seleccionar»')
+    const confirmRow = p.locator('[data-testid=domain-result][data-status=confirm]').first()
+    ok(await confirmRow.getByTestId('request-registration').count() === 1 && /pagamento só é pedido depois/.test(await confirmRow.innerText()), 'alternativas .ao: «Solicitar registo» com aviso de pagamento após confirmação')
+    await shot(p, label, 'resultados-pesquisa')
+    await exact.getByTestId('register-now').click()
+    await p.waitForURL('**/dominios/configurar**')
+    await p.getByTestId('config-domain').waitFor()
+    ok(await p.getByTestId('config-domain').innerText() === `${nm}.com`, 'configuração abre com o domínio já preenchido')
+    ok(digits(await p.getByTestId('config-price-now').innerText()) === COM_REG, `preço a pagar agora (1 ano) = ${COM_REG}`)
+    ok(digits(await p.getByTestId('config-renewal').innerText()) === COM_REN, `preço de renovação = ${COM_REN}/ano`)
+    ok(await p.getByTestId('config-years').locator('option').count() === 3, 'período disponível na extensão: 1 a 3 anos')
+    ok(/ns1\.viralizahost\.com/.test(await p.getByTestId('ns-default-list').innerText()), 'nameservers padrão da plataforma visíveis')
+    ok(await p.getByTestId('ns-default').getAttribute('aria-checked') === 'true', 'nameservers padrão escolhidos por omissão')
+    await p.getByTestId('config-years').selectOption('2')
+    ok(digits(await p.getByTestId('config-price-now').innerText()) === COM_REG + COM_REN, '2 anos: 1.º ano + 1 renovação')
+    ok(await overflow(p) <= 1, 'configuração sem deslocamento horizontal')
+    await shot(p, label, 'configuracao-dominio', true)
+    await p.getByTestId('config-continue').click()
+    await p.waitForURL('**/carrinho'); await p.getByTestId('summary-total').waitFor()
+    let lines = await cartLines(p)
+    ok(lines.length === 1 && lines[0].type === 'domain' && lines[0].years === 2 && lines[0].nameservers?.useDefault === true, 'carrinho: domínio, 2 anos, nameservers padrão')
+    const line = p.locator('[data-testid=cart-line]').first()
+    ok(/2 anos/.test(await line.getByTestId('line-period').innerText()), 'carrinho mostra o período de registo')
+    ok(digits(await line.getByTestId('line-total').innerText()) === COM_REG + COM_REN, 'carrinho: preço do item')
+    ok(digits(await line.getByTestId('line-renewal').innerText()) === COM_REN, 'carrinho: valor de renovação')
+    ok(digits(await p.getByTestId('summary-total').innerText()) === COM_REG + COM_REN, 'carrinho: total a pagar agora (servidor)')
+    ok(/ns1\.viralizahost\.com/.test(await line.getByTestId('line-ns').innerText()), 'carrinho: nameservers padrão indicados')
+    ok(await overflow(p) <= 1, 'carrinho sem deslocamento horizontal')
+    await shot(p, label, 'carrinho', true)
+    await p.reload({ waitUntil: 'domcontentloaded' }); await p.getByTestId('summary-total').waitFor()
+    ok((await cartLines(p)).length === 1 && digits(await p.getByTestId('summary-total').innerText()) === COM_REG + COM_REN, 'recarregar mantém o carrinho')
+    // repetir o percurso não duplica
+    await search(p, `${nm}.com`)
+    await p.locator('[data-testid=domain-result]').first().getByTestId('register-now').click()
+    await configureAndContinue(p, `${nm}.com`)
+    ok((await cartLines(p)).filter(l => l.domain === `${nm}.com`).length === 1, 'voltar a «Registrar Agora» e «Continuar» actualiza o item sem o duplicar')
+    ok(await p.getByTestId('cart-line').count() === 1, 'carrinho continua com 1 item')
+    await p.getByTestId('finalize').click()
+    await p.waitForURL('**/checkout/conta')
+    ok(await p.getByTestId('tab-register').getAttribute('aria-selected') === 'true' && await p.getByTestId('tab-login').count() === 1, 'visitante → cadastro, com «Já tenho conta»')
+    ok(await overflow(p) <= 1, 'cadastro sem deslocamento horizontal')
+    await shot(p, label, 'cadastro', true)
+    ok(p.errors.length === 0, 'sem erros de consola', p.errors.join(' | '))
+
+    // ── 2. Visitante cria conta → confirma o e-mail → continua com o mesmo carrinho ──
+    console.log('\n2. Visitante cria conta, confirma o e-mail e retoma a compra')
+    const em = `novo-${label}-${rnd()}@ensaio.test`
+    await p.locator('#f-full_name').fill('Ana Ensaio Silva')
+    await p.locator('#f-email').fill(em)
+    await p.locator('#f-phone').fill('+244 923 111 222')
+    await p.locator('#f-address').fill('Rua da Missão, 15')
+    await p.locator('#f-city').fill('Luanda')
+    await p.locator('#f-password').fill('Senha#Ensaio1')
+    await p.locator('#f-confirm').fill('Senha#Ensaio1')
+    await p.getByTestId('register-submit').click()
+    await p.getByTestId('account-verify').waitFor()
+    ok(/carrinho fica guardado/.test(await p.getByTestId('account-cart-kept').innerText()), 'verificação obrigatória: mensagem «o carrinho fica guardado»')
+    await shot(p, label, 'confirmar-email')
+    const link = await lastLink(em)
+    ok(!!link, 'e-mail de verificação enviado')
+    const owned = await one('SELECT COUNT(*) n FROM shopping_carts c JOIN profiles p ON p.id = c.profile_id WHERE p.email = ? AND c.items <> \'[]\'', [em])
+    ok(Number(owned.n) === 1, 'carrinho guardado no servidor e associado à nova conta')
+    if (label === 'desktop') {
+      // confirmação noutro dispositivo/navegador: sem localStorage nem cookie do carrinho
+      const other = await ctxFor(b, opts)
+      await other.p.goto(link, { waitUntil: 'load' })
+      await other.p.waitForURL('**/checkout/pagamento?verificado=1')
+      await other.p.getByTestId('summary-total').waitFor()
+      ok(true, 'link aberto noutro navegador → sessão → pagamento (dados completos no cadastro)')
+      ok((await cartLines(other.p)).some(l => l.domain === `${nm}.com` && l.years === 2) && digits(await other.p.getByTestId('summary-total').innerText()) === COM_REG + COM_REN, 'carrinho recuperado do servidor (mesmo domínio, período e total)')
+      ok(await other.p.getByTestId('verified-banner').isVisible(), 'aviso «E-mail confirmado»')
+      await shot(other.p, label, 'pagamento-depois-verificacao', true)
+      await other.ctx.close()
+    }
+    await p.goto(link, { waitUntil: 'load' }).catch(() => {})
+    if (label !== 'desktop') {
+      await p.waitForURL('**/checkout/pagamento?verificado=1')
+      await p.getByTestId('summary-total').waitFor()
+      ok((await cartLines(p)).length === 1, 'mesmo navegador: link → pagamento com o mesmo carrinho')
+    } else {
+      // link já usado noutro navegador: inicia sessão aqui e continua
+      await p.goto(BASE + '/checkout/conta', { waitUntil: 'domcontentloaded' })
+      await p.getByTestId('tab-login').click()
+      await p.locator('#l-email').fill(em); await p.locator('#l-pass').fill('Senha#Ensaio1')
+      await p.getByTestId('login-submit').click()
+      await p.waitForURL('**/checkout/pagamento')
+      await p.getByTestId('summary-total').waitFor()
+      ok((await cartLines(p)).length === 1, 'login depois da confirmação → pagamento com o mesmo carrinho')
+    }
+    await payAndConfirm(p)
+    await shot(p, label, 'revisao', true)
+    await p.getByTestId('confirm-order').dblclick()
+    await p.waitForURL('**/orders/**')
+    await p.getByText('Encomenda recebida').waitFor()
+    const ord = await one(`SELECT o.id, o.payment_status, o.use_default_ns, o.ns1, oi.nameservers, oi.years, o.billing_details FROM orders o JOIN order_items oi ON oi.order_id = o.id WHERE oi.domain_name = ?`, [`${nm}.com`])
+    ok(ord && JSON.parse(ord.nameservers).useDefault === true && JSON.parse(ord.nameservers).ns[0] === 'ns1.viralizahost.com' && ord.ns1 === 'ns1.viralizahost.com', 'encomenda: nameservers padrão guardados no item e na encomenda')
+    ok(Number(ord.years) === 2, 'encomenda: período do item (2 anos, mantido ao repetir «Registrar Agora»)')
+    const bd = typeof ord.billing_details === 'string' ? ord.billing_details : JSON.stringify(ord.billing_details)
+    ok(/Ana Ensaio Silva/.test(bd) && /Luanda/.test(bd) && /\+244 923 111 222/.test(bd), 'encomenda: dados do titular tirados do servidor')
+    ok(Number((await one('SELECT COUNT(DISTINCT order_id) n FROM order_items WHERE domain_name = ?', [`${nm}.com`])).n) === 1, 'duplo clique → uma só encomenda')
+    await shot(p, label, 'encomenda-recebida', true)
+    ok(p.errors.length === 0, 'sem erros de consola', p.errors.join(' | '))
+    await ctx.close()
+
+    // ── 3. Indisponível e confirmação manual ──
+    console.log('\n3. Domínio indisponível e domínio com confirmação manual')
+    ;({ ctx, p } = await ctxFor(b, opts))
+    await search(p, `ocupado-${rnd()}.com`)
+    const taken = p.locator('[data-testid=domain-result]').first()
+    ok(await taken.getAttribute('data-status') === 'unavailable' && await taken.getByTestId('register-now').count() === 0 && await taken.getByRole('button', { name: /Indisponível/ }).isDisabled(), 'indisponível: sem «Registrar Agora», botão desactivado')
+    await p.goto(BASE + `/dominios/configurar?dominio=ocupado-${rnd()}.com`, { waitUntil: 'domcontentloaded' })
+    await p.getByTestId('domain-config-blocked').waitFor()
+    ok(await p.getByTestId('config-continue').count() === 0, 'endereço directo da configuração de um domínio ocupado não permite avançar')
+    await shot(p, label, 'indisponivel')
+    const ao = `pedido-${label}-${rnd()}`
+    await search(p, `${ao}.ao`)
+    const aoRow = p.locator('[data-testid=domain-result]').first()
+    ok(await aoRow.getAttribute('data-status') === 'confirm' && /Solicitar registo/.test(await aoRow.getByTestId('request-registration').innerText()), `${ao}.ao «A confirmar pela equipa» → «Solicitar registo»`)
+    await aoRow.getByTestId('request-registration').click()
+    await p.waitForURL('**/dominios/configurar**'); await p.getByTestId('config-confirm-note').waitFor()
+    ok(/pagamento só é pedido depois/.test(await p.getByTestId('config-confirm-note').innerText()), 'configuração mantém o aviso: pagamento só após confirmação')
+    await shot(p, label, 'configuracao-confirmacao-manual')
+    await p.getByTestId('config-continue').click(); await p.waitForURL('**/carrinho'); await p.getByTestId('summary-total').waitFor()
+    ok(await p.getByTestId('line-confirm').isVisible() && await p.getByTestId('summary-held').isVisible(), 'carrinho: «A confirmar pela equipa» e aviso de pagamento depois')
+    await login(p, C2)
+    await p.getByTestId('finalize').click()
+    await p.waitForURL('**/checkout/pagamento')
+    ok(true, 'cliente com sessão e dados completos (já comprou antes) → pagamento directo')
+    await payAndConfirm(p, { held: true })
+    ok(/Sem cobrança agora/.test(await p.locator('body').innerText()), 'revisão: sem cobrança agora')
+    await shot(p, label, 'revisao-sem-cobranca', true)
+    await p.getByTestId('confirm-order').click()
+    await p.waitForURL('**/orders/**'); await p.getByTestId('order-held').waitFor()
+    const held = await one(`SELECT o.payment_status, o.hold_reason, i.status inv, (SELECT COUNT(*) FROM payments y WHERE y.order_id = o.id) pays FROM orders o JOIN invoices i ON i.order_id = o.id JOIN order_items oi ON oi.order_id = o.id WHERE oi.domain_name = ?`, [`${ao}.ao`])
+    ok(held.payment_status === 'unpaid' && held.hold_reason === 'domain_confirmation' && held.inv === 'draft' && Number(held.pays) === 0, 'encomenda retida: sem cobrança (factura em rascunho, nenhum pagamento) até a equipa confirmar')
+    await shot(p, label, 'encomenda-retida')
+    await ctx.close()
+
+    // ── 4. Nameservers próprios, edição a partir do carrinho, recarregar ──
+    console.log('\n4. Nameservers próprios, edição e persistência')
+    ;({ ctx, p } = await ctxFor(b, opts))
+    const nsDom = `dns-${label}-${rnd()}.com`
+    await search(p, nsDom)
+    await p.locator('[data-testid=domain-result]').first().getByTestId('register-now').click()
+    await p.getByTestId('config-domain').waitFor()
+    await p.getByTestId('ns-custom').click()
+    await p.getByTestId('ns-input-1').fill('ns1.cloudflare.com')
+    await p.getByTestId('config-continue').click()
+    await p.getByTestId('ns-error').waitFor()
+    ok(/pelo menos 2/.test(await p.getByTestId('ns-error').innerText()), 'nameservers próprios: exige pelo menos 2')
+    await p.getByTestId('ns-input-2').fill(`ns2.${nsDom}`)
+    await p.getByTestId('config-continue').click()
+    await p.getByTestId('ns-error').waitFor()
+    ok(/glue/.test(await p.getByTestId('ns-error').innerText()), 'nameserver dentro do próprio domínio recusado (glue)')
+    // validação no servidor (contornando o navegador)
+    const srv = await p.request.post(BASE + '/api/domains/config', { data: { domain: nsDom, years: 1, nameservers: { useDefault: false, ns: ['ns1.cloudflare.com', 'não válido'] } } })
+    ok(srv.status() === 400 && (await srv.json()).field === 'nameservers', 'servidor recusa nameservers inválidos')
+    const q = await p.request.post(BASE + '/api/checkout/quote', { data: { lines: [{ type: 'domain', domain: nsDom, operation: 'register', years: 1, nameservers: { useDefault: false, ns: ['x'] } }] } })
+    ok((await q.json()).quote.lines[0].error?.code === 'nameservers_invalid', 'cotação do carrinho recusa nameservers inválidos')
+    await p.getByTestId('ns-input-2').fill('ns2.cloudflare.com')
+    await shot(p, label, 'nameservers-proprios', true)
+    await p.getByTestId('config-continue').click(); await p.waitForURL('**/carrinho'); await p.getByTestId('summary-total').waitFor()
+    ok(/ns1\.cloudflare\.com, ns2\.cloudflare\.com/.test(await p.getByTestId('line-ns').innerText()), 'carrinho mostra os nameservers próprios')
+    await p.reload({ waitUntil: 'domcontentloaded' }); await p.getByTestId('line-ns').waitFor()
+    ok(/cloudflare/.test(await p.getByTestId('line-ns').innerText()), 'recarregar mantém os nameservers próprios')
+    await p.getByTestId('edit-line').click()
+    await p.waitForURL('**/dominios/configurar**'); await p.getByTestId('config-domain').waitFor()
+    ok(await p.getByTestId('ns-custom').getAttribute('aria-checked') === 'true' && await p.getByTestId('ns-input-2').inputValue() === 'ns2.cloudflare.com', 'editar: recupera a configuração guardada')
+    await p.getByTestId('config-years').selectOption('3')
+    await p.getByTestId('add-hosting').check()
+    await p.getByTestId('hosting-plan').selectOption('hosting-start')
+    await p.getByTestId('hosting-cycle').selectOption('1year')
+    await shot(p, label, 'editar-com-hospedagem', true)
+    await p.getByTestId('config-continue').click(); await p.waitForURL('**/carrinho'); await p.getByTestId('summary-total').waitFor()
+    lines = await cartLines(p)
+    ok(lines.filter(l => l.type === 'domain' && l.domain === nsDom).length === 1 && lines.find(l => l.domain === nsDom && l.type === 'domain').years === 3, 'edição actualiza o mesmo item (3 anos), sem duplicar')
+    ok(lines.some(l => l.type === 'product' && l.slug === 'hosting-start' && l.domain === nsDom && l.domainMode === 'register' && l.cycle === '1year'), 'hospedagem opcional adicionada com o domínio escolhido')
+    ok(await p.locator('[data-testid=cart-line] [role=alert]').count() === 0, 'carrinho misto válido (domínio + hospedagem)')
+    ok(await p.getByTestId('cart-renewals').isVisible(), 'carrinho mostra os valores de renovação')
+    await shot(p, label, 'carrinho-misto', true)
+    // continuar a comprar e voltar: carrinho mantém-se
+    await p.getByTestId('continue-shopping').click(); await p.waitForURL('**/dominios/pesquisar')
+    await p.goBack(); await p.getByTestId('summary-total').waitFor()
+    ok((await cartLines(p)).length === 2, '«Continuar a comprar» e voltar mantém os itens')
+    // visitante → «Já tenho conta» com cliente 2 (dados completos) → pagamento
+    await p.getByTestId('finalize').click(); await p.waitForURL('**/checkout/conta')
+    await p.getByTestId('tab-login').click()
+    await shot(p, label, 'ja-tenho-conta')
+    await p.locator('#l-email').fill(C2.email); await p.locator('#l-pass').fill(C2.password)
+    await p.getByTestId('login-submit').click()
+    await p.waitForURL('**/checkout/pagamento'); await p.getByTestId('summary-total').waitFor()
+    ok((await cartLines(p)).length === 2, 'visitante inicia sessão → pagamento com o mesmo carrinho')
+    // revalidação: preço alterado entre o carrinho e a confirmação
+    await payAndConfirm(p, { proof: true })
+    await db.query("UPDATE domain_prices SET price = price + 100 WHERE extension = '.com' AND operation = 'renew' AND years = 1")
+    await p.getByTestId('confirm-order').click()
+    await p.getByTestId('submit-error').waitFor()
+    ok(/total foi actualizado/.test(await p.getByTestId('submit-error').innerText()), 'servidor revalida o preço antes de confirmar (preço alterado → rever)')
+    await db.query("UPDATE domain_prices SET price = price - 100 WHERE extension = '.com' AND operation = 'renew' AND years = 1")
+    await p.reload({ waitUntil: 'domcontentloaded' })
+    await payAndConfirm(p, { proof: true })
+    await p.getByTestId('confirm-order').click(); await p.waitForURL('**/orders/**')
+    const it = await one("SELECT oi.nameservers, oi.years, o.use_default_ns, o.ns1, o.ns2, o.payment_status FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.domain_name = ? AND oi.domain_operation = 'register' AND oi.service_type = 'domain'", [nsDom])
+    const nsJ = JSON.parse(it.nameservers)
+    ok(nsJ.useDefault === false && nsJ.ns.join() === 'ns1.cloudflare.com,ns2.cloudflare.com' && Number(it.use_default_ns) === 0 && it.ns1 === 'ns1.cloudflare.com', 'encomenda: nameservers próprios no item e na encomenda (para a activação/equipa)')
+    ok(Number(it.years) === 3 && it.payment_status === 'proof_submitted', 'encomenda: 3 anos, comprovativo em análise')
+    ok((await cartLines(p)).length === 0 && Number((await one("SELECT COUNT(*) n FROM shopping_carts c JOIN profiles p ON p.id = c.profile_id WHERE p.email = ? AND c.items <> '[]'", [C2.email])).n) === 0, 'depois da encomenda o carrinho fica vazio (navegador e servidor)')
+    ok(p.errors.length === 0, 'sem erros de consola', p.errors.join(' | '))
+    await ctx.close()
+
+    // ── 5. Cliente com sessão e dados em falta (já tem um produto) ──
+    console.log('\n5. Cliente autenticado com dados em falta')
+    await db.query("UPDATE profiles SET phone = NULL WHERE id = ?", [C3.id])
+    await db.query("UPDATE clients SET address = NULL, city = NULL WHERE profile_id = ?", [C3.id])
+    ;({ ctx, p } = await ctxFor(b, opts))
+    await login(p, C3)
+    const d3 = `rui-${label}-${rnd()}.com`
+    await search(p, d3)
+    await p.locator('[data-testid=domain-result]').first().getByTestId('register-now').click()
+    await configureAndContinue(p, d3)
+    await p.getByTestId('finalize').click()
+    await p.waitForURL('**/checkout/dados')
+    await p.getByTestId('customer-form').waitFor()
+    const inputs = await p.locator('[data-testid=customer-form] input, [data-testid=customer-form] select').evaluateAll(els => els.map(e => e.name || e.id))
+    ok(inputs.length === 3 && ['phone', 'address', 'city'].every(f => inputs.includes(f)), `pede só o que falta (${inputs.join(', ')})`)
+    ok(await p.locator('[data-testid=customer-form] input[type=email], [data-testid=customer-form] input[type=password]').count() === 0, 'sem campos de e-mail nem senha')
+    ok(await p.getByTestId('customer-email').innerText() === C3.email && /Rui Domingos/.test(await p.getByTestId('customer-saved').innerText()), 'mostra a identidade da sessão e os dados já guardados')
+    await shot(p, label, 'dados-em-falta', true)
+    await p.getByTestId('customer-phone').fill('12')
+    await p.getByTestId('customer-address').fill('Rua 1º de Maio, 7'); await p.getByTestId('customer-city').fill('Benguela')
+    await p.getByTestId('customer-submit').click()
+    await p.getByText(/Telefone inválido/).waitFor()
+    ok(true, 'servidor valida os dados (telefone inválido)')
+    await p.getByTestId('customer-phone').fill('+244 923 333 444')
+    await p.getByTestId('customer-submit').click()
+    await p.waitForURL('**/checkout/pagamento'); await p.getByTestId('summary-total').waitFor()
+    ok(/Benguela/.test(await p.locator('body').innerText()), 'dados guardados → pagamento')
+    const prof = await one('SELECT p.phone, c.address, c.city FROM profiles p JOIN clients c ON c.profile_id = p.id WHERE p.id = ?', [C3.id])
+    ok(prof.phone === '+244 923 333 444' && prof.city === 'Benguela', 'dados guardados no perfil do cliente')
+    // pedido directo à API com dados incompletos é recusado
+    await db.query("UPDATE clients SET city = NULL WHERE profile_id = ?", [C3.id])
+    const r = await p.request.post(BASE + '/api/checkout/orders', { data: { idempotencyKey: `teste-incompleto-${rnd()}-xxxxxxxx`, lines: [{ type: 'domain', domain: d3, operation: 'register', years: 1 }], acceptedTotal: COM_REG, paymentMethod: 'bank_transfer' } })
+    ok(r.status() === 409 && (await r.json()).code === 'customer_incomplete', 'API recusa encomendar com dados obrigatórios em falta')
+    await p.goto(BASE + '/checkout/pagamento', { waitUntil: 'domcontentloaded' })
+    ok(/\/checkout\/dados/.test(p.url()), 'página de pagamento sem dados completos → dados do cliente')
+    ok(p.errors.length === 0, 'sem erros de consola', p.errors.join(' | '))
+    await ctx.close()
+
+    // ── 6. Esvaziar e regressões (transferência, renovação, hospedagem) ──
+    console.log('\n6. Esvaziar carrinho e fluxos existentes')
+    ;({ ctx, p } = await ctxFor(b, opts))
+    await search(p, `vazio-${rnd()}.net`)
+    await p.locator('[data-testid=domain-result]').first().getByTestId('register-now').click()
+    await p.getByTestId('config-domain').waitFor(); await p.getByTestId('config-continue').click(); await p.waitForURL('**/carrinho')
+    await p.getByTestId('clear-cart').click(); await p.getByTestId('clear-cart-confirm').click()
+    await p.getByTestId('cart-empty').waitFor()
+    await p.reload({ waitUntil: 'domcontentloaded' }); await p.getByTestId('cart-empty').waitFor()
+    ok(true, 'esvaziar carrinho (mantém-se vazio depois de recarregar)')
+    // hospedagem pelo percurso /comprar
+    await p.goto(BASE + '/comprar/hosting-business', { waitUntil: 'domcontentloaded' })
+    await p.getByRole('radio', { name: 'Usar um domínio que já tenho' }).click()
+    await p.getByPlaceholder('empresa.ao').fill(`meu-${rnd()}.com`)
+    await p.getByTestId('continue-own-domain').click(); await p.waitForURL('**passo=duracao**')
+    await p.getByTestId('add-to-cart').click(); await p.waitForURL('**/carrinho'); await p.getByTestId('summary-total').waitFor()
+    ok((await cartLines(p)).length === 1 && await p.locator('[data-testid=cart-line] [role=alert]').count() === 0, 'hospedagem (percurso /comprar) vai para o carrinho, válida')
+    // transferência (separador Transferir)
+    await p.goto(BASE + '/dominios/transferir', { waitUntil: 'domcontentloaded' })
+    const tDom = `ocupado-transf-${rnd()}.com`  // registado no RDAP simulado
+    await p.getByPlaceholder('empresa.ao').fill(tDom)
+    await p.locator('input[type=password]').fill('EPP-ensaio-123')
+    await p.getByTestId('add-transfer-to-cart').click(); await p.waitForURL('**/carrinho'); await p.getByTestId('summary-total').waitFor()
+    await p.locator('[data-testid=cart-line][data-type=domain] [data-testid=line-period]').waitFor()
+    ok(/Transferência/.test(await p.locator('[data-testid=cart-line][data-type=domain] [data-testid=line-period]').innerText()) && await p.locator('[data-testid=cart-line] [role=alert]').count() === 0, 'transferência: no carrinho com o rótulo e regras próprias (EPP)')
+    ok(!JSON.stringify(await p.evaluate(() => ({ ...localStorage }))).includes('EPP-ensaio-123'), 'código EPP não fica no navegador')
+    await p.goto(BASE + '/checkout?plan=hosting-start&billing=monthly', { waitUntil: 'domcontentloaded' })
+    await p.waitForURL('**/carrinho'); await p.getByTestId('summary-total').waitFor()
+    ok((await cartLines(p)).some(l => l.slug === 'hosting-start'), 'links antigos /checkout?plan= continuam a funcionar')
+    ok(p.errors.length === 0, 'sem erros de consola', p.errors.join(' | '))
+    await ctx.close()
+    // renovação na Área do Cliente
+    ;({ ctx, p } = await ctxFor(b, opts))
+    await login(p, C3)
+    await p.goto(BASE + '/services', { waitUntil: 'domcontentloaded' })
+    const renewBtn = p.locator('[data-testid=service-card]').filter({ hasText: 'rui-anterior.com' }).getByTestId('renew').first()
+    await renewBtn.waitFor({ timeout: 10000 }).catch(() => {})
+    if (await renewBtn.count()) {
+      await renewBtn.click(); await p.waitForURL('**/carrinho'); await p.getByTestId('summary-total').waitFor()
+      ok((await cartLines(p)).some(l => l.type === 'renewal' || l.operation === 'renew'), 'renovação na Área do Cliente → carrinho')
+    } else ok(false, 'botão «Renovar» não encontrado')
+    await ctx.close()
+    void mobile; void AO_REG
+  }
+
+  await db.end(); await b.close()
+  console.log(`\n${pass} OK, ${fail} falhadas — capturas em ${OUT}`)
+  fs.writeFileSync(`${OUT}/resultados.json`, JSON.stringify(results))
+  process.exit(fail ? 1 : 0)
+}
+main().catch(e => { console.error('ERRO', e.message.split('\n').slice(0, 8).join('\n')); process.exit(2) })

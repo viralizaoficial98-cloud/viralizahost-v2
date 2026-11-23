@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { getPool } from '@/lib/db/pool'
+import { getDefaultNameservers, saveDefaultNameservers } from '@/lib/commerce/nameserver-settings'
 import { PROVIDERS, RegistrarConfigError, loadRegistrarSettings, saveRegistrarSettings, testRegistrarConnection } from '@/lib/registrar/settings'
 
 export const dynamic = 'force-dynamic'
@@ -15,6 +16,7 @@ async function state() {
   ]) as any
   return {
     settings: await loadRegistrarSettings(),
+    defaultNameservers: await getDefaultNameservers(),
     providers: PROVIDERS,
     extensions: (exts as any[]).map(e => ({ extension: e.extension, onSale: !!Number(e.on_sale) })),
     operations: Object.fromEntries((ops as any[]).map(o => [o.status, Number(o.n)])),
@@ -46,6 +48,12 @@ export async function POST(req: NextRequest) {
         extensions: Array.isArray(body.extensions) ? body.extensions.map(String) : [], enabled: body.enabled === true,
       }, adminId)
       await log(`registrar save: ${body.provider} ${body.mode} ${body.enabled ? 'activo' : 'inactivo'}${body.secret ? ' (credencial alterada)' : ''}`)
+      return NextResponse.json({ ok: true, state: await state() })
+    }
+    if (body.action === 'nameservers') {
+      let list: string[]
+      try { list = await saveDefaultNameservers(Array.isArray(body.nameservers) ? body.nameservers : [], adminId) } catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: 400 }) }
+      await log(`nameservers padrão: ${list.join(', ')}`)
       return NextResponse.json({ ok: true, state: await state() })
     }
     return NextResponse.json({ error: 'Acção inválida.' }, { status: 400 })

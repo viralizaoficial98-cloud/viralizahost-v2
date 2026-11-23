@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createOrder, OrderError } from '@/lib/commerce/orders'
-import { createSession, createUser, getSessionUser, setSessionCookie } from '@/lib/auth/server'
+import { getSessionUser } from '@/lib/auth/server'
+import { billingSnapshot, loadCustomer } from '@/lib/commerce/customer'
+import { clearUserCarts } from '@/lib/commerce/cart-server'
 import { getPool } from '@/lib/db/pool'
 import { clientIp, rateLimit } from '@/lib/auth/rate-limit'
 
@@ -19,22 +21,14 @@ export async function POST(req: NextRequest) {
   let body: Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
   try { body = await req.json() } catch { return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 }) }
 
-  // ── Utilizador: sessão ou conta criada no checkout ──────────────────────────
-  let userId = (await getSessionUser())?.id ?? null
-  if (!userId) {
-    const u = body.userData ?? {}
-    if (!u.email || !u.password) return NextResponse.json({ error: 'Inicie sessão ou crie uma conta para concluir a encomenda.', code: 'auth_required' }, { status: 401 })
-    const created = await createUser({
-      email: String(u.email), password: String(u.password), email_confirm: true,
-      user_metadata: { full_name: String(u.name ?? '').slice(0, 120), phone: String(u.phone ?? '').slice(0, 40), source: 'checkout' },
-    })
-    if ('error' in created) {
-      const exists = created.error.code === 'email_exists'
-      return NextResponse.json({ error: exists ? 'Já existe uma conta com este e-mail. Inicie sessão para continuar.' : created.error.message, code: exists ? 'email_exists' : 'signup_failed' }, { status: exists ? 409 : 400 })
-    }
-    userId = created.user.id
-    const s = await createSession(userId)
-    await setSessionCookie(s.token, s.expiresAt)
+  // ── Utilizador: sempre o da sessão (a conta é criada antes, em /checkout/conta) ──
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: 'Inicie sessão ou crie uma conta para concluir a encomenda.', code: 'auth_required', next: '/checkout/conta' }, { status: 401 })
+  const userId = user.id
+  // Dados do titular validados no servidor (não basta já ter comprado antes)
+  const customer = await loadCustomer(userId)
+  if (!customer || customer.missing.length) {
+    return NextResponse.json({ error: 'Complete os dados do cliente antes de confirmar a encomenda.', code: 'customer_incomplete', next: '/checkout/dados' }, { status: 409 })
   }
 
   // ── Comprovativo opcional: tem de existir e não pode estar usado noutra encomenda ──
@@ -54,9 +48,10 @@ export async function POST(req: NextRequest) {
       paymentMethod: String(body.paymentMethod ?? ''),
       proofFile: proof,
       transferRef: body.transferRef ? String(body.transferRef).slice(0, 120) : null,
-      billingDetails: body.billingDetails && typeof body.billingDetails === 'object' ? body.billingDetails : null,
+      billingDetails: billingSnapshot(customer.email, customer.data),
       nameservers: body.nameservers,
     })
+    if (!order.replayed) await clearUserCarts(userId).catch(() => {})
     console.info('[checkout/orders]', order.replayed ? 'repetição' : 'criada', order.order_number, order.total)
     return NextResponse.json({ order, quote: { total: quote.total, currency: quote.currency } }, { status: order.replayed ? 200 : 201 })
   } catch (e) {

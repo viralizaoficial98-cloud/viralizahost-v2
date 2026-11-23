@@ -30,6 +30,8 @@ const users = [
   ['00000000-0000-4000-8000-00000000a001', 'admin@ensaio.test', 'Admin#Teste2026', 'Administradora Ensaio', 'admin'],
   ['00000000-0000-4000-8000-00000000c001', 'cliente1@ensaio.test', 'Cliente#Um2026', 'João Conceição', 'client'],
   ['00000000-0000-4000-8000-00000000c002', 'cliente2@ensaio.test', 'Cliente#Dois2026', 'Maria Gonçalves', 'client'],
+  // cliente 3: conta sem telefone nem morada (etapa «Dados do cliente» do checkout)
+  ['00000000-0000-4000-8000-00000000c003', 'cliente3@ensaio.test', 'Cliente#Tres2026', 'Rui Domingos', 'client'],
 ]
 for (const [id, email, pw, name, role] of users) {
   await q(`INSERT INTO auth_users (id, email, encrypted_password, email_confirmed_at, raw_user_meta_data) VALUES (?, ?, ?, CURRENT_TIMESTAMP(6), ?)
@@ -37,6 +39,12 @@ for (const [id, email, pw, name, role] of users) {
     [id, email, await bcrypt.hash(pw, 10), JSON.stringify({ full_name: name })])
   await q(`INSERT INTO profiles (id, email, full_name, country, role) VALUES (?, ?, ?, 'AO', ?) ON DUPLICATE KEY UPDATE role = VALUES(role)`, [id, email, name, role])
   if (!(await q('SELECT 1 FROM clients WHERE profile_id = ?', [id])).length) await q('INSERT INTO clients (id, profile_id) VALUES (?, ?)', [randomUUID(), id])
+}
+
+// Dados de titular completos (admin, clientes 1 e 2 encomendam directamente); o cliente 3 fica incompleto
+for (const [id, phone, address, city] of [[users[0][0], '+244 923 000 000', 'Rua Major Kanhangulo, 1', 'Luanda'], [users[1][0], '+244 923 000 001', 'Rua Rainha Ginga, 12', 'Luanda'], [users[2][0], '+244 923 000 002', 'Av. 4 de Fevereiro, 40', 'Luanda']]) {
+  await q('UPDATE profiles SET phone = COALESCE(phone, ?) WHERE id = ?', [phone, id])
+  await q('UPDATE clients SET address = COALESCE(address, ?), city = COALESCE(city, ?) WHERE profile_id = ?', [address, city, id])
 }
 
 // WHM simulado

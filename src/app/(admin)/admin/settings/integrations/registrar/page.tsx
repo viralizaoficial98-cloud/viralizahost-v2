@@ -8,6 +8,7 @@ import { ArrowLeft, CheckCircle2, Loader2, PlugZap, Save, XCircle } from 'lucide
 type Provider = { id: string; label: string; testOnly?: boolean; needsUrl?: boolean; needsUser?: boolean }
 type State = {
   settings: { provider: string; mode: 'test' | 'live'; enabled: boolean; apiUrl: string | null; username: string | null; hasSecret: boolean; extensions: string[]; lastTest: { at: string | null; ok: boolean | null; message: string | null } }
+  defaultNameservers: string[]
   providers: Provider[]; extensions: { extension: string; onSale: boolean }[]; operations: Record<string, number>; encryptionKey: boolean; testProvisioning: boolean
 }
 
@@ -16,12 +17,14 @@ const input = 'w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm focus
 export default function RegistrarIntegrationPage() {
   const [st, setSt] = useState<State | null>(null)
   const [err, setErr] = useState('')
-  const [busy, setBusy] = useState<'save' | 'test' | null>(null)
+  const [busy, setBusy] = useState<'save' | 'test' | 'ns' | null>(null)
+  const [nsForm, setNsForm] = useState<string[]>(['', '', '', ''])
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
   const [form, setForm] = useState({ provider: 'none', mode: 'test' as 'test' | 'live', apiUrl: '', username: '', secret: '', extensions: [] as string[], enabled: false })
 
   const apply = (s: State) => {
     setSt(s)
+    setNsForm([...s.defaultNameservers, '', '', '', ''].slice(0, 4))
     setForm({ provider: s.settings.provider, mode: s.settings.mode, apiUrl: s.settings.apiUrl ?? '', username: s.settings.username ?? '', secret: '', extensions: s.settings.extensions, enabled: s.settings.enabled })
   }
   const load = useCallback(() => {
@@ -31,7 +34,7 @@ export default function RegistrarIntegrationPage() {
   }, [])
   useEffect(load, [load])
 
-  async function post(body: Record<string, unknown>, kind: 'save' | 'test') {
+  async function post(body: Record<string, unknown>, kind: 'save' | 'test' | 'ns') {
     setBusy(kind); setNotice(null)
     try {
       const r = await fetch('/api/admin/integrations/registrar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -39,7 +42,7 @@ export default function RegistrarIntegrationPage() {
       if (!r.ok) setNotice({ ok: false, text: j.error ?? 'Falhou.' })
       else {
         apply(j.state)
-        setNotice(kind === 'test' ? { ok: j.ok, text: j.message } : { ok: true, text: 'Configuração guardada.' })
+        setNotice(kind === 'test' ? { ok: j.ok, text: j.message } : { ok: true, text: kind === 'ns' ? 'Nameservers padrão guardados.' : 'Configuração guardada.' })
       }
     } catch { setNotice({ ok: false, text: 'Falha de rede.' }) } finally { setBusy(null) }
   }
@@ -136,6 +139,21 @@ export default function RegistrarIntegrationPage() {
           </button>
         </div>
         <p className="text-xs text-[#64748B]">«Testar ligação» usa a configuração guardada e faz apenas uma consulta de leitura à conta — nunca regista, transfere nem cobra.</p>
+      </section>
+
+      <section className="rounded-2xl border border-[#E5E7EB] bg-white p-5 space-y-3" data-testid="default-ns">
+        <h2 className="font-bold text-[#0B0B0D]">Nameservers padrão</h2>
+        <p className="text-sm text-[#64748B]">Mostrados na configuração de domínios do site («Usar os nameservers da ViralizaHost») e enviados ao registrador nos registos que os usam. Mínimo 2.</p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {nsForm.map((v, i) => (
+            <label key={i} className="text-sm font-semibold text-[#334155]">Nameserver {i + 1}{i < 2 ? ' *' : ''}
+              <input className={`${input} font-mono`} value={v} onChange={e => { const n = [...nsForm]; n[i] = e.target.value; setNsForm(n) }} placeholder={`ns${i + 1}.viralizahost.com`} data-testid={`default-ns-${i + 1}`} />
+            </label>
+          ))}
+        </div>
+        <button disabled={!!busy} onClick={() => post({ action: 'nameservers', nameservers: nsForm.filter(x => x.trim()) }, 'ns')} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0B0B0D] text-white text-sm font-bold" data-testid="default-ns-save">
+          {busy === 'ns' ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar nameservers
+        </button>
       </section>
 
       <section className="rounded-2xl border border-[#E5E7EB] bg-white p-5 text-sm text-[#334155] space-y-2">

@@ -30,7 +30,7 @@ export function ServiceActions(p: ServiceActionProps) {
   const renew = () => {
     if (p.kind === 'domain' && p.domain) addDomain(p.domain, 'renew')
     else addRenewal(p.id, `Renovação — ${p.name}`)
-    router.push('/checkout')
+    router.push('/carrinho')
   }
 
   return (

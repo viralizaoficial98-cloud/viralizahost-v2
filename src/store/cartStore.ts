@@ -6,12 +6,13 @@ import { persist } from 'zustand/middleware'
 // da cotação do servidor (/api/checkout/quote). O código EPP de transferência
 // nunca é persistido.
 
+export interface NameserverChoice { useDefault: boolean; ns: string[] }
 export type Cycle = 'monthly' | '3months' | '6months' | '1year' | '2years' | '3years'
 export type DomainMode = 'register' | 'transfer' | 'existing'
 
 export type CartLine =
   | { key: string; type: 'product'; slug: string; cycle: Cycle; quantity: number; domain?: string; domainMode?: DomainMode; flowId?: string }
-  | { key: string; type: 'domain'; domain: string; operation: 'register' | 'transfer' | 'renew'; eppCode?: string; years?: number; flowId?: string }
+  | { key: string; type: 'domain'; domain: string; operation: 'register' | 'transfer' | 'renew'; eppCode?: string; years?: number; flowId?: string; nameservers?: NameserverChoice }
   | { key: string; type: 'renewal'; serviceId: string; label?: string }
 
 /** Linha sem chave (Omit distributivo sobre a união). */
@@ -25,6 +26,13 @@ interface CartState {
   addRenewal: (serviceId: string, label?: string) => void
   /** Linhas de um percurso de compra (/comprar): substitui as do mesmo percurso e não duplica domínio/plano. */
   setPurchase: (flowId: string, lines: NewCartLine[]) => void
+  /**
+   * Configuração de um domínio avulso (registo): cria ou actualiza a linha do domínio no mesmo lugar,
+   * sem duplicar. hosting: plano a juntar (null = retirar o alojamento associado a este domínio novo).
+   */
+  saveDomainConfig: (domain: { domain: string; years: number; nameservers: NameserverChoice }, hosting: { slug: string; cycle: Cycle } | null) => void
+  /** Substitui o carrinho pelo guardado no servidor (retoma noutro separador/dispositivo). */
+  replaceAll: (lines: CartLine[]) => void
   update: (key: string, patch: Partial<CartLine>) => void
   remove: (key: string) => void
   clear: () => void
@@ -60,6 +68,29 @@ export const useCart = create<CartState>()(
         const kept = s.lines.filter(l => (l as { flowId?: string }).flowId !== flowId && !ids.has(ident(l)))
         return { lines: [...kept, ...incoming.map(l => ({ ...l, key: newKey(), flowId } as CartLine))], idempotencyKey: null }
       }),
+      saveDomainConfig: (cfg, hosting) => set(s => {
+        const d = cfg.domain.trim().toLowerCase()
+        const isDomain = (l: CartLine) => l.type === 'domain' && l.domain === d
+        const isHosting = (l: CartLine) => l.type === 'product' && l.domain === d && l.domainMode === 'register'
+        const prevDomain = s.lines.find(isDomain)
+        const domainLine: CartLine = { key: prevDomain?.key ?? newKey(), type: 'domain', domain: d, operation: 'register', years: cfg.years, nameservers: cfg.nameservers, flowId: `dominio:${d}` }
+        const prevHosting = s.lines.find(isHosting)
+        const hostingLine: CartLine | null = hosting
+          ? { key: prevHosting?.key ?? newKey(), type: 'product', slug: hosting.slug, cycle: hosting.cycle, quantity: 1, domain: d, domainMode: 'register', flowId: `dominio:${d}` }
+          : null
+        const out: CartLine[] = []
+        let placed = false
+        for (const l of s.lines) {
+          if (isDomain(l) || isHosting(l)) {
+            if (!placed) { if (hostingLine) out.push(hostingLine); out.push(domainLine); placed = true }
+            continue
+          }
+          out.push(l)
+        }
+        if (!placed) { if (hostingLine) out.push(hostingLine); out.push(domainLine) }
+        return { lines: out, idempotencyKey: null }
+      }),
+      replaceAll: lines => set({ lines, idempotencyKey: null }),
       update: (key, patch) => set(s => ({ lines: s.lines.map(l => (l.key === key ? ({ ...l, ...patch } as CartLine) : l)), idempotencyKey: null })),
       remove: key => set(s => ({ lines: s.lines.filter(l => l.key !== key), idempotencyKey: null })),
       clear: () => set({ lines: [], idempotencyKey: null }),
@@ -85,6 +116,6 @@ export const useCart = create<CartState>()(
 /** Converte uma linha do carrinho no formato da API (o EPP só vai no pedido final). */
 export function toApiLine(l: CartLine) {
   if (l.type === 'renewal') return { type: 'renewal', serviceId: l.serviceId }
-  if (l.type === 'domain') return { type: 'domain', domain: l.domain, operation: l.operation, years: l.years ?? 1, ...(l.eppCode ? { eppCode: l.eppCode } : {}) }
+  if (l.type === 'domain') return { type: 'domain', domain: l.domain, operation: l.operation, years: l.years ?? 1, ...(l.eppCode ? { eppCode: l.eppCode } : {}), ...(l.nameservers ? { nameservers: l.nameservers } : {}) }
   return { type: 'product', slug: l.slug, cycle: l.cycle, quantity: l.quantity, ...(l.domain ? { domain: l.domain, domainMode: l.domainMode ?? 'existing' } : {}) }
 }

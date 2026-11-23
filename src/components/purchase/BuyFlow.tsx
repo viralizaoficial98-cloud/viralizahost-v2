@@ -375,7 +375,7 @@ export function BuyFlow({ plan, initialCycle }: { plan: BuyPlan; initialCycle?: 
       lines.push({ type: 'domain', domain: sel.domain, operation: sel.mode, years: sel.mode === 'register' ? sel.years || 1 : 1, ...(sel.mode === 'transfer' && epp ? { eppCode: epp } : {}) })
     }
     setPurchase(sel.flowId || newId(), lines)
-    router.push('/checkout')
+    router.push('/carrinho')
   }
 
   if (!hydrated) return <div className="flex items-center justify-center min-h-[40vh]"><Loader2 className="animate-spin text-[#F5B700]" /></div>
@@ -395,7 +395,7 @@ export function BuyFlow({ plan, initialCycle }: { plan: BuyPlan; initialCycle?: 
           <p className="font-black text-[#0A0A0A]">{plan.name}</p>
           {plan.description && <p className="text-sm text-[#666]">{plan.description}</p>}
           <ul className="mt-3 space-y-1.5">{plan.features.slice(0, 8).map(f => <li key={f} className="text-sm text-[#444] flex gap-2"><Check size={14} className="text-green-600 mt-0.5 shrink-0" />{f}</li>)}</ul>
-          <Link href="/checkout" className="mt-4 inline-flex items-center gap-1 text-xs font-bold underline text-[#555]"><ShoppingCart size={12} /> Ver carrinho</Link>
+          <Link href="/carrinho" className="mt-4 inline-flex items-center gap-1 text-xs font-bold underline text-[#555]"><ShoppingCart size={12} /> Ver carrinho</Link>
         </aside>
       </div>
     </div>

@@ -90,7 +90,10 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
     const orderNumber = await nextNumber(conn, 'orders', 'order_number', `VH-ORD-${ym}-`)
     const firstDomain = quote.lines.find(l => l.domain)?.domain ?? null
     const firstDomainLine = quote.lines.find(l => l.type === 'domain')
-    const ns = input.nameservers?.ns ?? []
+    // Nameservers da encomenda (colunas ns1..ns4): os do primeiro domínio com escolha feita; cada item guarda os seus.
+    const nsLine = quote.lines.find(l => l.type === 'domain' && l.nameservers)
+    const ns = nsLine?.nameservers?.ns ?? input.nameservers?.ns ?? []
+    const useDefaultNs = nsLine?.nameservers ? nsLine.nameservers.useDefault : input.nameservers?.useDefault !== false
     const cycle = quote.lines.find(l => l.cycle)?.cycle ?? '1year'
     const held = quote.needsConfirmation
     if (held && input.proofFile) {
@@ -104,7 +107,7 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'AKZ', ?, ?, ?, 'pending', ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [orderId, input.userId, input.idempotencyKey, orderNumber, cycle, firstDomain, firstDomainLine?.operation ?? null, input.paymentMethod,
         quote.total, quote.subtotal, quote.taxRate, quote.tax, hasProof ? 'proof_submitted' : 'unpaid', held ? 'domain_confirmation' : null, input.proofFile ?? null, input.transferRef ?? null,
-        input.nameservers?.useDefault === false ? 0 : 1, ns[0] || 'ns1.viralizahost.com', ns[1] || 'ns2.viralizahost.com', ns[2] || null, ns[3] || null,
+        useDefaultNs ? 1 : 0, ns[0] || 'ns1.viralizahost.com', ns[1] || 'ns2.viralizahost.com', ns[2] || null, ns[3] || null,
         input.billingDetails ? JSON.stringify(input.billingDetails) : null],
     )
 
@@ -116,11 +119,12 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
       const epp = l.type === 'domain' && l.operation === 'transfer' && raw?.eppCode ? secretEpp(String(raw.eppCode)) : null
       await conn.query(
         `INSERT INTO order_items (id, order_id, service_name, service_type, price, quantity, product_id, product_slug, billing_cycle, months,
-           unit_price, line_total, renewal_price, domain_name, domain_operation, epp_code_enc, renews_service_id, years, availability)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           unit_price, line_total, renewal_price, domain_name, domain_operation, epp_code_enc, renews_service_id, years, availability, nameservers)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [itemId, orderId, l.name, l.serviceType, l.unitPrice, l.quantity, l.productId ?? null, l.slug ?? null, l.cycle ?? null, l.months ?? null,
           l.unitPrice, l.lineTotal, l.renewalPrice, l.domain ?? null, l.type === 'domain' ? l.operation : (l.domainMode ?? null), epp, l.renewsServiceId ?? null,
-          l.type === 'domain' ? (l.years ?? 1) : null, l.type === 'domain' ? (l.availability?.status ?? null) : null],
+          l.type === 'domain' ? (l.years ?? 1) : null, l.type === 'domain' ? (l.availability?.status ?? null) : null,
+          l.type === 'domain' && l.nameservers ? JSON.stringify(l.nameservers) : null],
       )
       // Serviço (um por item) — a activação acontece só depois do pagamento confirmado
       const serviceType = l.type === 'domain' ? 'domain' : l.serviceType

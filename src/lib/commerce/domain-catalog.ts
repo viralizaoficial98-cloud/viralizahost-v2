@@ -67,3 +67,47 @@ export async function searchDomains(query: string, maxAlternatives = 6): Promise
   const [x, ...rest] = await Promise.all([check(exact), ...alts.map(check)])
   return { exact: x, alternatives: rest }
 }
+
+export interface HostingOption { slug: string; name: string; category: string; prices: { cycle: string; months: number; price: number; renewal: number }[] }
+
+/** Planos de alojamento que se podem juntar a um domínio na configuração (opcional). */
+export async function hostingOptions(): Promise<HostingOption[]> {
+  const [rows] = await getPool().query(
+    `SELECT p.slug, p.name, p.category, pp.cycle, pp.months, pp.price, pp.renewal_price FROM products p
+     JOIN product_prices pp ON pp.product_id = p.id AND pp.active = 1
+     WHERE p.active = 1 AND p.sale_status = 'active' AND p.service_type = 'hosting' AND p.category IN ('hosting','wordpress')
+     ORDER BY p.category = 'hosting' DESC, p.position, pp.months`) as any
+  const map = new Map<string, HostingOption>()
+  for (const r of rows as any[]) {
+    const o: HostingOption = map.get(r.slug) ?? { slug: r.slug, name: r.name, category: r.category, prices: [] }
+    o.prices.push({ cycle: r.cycle, months: Number(r.months), price: Number(r.price), renewal: Number(r.renewal_price) })
+    map.set(r.slug, o)
+  }
+  return [...map.values()]
+}
+
+export interface DomainConfigInfo {
+  domain: string
+  extension: string
+  availability: AvailabilityStatus | 'on_request'
+  register: number | null
+  renew: number | null
+  maxYears: number
+  /** Total a pagar agora para cada período disponível (1.º ano + renovações seguintes). */
+  periods: { years: number; total: number }[]
+}
+
+/** Informação para a página «Configuração do domínio» (preços de domain_prices + disponibilidade). */
+export async function domainConfigInfo(raw: string, opts: { checkAvailability?: boolean } = {}): Promise<DomainConfigInfo | null> {
+  const domain = normalizeDomain(raw)
+  if (!domain) return null
+  const exts = await listExtensions()
+  const parts = splitDomain(domain, exts.map(e => e.extension))
+  const e = parts ? exts.find(x => x.extension === parts.extension) : undefined
+  if (!e) return null
+  if (e.status !== 'active' || e.register == null) return { domain, extension: e.extension, availability: 'on_request', register: null, renew: null, maxYears: 1, periods: [] }
+  const availability = opts.checkAvailability === false ? 'confirm' : (await checkAvailability(domain)).status
+  const renew = e.renew ?? e.register
+  const periods = Array.from({ length: e.maxYears }, (_, i) => ({ years: i + 1, total: Math.round((e.register! + renew * i) * 100) / 100 }))
+  return { domain, extension: e.extension, availability, register: e.register, renew, maxYears: e.maxYears, periods }
+}

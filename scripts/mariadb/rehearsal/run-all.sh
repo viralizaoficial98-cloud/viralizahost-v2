@@ -27,6 +27,7 @@ run "Painel: receita, acções pendentes, registrador e WHM" node --env-file=.en
 if [ "${SKIP_UI:-0}" = "1" ]; then
   echo; echo "=== Interface e links: ignorados (SKIP_UI=1, sem Chromium neste servidor)"
 else
+  run "Domínio avulso: configuração, carrinho, cadastro e pagamento (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/domain-checkout-e2e.cjs
   run "Percursos de compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/purchase-flows-e2e.cjs
   run "Interface desktop + iPhone" node scripts/mariadb/rehearsal/ui-e2e.cjs
   run "Painel: menu, acções pendentes, integrações (desktop + iPhone)" node scripts/mariadb/rehearsal/admin-ui-e2e.cjs

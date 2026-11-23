@@ -44,7 +44,7 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
   ) as any
   if (!claim.affectedRows) return { serviceId, status: 'skipped', message: 'Já activo ou em curso.' }
 
-  const [s] = await rows(db, `SELECT s.*, o.payment_status, o.ns1, o.ns2, o.ns3, o.ns4, oi.months, oi.years, oi.domain_operation, oi.epp_code_enc, p.provisioning, p.whm_package, p.whm_server_id, p.slug
+  const [s] = await rows(db, `SELECT s.*, o.payment_status, o.ns1, o.ns2, o.ns3, o.ns4, oi.months, oi.years, oi.domain_operation, oi.epp_code_enc, oi.nameservers AS item_ns, p.provisioning, p.whm_package, p.whm_server_id, p.slug
     FROM services s JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id LEFT JOIN products p ON p.id = s.product_id
     WHERE s.id = ?`, [serviceId])
   const done = async (status: ProvisionOutcome['status'], message: string, extra: Record<string, unknown> = {}) => {
@@ -80,7 +80,9 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
       const op = s.domain_operation === 'transfer' ? 'transfer' : s.domain_operation === 'renew' ? 'renew' : 'register'
       const label = op === 'transfer' ? 'Transferência' : op === 'renew' ? 'Renovação' : 'Registo'
       if (!s.domain) return await done('manual_required', `${label} sem domínio associado.`)
-      const ns = [s.ns1, s.ns2, s.ns3, s.ns4].filter(Boolean)
+      // Nameservers escolhidos para este domínio (item); encomendas antigas usam os da encomenda.
+      let ns = [s.ns1, s.ns2, s.ns3, s.ns4].filter(Boolean)
+      try { const it = s.item_ns ? JSON.parse(s.item_ns) : null; if (Array.isArray(it?.ns) && it.ns.length) ns = it.ns } catch { /* JSON inválido → os da encomenda */ }
       const r = await runDomainOperation(serviceId, op, s.domain, { years: Math.max(1, Number(s.years ?? 1)), eppEnc: s.epp_code_enc, nameservers: ns })
       if (!r.handled) return await done('manual_required', `${label} manual no registrador: extensão sem integração automática activa. Marque como activo só com a referência do registo.`)
       if (r.outcome === 'succeeded') {

@@ -2,11 +2,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AlertCircle, Check, Loader2, Search, ShoppingCart, XCircle, ArrowRightLeft, Globe, RefreshCw } from 'lucide-react'
+import { AlertCircle, ChevronRight, Clock, Loader2, Search, ShoppingCart, XCircle, ArrowRightLeft, Globe, RefreshCw } from 'lucide-react'
 import { kz as kzFmt } from '@/lib/commerce/status'
 import { useCart } from '@/store/cartStore'
 
-// Domínio avulso: pesquisa → disponibilidade e alternativas → duração do registo → carrinho.
+// Domínio avulso: pesquisa → disponibilidade e alternativas → «Registrar Agora» → Configuração do domínio
+// (/dominios/configurar: período, nameservers, alojamento opcional) → carrinho.
 // Transferência: domínio + código EPP (só quando a extensão o exige) → carrinho.
 // Preços de domain_prices (os mesmos do carrinho/checkout); o servidor revalida tudo.
 
@@ -37,8 +38,6 @@ export function DomainShop({ initialMode = 'register' }: { initialMode?: 'regist
   const [results, setResults] = useState<{ exact: Result; alternatives: Result[] } | null>(null)
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState('')
-  const [picked, setPicked] = useState<Result | null>(null)
-  const [years, setYears] = useState(1)
   const [tDomain, setTDomain] = useState('')
   const [epp, setEpp] = useState('')
   const [tError, setTError] = useState('')
@@ -54,7 +53,7 @@ export function DomainShop({ initialMode = 'register' }: { initialMode?: 'regist
   const search = useCallback(async (q?: string) => {
     const n = (q ?? name).trim().toLowerCase().replace(/^www\./, '')
     if (!n) return
-    setSearching(true); setError(''); setResults(null); setPicked(null)
+    setSearching(true); setError(''); setResults(null)
     try {
       const r = await fetch(`/api/domains/search?q=${encodeURIComponent(n.includes('.') ? n : n + ext)}`, { cache: 'no-store' })
       const j = await r.json()
@@ -73,10 +72,10 @@ export function DomainShop({ initialMode = 'register' }: { initialMode?: 'regist
     void search(params.get('q') ?? '')
   }, [autoDone, exts, params, search])
 
-  const addRegister = () => {
-    if (!picked) return
-    addDomain(`dominio:${picked.domain}`, [{ type: 'domain', domain: picked.domain, operation: 'register', years }])
-    router.push('/checkout')
+  const configure = (r: Result) => {
+    // «Voltar» da configuração repete esta pesquisa
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}?q=${encodeURIComponent(results?.exact.domain ?? r.domain)}`)
+    router.push(`/dominios/configurar?dominio=${encodeURIComponent(r.domain)}`)
   }
   const tExt = [...sold].sort((a, b) => b.extension.length - a.extension.length).find(x => tDomain.trim().toLowerCase().endsWith(x.extension))
   const addTransfer = () => {
@@ -85,28 +84,28 @@ export function DomainShop({ initialMode = 'register' }: { initialMode?: 'regist
     if (tExt.eppRequired && !epp.trim()) { setTError('Indique o código de autorização (EPP).'); return }
     setTError('')
     addDomain(`dominio:${d}`, [{ type: 'domain', domain: d, operation: 'transfer', years: 1, ...(epp ? { eppCode: epp } : {}) }])
-    router.push('/checkout')
+    router.push('/carrinho')
   }
 
   const Row = ({ r, exact }: { r: Result; exact?: boolean }) => {
     const ui = STATUS_UI[r.availability]
-    const ok = r.availability === 'available' || r.availability === 'confirm'
-    const on = picked?.domain === r.domain
     return (
-      <li className={`flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-xl border ${on ? 'border-[#0A0A0A]' : exact ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#EEE] bg-white'}`} data-testid="domain-result" data-status={r.availability}>
+      <li className={`flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-xl border ${exact ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#EEE] bg-white'}`} data-testid="domain-result" data-status={r.availability}>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-[#0A0A0A] break-all">{r.domain}</p>
           <span className={`inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${ui.cls}`}>{ui.label}</span>
-          {r.availability === 'confirm' && <p className="text-xs text-amber-800 mt-1">Sem consulta automática nesta extensão: encomenda já, paga depois de a equipa confirmar.</p>}
+          {r.availability === 'confirm' && <p className="text-xs text-amber-800 mt-1 flex gap-1"><Clock size={12} className="shrink-0 mt-0.5" /> Sem consulta automática nesta extensão: a equipa confirma a disponibilidade e o pagamento só é pedido depois dessa confirmação.</p>}
         </div>
         {r.register != null && r.availability !== 'on_request' && (
           <div className="text-sm sm:text-right"><p className="font-bold">{kz(r.register)} <span className="font-normal text-[#888]">/ 1.º ano</span></p>{r.renew != null && <p className="text-xs text-[#888]">Renova por {kz(r.renew)}/ano</p>}</div>
         )}
-        {ok ? (
-          <button className={on ? btnGhost : btnPrimary} onClick={() => { setPicked(r); setYears(1) }} data-testid="pick-domain">{on ? <><Check size={14} /> Seleccionado</> : 'Seleccionar'}</button>
+        {r.availability === 'available' ? (
+          <button className={btnPrimary} onClick={() => configure(r)} data-testid="register-now">Registrar Agora <ChevronRight size={15} /></button>
+        ) : r.availability === 'confirm' ? (
+          <button className={btnPrimary} onClick={() => configure(r)} data-testid="request-registration">Solicitar registo <ChevronRight size={15} /></button>
         ) : r.availability === 'unavailable' ? (
-          <button className={btnGhost} disabled><XCircle size={14} /> Indisponível</button>
-        ) : <Link href="/suporte/contactar" className={btnGhost}>Pedir preço</Link>}
+          <button className={btnGhost} disabled aria-disabled="true"><XCircle size={14} /> Indisponível</button>
+        ) : <Link href={`/suporte/contactar?assunto=${encodeURIComponent('Domínio ' + r.domain)}`} className={btnGhost}>Pedir preço</Link>}
       </li>
     )
   }
@@ -143,21 +142,7 @@ export function DomainShop({ initialMode = 'register' }: { initialMode?: 'regist
                 {results.alternatives.length > 0 && <li className="pt-3 text-xs font-black uppercase tracking-widest text-[#888]">Alternativas</li>}
                 {results.alternatives.map(r => <Row key={r.domain} r={r} />)}
               </ul>
-            </div>
-          )}
-          {picked && (
-            <div className="mt-5 p-4 rounded-xl bg-[#F8F8F8] flex flex-col sm:flex-row sm:items-center gap-3" data-testid="domain-years">
-              <div className="flex-1">
-                <p className="font-bold text-[#0A0A0A]">{picked.domain}</p>
-                <label className="text-sm text-[#555] flex flex-wrap items-center gap-2 mt-1">Duração do registo
-                  <select className="border border-[#E2E2E2] rounded-lg px-2 py-1.5 text-sm" value={years} onChange={e => setYears(Number(e.target.value))} aria-label="Anos de registo">
-                    {Array.from({ length: picked.maxYears }, (_, i) => i + 1).map(y => <option key={y} value={y}>{y} {y === 1 ? 'ano' : 'anos'}</option>)}
-                  </select>
-                  — <strong className="text-[#0A0A0A]">{kz((picked.register ?? 0) + (picked.renew ?? picked.register ?? 0) * (years - 1))}</strong>
-                </label>
-                <p className="text-xs text-[#888]">Renova por {kz(picked.renew ?? picked.register ?? 0)}/ano.</p>
-              </div>
-              <button className={btnPrimary} onClick={addRegister} data-testid="add-domain-to-cart"><ShoppingCart size={16} /> Adicionar ao carrinho</button>
+              <p className="text-xs text-[#888] mt-3">A disponibilidade e o preço voltam a ser verificados no servidor antes de confirmar a encomenda.</p>
             </div>
           )}
         </div>
