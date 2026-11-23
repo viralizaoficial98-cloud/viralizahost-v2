@@ -200,13 +200,13 @@ export function HostingPlansSection({ id = 'planos', tag = 'Hospedagem Premium',
 
         {state === 'loading' && <div className="flex justify-center py-20" role="status" aria-label="A carregar planos de hospedagem"><Loader2 size={32} className="animate-spin text-[#F5B700]" /></div>}
         {state === 'error' && (
-          <div className="max-w-xl mx-auto text-center bg-white border border-red-200 rounded-2xl p-8" role="alert">
+          <div className="max-w-xl mx-auto text-center bg-white border border-red-200 rounded-2xl p-8" role="alert" data-testid="plans-error">
             <p className="font-bold text-[#0A0A0A]">Não foi possível carregar os planos de hospedagem.</p>
             <button onClick={() => { setState('loading'); setAttempt(a => a + 1) }} className="mt-4 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#F5B700] text-[#0A0A0A]">Tentar novamente</button>
           </div>
         )}
         {state === 'empty' && (
-          <div className="max-w-xl mx-auto text-center bg-white border border-[#E8E8E8] rounded-2xl p-8">
+          <div className="max-w-xl mx-auto text-center bg-white border border-[#E8E8E8] rounded-2xl p-8" data-testid="plans-empty">
             <p className="font-bold text-[#0A0A0A]">Ainda não há planos de hospedagem publicados.</p>
             <Link href="/suporte/contactar" className="inline-block mt-4 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#0A0A0A] text-white">Falar com a equipa</Link>
           </div>

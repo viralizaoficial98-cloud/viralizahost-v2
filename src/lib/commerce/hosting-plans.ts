@@ -162,6 +162,7 @@ export async function saveHostingPlan(input: HostingPlanInput): Promise<string> 
   const per = new Map((input.periods ?? []).map(p => [String(p?.cycle), p]))
   for (const c of per.keys()) if (!PLAN_PERIODS.some(p => p.cycle === c)) throw new HostingPlanError(`Período inválido: ${c}.`, 'periods')
 
+  const specsJson = Object.keys(specs).length ? JSON.stringify(specs) : null // sem ficha → NULL (cartão só com características)
   const id = await withTransaction(async conn => {
     let pid = input.id ? String(input.id) : ''
     if (pid) {
@@ -171,7 +172,7 @@ export async function saveHostingPlan(input: HostingPlanInput): Promise<string> 
       if (dup) throw new HostingPlanError('Já existe um plano de hospedagem com esse nome.', 'name')
       // whm_package, provisioning e service_type não são tocados
       await conn.query('UPDATE products SET name = ?, description = ?, sale_status = ?, position = ?, badge = ?, popular = ?, base_monthly_price = ?, plan_specs = ?, storage_gb = ?, send_limit_hour = ? WHERE id = ?',
-        [name, description, saleStatus, position, badge, highlight ? 1 : 0, base, JSON.stringify(specs), specs.storageGb ?? null, specs.sendLimitHour ?? null, pid])
+        [name, description, saleStatus, position, badge, highlight ? 1 : 0, base, specsJson, specs.storageGb ?? null, specs.sendLimitHour ?? null, pid])
     } else {
       const [dup] = await rows(conn, "SELECT id FROM products WHERE category = 'hosting' AND LOWER(name) = LOWER(?)", [name])
       if (dup) throw new HostingPlanError('Já existe um plano de hospedagem com esse nome.', 'name')
@@ -182,7 +183,7 @@ export async function saveHostingPlan(input: HostingPlanInput): Promise<string> 
       // Novo plano: activação manual até ser associado um pacote WHM (linha do produto ou Integrações → WHM/cPanel)
       await conn.query(`INSERT INTO products (id, slug, category, name, description, sale_status, position, badge, popular, active, base_monthly_price, plan_specs, storage_gb, send_limit_hour,
           service_type, provisioning, max_quantity, currency) VALUES (?, ?, 'hosting', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 'hosting', 'whm', 1, 'AOA')`,
-        [pid, slug, name, description, saleStatus, position, badge, highlight ? 1 : 0, base, JSON.stringify(specs), specs.storageGb ?? null, specs.sendLimitHour ?? null])
+        [pid, slug, name, description, saleStatus, position, badge, highlight ? 1 : 0, base, specsJson, specs.storageGb ?? null, specs.sendLimitHour ?? null])
     }
     await conn.query('DELETE FROM product_features WHERE product_id = ?', [pid])
     for (const [i, f] of features.entries())
