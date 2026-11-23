@@ -1,25 +1,15 @@
 import { NextResponse } from 'next/server'
-import { createAdminWriteClient } from '@/lib/supabase/server'
+import { featuredExtensions } from '@/lib/commerce/domain-catalog'
 
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
+// Compatibilidade: antes lia site_domains (preços duplicados). Agora devolve os cartões do catálogo
+// (preços de domain_prices; destaque, ordem e etiqueta de domain_extensions).
 export async function GET() {
   try {
-    const supabase = createAdminWriteClient()
-    const { data, error } = await supabase
-      .from('site_domains')
-      .select('extension, price_annual, price_monthly, currency, popular, active')
-      .eq('active', true)
-      .order('position')
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    return NextResponse.json(
-      { domains: data ?? [] },
-      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
-    )
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message ?? 'Internal error' }, { status: 500 })
+    const domains = (await featuredExtensions()).map(e => ({ extension: e.extension, price_annual: e.register, renewal: e.renew, currency: 'AKZ', popular: e.highlight, badge: e.badge, description: e.description, active: true }))
+    return NextResponse.json({ domains }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
 }

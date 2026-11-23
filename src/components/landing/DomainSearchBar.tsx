@@ -5,10 +5,12 @@ import { Search, Shield, Zap, Headphones, Lock, Globe, RefreshCw, Check, X, Load
 import { useLocale } from '@/hooks/useLocale'
 import { convertFromAOA } from '@/lib/currency'
 
-type ExtItem = { tld: string; label: string; priceNum: number; renewNum: number | null; popular: boolean }
+type ExtItem = { tld: string; label: string; priceNum: number; renewNum: number | null; badge: string | null; highlight: boolean }
+type ApiExt = { extension: string; status: string; register: number | null; renew: number | null; description: string | null; badge: string | null; highlight: boolean }
 
-// Extensões e preços vêm do catálogo (/api/catalog/domains → domain_prices). Sem preços de recurso.
-const LABELS: Record<string, string> = { '.ao': 'Angola oficial', '.co.ao': 'Empresas em Angola', '.com': 'O mais popular', '.net': 'Tecnologia e redes', '.org': 'Organizações', '.it.ao': 'Tecnologia em Angola', '.io': 'Startups e tecnologia', '.online': 'Presença online', '.shop': 'Lojas', '.store': 'Lojas' }
+// Cartões e preços vêm do catálogo (/api/catalog/domains): preços de domain_prices; descrição, etiqueta,
+// realce e ordem de domain_extensions (Administração → Catálogo e Preços → Domínios). Sem valores fixos.
+const toItem = (e: ApiExt): ExtItem => ({ tld: e.extension, label: e.description ?? '', priceNum: e.register ?? 0, renewNum: e.renew, badge: e.badge, highlight: e.highlight })
 
 type CheckResult = { tld: string; domain: string; status: 'available' | 'unavailable' | 'confirm' | 'on_request' | null; loading: boolean }
 
@@ -30,7 +32,8 @@ export function DomainSearchBar() {
   const { formatCurrency, currency } = useLocale()
   const fmtAOA = (n: number) => formatCurrency(convertFromAOA(n, currency))
   const [query, setQuery] = useState('')
-  const [extensions, setExtensions] = useState<ExtItem[]>([])
+  const [extensions, setExtensions] = useState<ExtItem[]>([])   // cartões em destaque
+  const [onSale, setOnSale] = useState<ExtItem[]>([])          // todas à venda (preço nos resultados da pesquisa)
   const [results, setResults] = useState<CheckResult[]>([])
   const [searching, setSearching] = useState(false)
   const [revealed, setRevealed] = useState<boolean[]>([])
@@ -42,14 +45,15 @@ export function DomainSearchBar() {
   useEffect(() => {
     fetch('/api/catalog/domains', { cache: 'no-store' })
       .then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error); return j })
-      .then(j => setExtensions((j.extensions as { extension: string; status: string; register: number | null; renew: number | null; national: boolean }[])
-        .filter(e => e.status === 'active' && e.register != null).slice(0, 6)
-        .map(e => ({ tld: e.extension, label: LABELS[e.extension] ?? e.extension, priceNum: e.register ?? 0, renewNum: e.renew, popular: e.extension === '.ao' || e.extension === '.com' }))))
+      .then(j => {
+        setExtensions((j.featured as ApiExt[] ?? []).map(toItem))
+        setOnSale((j.extensions as ApiExt[]).filter(e => e.status === 'active' && e.register != null).map(toItem))
+      })
       .catch(() => setExtError(true))
   }, [])
 
   function getExtByTld(tld: string): ExtItem | undefined {
-    return extensions.find(e => e.tld === tld)
+    return onSale.find(e => e.tld === tld)
   }
 
   async function handleSearch() {
@@ -302,9 +306,10 @@ export function DomainSearchBar() {
           {/* Extension cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
             {extError && <p className="col-span-full text-center text-sm text-[#888]" role="alert">Não foi possível carregar as extensões. <a href="/dominios" className="underline">Ver domínios</a></p>}
-            {extensions.map(({ tld, label, priceNum, popular }) => (
+            {extensions.map(({ tld, label, priceNum, badge, highlight: popular }) => (
               <div
                 key={tld}
+                data-testid="ext-card" data-ext={tld} data-highlight={popular ? '1' : '0'}
                 className="group relative flex flex-col items-center text-center bg-white border rounded-2xl p-5 cursor-pointer transition-all duration-200"
                 style={{
                   borderColor: popular ? '#F5B700' : '#EBEBEB',
@@ -313,9 +318,9 @@ export function DomainSearchBar() {
                 onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = '#F5B700'; el.style.boxShadow = '0 8px 32px rgba(245,183,0,0.22)'; el.style.transform = 'translateY(-3px)' }}
                 onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = popular ? '#F5B700' : '#EBEBEB'; el.style.boxShadow = popular ? '0 4px 24px rgba(245,183,0,0.18)' : '0 2px 12px rgba(0,0,0,0.05)'; el.style.transform = 'translateY(0)' }}
               >
-                {popular && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#F5B700] text-[#0A0A0A] text-[10px] font-black px-3 py-0.5 rounded-full tracking-wide uppercase">
-                    Popular
+                {badge && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#F5B700] text-[#0A0A0A] text-[10px] font-black px-3 py-0.5 rounded-full tracking-wide uppercase whitespace-nowrap max-w-[90%] truncate" data-testid="ext-card-badge">
+                    {badge}
                   </span>
                 )}
                 <div className="text-2xl font-black text-[#0A0A0A] mb-1">{tld}</div>

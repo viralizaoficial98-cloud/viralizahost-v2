@@ -797,6 +797,65 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
+  "domain_extensions": {
+    "pk": [
+      "extension"
+    ],
+    "unique": [],
+    "columns": {
+      "extension": {
+        "kind": "text"
+      },
+      "description": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "featured": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "featured_position": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "badge": {
+        "kind": "enum",
+        "values": [
+          "none",
+          "popular",
+          "promo",
+          "new",
+          "custom"
+        ],
+        "hasDefault": true
+      },
+      "badge_text": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "highlight": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "updated_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
   "domain_prices": {
     "pk": [
       "id"

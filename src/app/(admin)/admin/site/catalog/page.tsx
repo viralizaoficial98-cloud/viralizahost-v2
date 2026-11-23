@@ -1,5 +1,6 @@
 'use client'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { DomainExtensionsEditor, type DomainExtension } from '@/components/admin/DomainExtensionsEditor'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Save, ExternalLink, AlertTriangle } from 'lucide-react'
 import { AdminPageShell } from '@/components/admin/AdminPageShell'
@@ -14,7 +15,6 @@ type DomainPrice = { id: string; extension: string; operation: string; years: nu
 
 const CYCLES = [['monthly', 'Mensal'], ['3months', 'Trimestral'], ['6months', '6 meses'], ['1year', '1 ano'], ['2years', '2 anos'], ['3years', '3 anos']] as const
 const STATUS = { active: 'À venda', on_request: 'Sob consulta', draft: 'Rascunho' }
-const OP = { register: 'Registo', renew: 'Renovação', transfer: 'Transferência' } as Record<string, string>
 const input = 'w-full border border-[#E5E7EB] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-[#F5B700]'
 
 function ProductRow({ p, onSaved }: { p: Product; onSaved: () => void }) {
@@ -86,26 +86,6 @@ function ProductRow({ p, onSaved }: { p: Product; onSaved: () => void }) {
   )
 }
 
-function DomainRow({ d, onSaved }: { d: DomainPrice; onSaved: () => void }) {
-  const [price, setPrice] = useState<string>(d.price == null ? '' : String(d.price))
-  const [status, setStatus] = useState(d.status)
-  const [msg, setMsg] = useState('')
-  async function save() {
-    setMsg('')
-    const res = await fetch('/api/admin/catalog', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'domain', id: d.id, price: price === '' ? null : Number(price), status }) })
-    const j = await res.json(); setMsg(res.ok ? 'Guardado' : j.error); if (res.ok) onSaved()
-  }
-  return (
-    <tr className="border-t border-[#F1F5F9]">
-      <td className="py-1.5 font-mono">{d.extension}</td><td>{OP[d.operation] ?? d.operation}</td>
-      <td className="pr-2"><input className={input} type="number" min={0} step={100} value={price} onChange={e => setPrice(e.target.value)} aria-label={`Preço ${d.extension} ${d.operation}`} /></td>
-      <td className="pr-2"><select className={input} value={status} onChange={e => setStatus(e.target.value as DomainPrice['status'])}>{Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></td>
-      <td className="text-xs text-[#64748B]">{d.reference?.provider ?? d.reference?.reason ?? ''}</td>
-      <td><button onClick={save} className="text-xs font-bold underline">Guardar</button> <span className="text-xs">{msg}</span></td>
-    </tr>
-  )
-}
-
 const CAT_GROUPS: Record<string, { label: string; categories: string[] | null }> = {
   all: { label: 'Tudo', categories: null },
   hosting: { label: 'Hospedagem', categories: ['hosting', 'wordpress', 'website-builder', 'reseller'] },
@@ -141,7 +121,7 @@ function Catalog() {
   const params = useSearchParams()
   const router = useRouter()
   const cat = CAT_GROUPS[params.get('cat') ?? 'all'] ? (params.get('cat') ?? 'all') : 'all'
-  const [data, setData] = useState<{ products: Product[]; domains: DomainPrice[] } | null>(null)
+  const [data, setData] = useState<{ products: Product[]; domains: DomainPrice[]; extensions: DomainExtension[] } | null>(null)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('')
   const load = useCallback(() => {
@@ -179,14 +159,9 @@ function Catalog() {
               <div className="space-y-2">{list.map(p => <ProductRow key={p.id} p={p} onSaved={load} />)}</div>
             </section>
           ))}
-          {(cat === 'all' || cat === 'dominios') && <section>
-            <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">Domínios (preço por 1 ano; registos de 2–3 anos = registo + renovações)</h2>
-            <div className="rounded-xl border border-[#E5E7EB] bg-white p-3 overflow-x-auto">
-              <table className="w-full text-sm min-w-[640px]">
-                <thead><tr className="text-left text-[11px] uppercase text-[#64748B]"><th>Extensão</th><th>Operação</th><th>Preço (Kz)</th><th>Estado</th><th>Referência</th><th /></tr></thead>
-                <tbody>{data.domains.map(d => <DomainRow key={d.id} d={d} onSaved={load} />)}</tbody>
-              </table>
-            </div>
+          {(cat === 'all' || cat === 'dominios') && <section data-testid="domains-section">
+            <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">Domínios — extensões, preços e cartões da página inicial</h2>
+            <DomainExtensionsEditor extensions={data.extensions} onSaved={load} />
             <NewExtension onSaved={load} />
           </section>}
         </div>

@@ -16,16 +16,31 @@ export interface Extension {
   eppRequired: boolean
   national: boolean
   maxYears: number
+  /** Apresentação (domain_extensions); os preços vêm SEMPRE de domain_prices. */
+  description: string | null
+  featured: boolean
+  position: number
+  badge: string | null
+  highlight: boolean
 }
+
+const BADGE_LABEL: Record<string, string> = { popular: 'Popular', promo: 'Promoção', new: 'Novo' }
 
 /** Ordem de apresentação: nacionais primeiro, depois as mais procuradas. */
 const PRIORITY = ['.ao', '.co.ao', '.com', '.net', '.org', '.it.ao', '.org.ao', '.edu.ao', '.online', '.shop', '.store', '.xyz', '.io', '.tech', '.ai']
 
 export async function listExtensions(): Promise<Extension[]> {
   const [rows] = await getPool().query("SELECT extension, operation, price, status FROM domain_prices WHERE years = 1 AND status IN ('active','on_request')") as any
+  const [metaRows] = await getPool().query('SELECT extension, description, featured, featured_position, badge, badge_text, highlight FROM domain_extensions').catch(() => [[]]) as any
+  const meta = new Map<string, any>((metaRows as any[]).map(m => [m.extension, m]))
   const map = new Map<string, Extension>()
   for (const r of rows as any[]) {
-    const e = map.get(r.extension) ?? { extension: r.extension, status: 'on_request', register: null, renew: null, transfer: null, eppRequired: !EPP_OPTIONAL.some(x => r.extension.endsWith(x)), national: r.extension.endsWith('.ao'), maxYears: 1 }
+    const m = meta.get(r.extension)
+    const e = map.get(r.extension) ?? {
+      extension: r.extension, status: 'on_request', register: null, renew: null, transfer: null, eppRequired: !EPP_OPTIONAL.some(x => r.extension.endsWith(x)), national: r.extension.endsWith('.ao'), maxYears: 1,
+      description: m?.description ?? null, featured: !!m?.featured, position: Number(m?.featured_position ?? 999),
+      badge: m?.badge === 'custom' ? (m.badge_text || null) : BADGE_LABEL[m?.badge] ?? null, highlight: !!m?.highlight,
+    }
     const price = r.status === 'active' && r.price != null ? Number(r.price) : null
     if (r.operation === 'register' || r.operation === 'renew' || r.operation === 'transfer') e[r.operation as 'register'] = price
     if (r.operation === 'register' && r.status === 'active') e.status = 'active'
@@ -34,6 +49,11 @@ export async function listExtensions(): Promise<Extension[]> {
   for (const e of map.values()) e.maxYears = e.register != null && e.renew != null ? MAX_DOMAIN_YEARS : 1
   const rank = (x: string) => { const i = PRIORITY.indexOf(x); return i < 0 ? 99 : i }
   return [...map.values()].sort((a, b) => rank(a.extension) - rank(b.extension) || a.extension.localeCompare(b.extension))
+}
+
+/** Cartões da página inicial: à venda (registo activo com preço) e escolhidas para destaque, pela ordem do administrador. */
+export async function featuredExtensions(all?: Extension[]): Promise<Extension[]> {
+  return (all ?? await listExtensions()).filter(e => e.featured && e.status === 'active' && e.register != null).sort((a, b) => a.position - b.position || a.extension.localeCompare(b.extension))
 }
 
 export interface SearchResult extends Extension {
