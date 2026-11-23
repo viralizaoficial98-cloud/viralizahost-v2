@@ -2117,6 +2117,11 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "int",
         "hasDefault": true,
         "nullable": true
+      },
+      "nameservers": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": [
@@ -3235,6 +3240,11 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "timestamp",
         "hasDefault": true,
         "autoUpdate": true
+      },
+      "default_nameservers": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": []
@@ -3631,6 +3641,43 @@ export const SCHEMA_META: SchemaMeta = {
         "many": true
       }
     ]
+  },
+  "shopping_carts": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "token_hash"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "token_hash": {
+        "kind": "text"
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "items": {
+        "kind": "json",
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
   },
   "site_banners": {
     "pk": [

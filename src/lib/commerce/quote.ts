@@ -1,6 +1,8 @@
 import 'server-only'
 import { getPool, type Queryable } from '@/lib/db/pool'
 import { checkAvailability, normalizeDomain, splitDomain, type Availability } from './domains'
+import { validateNameservers } from './nameservers'
+import { getDefaultNameservers } from './nameserver-settings'
 
 // Cotação calculada SEMPRE no servidor a partir da base (product_prices / domain_prices).
 // O cliente só envia escolhas (produto, ciclo, quantidade, domínio, operação).
@@ -12,7 +14,7 @@ export const CYCLE_LABEL: Record<Cycle, string> = { monthly: 'Mensal', '3months'
 export type DomainMode = 'register' | 'transfer' | 'existing'
 export type CartLineInput =
   | { type: 'product'; slug: string; cycle: Cycle; quantity?: number; domain?: string; domainMode?: DomainMode }
-  | { type: 'domain'; domain: string; operation: 'register' | 'transfer' | 'renew'; years?: number; eppCode?: string }
+  | { type: 'domain'; domain: string; operation: 'register' | 'transfer' | 'renew'; years?: number; eppCode?: string; nameservers?: { useDefault?: boolean; ns?: string[] } }
   | { type: 'renewal'; serviceId: string }
 
 export interface QuoteLine {
@@ -39,6 +41,8 @@ export interface QuoteLine {
   availability?: Availability
   hasEppCode?: boolean
   years?: number
+  /** Registo/transferência: nameservers efectivos (os padrão da plataforma ou os próprios do cliente). */
+  nameservers?: { useDefault: boolean; ns: string[] }
   cycles?: { cycle: Cycle; months: number; price: number; renewal: number }[]
   error?: { code: string; message: string }
 }
@@ -82,6 +86,7 @@ const MSG: Record<string, string> = {
   service_not_renewable: 'Este serviço não pode ser renovado aqui (sem preço de renovação ou cancelado).',
   renewal_pending: 'Já existe uma renovação por pagar para este serviço — veja as Encomendas.',
   duplicate_line: 'Item repetido no carrinho.',
+  nameservers_invalid: 'Nameservers inválidos.',
 }
 const err = (code: string) => ({ code, message: MSG[code] ?? code })
 
@@ -104,6 +109,7 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
   const db = opts.db ?? getPool()
   const exts = await knownExtensions(db)
   const lines: QuoteLine[] = []
+  let defaultNs: string[] | null = null
   const list = Array.isArray(input) ? input.slice(0, 30) : []
 
   for (const [index, raw] of list.entries()) {
@@ -146,6 +152,12 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
       const renew = Number(r?.price ?? p.price)
       base.unitPrice = Number(p.price); base.lineTotal = round2(Number(p.price) + renew * (years - 1)); base.renewalPrice = renew
       if (op === 'transfer' && !raw.eppCode && !EPP_OPTIONAL.some(x => parts.extension.endsWith(x))) { lines.push({ ...base, error: err('epp_required') }); continue }
+      if (op !== 'renew') {
+        const ns = validateNameservers(raw.nameservers, domain)
+        if (!ns.ok) { lines.push({ ...base, error: { code: 'nameservers_invalid', message: ns.message } }); continue }
+        defaultNs ??= await getDefaultNameservers(db)
+        base.nameservers = { useDefault: ns.value.useDefault, ns: ns.value.useDefault ? defaultNs : ns.value.ns }
+      }
       if (op === 'renew') {
         const [own] = opts.userId ? await rows(db, 'SELECT id FROM domains WHERE profile_id = ? AND name = ? AND extension = ?', [opts.userId, parts.name, parts.extension]) : []
         if (!own) { lines.push({ ...base, error: err('domain_not_owned') }); continue }

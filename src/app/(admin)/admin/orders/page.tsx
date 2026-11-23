@@ -11,7 +11,7 @@ type Order = {
   review_flag: 'test' | 'real' | null; review_note: string | null
   amount: number; currency: string | null; payment_method: string | null; transfer_ref: string | null; proof_url: string | null
   profiles: { full_name: string; email: string; role: string } | null
-  order_items: { id: string; service_name: string; quantity: number; line_total: number | null; unit_price: number | null; renewal_price: number | null; billing_cycle: string | null; domain_name: string | null; domain_operation: string | null; availability?: string | null; years?: number | null }[]
+  order_items: { id: string; service_name: string; quantity: number; line_total: number | null; unit_price: number | null; renewal_price: number | null; billing_cycle: string | null; domain_name: string | null; domain_operation: string | null; availability?: string | null; years?: number | null; nameservers?: unknown }[]
   services: Service[]; invoice: { invoice_number: string; status: string } | null
   payments: { id: string; status: string; amount: number; currency: string; paid_at: string | null; created_at: string }[]
 }
@@ -161,6 +161,7 @@ function OrdersInner() {
                         return (
                           <tr key={it.id} className="border-t border-[#F3F3F3] align-top" data-testid="order-item">
                             <td className="py-2 pr-2">{it.service_name}{it.quantity > 1 ? ` × ${it.quantity}` : ''}{it.domain_name ? <span className="block text-xs text-[#888]">{it.domain_name}</span> : null}
+                              {nsText(it.nameservers) && <span className="block text-[11px] text-[#666] font-mono" data-testid="item-ns">NS: {nsText(it.nameservers)}</span>}
                               {it.availability === 'confirm' && (
                                 <span className="mt-1 flex flex-wrap items-center gap-1" data-testid="domain-confirm">
                                   <span className="text-xs font-bold text-amber-800">Disponibilidade a confirmar:</span>
@@ -222,6 +223,14 @@ function OrdersInner() {
         )}
     </div>
   )
+}
+
+/** Nameservers escolhidos para o domínio (item da encomenda), para a activação ou a equipa. */
+function nsText(v: unknown): string {
+  try {
+    const o = (typeof v === 'string' ? JSON.parse(v) : v) as { useDefault?: boolean; ns?: string[] } | null
+    return o?.ns?.length ? `${o.ns.join(', ')}${o.useDefault ? ' (padrão)' : ' (do cliente)'}` : ''
+  } catch { return '' }
 }
 
 export default function AdminOrdersPage() {

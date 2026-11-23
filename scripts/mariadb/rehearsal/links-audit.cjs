@@ -52,7 +52,7 @@ const BASE = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, ''
       return { lines: q.quote.lines.map(l => `${l.slug ?? l.domain}:${l.cycle ?? ''}:${l.error ? 'ERRO ' + l.error.code : l.lineTotal}`) }
     }).catch(e => ({ err: e.message }))
     const good = res.lines && res.lines.every(x => !x.includes('ERRO'))
-    const domainSearch = res.empty && /plan=domain|tld=/.test(u)
+    const domainSearch = res.empty && /plan=domain|tld=|[?&]domain=/.test(u)  // ?domain= abre a configuração do domínio
     if (good || domainSearch) okN++; else fails.push(`${u} → ${res.empty ? 'carrinho vazio' : res.err ?? res.lines.join(', ')}   ← ${refs.get(u)}`)
     await ctx.close()
   }

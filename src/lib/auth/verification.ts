@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { getPool } from '@/lib/db/pool'
 import { issueToken, siteUrl } from './server'
 import { sendAuthEmail } from './email'
+import { userHasCart } from '@/lib/commerce/cart-server'
 
 // Verificação do e-mail da conta: emissão do link (uso único, expira em 24 h) e estado de um link.
 
@@ -15,7 +16,9 @@ const sha256 = (s: string) => createHash('sha256').update(s).digest('hex')
  */
 export async function sendVerificationEmail(userId: string, email: string) {
   await getPool().query("UPDATE auth_tokens SET expires_at = LEAST(expires_at, CURRENT_TIMESTAMP(6)) WHERE user_id = ? AND type = 'signup' AND used_at IS NULL", [userId])
-  const token = await issueToken(userId, 'signup', '/dashboard')
+  // Compra a meio: depois de confirmar, retoma o carrinho guardado na conta («Finalizar»).
+  const next = await userHasCart(userId).catch(() => false) ? '/carrinho/finalizar' : '/dashboard'
+  const token = await issueToken(userId, 'signup', next)
   return sendAuthEmail('signup', email, `${siteUrl()}/api/auth/verify?type=signup&token_hash=${encodeURIComponent(token)}`, userId)
 }
 

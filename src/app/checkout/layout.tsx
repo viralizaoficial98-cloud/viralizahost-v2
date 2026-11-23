@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { ShieldCheck } from 'lucide-react'
 import { CheckoutLogo } from './CheckoutLogo'
+import { CartSync } from '@/components/cart/CartSync'
 
 export const metadata: Metadata = { title: 'Checkout' }
 
@@ -18,6 +19,7 @@ export default function CheckoutLayout({ children }: { children: React.ReactNode
           </div>
         </div>
       </header>
+      <CartSync />
       {children}
     </div>
   )

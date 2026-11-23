@@ -19,6 +19,7 @@ export default function robots(): MetadataRoute.Robots {
         // '$' keeps /email-corporativo and /email/* (public pages) crawlable
         '/email$',
         '/checkout',
+        '/carrinho',
         '/auth/',
         '/reset-password',
       ],

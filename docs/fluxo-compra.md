@@ -25,3 +25,10 @@ Consulta: 2026-11-20, navegador (Playwright), como visitante, sem chegar a qualq
 - Duração: cada ciclo mostra equivalente mensal, total a pagar agora, duração e renovação; o domínio aparece à parte, em anos.
 - Sem «Poupe x%»: o catálogo aprovado não tem descontos por ciclo (preço/mês × meses).
 - Carrinho acessível no cabeçalho com contador; o passo 1 do checkout é o carrinho editável.
+
+## Domínio avulso (2026-11-26)
+- Pesquisa → **«Registrar Agora»** (disponível) ou **«Solicitar registo»** («A confirmar pela equipa») → **Configuração do domínio**
+  (`/dominios/configurar`: período, preço agora e de renovação, nameservers padrão ou próprios, alojamento opcional) → **Carrinho**
+  (`/carrinho`) → **Finalizar**, com o passo seguinte decidido no servidor (cadastro, dados do cliente em falta ou pagamento).
+- Carrinho guardado também no servidor (`shopping_carts`): retoma depois do login e da verificação de e-mail, mesmo noutro dispositivo.
+- Detalhes, testes e publicação: `docs/publicacao-dominio-avulso.md`.
