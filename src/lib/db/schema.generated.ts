@@ -2680,6 +2680,11 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "int",
         "hasDefault": true,
         "nullable": true
+      },
+      "plan_specs": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": [
@@ -2742,6 +2747,11 @@ export const SCHEMA_META: SchemaMeta = {
       "position": {
         "kind": "int",
         "hasDefault": true
+      },
+      "group_name": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": [

@@ -7,7 +7,7 @@ import { fromPriceText } from '@/lib/commerce/from-price'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Server, Shield, Zap, HardDrive, Mail, RotateCcw, Headphones, Globe, Lock } from 'lucide-react'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { HostingPlansSection } from '@/components/service/HostingPlansSection'
 
 export const metadata: Metadata = {
   title: 'Hospedagem de Sites Premium',
@@ -50,13 +50,9 @@ export default async function HospedagemDeSitesPage() {
           guarantee={banner?.show_guarantee ?? true}
           layout="split"
         />
-        <DynamicServicePricing
-          category="hosting"
-          cols={3}
-          showBillingToggle
-          carousel
+        <HostingPlansSection
           title="Hospedagem de Sites — Escolha o seu plano"
-          subtitle="Escolha o plano, depois o domínio e a duração." />
+          subtitle="Escolha o plano e o período; depois o domínio e os extras." />
         <IncludedFeatures features={included} hoverBorder />
         <FinalCTA
           title="Comece hoje"

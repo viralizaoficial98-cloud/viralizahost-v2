@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminWriteClient()
     let query = (supabase as any)
       .from('products')
-      .select('*, product_features(feature, included, position), product_prices(cycle, months, price, renewal_price, active, discount_pct, renewal_discount_pct)')
+      .select('*, product_features(feature, included, position, group_name), product_prices(cycle, months, price, renewal_price, active, discount_pct, renewal_discount_pct)')
       .eq('active', true)
       .neq('sale_status', 'draft')
       .order('position', { ascending: true })
@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
     // Preços de apresentação derivados SEMPRE de product_prices (valor mensal equivalente por ciclo)
     const cols: Record<string, string> = { monthly: 'price_monthly', '6months': 'price_6months', '1year': 'price_1year', '2years': 'price_2years', '3years': 'price_3years' }
     for (const p of (data ?? []) as any[]) {
+      // Ficha técnica (Hospedagem Premium) como objecto
+      if (typeof p.plan_specs === 'string') { try { p.plan_specs = JSON.parse(p.plan_specs) } catch { p.plan_specs = null } }
       const pp = ((p.product_prices ?? []) as any[]).filter(r => Number(r.active) === 1)
       if (!pp.length) continue
       for (const [cycle, col] of Object.entries(cols)) {
