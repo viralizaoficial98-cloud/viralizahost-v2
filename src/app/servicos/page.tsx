@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
+import { PageLinksSection } from '@/components/site/PageLinksSection'
+import { servicePagesByCategory } from '@/lib/site/pages'
 import { Footer } from '@/components/layout/Footer'
 import { Server, Globe, Users, Cpu, HardDrive, Mail, Code, Lock, Shield, Zap, RefreshCw, Gauge } from 'lucide-react'
 
@@ -64,6 +66,12 @@ export default function ServicosPage() {
             </div>
           </div>
         </section>
+
+        {/* Todos os serviços publicados, por categoria — a mesma fonte do grupo «Serviços» do menu */}
+        {servicePagesByCategory().map((c, i) => (
+          <PageLinksSection key={c.id} id={`servicos-${c.id}`} title={c.label} dark={i % 2 === 1}
+            items={c.pages.map(p => ({ href: p.path, title: p.title, desc: p.desc, icon: p.icon, cta: 'Ver serviço' }))} />
+        ))}
 
         <section className="py-20" style={{ background: 'linear-gradient(160deg,#090909,#111)' }}>
           <div className="container mx-auto px-4 lg:px-8 text-center max-w-2xl">

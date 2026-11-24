@@ -21,7 +21,8 @@ async function guard(): Promise<NextResponse | string> {
   try { return await requireAdminRole() } catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: (e as { status?: number }).status ?? 401 }) }
 }
 async function plan(id: string) {
-  const [rows] = await getPool().query("SELECT id, name, image_path FROM products WHERE id = ? AND category = 'vps' AND subcategory IS NULL", [id]) as unknown as [{ id: string; name: string; image_path: string | null }[]]
+  // Planos com faixa e imagem: Servidor VPS (sem subcategoria) e Servidores Dedicados Linux/Windows
+  const [rows] = await getPool().query("SELECT id, name, image_path FROM products WHERE id = ? AND ((category = 'vps' AND subcategory IS NULL) OR category IN ('dedicated','dedicated-windows'))", [id]) as unknown as [{ id: string; name: string; image_path: string | null }[]]
   return rows[0] ?? null
 }
 const audit = (a: string, id: string, d: string) => getPool().query("INSERT INTO activity_logs (id, profile_id, action, entity_type, entity_id, description) VALUES (UUID(), ?, 'update', 'product', ?, ?)", [a, id, d]).catch(() => {})

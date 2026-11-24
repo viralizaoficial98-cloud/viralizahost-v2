@@ -305,6 +305,7 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Contactar pelo WhatsApp"
+      data-floating=""
       className="fixed z-50 transition-all active:scale-95 hover:scale-105"
       style={{ bottom: 24, left: 24 }}
     >
@@ -321,7 +322,7 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
     </a>
 
     {/* AI Chat (Cizesa) — fixed bottom-right */}
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <div data-floating="" className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
       {open && (
         <div
           className="w-[360px] bg-white rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.25)] border border-[#E8E8E8] overflow-hidden flex flex-col"

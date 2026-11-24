@@ -1,15 +1,18 @@
 // Servidor VPS — partilhado pelo painel, pela página pública e pelo servidor (sem dependências de servidor).
 
 /** Ciclos que um plano VPS pode publicar (os mesmos do catálogo). */
+/** Ciclos à venda para novos VPS. «3 meses» foi retirado: encomendas, facturas e renovações já contratadas mantêm-se. */
 export const VPS_CYCLES = [
   { cycle: 'monthly', months: 1, label: '1 mês' },
-  { cycle: '3months', months: 3, label: '3 meses' },
   { cycle: '6months', months: 6, label: '6 meses' },
   { cycle: '1year', months: 12, label: '1 ano' },
   { cycle: '2years', months: 24, label: '2 anos' },
   { cycle: '3years', months: 36, label: '3 anos' },
 ] as const
 export type VpsCycle = (typeof VPS_CYCLES)[number]['cycle']
+/** Ciclos retirados da venda de VPS (servidor recusa-os em novas compras). */
+export const VPS_RETIRED_CYCLES: readonly string[] = ['3months']
+export const isVpsCycleForSale = (c: unknown) => VPS_CYCLES.some(x => x.cycle === c)
 
 /** Lista CONTROLADA de ícones para as características extras (o painel só oferece estes). */
 export const VPS_FEATURE_ICONS = {

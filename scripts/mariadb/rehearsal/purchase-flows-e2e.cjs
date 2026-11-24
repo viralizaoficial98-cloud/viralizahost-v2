@@ -28,14 +28,18 @@ async function ctxFor(b, opts) {
 async function login(p, email, password) { const r = await p.request.post(BASE + '/api/auth/login', { data: { email, password } }); if (!r.ok()) throw new Error('login ' + email) }
 
 async function openFromMenu(p, label, mobile, menuText, linkHref) {
+  // Menu principal (mesma configuração no desktop e no telemóvel): grupos com painel ou links directos
   if (mobile) {
-    await p.getByRole('button', { name: 'Menu' }).click()
-    const toggle = p.locator('div.lg\\:hidden').getByText(menuText, { exact: false }).first()
-    if (await toggle.isVisible().catch(() => false)) await toggle.click().catch(() => {})
-    await p.locator(`div.lg\\:hidden a[href="${linkHref}"]`).first().click()
+    await p.getByTestId('mobile-menu-toggle').click()
+    const nav = p.getByTestId('mobile-nav')
+    const direct = nav.locator(`a[href="${linkHref}"]`).first()
+    if (!(await direct.isVisible().catch(() => false))) await nav.getByRole('button', { name: menuText, exact: true }).click()
+    await nav.locator(`a[href="${linkHref}"]`).first().click()
   } else {
-    await p.locator('header nav').getByText(menuText, { exact: true }).first().hover()
-    await p.locator(`header a[href="${linkHref}"]`).first().click()
+    const nav = p.getByTestId('main-nav')
+    const direct = nav.locator(`a[href="${linkHref}"]`)
+    if (await direct.count()) await direct.first().click()
+    else { await nav.getByRole('button', { name: menuText, exact: true }).click(); await p.getByTestId('nav-panel').locator(`a[href="${linkHref}"]`).first().click() }
   }
   await p.waitForURL(`**${linkHref.split('#')[0]}**`)
   void label
@@ -56,14 +60,14 @@ async function main() {
     console.log('\n1. Listagens de hospedagem e e-mail')
     let { ctx, p } = await ctxFor(b, opts)
     await p.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
-    await openFromMenu(p, label, mobile, 'Hospedagem e Sites', '/hospedagem-de-sites')
+    await openFromMenu(p, label, mobile, 'Hospedagem e site', '/hospedagem-de-sites')
     await p.locator('#planos a[href^="/comprar/"]').first().waitFor()
     const hostCards = await p.locator('#planos a[href^="/comprar/hosting-"]').count()
     ok(hostCards >= 3, `hospedagem: ${hostCards} planos com «Escolher plano»`)
     ok(/(Kz\s?[\d.\s]+|[\d\s.,]+\s?Kz)/.test(await p.locator('#planos').innerText()), 'hospedagem: preços em Kz visíveis')
     ok(await overflow(p) <= 1, 'hospedagem: sem deslocamento horizontal')
     await p.locator('#planos').scrollIntoViewIfNeeded(); await shot(p, `${label}-01-catalogo-hospedagem`)
-    await openFromMenu(p, label, mobile, 'E-mail Corporativo', '/email-corporativo#planos')
+    await openFromMenu(p, label, mobile, 'E-mail corporativo', '/email-corporativo')
     await p.locator('#planos a[href^="/comprar/email-"]').first().waitFor()
     const mailCards = await p.locator('#planos a[href^="/comprar/email-"]').count()
     ok(mailCards >= 3, `e-mail: ${mailCards} planos com «Escolher plano»`)

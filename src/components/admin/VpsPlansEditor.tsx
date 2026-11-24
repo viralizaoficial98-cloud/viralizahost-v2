@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, Eye, EyeOff, ImagePlus, Info, Loader2, Plus, Save, Trash2 } from 'lucide-react'
 import { MAX_DISCOUNT, exactPeriodTotal, impliedDiscount } from '@/lib/commerce/period-pricing'
 import { TRAFFIC_UNITS, VPS_CYCLES, VPS_FEATURE_ICONS, compareSpecs, formatRaw, formatTrafficGb, type ProviderSpecs, type TrafficUnit, type VpsFeature, type VpsIcon, type VpsSpecs } from '@/lib/commerce/vps-shared'
@@ -202,13 +202,19 @@ function PlanForm({ plan, provider, onSaved, onCancel }: { plan?: Plan; provider
           <table className="w-full text-sm min-w-[980px]">
             <thead><tr className="text-left text-[11px] uppercase text-[#64748B]"><th className="py-1">Ciclo</th><th>Publicado</th><th>Desconto %</th><th>Total</th><th>/mês</th><th>Renovação (Kz)</th><th>Item Hostinger</th><th>Custo (mín.)</th><th>Moeda</th><th>Limite (mín.)</th></tr></thead>
             <tbody>
-              {VPS_CYCLES.map((c, i) => {
+              {VPS_CYCLES.map((c, i) => (<Fragment key={c.cycle}>{(() => {
                 const pd = d.periods[i], r = result(i), cur = plan?.periods[i]
                 const items = item?.prices.filter(z => monthsOf(z) === c.months) ?? []
-                return (
-                  <tr key={c.cycle} className="border-t border-[#F1F5F9] align-top" data-testid={`vp-period-${c.cycle}`}>
+                // Dados em falta para activação automática deste ciclo (o item tem de ser do MESMO período)
+                const missing = d.providerProductId ? [
+                  !pd.providerItemId && (item && !items.length ? `sem item de ${c.months} mês(es) no catálogo da Hostinger` : 'item de preço'),
+                  pd.providerCost === '' && 'custo', !pd.providerCurrency && 'moeda', pd.providerLimit === '' && 'limite'].filter(Boolean) as string[] : []
+                const blocked = d.providerMode === 'auto' && missing.length > 0
+                return (<>
+                  <tr className="border-t border-[#F1F5F9] align-top" data-testid={`vp-period-${c.cycle}`}>
                     <td className="py-2 pr-2 font-semibold whitespace-nowrap">{c.label}</td>
-                    <td className="pt-2"><input type="checkbox" checked={pd.publish} onChange={e => setP(i, { publish: e.target.checked })} aria-label={`Publicar ${c.label}`} data-testid={`vp-publish-${c.cycle}`} /></td>
+                    <td className="pt-2"><input type="checkbox" checked={pd.publish} disabled={blocked && !pd.publish} onChange={e => setP(i, { publish: e.target.checked })} aria-label={`Publicar ${c.label}`} data-testid={`vp-publish-${c.cycle}`}
+                      title={blocked ? 'Em activação automática só se publica com item do mesmo período, custo, moeda e limite' : undefined} /></td>
                     <td className="pr-2 w-24">{pd.discount === null
                       ? <span className="text-[11px]">Preço mantido{r ? ` (≈${r.discount}%)` : ''} <button type="button" className="underline font-bold" onClick={() => setP(i, { discount: String(r?.discount ?? 0) })}>Aplicar regra</button></span>
                       : <input type="number" min={0} max={MAX_DISCOUNT} className={`${input} ${bad(`discount-${c.cycle}`)}`} value={pd.discount} onChange={e => setP(i, { discount: e.target.value })} aria-label={`Desconto ${c.label}`} data-testid={`vp-discount-${c.cycle}`} />}</td>
@@ -223,8 +229,17 @@ function PlanForm({ plan, provider, onSaved, onCancel }: { plan?: Plan; provider
                     <td className="pr-2 w-16"><input className={input} maxLength={3} value={pd.providerCurrency} onChange={e => setP(i, { providerCurrency: e.target.value.toUpperCase() })} aria-label={`Moeda ${c.label}`} /></td>
                     <td className="w-24"><input type="number" min={0} className={input} value={pd.providerLimit} onChange={e => setP(i, { providerLimit: e.target.value })} aria-label={`Limite ${c.label}`} data-testid={`vp-limit-${c.cycle}`} /></td>
                   </tr>
-                )
-              })}
+                  {missing.length > 0 && (
+                    <tr data-testid={`vp-missing-${c.cycle}`} data-blocked={blocked ? '1' : '0'}>
+                      <td />
+                      <td colSpan={9} className={`pb-2 text-[11px] ${blocked && pd.publish ? 'text-red-700 font-bold' : 'text-amber-800'}`}>
+                        Falta para activação automática: {missing.join(', ')}.{' '}
+                        {d.providerMode === 'auto' ? (pd.publish ? 'Não pode ser publicado assim — desmarque «Publicado» ou complete os dados.' : 'Pode guardar como não publicado.') : 'Em modo Manual pode ser publicado (a equipa trata da aquisição).'}
+                      </td>
+                    </tr>
+                  )}
+                </>)
+              })()}</Fragment>))}
             </tbody>
           </table>
         </div>

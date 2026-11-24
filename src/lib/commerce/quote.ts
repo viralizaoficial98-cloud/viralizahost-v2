@@ -3,6 +3,7 @@ import { getPool, type Queryable } from '@/lib/db/pool'
 import { checkAvailability, normalizeDomain, splitDomain, type Availability } from './domains'
 import { validateNameservers } from './nameservers'
 import { getDefaultNameservers } from './nameserver-settings'
+import { VPS_RETIRED_CYCLES, isVpsCycleForSale } from './vps-shared'
 
 // Cotação calculada SEMPRE no servidor a partir da base (product_prices / domain_prices).
 // O cliente só envia escolhas (produto, ciclo, quantidade, domínio, operação).
@@ -78,6 +79,7 @@ const MSG: Record<string, string> = {
   on_request: 'Plano sob consulta: contacte a equipa comercial.',
   draft: 'Plano ainda não disponível para venda.',
   cycle_unavailable: 'Ciclo de facturação indisponível para este plano.',
+  cycle_retired: 'Este período deixou de estar disponível para novos VPS. Escolha outro período para este item.',
   quantity_invalid: 'Quantidade inválida.',
   domain_required: 'Indique o domínio a usar com este serviço.',
   domain_invalid: 'Domínio inválido.',
@@ -193,7 +195,11 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
     base.productId = prod.id
     base.cycles = (await rows(db, 'SELECT cycle, months, price, renewal_price, discount_pct, renewal_discount_pct FROM product_prices WHERE product_id = ? AND active = 1 ORDER BY months', [prod.id]))
       .map(c => ({ cycle: c.cycle, months: Number(c.months), price: Number(c.price), renewal: Number(c.renewal_price), discount: Number(c.discount_pct ?? 0), renewalDiscount: Number(c.renewal_discount_pct ?? 0) }))
+    // VPS (Servidor VPS): só os ciclos à venda; um carrinho antigo com um ciclo retirado pede outro período
+    const serverVps = prod.category === 'vps' && !prod.subcategory
+    if (serverVps) base.cycles = base.cycles.filter(x => isVpsCycleForSale(x.cycle))
     if (prod.sale_status !== 'active') { lines.push({ ...base, error: err(prod.sale_status === 'on_request' ? 'on_request' : 'draft') }); continue }
+    if (serverVps && !isVpsCycleForSale(cycle)) { lines.push({ ...base, error: err(VPS_RETIRED_CYCLES.includes(cycle) ? 'cycle_retired' : 'cycle_unavailable') }); continue }
     const c = base.cycles.find(x => x.cycle === cycle)
     if (!c) { lines.push({ ...base, error: err('cycle_unavailable') }); continue }
     const qty = Number((raw as { quantity?: number }).quantity ?? 1)

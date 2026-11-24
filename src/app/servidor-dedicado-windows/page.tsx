@@ -4,7 +4,8 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { DedicatedPlansSection } from '@/components/service/DedicatedPlansSection'
+import { DedicatedCompatibility } from '@/components/service/DedicatedCompatibility'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Monitor, HardDrive, Globe, Shield, Zap, Server, Headphones, Lock, RotateCcw } from 'lucide-react'
@@ -49,9 +50,10 @@ export default async function ServidorDedicadoWindowsPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["Windows Server 2022","Plesk Incluído","MS SQL Server","Remote Desktop"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <DynamicServicePricing category="dedicated-windows" cols={3} showBillingToggle
+        <DedicatedPlansSection kind="windows"
           title="Servidor Dedicado Windows — Planos"
-          subtitle="Hardware exclusivo com Windows Server licenciado. Suporte especializado 24/7." />
+          subtitle="Hardware exclusivo com Windows Server licenciado. Escolha o período e compre — activação pela equipa depois do pagamento confirmado." />
+        <DedicatedCompatibility kind="windows" />
         <IncludedFeatures features={included} dark
           title="Infra-estrutura Windows completa incluída" />
         <FinalCTA
