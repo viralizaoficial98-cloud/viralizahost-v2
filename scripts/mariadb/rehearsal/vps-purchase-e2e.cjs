@@ -189,7 +189,10 @@ const mockPost = async (path, body) => { const r = await fetch(MOCK + path, { me
     ok(num(await prev.getByTestId('vps-plan-total').innerText()) === totalOf(base1, 12, 25) && /renova/i.test(await prev.getByTestId('vps-plan-renewal').innerText()), 'pré-visualização: total e preço de renovação')
     ok(/KVM 2/.test(await form.getByTestId('vp-provider').innerText()) && await form.getByTestId('vp-mismatch').count() === 0, 'associação Hostinger KVM 2 sem divergências')
     await p.addStyleTag({ content: 'header, [class*=sticky], [class*=fixed] { position: relative !important }' })
+    // O painel desloca-se num contentor interno: viewport alto para a ficha caber sem deslocamento
+    await p.setViewportSize({ width: 1440, height: 3000 }); await form.scrollIntoViewIfNeeded(); await p.waitForTimeout(300)
     await form.screenshot({ path: `${OUT}/painel-01-editor-plano.png` })
+    await p.setViewportSize({ width: 1440, height: 900 })
     await form.getByTestId('vp-vcpu').fill('4')
     ok(await form.getByTestId('vp-mismatch').isVisible(), 'aviso imediato quando as características não correspondem ao produto')
     await form.getByTestId('vp-save').click()

@@ -23,6 +23,7 @@ type Draft = { id?: string; name: string; description: string; saleStatus: Plan[
 
 const input = 'w-full border border-[#E5E7EB] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-[#F5B700] bg-white'
 const lbl = 'text-xs text-[#64748B] block'
+const field = input.replace('w-full', 'min-w-0')   // para campos lado a lado (flex)
 const kz = (v: number) => `${Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\s/g, ' ')} Kz`
 const money = (minor: number, cur: string) => `${(minor / 100).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} ${cur}`
 const BADGES = ['Mais popular', 'Disponibilidade limitada', 'Melhor valor', 'Novo']
@@ -143,19 +144,19 @@ function PlanForm({ plan, provider, onSaved, onCancel }: { plan?: Plan; provider
 
       <div>
         <p className="text-xs font-bold text-[#334155] mb-2">Especificações (com ícone na página)</p>
-        <div className="grid sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <label className={lbl}>vCPU<input type="number" min={1} className={`${input} ${bad('vcpu')}`} value={d.vcpu} onChange={e => set('vcpu', e.target.value)} data-testid="vp-vcpu" /></label>
           <label className={lbl}>RAM (GB)<input type="number" min={0.5} step="0.5" className={`${input} ${bad('ramGb')}`} value={d.ramGb} onChange={e => set('ramGb', e.target.value)} data-testid="vp-ram" /></label>
           <label className={lbl}>Disco (GB)<input type="number" min={1} className={`${input} ${bad('diskGb')}`} value={d.diskGb} onChange={e => set('diskGb', e.target.value)} data-testid="vp-disk" /></label>
           <label className={lbl}>Tipo de disco<select className={input} value={d.diskType} onChange={e => set('diskType', e.target.value as Draft['diskType'])} data-testid="vp-disk-type"><option value="">—</option><option>NVMe</option><option>SSD</option></select></label>
-          <div className={lbl}>Tráfego
+          <div className={`${lbl} lg:col-span-2`}>Tráfego
             <div className="flex gap-1">
-              <select className={`${input} ${bad('traffic')}`} value={d.trafficMode} onChange={e => set('trafficMode', e.target.value as Draft['trafficMode'])} data-testid="vp-traffic-mode"><option value="">—</option><option value="value">Limite</option><option value="unlimited">Ilimitado</option></select>
-              {d.trafficMode === 'value' && <><input type="number" min={1} className={input} value={d.trafficValue} onChange={e => set('trafficValue', e.target.value)} data-testid="vp-traffic" /><select className={`${input} w-16`} value={d.trafficUnit} onChange={e => set('trafficUnit', e.target.value as 'GB' | 'TB')} data-testid="vp-traffic-unit"><option>GB</option><option>TB</option></select></>}
+              <select className={`${field} ${bad('traffic')} w-32 shrink-0`} value={d.trafficMode} onChange={e => set('trafficMode', e.target.value as Draft['trafficMode'])} data-testid="vp-traffic-mode"><option value="">—</option><option value="value">Limite</option><option value="unlimited">Ilimitado</option></select>
+              {d.trafficMode === 'value' && <><input type="number" min={1} className={`${field} flex-1`} value={d.trafficValue} onChange={e => set('trafficValue', e.target.value)} data-testid="vp-traffic" /><select className={`${field} w-20 shrink-0`} value={d.trafficUnit} onChange={e => set('trafficUnit', e.target.value as 'GB' | 'TB')} data-testid="vp-traffic-unit"><option>GB</option><option>TB</option></select></>}
             </div>
           </div>
-          <div className={lbl}>Velocidade de rede
-            <div className="flex gap-1"><input type="number" min={1} className={`${input} ${bad('network')}`} value={d.networkValue} onChange={e => set('networkValue', e.target.value)} data-testid="vp-network" /><select className={`${input} w-20`} value={d.networkUnit} onChange={e => set('networkUnit', e.target.value as 'Mbps' | 'Gbps')}><option>Mbps</option><option>Gbps</option></select></div>
+          <div className={`${lbl} lg:col-span-2`}>Velocidade de rede
+            <div className="flex gap-1"><input type="number" min={1} className={`${field} ${bad('network')} flex-1`} value={d.networkValue} onChange={e => set('networkValue', e.target.value)} data-testid="vp-network" /><select className={`${field} w-24 shrink-0`} value={d.networkUnit} onChange={e => set('networkUnit', e.target.value as 'Mbps' | 'Gbps')}><option>Mbps</option><option>Gbps</option></select></div>
           </div>
         </div>
         {d.trafficMode === 'unlimited' && <p className="text-[11px] text-amber-800 mt-1">Use «Ilimitado» só se o pacote da Hostinger o oferecer de facto (validado contra o produto associado).</p>}
