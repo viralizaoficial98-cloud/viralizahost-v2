@@ -149,8 +149,10 @@ export function toCardPlan(p: ApiPlan, cycle: string): CardPlan {
   }
 }
 
-export function HostingPlansSection({ id = 'planos', tag = 'Hospedagem Premium', title, subtitle, defaultCycle = 'monthly' }: {
-  id?: string; tag?: string; title: ReactNode; subtitle?: string; defaultCycle?: EmailCycle
+export function HostingPlansSection({ id = 'planos', tag = 'Hospedagem Premium', title, subtitle, defaultCycle = 'monthly', headingAs: Heading = 'h2', className = 'py-20' }: {
+  id?: string; tag?: string; title: ReactNode; subtitle?: ReactNode; defaultCycle?: EmailCycle
+  /** «h1» quando a secção abre a página (ex.: /hospedagem-de-sites sem banner) */
+  headingAs?: 'h1' | 'h2'; className?: string
 }) {
   const { formatCurrency, currency } = useLocale()
   const fmt = (v: number) => formatCurrency(convertFromAOA(v, currency))
@@ -177,11 +179,11 @@ export function HostingPlansSection({ id = 'planos', tag = 'Hospedagem Premium',
   const active = periods.some(p => p.cycle === cycle) ? cycle : (periods[0]?.cycle ?? cycle)
 
   return (
-    <section id={id} className="bg-[#F8F8F8] py-20" data-testid="hosting-plans-section">
+    <section id={id} className={`bg-[#F8F8F8] scroll-mt-24 ${className}`} data-testid="hosting-plans-section">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <span className="section-tag">{tag}</span>
-          <h2 className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3 mb-3">{title}</h2>
+          <Heading className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3 mb-3">{title}</Heading>
           {subtitle && <p className="text-[#666] max-w-xl mx-auto text-sm md:text-base">{subtitle}</p>}
           {state === 'ok' && periods.length > 1 && (
             <div className="flex justify-center mt-6">
