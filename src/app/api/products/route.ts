@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminWriteClient()
     let query = (supabase as any)
       .from('products')
-      .select('*, product_features(feature, included, position, group_name), product_prices(cycle, months, price, renewal_price, active, discount_pct, renewal_discount_pct)')
+      .select('*, product_features(feature, included, position, group_name, icon), product_prices(cycle, months, price, renewal_price, active, discount_pct, renewal_discount_pct)')
       .eq('active', true)
       .neq('sale_status', 'draft')
       .order('position', { ascending: true })

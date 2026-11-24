@@ -112,9 +112,9 @@ export function HostingPlanCard({ plan, fmt, href, preview = false }: { plan: Ca
           {href ? (
             <Link href={href} data-testid="hosting-plan-cta"
               className={`block w-full text-center py-3 rounded-xl font-bold text-sm transition-all ${dark ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#E5A800]' : 'bg-[#0A0A0A] text-white hover:bg-[#222]'}`}>
-              {plan.onRequest ? 'Pedir proposta' : 'Configurar'}
+              {plan.onRequest ? 'Pedir proposta' : 'Comprar agora'}
             </Link>
-          ) : <span className={`block w-full text-center py-3 rounded-xl font-bold text-sm ${dark ? 'bg-[#F5B700] text-[#0A0A0A]' : 'bg-[#0A0A0A] text-white'}`}>Configurar</span>}
+          ) : <span className={`block w-full text-center py-3 rounded-xl font-bold text-sm ${dark ? 'bg-[#F5B700] text-[#0A0A0A]' : 'bg-[#0A0A0A] text-white'}`}>Comprar agora</span>}
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@
 #   APP_LOG=/caminho/next.log BASE_URL=http://localhost:3000 bash scripts/mariadb/rehearsal/run-all.sh
 # O processo Next de ensaio deve correr com RDAP_BOOTSTRAP_URL=http://127.0.0.1:12088/dns.json (mock-rdap.mjs),
 # NODE_EXTRA_CA_CERTS=<certificado do WHM simulado>, ORDER_RATE_LIMIT=500, QUOTE_RATE_LIMIT=200,
-# REGISTRAR_TEST_PROVISIONING=1, REGISTRAR_TIMEOUT_MS=2000 , LOGIN_RATE_LIMIT=100 e SIGNUP_RATE_LIMIT=200 (nunca em produção); RESEND_API_URL=http://127.0.0.1:12090 com mock-resend.mjs e RESEND_API_KEY fictícia «re_…» (com mock-registrar.mjs --delay=4000 na porta 12089 e mock-hostinger.mjs --delay=4000 na porta 12091).
+# REGISTRAR_TEST_PROVISIONING=1, REGISTRAR_TIMEOUT_MS=2000, VPS_PROVIDER_TIMEOUT_MS=2000, LOGIN_RATE_LIMIT=100 e SIGNUP_RATE_LIMIT=200 (nunca em produção); RESEND_API_URL=http://127.0.0.1:12090 com mock-resend.mjs e RESEND_API_KEY fictícia «re_…» (com mock-registrar.mjs --delay=4000 na porta 12089 e mock-hostinger.mjs --delay=4000 --vps-ready=3000 na porta 12091).
 set -u
 cd "$(dirname "$0")/../../.."
 case "$(node --env-file=.env.local -p 'process.env.DB_NAME')" in
@@ -35,6 +35,7 @@ else
   run "Transferência com domínio .ao a confirmar: pagar já, comprovativo, painel (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/bank-transfer-domain-e2e.cjs
   run "Hospedagem Premium: períodos, descontos e fichas de plano (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/hosting-plans-e2e.cjs
   run "E-mail Corporativo: períodos, descontos e fichas de plano (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/email-plans-e2e.cjs
+  run "Servidor VPS: planos, compra, comprovativo e Hostinger VPS simulada (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/vps-purchase-e2e.cjs
   run "Percursos de compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/purchase-flows-e2e.cjs
   run "Interface desktop + iPhone" node scripts/mariadb/rehearsal/ui-e2e.cjs
   run "Painel: menu, acções pendentes, integrações (desktop + iPhone)" node scripts/mariadb/rehearsal/admin-ui-e2e.cjs

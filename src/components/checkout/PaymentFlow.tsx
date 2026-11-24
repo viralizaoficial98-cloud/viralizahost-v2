@@ -7,7 +7,7 @@ import { BankTransferCard } from '@/components/billing/BankTransferCard'
 import type { BankDetails } from '@/lib/billing/bank-details'
 import { useCart, toApiLine } from '@/store/cartStore'
 import { createAuthClient } from '@/lib/supabase/client'
-import { PurchaseSteps, Summary, btnGhost, btnPrimary, card, discountOf, input, kz, periodOf, renewalOf, useCartHydrated, useQuote } from './shared'
+import { PurchaseSteps, Summary, btnGhost, btnPrimary, card, discountOf, input, kz, optionsOf, periodOf, renewalOf, useCartHydrated, useQuote } from './shared'
 
 // Pagamento e confirmação (cliente com sessão e dados completos). Reaproveita o pagamento por
 // transferência e a revisão do checkout anterior. Antes de criar a encomenda, o servidor volta a
@@ -152,6 +152,7 @@ export function PaymentFlow({ customer, verified }: { customer: CustomerSummary;
                         <span className="min-w-0 break-words">{l.name}{l.quantity > 1 ? ` × ${l.quantity}${l.quantityUnit === 'caixa' ? ' caixas' : ''}` : ''}
                           <span className="block text-xs text-[#888]">{periodOf(l)} · renova por {renewalOf(l)}{l.nameservers ? ` · NS ${l.nameservers.ns.join(', ')}` : ''}</span>
                           {discountOf(l) && <span className="block text-xs text-green-700" data-testid="review-discount">{discountOf(l)}</span>}
+                          {optionsOf(l) && <span className="block text-xs text-[#555]" data-testid="review-options">{optionsOf(l)}</span>}
                           {l.error && <span className="block text-xs text-red-700">{l.error.message}</span>}
                         </span>
                         <strong className="whitespace-nowrap">{kz(l.lineTotal)}</strong>

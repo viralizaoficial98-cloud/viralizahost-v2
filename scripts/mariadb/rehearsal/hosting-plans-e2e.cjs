@@ -149,7 +149,7 @@ class S {
         if (!k || num(k.total) !== Number(row.price) || Math.abs(num(k.monthly) - Number(row.price) / months) > 0.01 || (d === 0 && (k.discount || k.list)) || k.cta !== `/comprar/${v.slug}?ciclo=${c}`) bad.push(`${v.slug}:${JSON.stringify(k).slice(0, 200)}`)
         if (k && months > 1 && !new RegExp(`pagos por ${months} meses`).test(k.period)) bad.push(`${v.slug}: «${k.period}»`)
       }
-      ok(!bad.length, `${label}: total guardado, equivalente mensal, sem etiqueta/riscado com desconto 0${months > 1 ? `, «pagos por ${months} meses»` : ''}, «Configurar» com ?ciclo=${c}`, bad.join(' '))
+      ok(!bad.length, `${label}: total guardado, equivalente mensal, sem etiqueta/riscado com desconto 0${months > 1 ? `, «pagos por ${months} meses»` : ''}, «Comprar agora» com ?ciclo=${c}`, bad.join(' '))
       ok(!(await periodBadge(c)), `${label}: selector sem «Poupe/Até» (descontos 0)`)
     }
     await pick('monthly')
@@ -309,7 +309,7 @@ class S {
     const partSlug = (await one('SELECT slug FROM products WHERE id = ?', [part])).slug
     await open(); await pick('2years')
     let pk = (await cardsOf()).find(x => x.slug === partSlug)
-    ok(pk && pk.cta == null && /Indisponível neste período/.test(pk.text), '2 anos não publicado: cartão sem preço nem «Configurar»')
+    ok(pk && pk.cta == null && /Indisponível neste período/.test(pk.text), '2 anos não publicado: cartão sem preço nem «Comprar agora»')
     await ap.reload({ waitUntil: 'domcontentloaded' })
     const prow = ap.locator('[data-testid=hosting-plan-admin]', { hasText: 'Ensaio Parcial' }); await prow.locator('summary').click()
     ok(await prow.getByTestId('hp-period-3years').getByTestId('hp-needs-config').count() === 1, 'editor marca 3 anos «por configurar»')
@@ -355,7 +355,7 @@ class S {
     await p.getByRole('radio', { name: 'Usar um domínio que já tenho' }).click()
     await p.getByPlaceholder('empresa.ao').fill(dom)
     await p.getByTestId('continue-own-domain').click(); await p.waitForURL('**passo=duracao**')
-    ok(await p.getByTestId('cycle-3years').getAttribute('aria-checked') === 'true', '«Configurar» leva o período (3 anos) e passa pelo domínio')
+    ok(await p.getByTestId('cycle-3years').getAttribute('aria-checked') === 'true', '«Comprar agora» leva o período (3 anos) e passa pelo domínio')
     ok(num(await p.getByTestId('flow-total').innerText()) === 57456 && /Poupe 62%/.test(await p.getByTestId('cycle-3years').innerText()), `configuração: ${await p.getByTestId('flow-total').innerText()}, «Poupe 62%»`)
     await p.getByTestId('add-to-cart').click(); await p.waitForURL('**/carrinho')
     await p.getByTestId('summary-total').waitFor()

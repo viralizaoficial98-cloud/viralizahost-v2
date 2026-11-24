@@ -21,6 +21,12 @@ const CYCLES = ['monthly', '3months', '6months', '1year', '2years', '3years']
 
 export type StoredLine = Record<string, unknown> & { key: string; type: 'product' | 'domain' | 'renewal' }
 
+const opts = (v: unknown) => {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>, loc = str(o.location, 40), img = str(o.image, 40)
+  return loc || img ? { ...(loc ? { location: loc } : {}), ...(img ? { image: img } : {}) } : null
+}
+
 /** Normaliza as linhas recebidas do navegador: só campos conhecidos, tamanhos limitados, sem EPP. */
 export function sanitizeLines(raw: unknown): StoredLine[] {
   const out: StoredLine[] = []
@@ -32,7 +38,7 @@ export function sanitizeLines(raw: unknown): StoredLine[] {
     if (x.type === 'product' && str(x.slug, 120) && CYCLES.includes(String(x.cycle))) {
       out.push({ key, type: 'product', slug: str(x.slug, 120)!, cycle: String(x.cycle), quantity: Math.max(1, Math.min(1000, Math.floor(Number(x.quantity) || 1))),
         ...(str(x.domain, 253) ? { domain: str(x.domain, 253) } : {}), ...(['register', 'transfer', 'existing'].includes(String(x.domainMode)) ? { domainMode: String(x.domainMode) } : {}),
-        ...(flowId ? { flowId } : {}) })
+        ...(flowId ? { flowId } : {}), ...(opts(x.options) ? { options: opts(x.options) } : {}) })
     } else if (x.type === 'domain' && str(x.domain, 253) && ['register', 'transfer', 'renew'].includes(String(x.operation))) {
       const ns = x.nameservers as { useDefault?: unknown; ns?: unknown } | undefined
       out.push({ key, type: 'domain', domain: str(x.domain, 253)!.toLowerCase(), operation: String(x.operation),

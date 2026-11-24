@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { VpsPlansSection } from '@/components/service/VpsPlansSection'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Cpu, HardDrive, Globe, Shield, Zap, Server, Headphones, Lock, RotateCcw } from 'lucide-react'
@@ -49,9 +49,9 @@ export default async function ServidorVPSPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["RAM DDR5","NVMe SSD","IP Dedicado","Root Access"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <DynamicServicePricing category="vps" cols={3} showBillingToggle
+        <VpsPlansSection
           title="Servidor VPS — Escolha o seu plano"
-          subtitle="Escolha o plano e a duração; a equipa activa o servidor depois do pagamento confirmado." />
+          subtitle="Escolha o plano e o período; depois a localização e o sistema operativo, reveja e pague." />
         <IncludedFeatures features={included} dark
           title="Infra-estrutura premium incluída" />
         <FinalCTA

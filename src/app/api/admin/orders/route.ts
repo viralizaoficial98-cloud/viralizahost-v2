@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { confirmNotPurchased, linkVps, reconcileVps } from '@/lib/vps/provisioning'
 import { createAdminWriteClient, createServiceClient } from '@/lib/supabase/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { getPool } from '@/lib/db/pool'
@@ -15,7 +16,7 @@ export async function GET() {
   const db = createAdminWriteClient()
   const COLS = `id, order_number, user_id, status, payment_status, activation_status, hold_reason, review_flag, review_note, review_at, amount, currency, subtotal, tax_amount, billing_cycle, payment_method,
       domain_name, proof_file, transfer_ref, notes, created_at, updated_at, paid_at,
-      order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, years, nameservers, domain_case, domain_case_note, proposed_domain)`
+      order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, years, nameservers, domain_case, domain_case_note, proposed_domain, options)`
   const { data: recent, error } = await db.from('orders').select(COLS).order('created_at', { ascending: false }).limit(300)
   if (error) return NextResponse.json({ orders: [], error: error.message })
   // Encomendas mais antigas com acções pendentes (activação por fazer, comprovativo, domínio por confirmar)
@@ -44,6 +45,10 @@ export async function GET() {
   const invIds = (invoices ?? []).map((i: any) => i.id)
   const extraPays = invIds.length ? ((await db.from('payments').select('id, order_id, invoice_id, status, amount, currency, proof_url, transfer_ref, created_at, paid_at, reviewed_by').in('invoice_id', invIds).is('order_id', null)).data ?? []) : []
   const allPays = [...(payments ?? []), ...extraPays.map((p: any) => ({ ...p, order_id: (invoices ?? []).find((i: any) => i.id === p.invoice_id)?.order_id }))]
+  const svcIds = (services ?? []).map((s: any) => s.id)
+  const [vpsOps] = svcIds.length ? await getPool().query(`SELECT v.service_id, v.mode, v.status, v.item_id, v.expected_cost_minor, v.cost_limit_minor, v.currency, v.provider_vm_id, v.provider_order_id, v.provider_subscription_id, v.provider_status, v.ipv4, v.attempts, v.message,
+      (SELECT JSON_ARRAYAGG(JSON_OBJECT('event', e.event, 'detail', e.detail, 'at', e.created_at)) FROM vps_provider_events e WHERE e.provider_order_id = v.id) events
+    FROM vps_provider_orders v WHERE v.service_id IN (${svcIds.map(() => '?').join(',')})`, svcIds) as any : [[]]
   const ops = await operationsByService((services ?? []).filter((s: any) => s.service_type === 'domain').map((s: any) => s.id)).catch(() => ({} as Record<string, any>))
   const reg = await loadRegistrarSettings().catch(() => null)
   const registrar = reg ? { provider: reg.provider, enabled: reg.enabled, mode: reg.mode, extensions: reg.extensions } : null
@@ -62,7 +67,8 @@ export async function GET() {
           serviceType: s.service_type, domain: s.domain || item?.domain_name || null, operation: item?.domain_operation ?? null,
           renews: !!s.renews_service_id, paid: o.payment_status === 'paid',
         }) : null
-        return { ...s, registrar_op: (ops as any)[s.id] ?? null, hostinger }
+        const vpsOp = (vpsOps as any[]).find(v => v.service_id === s.id) ?? null
+        return { ...s, registrar_op: (ops as any)[s.id] ?? null, hostinger, vps_op: vpsOp ? { ...vpsOp, events: typeof vpsOp.events === 'string' ? JSON.parse(vpsOp.events) : vpsOp.events ?? [] } : null }
       }),
       invoice: (invoices ?? []).find((i: any) => i.order_id === o.id) ?? null,
       payments: pays.map((p: any) => ({ ...p, proof_url: undefined, has_proof: !!p.proof_url })),
@@ -77,7 +83,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   let adminId: string
   try { adminId = await requireAdminRole() } catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  const body = await req.json().catch(() => ({})) as { domain?: string; confirmed?: boolean; caseAction?: 'propose' | 'replace' | 'refund' | 'resolve'; orderItemId?: string; available?: boolean; orderId?: string; serviceId?: string; paymentId?: string; action?: string; notes?: string; reason?: string; externalRef?: string; flag?: string | null }
+  const body = await req.json().catch(() => ({})) as { vmId?: string; domain?: string; confirmed?: boolean; caseAction?: 'propose' | 'replace' | 'refund' | 'resolve'; orderItemId?: string; available?: boolean; orderId?: string; serviceId?: string; paymentId?: string; action?: string; notes?: string; reason?: string; externalRef?: string; flag?: string | null }
   const db = getPool()
   const log = (action: string, entity: string, id: string, description: string) =>
     db.query("INSERT INTO activity_logs (id, profile_id, action, entity_type, entity_id, description) VALUES (UUID(), ?, 'update', ?, ?, ?)", [adminId, entity, id, `${action}: ${description}`]).catch(() => {})
@@ -146,6 +152,30 @@ export async function POST(req: NextRequest) {
           if (it?.payment_status === 'paid') provisioning = await provisionOrder(it.id)
         }
         return NextResponse.json({ ...r, provisioning })
+      }
+      // VPS: consultar a Hostinger (sem compras), associar uma VM adquirida pela equipa, ou — depois de verificar no
+      // hPanel que nada foi comprado — autorizar nova tentativa. Nunca há compra automática a partir destas acções.
+      case 'vps_reconcile': {
+        const r = await reconcileVps(body.serviceId!, adminId)
+        const [[s]] = await db.query('SELECT order_id FROM services WHERE id = ?', [body.serviceId]) as any
+        if (s) await refreshOrderActivation(s.order_id)
+        await log('vps_reconcile', 'service', body.serviceId!, r.message)
+        return NextResponse.json({ ok: true, result: r })
+      }
+      case 'vps_link': {
+        const r = await linkVps(body.serviceId!, String(body.vmId ?? ''), adminId)
+        const [[s]] = await db.query('SELECT order_id FROM services WHERE id = ?', [body.serviceId]) as any
+        if (s) await refreshOrderActivation(s.order_id)
+        await log('vps_link', 'service', body.serviceId!, r.message)
+        return NextResponse.json({ ok: true, result: r })
+      }
+      case 'vps_confirm_not_purchased': {
+        await confirmNotPurchased(body.serviceId!, body.notes ?? '', adminId)
+        await log('vps_confirm_not_purchased', 'service', body.serviceId!, body.notes ?? '')
+        const r = await provisionService(body.serviceId!)
+        const [[s]] = await db.query('SELECT order_id FROM services WHERE id = ?', [body.serviceId]) as any
+        if (s) await refreshOrderActivation(s.order_id)
+        return NextResponse.json({ ok: true, result: r })
       }
       // Marcação manual autorizada: para domínios exige a referência do registo
       case 'mark_active': {

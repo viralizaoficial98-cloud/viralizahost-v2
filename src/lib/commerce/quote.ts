@@ -13,7 +13,7 @@ export const CYCLE_LABEL: Record<Cycle, string> = { monthly: 'Mensal', '3months'
 
 export type DomainMode = 'register' | 'transfer' | 'existing'
 export type CartLineInput =
-  | { type: 'product'; slug: string; cycle: Cycle; quantity?: number; domain?: string; domainMode?: DomainMode }
+  | { type: 'product'; slug: string; cycle: Cycle; quantity?: number; domain?: string; domainMode?: DomainMode; options?: { location?: string; image?: string } }
   | { type: 'domain'; domain: string; operation: 'register' | 'transfer' | 'renew'; years?: number; eppCode?: string; nameservers?: { useDefault?: boolean; ns?: string[] } }
   | { type: 'renewal'; serviceId: string }
 
@@ -46,6 +46,8 @@ export interface QuoteLine {
   cycles?: { cycle: Cycle; months: number; price: number; renewal: number; discount?: number; renewalDiscount?: number }[]
   /** Desconto do período (%) e preço de tabela da linha sem desconto (preço base × meses × quantidade). */
   discountPct?: number
+  /** VPS: localização e sistema operativo/imagem escolhidos (validados contra as opções activas) */
+  options?: { location?: { id: string; label: string } | null; image?: { id: string; label: string } | null } | null
   listTotal?: number | null
   /** Desconto configurado para a renovação (%); 0 = renova ao preço base. */
   renewalDiscountPct?: number
@@ -92,8 +94,14 @@ const MSG: Record<string, string> = {
   renewal_pending: 'Já existe uma renovação por pagar para este serviço — veja as Encomendas.',
   duplicate_line: 'Item repetido no carrinho.',
   nameservers_invalid: 'Nameservers inválidos.',
+  options_required: 'Escolha a localização e o sistema operativo do VPS.',
+  options_invalid: 'Localização ou sistema operativo indisponível: escolha de novo.',
 }
 const err = (code: string) => ({ code, message: MSG[code] ?? code })
+/** Opções de VPS activas (Integrações → Hostinger VPS). Lidas da base, sem chamar o fornecedor. */
+async function vpsOptions(): Promise<{ locations: { id: string; label: string }[]; images: { id: string; label: string }[] }> {
+  try { const { publicVpsOptions } = await import('@/lib/vps/settings'); return await publicVpsOptions() } catch { return { locations: [], images: [] } }
+}
 
 export async function getTaxSettings(db: Queryable = getPool()) {
   const [s] = await rows(db, 'SELECT tax_rate, tax_label FROM company_billing_settings WHERE active = 1 LIMIT 1').catch(() => [])
@@ -179,7 +187,7 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
     // Produto
     const slug = String((raw as { slug?: string })?.slug ?? '')
     const cycle = (raw as { cycle?: Cycle })?.cycle as Cycle
-    const [prod] = await rows(db, 'SELECT id, slug, name, active, sale_status, service_type, provisioning, quantity_unit, max_quantity, base_monthly_price FROM products WHERE slug = ?', [slug])
+    const [prod] = await rows(db, 'SELECT id, slug, name, active, sale_status, service_type, provisioning, quantity_unit, max_quantity, base_monthly_price, category, subcategory FROM products WHERE slug = ?', [slug])
     const base: QuoteLine = { index, type: 'product', slug, name: prod?.name ?? slug, serviceType: prod?.service_type ?? 'other', provisioning: prod?.provisioning, quantity: 1, unitPrice: 0, lineTotal: 0, renewalPrice: 0, cycle, quantityUnit: prod?.quantity_unit ?? null, maxQuantity: Number(prod?.max_quantity ?? 1) }
     if (!prod || !prod.active) { lines.push({ ...base, error: err('product_not_found') }); continue }
     base.productId = prod.id
@@ -193,6 +201,17 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
     Object.assign(base, { months: c.months, quantity: qty, unitPrice: c.price, lineTotal: round2(c.price * qty), renewalPrice: round2(c.renewal * qty),
       discountPct: c.discount ?? 0, renewalDiscountPct: c.renewalDiscount ?? 0,
       listTotal: prod.base_monthly_price != null && (c.discount ?? 0) > 0 ? round2(Number(prod.base_monthly_price) * c.months * qty) : null })
+    // VPS (/servidor-vps): localização e sistema operativo, quando o administrador activou opções
+    if (prod.category === 'vps' && !prod.subcategory) {
+      const avail = await vpsOptions()
+      const want = ((raw as { options?: { location?: string; image?: string } }).options ?? {})
+      const pick = (list: { id: string; label: string }[], id?: string) => (id ? list.find(o => o.id === String(id)) ?? undefined : null)
+      const loc = avail.locations.length ? pick(avail.locations, want.location) : null
+      const img = avail.images.length ? pick(avail.images, want.image) : null
+      if (loc === undefined || img === undefined) { lines.push({ ...base, error: err('options_invalid') }); continue }
+      if ((avail.locations.length && !loc) || (avail.images.length && !img)) { lines.push({ ...base, error: err('options_required') }); continue }
+      if (loc || img) base.options = { location: loc, image: img }
+    }
     if (base.serviceType === 'hosting' || base.serviceType === 'email') {
       const d = normalizeDomain((raw as { domain?: string }).domain)
       const mode = (raw as { domainMode?: DomainMode }).domainMode ?? 'existing'

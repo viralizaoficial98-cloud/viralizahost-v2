@@ -11,8 +11,8 @@ export const metadata = { title: 'Encomenda' }
 
 const CYCLE: Record<string, string> = { monthly: 'mês', '3months': 'trimestre', '6months': '6 meses', '1year': 'ano', '2years': '2 anos', '3years': '3 anos' }
 const SERVICE_STATUS: Record<string, string> = {
-  pending: 'Aguarda confirmação do pagamento', in_progress: 'Em activação', active: 'Activo',
-  manual_required: 'A equipa está a activar manualmente', failed: 'Activação falhou — a equipa vai resolver sem nova cobrança',
+  pending: 'Aguarda confirmação do pagamento', in_progress: 'Em activação: a preparar o serviço', active: 'Activo',
+  manual_required: 'Activação em tratamento pela equipa', failed: 'Activação falhou — a equipa vai resolver sem nova cobrança',
 }
 
 export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ nova?: string }> }) {
@@ -23,7 +23,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   if (!user) redirect('/login')
   // Propriedade: a política de orders só devolve encomendas do próprio cliente
   const { data: order } = await db.from('orders')
-    .select('id, order_number, created_at, amount, subtotal, tax_amount, tax_rate, payment_status, activation_status, hold_reason, status, payment_method, order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, domain_case, proposed_domain)')
+    .select('id, order_number, created_at, amount, subtotal, tax_amount, tax_rate, payment_status, activation_status, hold_reason, status, payment_method, order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, domain_case, proposed_domain, options)')
     .eq('id', id).eq('user_id', user.id).maybeSingle()
   if (!order) notFound()
   const [{ data: invoice }, { data: services }, bank] = await Promise.all([
@@ -106,9 +106,10 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
                 <div>
                   <p className="text-[#0B0B0D] font-bold">{it.service_name}{it.quantity > 1 ? ` × ${it.quantity}` : ''}</p>
                   {it.domain_name && <p className="text-xs text-[#64748B]">{it.domain_name}</p>}
+                  {(() => { try { const o = typeof it.options === 'string' ? JSON.parse(it.options) : it.options; const t = o ? [o.location ? `Localização: ${o.location.label}` : '', o.image ? `Sistema: ${o.image.label}` : ''].filter(Boolean).join(' · ') : ''; return t ? <p className="text-xs text-[#64748B]" data-testid="order-item-options">{t}</p> : null } catch { return null } })()}
                   {it.availability != null && (() => { const d = domainState(it, svc); return <p className="mt-1"><span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${TONE_CLASS[d.tone]}`} data-testid="order-domain-state">Domínio: {d.label}</span></p> })()}
                   <p className="text-xs text-[#64748B]">Renova por {kz(it.renewal_price)} / {CYCLE[it.billing_cycle] ?? 'ano'}</p>
-                  {svc && <p className="text-xs mt-1 text-amber-700">{SERVICE_STATUS[svc.provisioning_status] ?? svc.provisioning_status}</p>}
+                  {svc && <p className="text-xs mt-1 text-amber-700" data-testid="order-service-status">{SERVICE_STATUS[svc.provisioning_status] ?? svc.provisioning_status}</p>}
                 </div>
                 <p className="text-[#0B0B0D] font-bold">{kz(it.line_total ?? it.unit_price)}</p>
               </li>
