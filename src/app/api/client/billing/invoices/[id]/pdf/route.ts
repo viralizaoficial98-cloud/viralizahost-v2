@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadBankDetails } from '@/lib/billing/load-bank-details'
+import { bankFromSnapshot } from '@/lib/billing/bank-details'
 import { createAuthClient, createAdminWriteClient } from '@/lib/supabase/server'
 import { renderToBuffer, DocumentProps } from '@react-pdf/renderer'
 import { InvoicePDF } from '@/lib/pdf/invoice-pdf'
@@ -88,7 +89,8 @@ export async function GET(
     .maybeSingle()
 
   // Dados bancários: a mesma fonte do checkout e da Área do Cliente (lib/billing)
-  const bank = await loadBankDetails()
+  // Dados de transferência da própria factura (cópia na emissão); facturas sem cópia usam os dados em vigor
+  const bank = bankFromSnapshot((inv as { bank_details?: unknown }).bank_details) ?? await loadBankDetails()
   const billing = { ...DEFAULT_BILLING, ...(billingSettings ?? {}),
     bank_name: bank.bank, account_holder: bank.holder, iban: bank.iban, account_number: bank.accountNumber, swift: bank.swift, payment_instructions: bank.instructions ?? (billingSettings as { payment_instructions?: string | null } | null)?.payment_instructions ?? null }
 

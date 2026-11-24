@@ -1,4 +1,5 @@
 import 'server-only'
+import { bankSnapshotJson } from '@/lib/billing/load-bank-details'
 import { randomUUID } from 'node:crypto'
 import { withTransaction, type Queryable } from '@/lib/db/pool'
 import { encryptSecret } from '@/lib/crypto'
@@ -152,10 +153,12 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
     const invoiceNumber = await nextNumber(conn, 'invoices', 'invoice_number', `VH-${ym}-`)
     await conn.query(
       `INSERT INTO invoices (id, profile_id, order_id, invoice_number, status, currency, subtotal, discount, tax, total, amount_paid,
-         due_date, issue_date, notes, proof_file, items)
-       VALUES (?, ?, ?, ?, ?, 'AKZ', ?, 0, ?, ?, 0, CURRENT_DATE + INTERVAL 7 DAY, CURRENT_DATE, ?, ?, ?)`,
+         due_date, issue_date, notes, proof_file, items, bank_details)
+       VALUES (?, ?, ?, ?, ?, 'AKZ', ?, 0, ?, ?, 0, CURRENT_DATE + INTERVAL 7 DAY, CURRENT_DATE, ?, ?, ?, ?)`,
       [invoiceId, input.userId, orderId, invoiceNumber, hasProof ? 'under_review' : 'pending', quote.subtotal, quote.tax, quote.total,
-        `Encomenda ${orderNumber}`, input.proofFile ?? null, JSON.stringify(invoiceItems)],
+        `Encomenda ${orderNumber}`, input.proofFile ?? null, JSON.stringify(invoiceItems),
+        // Dados de transferência em vigor na emissão (alterações posteriores no painel não mudam esta factura)
+        await bankSnapshotJson(conn)],
     )
     for (const [pos, it] of invoiceItems.entries()) {
       await conn.query('INSERT INTO invoice_items (id, invoice_id, description, quantity, unit_price, subtotal, position) VALUES (?, ?, ?, ?, ?, ?, ?)',

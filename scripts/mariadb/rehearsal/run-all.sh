@@ -31,6 +31,7 @@ if [ "${SKIP_UI:-0}" = "1" ]; then
   echo; echo "=== Interface e links: ignorados (SKIP_UI=1, sem Chromium neste servidor)"
 else
   run "Domínio avulso: configuração, carrinho, cadastro e pagamento (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/domain-checkout-e2e.cjs
+  run "Facturação: IBAN, titular e imagem do cartão (painel, checkout, Área do Cliente)" node --env-file=.env.local scripts/mariadb/rehearsal/bank-settings-e2e.cjs
   run "Transferência com domínio .ao a confirmar: pagar já, comprovativo, painel (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/bank-transfer-domain-e2e.cjs
   run "Hospedagem Premium: períodos, descontos e fichas de plano (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/hosting-plans-e2e.cjs
   run "E-mail Corporativo: períodos, descontos e fichas de plano (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/email-plans-e2e.cjs

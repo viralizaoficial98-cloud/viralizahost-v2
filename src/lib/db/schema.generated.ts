@@ -596,6 +596,11 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "json",
         "hasDefault": true,
         "nullable": true
+      },
+      "bank_card_image_path": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": []
@@ -1503,6 +1508,11 @@ export const SCHEMA_META: SchemaMeta = {
       },
       "proof_file": {
         "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "bank_details": {
+        "kind": "json",
         "hasDefault": true,
         "nullable": true
       }
