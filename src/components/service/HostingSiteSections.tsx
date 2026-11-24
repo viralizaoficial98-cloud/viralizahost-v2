@@ -17,7 +17,7 @@ const OPTIONS: Option[] = [
     id: 'wordpress', n: '1', icon: LayoutTemplate, title: 'Use WordPress',
     text: 'O WordPress é a plataforma mais usada para criar sites. A hospedagem está preparada para o correr com estabilidade, para que os visitantes encontrem um site rápido e com aspecto profissional.',
     points: ['Instale o WordPress a partir do cPanel', 'Temas e plugins para blogs, lojas e sites de empresa', 'Gere páginas, artigos e imagens num só painel'],
-    links: [{ label: 'Ver planos WordPress', href: '#planos-wordpress', tid: 'build-link-wordpress' }],
+    links: [], // bloco informativo (os planos WordPress não são apresentados nesta página)
   },
   {
     id: 'editor-visual', n: '2', icon: MousePointerClick, title: 'Crie com um editor visual',
@@ -54,14 +54,14 @@ export function BuildSiteSection() {
               <ul className="space-y-2 mb-6">
                 {o.points.map(p => <li key={p} className="flex gap-2 text-sm text-[#333]"><Check size={16} className="text-[#D9A300] shrink-0 mt-0.5" aria-hidden="true" />{p}</li>)}
               </ul>
-              <div className="mt-auto flex flex-wrap gap-x-4 gap-y-2">
+              {o.links.length > 0 && <div className="mt-auto flex flex-wrap gap-x-4 gap-y-2">
                 {o.links.map((l, i) => (
                   <Link key={l.href} href={l.href} data-testid={l.tid}
                     className={i === 0 ? 'inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#0A0A0A] text-white hover:bg-[#222]' : 'inline-flex items-center gap-1 py-2.5 text-sm font-bold text-[#0A0A0A] underline decoration-[#F5B700] decoration-2 underline-offset-4'}>
                     {l.label} <ArrowRight size={14} aria-hidden="true" />
                   </Link>
                 ))}
-              </div>
+              </div>}
             </li>
           ))}
         </ol>

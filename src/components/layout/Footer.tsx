@@ -37,7 +37,7 @@ const columns = [
     title: 'Hospedagem',
     links: [
       { label: 'Hospedagem de Sites',  href: '/hospedagem-de-sites' },
-      { label: 'Hospedagem WordPress', href: '/hospedagem-de-sites#planos-wordpress' },
+      { label: 'Hospedagem WordPress', href: '/hospedagem-de-sites#wordpress' },
       { label: 'Criador de Sites',     href: '/criador-de-sites' },
       { label: 'Revenda WHM',          href: '/revenda-de-hospedagem' },
     ],
