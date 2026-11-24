@@ -4,6 +4,8 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
+import { PageLinksSection } from '@/components/site/PageLinksSection'
+import { pagesInSection } from '@/lib/site/pages'
 import { VpsPlansSection } from '@/components/service/VpsPlansSection'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
@@ -52,6 +54,9 @@ export default async function ServidorVPSPage() {
         <VpsPlansSection
           title="Servidor VPS — Escolha o seu plano"
           subtitle="Escolha o plano e o período; depois a localização e o sistema operativo, reveja e pague." />
+        <PageLinksSection id="aplicacoes" tag="Aplicações pré-configuradas" title="VPS com aplicações prontas a usar"
+          subtitle="Automação, WhatsApp Business e agentes de IA num VPS já configurado — cada solução tem a sua página com planos e detalhes."
+          items={pagesInSection('vps-apps').map(p => ({ href: p.path, title: p.title, desc: p.desc, icon: p.icon, cta: 'Ver solução' }))} />
         <IncludedFeatures features={included} dark
           title="Infra-estrutura premium incluída" />
         <FinalCTA

@@ -4,7 +4,7 @@ import { revalidateTag } from 'next/cache'
 import { getPool, withTransaction, type Queryable } from '@/lib/db/pool'
 import { MAX_DISCOUNT, exactPeriodTotal, matchesRule } from './period-pricing'
 import { syncDisplay } from './catalog-admin'
-import { VPS_CYCLES, compareSpecs, isTrafficUnit, isVpsIcon, type ProviderSpecs, type VpsFeature, type VpsSpecs } from './vps-shared'
+import { VPS_CYCLES, VPS_RETIRED_CYCLES, compareSpecs, isTrafficUnit, isVpsIcon, type ProviderSpecs, type VpsFeature, type VpsSpecs } from './vps-shared'
 
 // Catálogo e Preços → VPS (categoria «vps» sem subcategoria — a página /servidor-vps).
 // Ficha em products.plan_specs, imagem em products.image_path (armazenamento «catalog-assets»), características
@@ -73,6 +73,8 @@ const money = (v: unknown, field: string, label: string) => {
 }
 const slugify = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
 const PROVIDER_ID = /^[a-z0-9][a-z0-9-]{2,158}$/
+/** Meses de um item de preço do catálogo da Hostinger (period + period_unit). */
+export const catalogMonths = (p: { period: number; period_unit: string }) => /year/i.test(p.period_unit) ? p.period * 12 : /day/i.test(p.period_unit) ? 0 : p.period
 
 export function validateVpsSpecs(s: any): VpsSpecs {
   s = s && typeof s === 'object' ? s : {}
@@ -157,7 +159,15 @@ export async function saveVpsPlan(input: VpsPlanInput): Promise<string> {
   }
 
   const per = new Map((input.periods ?? []).map(p => [String(p?.cycle), p]))
-  for (const c of per.keys()) if (!VPS_CYCLES.some(p => p.cycle === c)) throw new VpsPlanError(`Ciclo inválido: ${c}.`, 'periods')
+  for (const c of per.keys()) {
+    if (VPS_RETIRED_CYCLES.includes(c)) throw new VpsPlanError('O ciclo de 3 meses deixou de estar à venda para VPS.', 'periods')
+    if (!VPS_CYCLES.some(p => p.cycle === c)) throw new VpsPlanError(`Ciclo inválido: ${c}.`, 'periods')
+  }
+  // Itens de preço da Hostinger: confirmados no catálogo (produto e PERÍODO) — nunca o item de outro período
+  const usesItems = !!providerProductId && (input.periods ?? []).some(p => !isEmpty(p?.providerItemId))
+  const catalog = usesItems ? await import('@/lib/vps/settings').then(m => m.providerCatalog()).catch(e => ({ error: (e as Error).message, items: [] })) : null
+  const productItems = catalog && !catalog.error ? catalog.items.find(i => i.id === providerProductId) ?? null : null
+  if (catalog && !catalog.error && !productItems) throw new VpsPlanError(`O produto ${providerProductId} não existe no catálogo VPS da Hostinger.`, 'providerProductId')
 
   const id = await withTransaction(async conn => {
     let pid = input.id ? String(input.id) : ''
@@ -201,8 +211,15 @@ export async function saveVpsPlan(input: VpsPlanInput): Promise<string> {
       const currency = raw && 'providerCurrency' in raw ? (text(raw.providerCurrency, 3).toUpperCase() || null) : cur?.provider_currency ?? null
       if (currency && !/^[A-Z]{3}$/.test(currency)) throw new VpsPlanError(`${c.label}: moeda do fornecedor inválida (ex.: USD).`, `provider-${c.cycle}`)
       if (cost != null && limit != null && limit < cost) throw new VpsPlanError(`${c.label}: o limite de custo não pode ser inferior ao custo esperado.`, `provider-${c.cycle}`)
-      if (providerMode === 'auto' && publish && (!itemId || cost == null || limit == null || !currency)) {
-        throw new VpsPlanError(`${c.label}: em modo automático indique o item de preço da Hostinger, o custo esperado, a moeda e o limite de custo.`, `provider-${c.cycle}`)
+      if (itemId && productItems) {
+        const pr = productItems.prices.find(x => x.id === itemId)
+        if (!pr) throw new VpsPlanError(`${c.label}: o item ${itemId} não pertence ao produto ${providerProductId} na Hostinger.`, `provider-${c.cycle}`)
+        if (catalogMonths(pr) !== c.months) throw new VpsPlanError(`${c.label}: o item ${itemId} é de ${catalogMonths(pr)} mês(es); use um item de ${c.months} mês(es) (não se usa o item de outro período).`, `provider-${c.cycle}`)
+      }
+      if (providerMode === 'auto' && publish) {
+        const missing = [!itemId && `item de preço da Hostinger de ${c.months} mês(es)`, cost == null && 'custo esperado', !currency && 'moeda', limit == null && 'limite de custo'].filter(Boolean)
+        if (missing.length) throw new VpsPlanError(`${c.label}: para publicar em activação automática falta ${missing.join(', ')}. Guarde o ciclo como não publicado ou mude para Manual.`, `provider-${c.cycle}`)
+        if (catalog?.error) throw new VpsPlanError(`${c.label}: não foi possível confirmar o item no catálogo da Hostinger (${catalog.error}); guarde o ciclo como não publicado e tente mais tarde.`, `provider-${c.cycle}`)
       }
       if (!(price > 0)) throw new VpsPlanError(`${c.label}: o total tem de ser maior que 0.`, `discount-${c.cycle}`)
       await conn.query(`INSERT INTO product_prices (id, product_id, cycle, months, price, renewal_price, currency, active, discount_pct, provider_item_id, provider_cost_minor, provider_currency, provider_cost_limit_minor, reference)
@@ -211,7 +228,7 @@ export async function saveVpsPlan(input: VpsPlanInput): Promise<string> {
           provider_item_id = VALUES(provider_item_id), provider_cost_minor = VALUES(provider_cost_minor), provider_currency = VALUES(provider_currency), provider_cost_limit_minor = VALUES(provider_cost_limit_minor)`,
         [pid, c.cycle, c.months, price, renewal, publish ? 1 : 0, discount, itemId, cost, currency, limit])
     }
-    const [n] = await rows(conn, 'SELECT COUNT(*) n FROM product_prices WHERE product_id = ? AND active = 1', [pid])
+    const [n] = await rows(conn, `SELECT COUNT(*) n FROM product_prices WHERE product_id = ? AND active = 1 AND cycle IN (${VPS_CYCLES.map(() => '?').join(',')})`, [pid, ...VPS_CYCLES.map(c => c.cycle)])
     if (saleStatus === 'active' && !Number(n.n)) throw new VpsPlanError('Para publicar, active pelo menos um ciclo.', 'periods')
     const [slugRow] = await rows(conn, 'SELECT slug FROM products WHERE id = ?', [pid])
     await syncDisplay(conn, pid, slugRow.slug)
@@ -229,7 +246,7 @@ export async function vpsListAction(input: { action: unknown; id?: unknown; publ
     const [[p]] = await db.query("SELECT id FROM products WHERE id = ? AND category = 'vps' AND subcategory IS NULL", [id]) as any
     if (!p) throw new VpsPlanError('Plano VPS inexistente.')
     if (input.published === true) {
-      const [[n]] = await db.query('SELECT COUNT(*) n FROM product_prices WHERE product_id = ? AND active = 1', [id]) as any
+      const [[n]] = await db.query(`SELECT COUNT(*) n FROM product_prices WHERE product_id = ? AND active = 1 AND cycle IN (${VPS_CYCLES.map(() => '?').join(',')})`, [id, ...VPS_CYCLES.map(c => c.cycle)]) as any
       if (!Number(n.n)) throw new VpsPlanError('Para publicar, active pelo menos um ciclo na ficha.')
     }
     await db.query('UPDATE products SET sale_status = ? WHERE id = ?', [input.published === true ? 'active' : 'draft', id])

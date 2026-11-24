@@ -37,7 +37,7 @@ const columns = [
     title: 'Hospedagem',
     links: [
       { label: 'Hospedagem de Sites',  href: '/hospedagem-de-sites' },
-      { label: 'Hospedagem WordPress', href: '/hospedagem-wordpress' },
+      { label: 'Hospedagem WordPress', href: '/hospedagem-de-sites#wordpress' },
       { label: 'Criador de Sites',     href: '/criador-de-sites' },
       { label: 'Revenda WHM',          href: '/revenda-de-hospedagem' },
     ],
@@ -99,8 +99,10 @@ const columns = [
   {
     title: 'Empresa',
     links: [
-      { label: 'Sobre a ViralizaHost', href: '/servicos' },
-      { label: 'Parceiros',            href: '/parcerias' },
+      { label: 'Sobre nós',            href: '/sobre' },
+      { label: 'Suporte',              href: '/suporte' },
+      { label: 'Parceria',             href: '/parcerias' },
+      { label: 'Blog',                 href: '/blog' },
       { label: 'Carreiras',            href: '/suporte/contactar' },
       { label: 'Contacto',             href: '/suporte/contactar' },
     ],

@@ -64,7 +64,8 @@ function Line({ l, q, onRemove }: { l: CartLine; q?: QuoteLine; onRemove: () => 
           {l.type === 'product' && (
             <div className="grid sm:grid-cols-2 gap-3 mt-3">
               <label className="text-xs text-[#888]">Ciclo de facturação
-                <select className={`${input} mt-1`} value={l.cycle} onChange={e => update(l.key, { cycle: e.target.value as Cycle })} aria-label={`Ciclo de ${lineTitle(l, q)}`}>
+                <select className={`${input} mt-1`} value={l.cycle} onChange={e => update(l.key, { cycle: e.target.value as Cycle })} aria-label={`Ciclo de ${lineTitle(l, q)}`} data-testid="line-cycle">
+                  {q?.cycles?.length && !q.cycles.some(c => c.cycle === l.cycle) && <option value={l.cycle} disabled>— escolha outro período —</option>}
                   {(q?.cycles?.length ? q.cycles : [{ cycle: l.cycle, months: 0, price: 0, renewal: 0 }]).map(c => (
                     <option key={c.cycle} value={c.cycle}>{CYCLE_LABEL[c.cycle as Cycle]}{c.price ? ` — ${kz(c.price * (l.quantity || 1))}` : ''}{c.discount ? ` (−${c.discount}%)` : ''}</option>
                   ))}

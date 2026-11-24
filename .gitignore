@@ -46,3 +46,6 @@ next-env.d.ts
 # relatórios do script de migração
 /migration-reports/
 RELEASE_COMMIT
+
+# Capturas geradas pelos ensaios (scripts/mariadb/rehearsal) — não versionar
+ui-shots*/

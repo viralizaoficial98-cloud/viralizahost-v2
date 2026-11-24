@@ -68,7 +68,7 @@ function PlansWrap({ carousel, gridClass, children }: { carousel: boolean; gridC
     : <div className={`grid grid-cols-1 ${gridClass} gap-6 max-w-6xl mx-auto`}>{children}</div>
 }
 
-export function DynamicServicePricing({ category, subcategory, title, subtitle, cols = 3, showBillingToggle = false, carousel = false }: Props) {
+export function DynamicServicePricing({ category, subcategory, title, subtitle, cols = 3, showBillingToggle = false, carousel = false, id = 'planos' }: Props & { id?: string }) {
   const { t, formatCurrency, currency } = useLocale()
   const [plans, setPlans] = useState<ProductWithFeatures[]>([])
   // loading → ok | empty (catálogo sem planos publicados) | error (falha ao carregar)
@@ -113,7 +113,7 @@ export function DynamicServicePricing({ category, subcategory, title, subtitle, 
   const fmtAOA = (aoa: number) => formatCurrency(convertFromAOA(aoa, currency))
 
   return (
-    <section id="planos" className="bg-[#F8F8F8] py-20">
+    <section id={id} className="bg-[#F8F8F8] py-20 scroll-mt-24">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <span className="section-tag">{t('billing.bestValue') !== 'billing.bestValue' ? t('billing.bestValue') : 'Planos e Preços'}</span>

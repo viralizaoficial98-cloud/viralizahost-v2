@@ -57,6 +57,7 @@ export async function updateProduct(productId: string, patch: ProductPatch) {
     // Hospedagem Premium: os 4 períodos públicos só pela ficha do plano (preço base e desconto); os restantes ciclos continuam aqui.
     // Servidor VPS (sem subcategoria): preços e custos do fornecedor só pela ficha do plano (Catálogo → VPS)
     if (p.category === 'vps' && !p.subcategory && patch.prices?.length) throw new Error('Os preços dos planos VPS editam-se na ficha do plano (preço base e desconto por ciclo).')
+    if ((p.category === 'dedicated' || p.category === 'dedicated-windows') && patch.prices?.length) throw new Error('Os preços dos servidores dedicados editam-se na ficha do plano (preço base e desconto por período).')
     if (p.category === 'hosting' && patch.prices?.some(x => ['monthly', '1year', '2years', '3years'].includes(x.cycle))) throw new Error('Os preços de 1 mês, 1, 2 e 3 anos da hospedagem editam-se na ficha do plano (preço base e desconto por período).')
     if (patch.sale_status && !['active', 'draft', 'on_request'].includes(patch.sale_status)) throw new Error('Estado inválido.')
     if (patch.whm_package !== undefined && patch.whm_package && !/^[\w .@-]{1,64}$/.test(patch.whm_package)) throw new Error('Pacote WHM inválido.')

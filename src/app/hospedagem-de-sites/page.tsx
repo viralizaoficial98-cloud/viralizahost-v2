@@ -6,7 +6,9 @@ import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
-import { Server, Shield, Zap, HardDrive, Mail, RotateCcw, Headphones, Globe, Lock } from 'lucide-react'
+import { Server, Shield, Zap, HardDrive, Mail, RotateCcw, Headphones, Globe, Lock, Bot, BarChart } from 'lucide-react'
+import Link from 'next/link'
+import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import { HostingPlansSection } from '@/components/service/HostingPlansSection'
 
 export const metadata: Metadata = {
@@ -25,6 +27,16 @@ const included = [
   { icon: Globe, title: 'Migração Gratuita', desc: 'A nossa equipa migra o seu site sem custo adicional e sem downtime.' },
   { icon: Headphones, title: 'Suporte 24/7', desc: 'Equipa técnica especializada disponível a qualquer hora.' },
   { icon: Lock, title: 'Proteção DDoS', desc: 'Protecção avançada contra ataques de negação de serviço.' },
+]
+
+// Hospedagem WordPress (antes em /hospedagem-wordpress, que encaminha para #wordpress): conteúdo e planos WordPress
+const wordpressIncluded = [
+  { icon: Globe, title: 'WordPress pré-instalado', desc: 'Instância WordPress pronta a usar logo após a activação.' },
+  { icon: Zap, title: 'LiteSpeed + cache WordPress', desc: 'Cache avançado específico para WordPress — carregamentos ultrarrápidos.' },
+  { icon: RotateCcw, title: 'Backup diário', desc: 'Cópias automáticas com restauração com um clique.' },
+  { icon: Bot, title: 'Criador com IA', desc: 'Gere conteúdo, páginas e posts com inteligência artificial.' },
+  { icon: BarChart, title: 'Optimização SEO', desc: 'Ferramentas integradas para melhor posicionamento nos motores de busca.' },
+  { icon: Lock, title: 'Segurança reforçada', desc: 'Firewall WAF, protecção contra malware e verificação automática.' },
 ]
 
 export default async function HospedagemDeSitesPage() {
@@ -53,7 +65,23 @@ export default async function HospedagemDeSitesPage() {
         <HostingPlansSection
           title="Hospedagem de Sites — Escolha o seu plano"
           subtitle="Escolha o plano e o período; depois o domínio e os extras." />
+        <div className="bg-[#FFFBEA] border-y border-[#F5E3A3]">
+          <p className="container mx-auto px-4 py-3 text-sm text-center text-[#5C4A00]">
+            Vai usar WordPress? <Link href="#wordpress" className="font-bold underline" data-testid="link-wordpress">Veja a hospedagem WordPress optimizada</Link> — WordPress pré-instalado, cache e criador com IA.
+          </p>
+        </div>
         <IncludedFeatures features={included} hoverBorder />
+        <section id="wordpress" className="scroll-mt-24 bg-white" data-testid="section-wordpress" aria-labelledby="wordpress-title">
+          <div className="container mx-auto px-4 pt-16 text-center max-w-3xl">
+            <span className="section-tag">WordPress</span>
+            <h2 id="wordpress-title" className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3">Hospedagem WordPress optimizada</h2>
+            <p className="text-[#666] mt-3">WordPress pré-instalado, LiteSpeed, SSL grátis, CDN e criador de sites com IA incluídos em todos os planos WordPress.</p>
+          </div>
+          <IncludedFeatures features={wordpressIncluded} title="Incluído nos planos WordPress" subtitle="Optimizações específicas para WordPress, sem custo adicional." />
+          <DynamicServicePricing id="planos-wordpress" category="wordpress" cols={3} showBillingToggle
+            title="Planos WordPress"
+            subtitle="Escolha o plano, depois o domínio e a duração." />
+        </section>
         <FinalCTA
           title="Comece hoje"
           subtitle="Migração gratuita, suporte 24/7 e uptime 99.9% garantido. Sem riscos." />

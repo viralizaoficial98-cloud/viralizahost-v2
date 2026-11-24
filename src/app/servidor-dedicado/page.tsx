@@ -4,7 +4,8 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { DedicatedPlansSection } from '@/components/service/DedicatedPlansSection'
+import { DedicatedCompatibility } from '@/components/service/DedicatedCompatibility'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Cpu, HardDrive, Globe, Shield, Zap, Server, Headphones, Lock, RotateCcw } from 'lucide-react'
@@ -49,9 +50,10 @@ export default async function ServidorDedicadoPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["vCPU Exclusivas","RAM DDR5","NVMe SSD","Root Access Total"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <DynamicServicePricing category="dedicated" cols={4} showBillingToggle
+        <DedicatedPlansSection kind="linux"
           title="Servidor Dedicado Linux — Planos"
-          subtitle="Recursos exclusivos, sem partilha. Máxima performance e controlo total." />
+          subtitle="Hardware exclusivo, sem partilha. Escolha o período e compre — a equipa activa o servidor depois do pagamento confirmado." />
+        <DedicatedCompatibility kind="linux" />
         <IncludedFeatures features={included} dark
           title="Infra-estrutura enterprise incluída" />
         <FinalCTA

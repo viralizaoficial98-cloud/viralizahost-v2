@@ -152,7 +152,7 @@ const mockPost = async (path, body) => { const r = await fetch(MOCK + path, { me
     await bad({ features: [{ text: 'Backups', icon: 'skull' }] }, {}, 'features', 'ícone fora da lista')
     await bad({ baseMonthly: -5 }, {}, 'baseMonthly', 'preço negativo')
     await bad({}, { '1year': { discount: 95 } }, 'discount-1year', 'desconto acima do máximo')
-    const AUTO = { providerProductId: 'hostingercom-vps-kvm2', providerSpecs: kvm2.specs, providerMode: 'auto' }, AUTO_PER = { monthly: { providerItemId: 'hostingercom-vps-kvm2-usd-1m', providerCostMinor: 699, providerCurrency: 'USD', providerCostLimitMinor: 800 }, '3months': { publish: false }, '6months': { publish: false }, '1year': { publish: false }, '2years': { publish: false }, '3years': { publish: false } }
+    const AUTO = { providerProductId: 'hostingercom-vps-kvm2', providerSpecs: kvm2.specs, providerMode: 'auto' }, AUTO_PER = { monthly: { providerItemId: 'hostingercom-vps-kvm2-usd-1m', providerCostMinor: 699, providerCurrency: 'USD', providerCostLimitMinor: 800 }, '6months': { publish: false }, '1year': { publish: false }, '2years': { publish: false }, '3years': { publish: false } }
     await bad({ ...AUTO, specs: { ...specs2, vcpu: 4 } }, AUTO_PER, 'specs', 'Automático: características ≠ produto da Hostinger')
     await bad({ ...AUTO, specs: { ...specs2, traffic: { unlimited: true } } }, AUTO_PER, 'specs', 'Automático: «Ilimitado» num produto com limite de tráfego')
 
@@ -163,7 +163,7 @@ const mockPost = async (path, body) => { const r = await fetch(MOCK + path, { me
     ok(kvm1?.specs?.trafficGb === 4000 && JSON.stringify(kvm1.specs.raw?.traffic) === JSON.stringify({ key: 'bandwidth', value: 4096000, unit: 'MB' }), `KVM 1: valor bruto bandwidth = 4 096 000 MB → 4 000 GB (${JSON.stringify(kvm1?.specs?.raw?.traffic)})`)
     const specs1 = { vcpu: 1, ramGb: 4, diskGb: 50, diskType: 'NVMe', traffic: { value: 4, unit: 'TB' }, network: { value: 1, unit: 'Gbps' } }
     const K1 = { providerProductId: 'hostingercombr-vps-kvm1', providerSpecs: kvm1?.specs }
-    const K1_PER = { monthly: { discount: 0, publish: true, providerItemId: 'hostingercombr-vps-kvm1-usd-1m', providerCostMinor: 499, providerCurrency: 'USD', providerCostLimitMinor: 550 }, '3months': { publish: false }, '6months': { publish: false }, '1year': { publish: false }, '2years': { publish: false }, '3years': { publish: false } }
+    const K1_PER = { monthly: { discount: 0, publish: true, providerItemId: 'hostingercombr-vps-kvm1-usd-1m', providerCostMinor: 499, providerCurrency: 'USD', providerCostLimitMinor: 550 }, '6months': { publish: false }, '1year': { publish: false }, '2years': { publish: false }, '3years': { publish: false } }
     const put = (over, per) => adm.req(API, { method: 'PUT', body: asInput(p2, over, per) })
     let u = await put({ ...K1, specs: specs1, providerMode: 'manual' }, K1_PER)
     ok(u.status === 200 && u.json.warnings.length === 0, 'KVM 1 com 4 TB em modo Manual: gravado sem divergência', JSON.stringify(u.json))
@@ -232,7 +232,7 @@ const mockPost = async (path, body) => { const r = await fetch(MOCK + path, { me
     // Base: ficha + associação por API (rápido); o formulário altera desconto, selo e característica
     const kItem = m => kvm2.prices.find(x => x.period === m)
     // A Hostinger só vende KVM 2 a 1, 12 e 24 meses: os outros ciclos deixam de ser publicados neste plano
-    const per1 = { monthly: { discount: 0, publish: true }, '3months': { publish: false }, '6months': { publish: false }, '1year': { discount: 20, publish: true }, '2years': { discount: 30, publish: true }, '3years': { publish: false } }
+    const per1 = { monthly: { discount: 0, publish: true }, '6months': { publish: false }, '1year': { discount: 20, publish: true }, '2years': { discount: 30, publish: true }, '3years': { publish: false } }
     for (const [c, m] of [['monthly', 1], ['1year', 12], ['2years', 24]]) { const it = kItem(m); Object.assign(per1[c], { providerItemId: it.id, providerCostMinor: it.first_period_price ?? it.price, providerCurrency: 'USD', providerCostLimitMinor: Math.ceil((it.first_period_price ?? it.price) * 1.1) }) }
     r = await adm.req(API, { method: 'PUT', body: asInput(p1, { specs: specs2, features: [{ text: 'Acesso root total', icon: 'terminal' }, { text: 'Backups semanais', icon: 'backup' }, { text: 'Protecção DDoS', icon: 'shield' }],
       providerProductId: 'hostingercom-vps-kvm2', providerSpecs: kvm2.specs, providerMode: 'auto', badge: null }, per1) })

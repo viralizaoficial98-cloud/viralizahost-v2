@@ -4,6 +4,12 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { EmailPlansSection } from '@/components/service/EmailPlansSection'
 import { Mail, Shield, Lock, Calendar, Smartphone, Globe, Zap, Archive, Activity } from 'lucide-react'
+import { PageLinksSection } from '@/components/site/PageLinksSection'
+import { pagesInSection } from '@/lib/site/pages'
+
+// Página de E-mail Corporativo (link directo no menu): planos, períodos e compra (EmailPlansSection) e, em secções,
+// as opções do antigo submenu (planos e Microsoft 365, segurança, produtividade).
+const cards = (section: string, cta: string) => pagesInSection(section).map(p => ({ href: p.path, title: p.title, desc: p.desc, icon: p.icon, cta }))
 
 export const metadata: Metadata = {
   title: 'E-mail Corporativo Profissional',
@@ -39,6 +45,11 @@ export default function EmailCorporativoPage() {
             <p className="text-lg lg:text-xl leading-relaxed mb-10 max-w-2xl mx-auto" style={{ color: 'rgba(255,255,255,0.60)' }}>
               Comunicação empresarial segura com domínio personalizado e alta disponibilidade.
             </p>
+            <nav className="flex flex-wrap justify-center gap-2 mb-6" aria-label="Secções de e-mail" data-testid="email-actions">
+              {[['#planos', 'Planos e preços'], ['#planos-detalhe', 'Microsoft 365'], ['#seguranca', 'Segurança'], ['#produtividade', 'Produtividade']].map(([h, l]) => (
+                <Link key={h} href={h} className="px-4 py-2 rounded-xl text-sm font-bold border border-white/15 text-white hover:border-[#F5B700] hover:text-[#F5B700]">{l}</Link>
+              ))}
+            </nav>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="#planos" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
                 Ver Planos de E-mail →
@@ -69,6 +80,10 @@ export default function EmailCorporativoPage() {
             </div>
           </div>
         </section>
+
+        <PageLinksSection id="planos-detalhe" tag="Planos" title="Detalhe dos planos e Microsoft 365" subtitle="Compare cada plano em detalhe ou escolha o Microsoft 365 com Outlook, Teams e OneDrive." items={cards('email-planos', 'Ver detalhes')} />
+        <PageLinksSection id="seguranca" tag="Segurança" title="Segurança e entregabilidade" items={cards('email-seguranca', 'Saber mais')} dark />
+        <PageLinksSection id="produtividade" tag="Produtividade" title="Produtividade e migração" items={cards('email-produtividade', 'Saber mais')} />
 
         <section className="py-20" style={{ background: 'linear-gradient(160deg,#090909,#111)' }}>
           <div className="container mx-auto px-4 lg:px-8 text-center max-w-2xl">

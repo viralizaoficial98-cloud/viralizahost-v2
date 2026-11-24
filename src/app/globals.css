@@ -446,3 +446,6 @@ html { overflow-x: hidden; }
     background-position: center right;
   }
 }
+
+/* Menu principal aberto no telemóvel: os botões flutuantes (chat/WhatsApp) não tapam as opções */
+html.vh-menu-open [data-floating] { visibility: hidden; }
