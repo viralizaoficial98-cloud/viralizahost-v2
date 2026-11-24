@@ -95,6 +95,7 @@ function ImageUpload({ value, onChange }: { value: string; onChange: (url: strin
       <input
         ref={inputRef}
         type="file"
+        data-testid="banner-image-file"
         accept="image/png,image/jpeg,image/webp"
         className="hidden"
         onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
@@ -201,11 +202,11 @@ function BannerForm({
           </div>
           <div>
             <label className={label}>Título *</label>
-            <textarea className={`${inp} resize-none`} rows={2} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Hospedagem de Sites Premium para o seu Negócio" />
+            <textarea data-testid="banner-title" className={`${inp} resize-none`} rows={2} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Hospedagem de Sites Premium para o seu Negócio" />
           </div>
           <div>
             <label className={label}>Descrição / Subtítulo</label>
-            <textarea className={`${inp} resize-none`} rows={3} value={form.subtitle} onChange={e => set('subtitle', e.target.value)} placeholder="Performance ultrarrápida com LiteSpeed..." />
+            <textarea data-testid="banner-subtitle" className={`${inp} resize-none`} rows={3} value={form.subtitle} onChange={e => set('subtitle', e.target.value)} placeholder="Performance ultrarrápida com LiteSpeed..." />
           </div>
         </div>
       </div>
@@ -371,6 +372,7 @@ function BannerForm({
           type="button"
           onClick={submit}
           disabled={saving}
+          data-testid="banner-save"
           className="flex items-center gap-2 px-6 py-2.5 bg-[#F5B700] text-[#0A0A0A] text-sm font-bold rounded-xl hover:bg-[#D9A300] transition-colors disabled:opacity-50"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
@@ -557,7 +559,7 @@ export default function AdminBannerPagesPage() {
             <div className="text-center py-16 text-[#999] text-sm">Nenhum banner encontrado. Clique em &ldquo;Nova Página&rdquo; para começar.</div>
           )}
           {banners.map(banner => (
-            <div key={banner.id} className="bg-white border border-[#E8E8E8] rounded-2xl shadow-sm overflow-hidden">
+            <div key={banner.id} className="bg-white border border-[#E8E8E8] rounded-2xl shadow-sm overflow-hidden" data-testid="banner-row" data-slug={banner.page_slug}>
               {/* Row */}
               <div className="flex items-center gap-4 p-4">
                 {/* Thumbnail */}
@@ -591,6 +593,7 @@ export default function AdminBannerPagesPage() {
                   </button>
 
                   <button
+                    data-testid="banner-edit"
                     onClick={() => { setEditingId(editingId === banner.id ? null : banner.id); setCreating(false) }}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0A0A0A] text-white text-xs font-bold rounded-lg hover:bg-[#1A1A1A] transition-colors"
                   >
