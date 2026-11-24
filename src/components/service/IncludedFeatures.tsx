@@ -46,7 +46,7 @@ export function IncludedFeatures({
                 <Icon size={18} className="text-[#F5B700]" />
               </div>
               <div>
-                <div className={`font-semibold text-sm mb-0.5 ${dark ? 'text-white' : 'text-[#0A0A0A]'}`}>{t}</div>
+                <div data-testid="included-title" className={`font-semibold text-sm mb-0.5 ${dark ? 'text-white' : 'text-[#0A0A0A]'}`}>{t}</div>
                 <div className={`text-xs leading-relaxed ${dark ? 'text-gray-500' : 'text-[#888]'}`}>{desc}</div>
               </div>
             </div>

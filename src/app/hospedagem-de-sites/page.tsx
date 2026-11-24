@@ -1,90 +1,83 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { Server, HardDrive, Mail, Globe, Headphones } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { ServiceHero } from '@/components/service/ServiceHero'
-import { getBannerPage } from '@/lib/banner-pages'
-import { fromPriceText } from '@/lib/commerce/from-price'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
-import { Server, Shield, Zap, HardDrive, Mail, RotateCcw, Headphones, Globe, Lock, Bot, BarChart } from 'lucide-react'
-import Link from 'next/link'
 import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import { HostingPlansSection } from '@/components/service/HostingPlansSection'
+import { BuildSiteSection, SecuritySection, type SslCoverage } from '@/components/service/HostingSiteSections'
+import { getPool } from '@/lib/db/pool'
+
+// /hospedagem-de-sites — ordem fixa (ver docs/hospedagem-de-sites.md):
+//   1. Hospedagem de sites — Escolha o seu plano (#planos; inclui os planos WordPress em #planos-wordpress)
+//   2. Todos os planos incluem
+//   3. Crie e publique o seu site (#crie-o-seu-site; «Use WordPress» em #wordpress)
+//   4. Segurança para o seu site (#seguranca)
+//   5. Comece hoje (botão → #planos)
+// Preços, ciclos, descontos e «Comprar agora» vêm do catálogo (HostingPlansSection / DynamicServicePricing).
 
 export const metadata: Metadata = {
-  title: 'Hospedagem de Sites Premium',
-  description: 'Hospedagem web premium com LiteSpeed, NVMe SSD, SSL grátis, cPanel e suporte 24/7. Uptime 99.9% garantido.',
+  title: 'Hospedagem de Sites',
+  description: 'Hospedagem de sites com cPanel, armazenamento NVMe, e-mail no seu domínio, migração gratuita e suporte 24/7. WordPress, editor visual ou site feito pela nossa equipa.',
 }
 
+export const dynamic = 'force-dynamic'
 
+// Só benefícios comuns a TODOS os planos de hospedagem do catálogo (confirmado em product_features dos planos
+// activos). SSL e cópias de segurança são tratados na secção «Segurança para o seu site», para não repetir.
 const included = [
-  { icon: Shield, title: 'SSL Grátis', desc: 'Certificado SSL/TLS Let\'s Encrypt instalado automaticamente em todos os domínios.' },
-  { icon: Server, title: 'cPanel', desc: 'Painel de controlo completo e intuitivo para gerir o seu alojamento.' },
-  { icon: Zap, title: 'LiteSpeed Web Server', desc: 'Até 6x mais rápido que o Apache, com cache avançado integrado.' },
-  { icon: HardDrive, title: 'NVMe SSD Gen4', desc: 'Armazenamento ultrarrápido para carregamentos instantâneos.' },
-  { icon: Mail, title: 'E-mail Corporativo', desc: 'Caixas de e-mail no seu domínio incluídas em todos os planos.' },
-  { icon: RotateCcw, title: 'Backups Automáticos', desc: 'Cópias de segurança regulares para proteger os seus dados.' },
-  { icon: Globe, title: 'Migração Gratuita', desc: 'A nossa equipa migra o seu site sem custo adicional e sem downtime.' },
-  { icon: Headphones, title: 'Suporte 24/7', desc: 'Equipa técnica especializada disponível a qualquer hora.' },
-  { icon: Lock, title: 'Proteção DDoS', desc: 'Protecção avançada contra ataques de negação de serviço.' },
+  { icon: Server, title: 'cPanel incluído', desc: 'Painel de controlo para gerir ficheiros, bases de dados, e-mail e domínios.' },
+  { icon: HardDrive, title: 'Armazenamento NVMe SSD', desc: 'Disco NVMe em todos os planos; a capacidade depende do plano escolhido.' },
+  { icon: Mail, title: 'E-mail no seu domínio', desc: 'Caixas de correio do tipo nome@asuaempresa.ao; a quantidade depende do plano.' },
+  { icon: Globe, title: 'Migração gratuita', desc: 'Já tem um site noutro alojamento? A nossa equipa ajuda a trazê-lo sem custo.' },
+  { icon: Headphones, title: 'Suporte 24/7', desc: 'Equipa técnica disponível a qualquer hora para o ajudar.' },
 ]
 
-// Hospedagem WordPress (antes em /hospedagem-wordpress, que encaminha para #wordpress): conteúdo e planos WordPress
-const wordpressIncluded = [
-  { icon: Globe, title: 'WordPress pré-instalado', desc: 'Instância WordPress pronta a usar logo após a activação.' },
-  { icon: Zap, title: 'LiteSpeed + cache WordPress', desc: 'Cache avançado específico para WordPress — carregamentos ultrarrápidos.' },
-  { icon: RotateCcw, title: 'Backup diário', desc: 'Cópias automáticas com restauração com um clique.' },
-  { icon: Bot, title: 'Criador com IA', desc: 'Gere conteúdo, páginas e posts com inteligência artificial.' },
-  { icon: BarChart, title: 'Optimização SEO', desc: 'Ferramentas integradas para melhor posicionamento nos motores de busca.' },
-  { icon: Lock, title: 'Segurança reforçada', desc: 'Firewall WAF, protecção contra malware e verificação automática.' },
-]
+/** Planos de hospedagem à venda que incluem «SSL» nas características do catálogo. */
+async function sslCoverage(): Promise<SslCoverage> {
+  try {
+    const [rows] = await getPool().query(`SELECT p.name,
+        EXISTS (SELECT 1 FROM product_features f WHERE f.product_id = p.id AND f.included = 1 AND f.feature LIKE '%SSL%') has_ssl
+      FROM products p WHERE p.category = 'hosting' AND p.active = 1 AND p.sale_status = 'active'
+        AND EXISTS (SELECT 1 FROM product_prices x WHERE x.product_id = p.id AND x.active = 1)
+      ORDER BY p.position, p.name`) as unknown as [{ name: string; has_ssl: number }[]]
+    const withSsl = rows.filter(r => Number(r.has_ssl) === 1).map(r => r.name)
+    return { all: rows.length > 0 && withSsl.length === rows.length, plans: withSsl }
+  } catch (e) { console.error('[hospedagem-de-sites] SSL do catálogo:', (e as Error).message); return { all: false, plans: [] } }
+}
 
 export default async function HospedagemDeSitesPage() {
-  const banner = await getBannerPage('hospedagem-de-sites')
-  const fromPrice = await fromPriceText('hosting')
+  const ssl = await sslCoverage()
   return (
     <>
       <Header />
       <main>
-        <ServiceHero
-          breadcrumb={banner?.breadcrumb ?? 'Hospedagem de Sites'}
-          tag={banner?.tag ?? 'Hospedagem Premium'}
-          title={banner?.title ?? 'Hospedagem de Sites Premium para o seu Negócio'}
-          subtitle={banner?.subtitle ?? 'Performance ultrarrápida com LiteSpeed, NVMe SSD, SSL grátis, cPanel e suporte técnico especializado 24/7.'}
-          price={fromPrice ?? undefined}
-          cta={banner?.button_primary_text ?? 'Ver Planos'}
-          ctaHref={banner?.button_primary_link ?? '#planos'}
-          ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
-          ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
-          bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80&auto=format&fit=crop'}
-          bgColor={banner?.bg_color ?? '#080d1a'}
-          highlights={banner?.highlights?.length ? banner.highlights : ["LiteSpeed Enterprise","NVMe SSD Gen4","Uptime 99.9%","cPanel Incluído"]}
-          guarantee={banner?.show_guarantee ?? true}
-          layout="split"
-        />
-        <HostingPlansSection
-          title="Hospedagem de Sites — Escolha o seu plano"
-          subtitle="Escolha o plano e o período; depois o domínio e os extras." />
-        <div className="bg-[#FFFBEA] border-y border-[#F5E3A3]">
-          <p className="container mx-auto px-4 py-3 text-sm text-center text-[#5C4A00]">
-            Vai usar WordPress? <Link href="#wordpress" className="font-bold underline" data-testid="link-wordpress">Veja a hospedagem WordPress optimizada</Link> — WordPress pré-instalado, cache e criador com IA.
-          </p>
-        </div>
-        <IncludedFeatures features={included} hoverBorder />
-        <section id="wordpress" className="scroll-mt-24 bg-white" data-testid="section-wordpress" aria-labelledby="wordpress-title">
-          <div className="container mx-auto px-4 pt-16 text-center max-w-3xl">
-            <span className="section-tag">WordPress</span>
-            <h2 id="wordpress-title" className="text-3xl md:text-4xl font-black text-[#0A0A0A] mt-3">Hospedagem WordPress optimizada</h2>
-            <p className="text-[#666] mt-3">WordPress pré-instalado, LiteSpeed, SSL grátis, CDN e criador de sites com IA incluídos em todos os planos WordPress.</p>
-          </div>
-          <IncludedFeatures features={wordpressIncluded} title="Incluído nos planos WordPress" subtitle="Optimizações específicas para WordPress, sem custo adicional." />
+        {/* 1. Escolha o seu plano (hospedagem + WordPress, a partir do catálogo) */}
+        <div data-section="plans">
+          <HostingPlansSection headingAs="h1" className="pt-32 md:pt-36 pb-16"
+            title="Hospedagem de sites — Escolha o seu plano"
+            subtitle={<>Escolha o plano e o período; depois o domínio e os extras. Vai usar WordPress? <Link href="#planos-wordpress" className="font-bold text-[#0A0A0A] underline decoration-[#F5B700] decoration-2 underline-offset-4" data-testid="link-wordpress">Veja os planos WordPress</Link>.</>} />
           <DynamicServicePricing id="planos-wordpress" category="wordpress" cols={3} showBillingToggle
             title="Planos WordPress"
-            subtitle="Escolha o plano, depois o domínio e a duração." />
-        </section>
-        <FinalCTA
-          title="Comece hoje"
-          subtitle="Migração gratuita, suporte 24/7 e uptime 99.9% garantido. Sem riscos." />
+            subtitle="Hospedagem para sites WordPress. Escolha o plano, depois o domínio e a duração." />
+        </div>
+        {/* 2. Todos os planos incluem */}
+        <div data-section="included" id="incluido" className="scroll-mt-24">
+          <IncludedFeatures features={included} hoverBorder subtitle="Benefícios comuns a todos os planos de hospedagem." />
+        </div>
+        {/* 3. Crie e publique o seu site */}
+        <BuildSiteSection />
+        {/* 4. Segurança para o seu site */}
+        <SecuritySection ssl={ssl} />
+        {/* 5. Comece hoje */}
+        <div data-section="cta">
+          <FinalCTA title="Comece hoje"
+            subtitle="Escolha o plano, registe ou ligue o seu domínio e publique o seu site."
+            cta="Ver os planos" ctaHref="#planos"
+            ctaSecondary="Falar com a equipa" ctaSecondaryHref="/suporte/contactar" />
+        </div>
       </main>
       <Footer />
     </>

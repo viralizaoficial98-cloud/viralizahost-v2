@@ -33,7 +33,7 @@ export const PUBLIC_PAGES: PublicPage[] = [
   { path: '/', title: 'Início', desc: 'ViralizaHost', icon: 'globe', priority: 1, freq: 'weekly' },
 
   // Hospedagem e sites
-  { path: '/hospedagem-de-sites', title: 'Hospedagem de Sites', desc: 'cPanel, LiteSpeed, NVMe e SSL grátis — inclui WordPress optimizado', icon: 'server', service: 'hospedagem', priority: 0.9, freq: 'weekly' },
+  { path: '/hospedagem-de-sites', title: 'Hospedagem de Sites', desc: 'cPanel, NVMe e SSL — com planos WordPress', icon: 'server', service: 'hospedagem', priority: 0.9, freq: 'weekly' },
   { path: '/revenda-de-hospedagem', title: 'Revenda de Hospedagem', desc: 'WHM/cPanel para revenda profissional', icon: 'users', service: 'hospedagem', priority: 0.8, freq: 'weekly' },
   { path: '/criador-de-sites', title: 'Criador de Sites com IA', desc: 'Crie um site profissional em minutos', icon: 'zap', service: 'hospedagem', priority: 0.8, freq: 'weekly' },
   { path: '/construtor-wordpress', title: 'Construtor WordPress', desc: 'WordPress com builder visual e plugins premium', icon: 'code', service: 'hospedagem', priority: 0.8, freq: 'weekly' },
@@ -117,5 +117,5 @@ export const pagesInSection = (section: string) => PUBLIC_PAGES.filter(p => p.se
  * Os restantes URLs antigos mantêm-se porque continuam a ter função própria (ver docs/menu-e-paginas.md).
  */
 export const CONSOLIDATED_REDIRECTS: { source: string; destination: string }[] = [
-  { source: '/hospedagem-wordpress', destination: '/hospedagem-de-sites#wordpress' },
+  { source: '/hospedagem-wordpress', destination: '/hospedagem-de-sites#planos-wordpress' },
 ]
