@@ -286,7 +286,11 @@ export default function BillingManager({ currency }: Props) {
       })
       const data = await res.json()
       if (!res.ok) {
-        if (data.existing_payment_id) { showToast('error', `Já existe um pagamento ${data.existing_status} para esta fatura.`); return }
+        if (data.existing_payment_id) {
+          // Pagamento já iniciado e ainda sem comprovativo: continua esse mesmo pagamento (sem criar outro)
+          if (data.existing_status === 'pending' && ['bank_transfer', 'multicaixa'].includes(method)) { setPaymentId(data.existing_payment_id); setStep('proof'); return }
+          showToast('error', data.existing_status === 'under_review' || data.existing_status === 'proof_uploaded' ? 'O comprovativo desta fatura já foi enviado e está por validar.' : `Já existe um pagamento ${data.existing_status} para esta fatura.`); return
+        }
         throw new Error(data.error ?? 'Erro ao criar pagamento.')
       }
       setPaymentId(data.payment.id)

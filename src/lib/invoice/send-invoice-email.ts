@@ -6,6 +6,7 @@
  */
 import { renderToBuffer } from '@react-pdf/renderer'
 import { loadBankDetails } from '@/lib/billing/load-bank-details'
+import { bankFromSnapshot } from '@/lib/billing/bank-details'
 import { Resend } from 'resend'
 import React from 'react'
 import { InvoicePDF } from '@/lib/pdf/invoice-pdf'
@@ -71,7 +72,7 @@ export async function sendInvoiceEmail(opts: SendInvoiceOptions): Promise<SendIn
   // ── 2. Carregar factura (verifica propriedade) ─────────────
   const { data: inv, error: invErr } = await db
     .from('invoices')
-    .select('id, invoice_number, status, currency, subtotal, discount, tax, total, due_date, issue_date, paid_at, notes, created_at, profile_id, email_to, email_provider_id, email_status, email_attempts, pdf_storage_path, order_id, ticket_id')
+    .select('id, invoice_number, status, currency, subtotal, discount, tax, total, due_date, issue_date, paid_at, notes, created_at, profile_id, email_to, email_provider_id, email_status, email_attempts, pdf_storage_path, order_id, ticket_id, bank_details')
     .eq('id', invoiceId)
     .eq('profile_id', customerId)
     .maybeSingle()
@@ -134,7 +135,8 @@ export async function sendInvoiceEmail(opts: SendInvoiceOptions): Promise<SendIn
     email_subject_template: null, email_body_template: null,
   }
   // Dados bancários: a mesma fonte do checkout e da Área do Cliente (lib/billing)
-  const bank = await loadBankDetails()
+  // Dados de transferência da própria factura (cópia na emissão); facturas sem cópia usam os dados em vigor
+  const bank = bankFromSnapshot((inv as { bank_details?: unknown }).bank_details) ?? await loadBankDetails()
   const billing = { ...billingRow, bank_name: bank.bank, account_holder: bank.holder, iban: bank.iban, account_number: bank.accountNumber, swift: bank.swift, payment_instructions: bank.instructions ?? billingRow.payment_instructions }
 
   // ── 6. Gerar PDF ──────────────────────────────────────────

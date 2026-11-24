@@ -1,4 +1,5 @@
 import 'server-only'
+import { bankSnapshotJson } from '@/lib/billing/load-bank-details'
 /* eslint-disable @typescript-eslint/no-explicit-any -- espelha a tipagem 'any' do supabase-js sem tipos gerados */
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -83,10 +84,10 @@ const FUNCTIONS: Record<string, (db: Queryable, a: Args) => Promise<unknown>> = 
     // ON CONFLICT (order_id) DO NOTHING — invoices.order_id é UNIQUE
     const [res] = await db.query(
       `INSERT IGNORE INTO invoices (id, profile_id, order_id, invoice_number, status, currency, subtotal, discount, tax, total, amount_paid,
-         due_date, issue_date, notes, proof_file, items)
-       VALUES (?, ?, ?, ?, ?, 'AKZ', ?, 0, 0, ?, 0, CURRENT_DATE + INTERVAL 7 DAY, CURRENT_DATE, ?, ?, ?)`,
+         due_date, issue_date, notes, proof_file, items, bank_details)
+       VALUES (?, ?, ?, ?, ?, 'AKZ', ?, 0, 0, ?, 0, CURRENT_DATE + INTERVAL 7 DAY, CURRENT_DATE, ?, ?, ?, ?)`,
       [invoiceId, a.p_user_id, orderId, invoiceNumber, invoiceStatus, a.p_amount, a.p_amount,
-        a.p_domain_name ? `Domínio: ${a.p_domain_name}` : null, nullif(a.p_proof_file), JSON.stringify(invoiceItems)],
+        a.p_domain_name ? `Domínio: ${a.p_domain_name}` : null, nullif(a.p_proof_file), JSON.stringify(invoiceItems), await bankSnapshotJson(db)],
     )
     const inserted = (res as { affectedRows: number }).affectedRows > 0
     return { id: orderId, status: a.p_status, invoice_id: inserted ? invoiceId : null }

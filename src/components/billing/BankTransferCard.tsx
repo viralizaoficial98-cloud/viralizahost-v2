@@ -1,11 +1,13 @@
 'use client'
 import { useRef, useState } from 'react'
 import { Check, Copy, Landmark } from 'lucide-react'
-import type { BankDetails } from '@/lib/billing/bank-details'
+import { displayAccount, type BankDetails } from '@/lib/billing/bank-details'
 
 // Cartão visual com os dados da transferência bancária (checkout, encomenda e Área do Cliente).
 // Representa os DADOS DA TRANSFERÊNCIA: não tem número de cartão, validade nem CVV. Texto seleccionável;
 // «Copiar IBAN» e «Copiar entidade» com confirmação anunciada a leitores de ecrã (aria-live).
+// A imagem do cartão (Configurações → Facturação) é só decorativa: fica por trás dos dados, que estão sempre em texto;
+// sem imagem (ou se não carregar) mostra o fundo vermelho.
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -33,8 +35,11 @@ export function BankTransferCard({ bank, amount, reference, referenceLabel = 'Re
 }) {
   const [copied, setCopied] = useState<{ key: string; ok: boolean } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const account = bank.iban ?? bank.accountNumber ?? ''
-  const accountLabel = bank.iban ? 'IBAN' : 'N.º de conta'
+  const shown = displayAccount(bank)
+  const account = shown.copy
+  const accountLabel = shown.label
+  const [imgOk, setImgOk] = useState(true)
+  const image = bank.cardImageUrl && imgOk ? bank.cardImageUrl : null
   const copy = async (key: string, label: string, text: string) => {
     const ok = await copyText(text)
     setCopied({ key, ok })
@@ -51,6 +56,11 @@ export function BankTransferCard({ bank, amount, reference, referenceLabel = 'Re
       className={`relative overflow-hidden rounded-2xl text-white shadow-[0_12px_32px_rgba(160,16,32,0.28)] ${className}`}
       style={{ background: 'linear-gradient(135deg, #D7192E 0%, #B3121F 48%, #7E0A15 100%)' }}>
       {/* Desenho decorativo (sem dados) */}
+      {image && <>
+        {/* eslint-disable-next-line @next/next/no-img-element -- imagem decorativa carregada no painel */}
+        <img src={image} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" onError={() => setImgOk(false)} data-testid="bank-card-image" />
+        <div aria-hidden className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(170,16,34,0.80) 0%, rgba(120,10,24,0.84) 55%, rgba(70,6,14,0.90) 100%)' }} />
+      </>}
       <div aria-hidden className="absolute -right-16 -top-20 w-64 h-64 rounded-full" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.18), rgba(255,255,255,0) 70%)' }} />
       <div aria-hidden className="absolute -left-10 -bottom-24 w-56 h-56 rounded-full" style={{ background: 'radial-gradient(circle, rgba(0,0,0,0.22), rgba(0,0,0,0) 70%)' }} />
 
@@ -63,7 +73,7 @@ export function BankTransferCard({ bank, amount, reference, referenceLabel = 'Re
         <dl className="mt-6 space-y-4">
           <div>
             <dt className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70">{accountLabel}</dt>
-            <dd className="mt-1 font-mono text-[15px] min-[380px]:text-lg sm:text-[22px] font-bold tracking-wide break-all select-text" data-testid="bank-card-iban">{account}</dd>
+            <dd className={`mt-1 font-mono font-bold select-text ${shown.text.includes(' ') ? 'text-[15px] min-[380px]:text-[17px] sm:text-[19px] break-words' : 'text-[15px] min-[380px]:text-lg sm:text-[22px] tracking-wide break-all'}`} data-testid="bank-card-iban">{shown.text}</dd>
           </div>
           <div>
             <dt className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70">Entidade</dt>
