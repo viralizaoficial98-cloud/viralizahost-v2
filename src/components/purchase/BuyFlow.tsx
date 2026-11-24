@@ -6,6 +6,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { Check, ChevronLeft, ChevronRight, Globe, Loader2, Search, ArrowRightLeft, Link2, AlertCircle, ShoppingCart, Minus, Plus, Clock, XCircle } from 'lucide-react'
 import { kz as kzFmt } from '@/lib/commerce/status'
+import { fitsLocation, licenseTotal, type PublicVpsOptions } from '@/lib/vps/install-shared'
+import { VpsInstallPicker, InstallIcon, licenseText } from './VpsInstallPicker'
 import { useCart, type Cycle, type NewCartLine } from '@/store/cartStore'
 
 // Percurso de compra: Plano → Escolher domínio → Escolher duração → Carrinho.
@@ -18,14 +20,14 @@ export interface BuyPlan {
   quantityUnit: string | null; maxQuantity: number; needsDomain: boolean; features: string[]
   prices: { cycle: Cycle; months: number; price: number; renewal: number; discount?: number; renewalDiscount?: number }[]
   baseMonthly?: number | null
-  /** VPS: localização e sistema operativo (só quando o administrador activou opções) */
-  vpsOptions?: { locations: { id: string; label: string }[]; images: { id: string; label: string }[] } | null
+  /** Servidor VPS: localização e instalação escolhidas na página da duração (carregadas de /api/catalog/vps-options) */
+  isVps?: boolean
 }
 type Mode = 'register' | 'transfer' | 'existing'
 type Status = 'available' | 'unavailable' | 'confirm' | 'on_request'
 interface Ext { extension: string; status: 'active' | 'on_request'; register: number | null; renew: number | null; transfer: number | null; eppRequired: boolean; national: boolean; maxYears: number }
 interface Result extends Ext { domain: string; availability: Status }
-interface Selection { mode: Mode | null; domain: string; availability: Status | null; years: number; cycle: Cycle | null; quantity: number; flowId: string; location?: string; image?: string }
+interface Selection { mode: Mode | null; domain: string; availability: Status | null; years: number; cycle: Cycle | null; quantity: number; flowId: string; location?: string; image?: string; later?: boolean }
 
 const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`)
 const useSelections = create<{ by: Record<string, Selection>; set: (slug: string, patch: Partial<Selection>) => void }>()(
@@ -65,12 +67,12 @@ function useHydrated() {
   )
 }
 
-function Steps({ current, needsDomain, vps }: { current: 'domain' | 'cycle' | 'options'; needsDomain: boolean; vps?: boolean }) {
-  // VPS (referência: compra na Hostinger): plano e período → localização e sistema → rever → pagar → activação
+function Steps({ current, needsDomain, vps }: { current: 'domain' | 'cycle'; needsDomain: boolean; vps?: boolean }) {
+  // VPS: período, localização e instalação na mesma página → rever (carrinho) → pagar → activação
   const steps = (vps
-    ? [['Plano e período', current === 'options'], ['Localização e sistema', false], ['Rever', false], ['Pagar', false], ['Activação', false]]
+    ? [['Plano', true], ['Período e instalação', false], ['Rever', false], ['Pagar', false], ['Activação', false]]
     : [['Plano', true], ...(needsDomain ? [['Domínio', current === 'cycle']] : []), ['Duração', false], ['Carrinho', false], ['Checkout', false]]) as [string, boolean][]
-  const active = vps ? (current === 'options' ? 'Localização e sistema' : 'Plano e período') : current === 'domain' ? 'Domínio' : 'Duração'
+  const active = vps ? 'Período e instalação' : current === 'domain' ? 'Domínio' : 'Duração'
   return (
     <ol className="flex flex-wrap items-center gap-2 text-xs sm:text-sm mb-6" aria-label="Passos da compra">
       {steps.map(([s, done], i) => (
@@ -251,18 +253,19 @@ function DomainStep({ plan, sel, update, exts, extsError, reloadExts, onDone, ep
 
 /* ───────────────────────── Passo «Duração» ───────────────────────── */
 
-function CycleStep({ plan, sel, update, exts, onBack, onAdd, adding, onNext }: {
+function CycleStep({ plan, sel, update, exts, onBack, onAdd, adding, vps }: {
   plan: BuyPlan; sel: Selection; update: (p: Partial<Selection>) => void; exts: Ext[] | null
   onBack: (() => void) | null; onAdd: () => void; adding: boolean
-  /** VPS com opções: «Continuar» para a localização e o sistema (em vez de adicionar já ao carrinho) */
-  onNext?: (() => void) | null
+  /** VPS: secção de localização e instalação, custo da licença e se a configuração está completa */
+  vps?: { section: React.ReactNode; extra: (months: number) => number; summary: (months: number) => React.ReactNode; ready: boolean } | null
 }) {
   const qty = plan.quantityUnit ? Math.max(1, Math.min(sel.quantity || 1, plan.maxQuantity)) : 1
   const chosen = plan.prices.find(p => p.cycle === sel.cycle) ?? null
   const ext = sel.domain ? [...(exts ?? [])].sort((a, b) => b.extension.length - a.extension.length).find(e => sel.domain.endsWith(e.extension)) : undefined
   const domainTotal = sel.mode === 'register' && ext?.register != null ? ext.register + (ext.renew ?? ext.register) * ((sel.years || 1) - 1)
     : sel.mode === 'transfer' && ext?.transfer != null ? ext.transfer : 0
-  const total = (chosen ? chosen.price * qty : 0) + domainTotal
+  const extra = chosen && vps ? vps.extra(chosen.months) : 0
+  const total = (chosen ? chosen.price * qty : 0) + domainTotal + extra
 
   return (
     <div className={card}>
@@ -304,6 +307,7 @@ function CycleStep({ plan, sel, update, exts, onBack, onAdd, adding, onNext }: {
           )
         })}
       </div>
+      {vps?.section}
       <p className="text-xs text-[#888] mb-6">Sem taxa de activação. Nenhum destes planos inclui domínio grátis: mudar a duração altera apenas o período e o valor a pagar.{plan.prices.some(p => (p.discount ?? 0) > 0) ? ' Os períodos com desconto são pagos antecipadamente; a renovação é ao preço indicado em cada período.' : ''}</p>
 
       {sel.domain && (
@@ -328,48 +332,12 @@ function CycleStep({ plan, sel, update, exts, onBack, onAdd, adding, onNext }: {
 
       {plan.serviceType === 'email' && <p className="text-xs text-[#666] mb-4">Depois do pagamento confirmado, o serviço é activado e cria as caixas na Área do Cliente (Emails). Para receber e-mail, o domínio tem de usar os nossos nameservers.</p>}
 
+      {vps && chosen && vps.summary(chosen.months)}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[#EEE] pt-4">
         <p className="text-sm text-[#555]">Total a pagar agora: <strong className="text-xl text-[#0A0A0A]" data-testid="flow-total">{chosen ? kz(total) : '—'}</strong></p>
         <div className="flex gap-2">
           {onBack && <button className={btnGhost} onClick={onBack}><ChevronLeft size={16} /> Voltar</button>}
-          {onNext
-            ? <button className={btnPrimary} disabled={!chosen} onClick={onNext} data-testid="to-options">Continuar <ChevronRight size={16} /></button>
-            : <button className={btnPrimary} disabled={!chosen || adding} onClick={onAdd} data-testid="add-to-cart">{adding ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />} Adicionar ao carrinho</button>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ───────────────────────── VPS: localização e sistema ───────────────────────── */
-
-function OptionsStep({ plan, sel, update, onBack, onAdd, adding }: { plan: BuyPlan; sel: Selection; update: (p: Partial<Selection>) => void; onBack: () => void; onAdd: () => void; adding: boolean }) {
-  const o = plan.vpsOptions ?? { locations: [], images: [] }
-  const chosen = plan.prices.find(p => p.cycle === sel.cycle) ?? null
-  const ok = chosen && (!o.locations.length || o.locations.some(x => x.id === sel.location)) && (!o.images.length || o.images.some(x => x.id === sel.image))
-  const group = (title: string, list: { id: string; label: string }[], value: string | undefined, key: 'location' | 'image') => list.length > 0 && (
-    <fieldset className="mb-6">
-      <legend className="text-sm font-bold text-[#0A0A0A] mb-2">{title}</legend>
-      <div role="radiogroup" aria-label={title} className="grid sm:grid-cols-2 gap-2">
-        {list.map(x => (
-          <button key={x.id} type="button" role="radio" aria-checked={value === x.id} onClick={() => update({ [key]: x.id })} data-testid={`opt-${key}-${x.id}`}
-            className={`text-left p-3 rounded-xl border-2 text-sm font-semibold ${value === x.id ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#EEE] hover:border-[#F5B700]/50'}`}>{x.label}</button>
-        ))}
-      </div>
-    </fieldset>
-  )
-  return (
-    <div className={card}>
-      <h1 className="text-2xl font-black text-[#0A0A0A] mb-1">Localização e sistema operativo</h1>
-      <p className="text-sm text-[#666] mb-5">{plan.name}{chosen ? <> · {CYCLE_NAME[chosen.cycle]} <button className="underline text-[#555]" onClick={onBack}>alterar período</button></> : null}</p>
-      {group('Localização do servidor', o.locations, sel.location, 'location')}
-      {group('Sistema operativo / imagem', o.images, sel.image, 'image')}
-      <p className="text-xs text-[#888] mb-6">A localização e o sistema não alteram o preço. Revê a configuração e o total no carrinho antes de pagar.</p>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[#EEE] pt-4">
-        <p className="text-sm text-[#555]">Total a pagar agora: <strong className="text-xl text-[#0A0A0A]" data-testid="flow-total">{chosen ? kz(chosen.price) : '—'}</strong></p>
-        <div className="flex gap-2">
-          <button className={btnGhost} onClick={onBack}><ChevronLeft size={16} /> Voltar</button>
-          <button className={btnPrimary} disabled={!ok || adding} onClick={onAdd} data-testid="add-to-cart">{adding ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />} Rever no carrinho</button>
+          <button className={btnPrimary} disabled={!chosen || adding || (vps ? !vps.ready : false)} onClick={onAdd} data-testid="add-to-cart">{adding ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />} Adicionar ao carrinho</button>
         </div>
       </div>
     </div>
@@ -407,14 +375,57 @@ export function BuyFlow({ plan, initialCycle }: { plan: BuyPlan; initialCycle?: 
     if (!sel.flowId) update({ flowId: newId() })
   }, [hydrated, initialCycle, plan.prices, sel.cycle, sel.flowId, update])
 
-  const hasOptions = !!plan.vpsOptions && (plan.vpsOptions.locations.length > 0 || plan.vpsOptions.images.length > 0)
-  const isVps = plan.vpsOptions !== undefined && plan.vpsOptions !== null
-  const step: 'domain' | 'cycle' | 'options' = hasOptions && params.get('passo') === 'opcoes' && sel.cycle ? 'options'
-    : !plan.needsDomain ? 'cycle' : params.get('passo') === 'duracao' && sel.domain ? 'cycle' : 'domain'
-  const goOptions = () => router.push(`/comprar/${plan.slug}?passo=opcoes`)
-  const goCycleOnly = () => router.push(`/comprar/${plan.slug}`)
+  const isVps = !!plan.isVps
+  const step: 'domain' | 'cycle' = !plan.needsDomain ? 'cycle' : params.get('passo') === 'duracao' && sel.domain ? 'cycle' : 'domain'
   const goCycle = () => router.push(`/comprar/${plan.slug}?passo=duracao`)
   const goDomain = () => router.push(`/comprar/${plan.slug}?passo=dominio`)
+
+  // VPS: localizações e instalações compatíveis com este plano (validadas de novo no servidor)
+  const [vpsData, setVpsData] = useState<PublicVpsOptions | null>(null)
+  const [vpsState, setVpsState] = useState<'loading' | 'error' | 'ready'>('loading')
+  const [notice, setNotice] = useState('')
+  const loadVps = useCallback(() => {
+    setVpsState('loading')
+    fetch(`/api/catalog/vps-options?plano=${encodeURIComponent(plan.slug)}`, { cache: 'no-store' })
+      .then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error); setVpsData(j); setVpsState('ready') })
+      .catch(() => setVpsState('error'))
+  }, [plan.slug])
+  useEffect(() => { if (isVps) loadVps() }, [isVps, loadVps])
+  // Escolhas guardadas que deixaram de ser válidas (opção retirada, incompatível com o plano ou com a localização)
+  useEffect(() => {
+    if (!hydrated || !vpsData) return
+    const patch: Partial<Selection> = {}
+    if (vpsData.locations.length === 1 && sel.location !== vpsData.locations[0].id) patch.location = vpsData.locations[0].id
+    else if (sel.location && !vpsData.locations.some(l => l.id === sel.location)) patch.location = undefined
+    if (sel.image && !vpsData.images.some(i => i.id === sel.image)) { patch.image = undefined; setNotice('A instalação escolhida anteriormente deixou de estar disponível para este plano. Escolha outra opção.') }
+    if (sel.later && !vpsData.allowChooseLater) patch.later = false
+    if (Object.keys(patch).length) update(patch)
+  }, [hydrated, vpsData, sel.location, sel.image, sel.later, update])
+  const vpsImage = vpsData?.images.find(i => i.id === sel.image) ?? null
+  const chooseLocation = (id: string) => {
+    const img = vpsData?.images.find(i => i.id === sel.image)
+    const label = vpsData?.locations.find(l => l.id === id)?.label ?? id
+    if (img && !fitsLocation(img, id)) { update({ location: id, image: undefined }); setNotice(`«${img.label}» não está disponível em ${label}. Escolha outra instalação compatível com esta localização.`) }
+    else { update({ location: id }); setNotice('') }
+  }
+  const vpsReady = !!vpsData && vpsState === 'ready' && (!vpsData.locations.length || !!sel.location) && (!vpsData.images.length || !!sel.image || !!sel.later)
+  const vpsSection = isVps ? {
+    ready: vpsReady,
+    extra: (months: number) => (sel.later ? 0 : licenseTotal(vpsImage, months)),
+    section: <VpsInstallPicker data={vpsData} state={vpsState} reload={loadVps} location={sel.location} image={sel.image} later={sel.later} months={plan.prices.find(p => p.cycle === sel.cycle)?.months ?? 1}
+      onLocation={chooseLocation} onImage={id => { update({ image: id, later: false }); setNotice('') }} onLater={v => { update({ later: v, ...(v ? { image: undefined } : {}) }); setNotice('') }} notice={notice} />,
+    summary: (months: number) => (vpsData && (sel.location || sel.image || sel.later)) ? (
+      <div className="mb-4 p-4 rounded-xl bg-[#F8F8F8] text-sm space-y-1.5" data-testid="vps-summary">
+        <p className="text-xs font-black uppercase tracking-widest text-[#888]">Resumo da configuração</p>
+        {sel.location && <p>Localização: <strong>{vpsData.locations.find(l => l.id === sel.location)?.label}</strong></p>}
+        {sel.later ? <p data-testid="summary-later">Instalação: <strong>escolher depois do pagamento</strong> (em «Os meus VPS»)</p>
+          : vpsImage && <div className="flex items-center gap-2"><InstallIcon icon={vpsImage.icon} name={vpsImage.name} size={24} /><span>Instalação: <strong data-testid="summary-image">{vpsImage.name}{vpsImage.version ? ` ${vpsImage.version}` : ''}</strong>
+            {vpsImage.includedOs && <span className="text-[#666]" data-testid="summary-included-os"> · sistema incluído: {vpsImage.includedOs}</span>}</span></div>}
+        {vpsImage && !sel.later && <p className={vpsImage.license.type === 'paid' ? 'text-amber-900' : 'text-[#555]'} data-testid="summary-license">{licenseText(vpsImage)}
+          {vpsImage.license.type === 'paid' && <> — <strong>{kz(licenseTotal(vpsImage, months))}</strong> neste período; a licença renova com o VPS ao mesmo valor mensal.</>}</p>}
+      </div>
+    ) : null,
+  } : null
 
   const addToCart = () => {
     const chosen = plan.prices.find(p => p.cycle === sel.cycle)
@@ -423,7 +434,7 @@ export function BuyFlow({ plan, initialCycle }: { plan: BuyPlan; initialCycle?: 
     const lines: NewCartLine[] = [{
       type: 'product', slug: plan.slug, cycle: chosen.cycle, quantity: plan.quantityUnit ? Math.max(1, sel.quantity || 1) : 1,
       ...(plan.needsDomain ? { domain: sel.domain, domainMode: sel.mode === 'existing' ? 'existing' : sel.mode === 'transfer' ? 'transfer' : 'register' } : {}),
-      ...(hasOptions ? { options: { ...(sel.location ? { location: sel.location } : {}), ...(sel.image ? { image: sel.image } : {}) } } : {}),
+      ...(isVps ? { options: { ...(sel.location ? { location: sel.location } : {}), ...(sel.later ? { later: true } : sel.image ? { image: sel.image } : {}) } } : {}),
     }]
     if (plan.needsDomain && (sel.mode === 'register' || sel.mode === 'transfer')) {
       lines.push({ type: 'domain', domain: sel.domain, operation: sel.mode, years: sel.mode === 'register' ? sel.years || 1 : 1, ...(sel.mode === 'transfer' && epp ? { eppCode: epp } : {}) })
@@ -442,9 +453,7 @@ export function BuyFlow({ plan, initialCycle }: { plan: BuyPlan; initialCycle?: 
         <div className="flex-1 w-full">
           {step === 'domain'
             ? <DomainStep plan={plan} sel={sel} update={update} exts={exts} extsError={extsError} reloadExts={loadExts} onDone={goCycle} epp={epp} setEpp={setEpp} />
-            : step === 'options'
-              ? <OptionsStep plan={plan} sel={sel} update={update} onBack={goCycleOnly} onAdd={addToCart} adding={adding} />
-              : <CycleStep plan={plan} sel={sel} update={update} exts={exts} onBack={plan.needsDomain ? goDomain : null} onAdd={addToCart} adding={adding} onNext={hasOptions ? goOptions : null} />}
+            : <CycleStep plan={plan} sel={sel} update={update} exts={exts} onBack={plan.needsDomain ? goDomain : null} onAdd={addToCart} adding={adding} vps={vpsSection} />}
         </div>
         <aside className="w-full lg:w-80 shrink-0 bg-white rounded-2xl border border-[#E8E8E8] shadow-sm p-5" aria-label="Plano escolhido">
           <p className="text-xs font-black uppercase tracking-widest text-[#888] mb-2">Plano escolhido</p>

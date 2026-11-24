@@ -25,8 +25,8 @@ export interface PurchasePlan {
   storageGb: number | null
   sendLimitHour: number | null
   badge: string | null
-  /** VPS (/servidor-vps): localização e sistema operativo a escolher, quando o administrador activou opções */
-  vpsOptions: { locations: { id: string; label: string }[]; images: { id: string; label: string }[] } | null
+  /** Servidor VPS: localização e instalação são carregadas no navegador (GET /api/catalog/vps-options?plano=slug). */
+  isVps: boolean
 }
 
 /** Serviços que precisam de domínio (alojamento e e-mail). VPS, dedicados, SSL, … não pedem domínio. */
@@ -51,6 +51,6 @@ export async function getPurchasePlan(slug: string): Promise<PurchasePlan | null
       .map(r => ({ cycle: r.cycle, months: Number(r.months), price: Number(r.price), renewal: Number(r.renewal_price), discount: Number(r.discount_pct ?? 0), renewalDiscount: Number(r.renewal_discount_pct ?? 0) })),
     baseMonthly: p.base_monthly_price == null ? null : Number(p.base_monthly_price),
     storageGb: p.storage_gb == null ? null : Number(p.storage_gb), sendLimitHour: p.send_limit_hour == null ? null : Number(p.send_limit_hour), badge: p.badge ?? null,
-    vpsOptions: p.category === 'vps' && !p.subcategory ? await import('@/lib/vps/settings').then(m => m.publicVpsOptions()).catch(() => null) : null,
+    isVps: p.category === 'vps' && !p.subcategory,
   }
 }

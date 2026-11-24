@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PAYMENT_STATUS, TONE_CLASS, activationState, domainState, kz } from '@/lib/commerce/status'
 import { BankTransferCard } from '@/components/billing/BankTransferCard'
 import { loadBankDetails } from '@/lib/billing/load-bank-details'
+import { describeVpsOptions } from '@/lib/vps/install-shared'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Encomenda' }
@@ -106,7 +107,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
                 <div>
                   <p className="text-[#0B0B0D] font-bold">{it.service_name}{it.quantity > 1 ? ` × ${it.quantity}` : ''}</p>
                   {it.domain_name && <p className="text-xs text-[#64748B]">{it.domain_name}</p>}
-                  {(() => { try { const o = typeof it.options === 'string' ? JSON.parse(it.options) : it.options; const t = o ? [o.location ? `Localização: ${o.location.label}` : '', o.image ? `Sistema: ${o.image.label}` : ''].filter(Boolean).join(' · ') : ''; return t ? <p className="text-xs text-[#64748B]" data-testid="order-item-options">{t}</p> : null } catch { return null } })()}
+                  {(() => { try { const o = typeof it.options === 'string' ? JSON.parse(it.options) : it.options; const t = describeVpsOptions(o, kz); return t ? <p className="text-xs text-[#64748B]" data-testid="order-item-options">{t}</p> : null } catch { return null } })()}
                   {it.availability != null && (() => { const d = domainState(it, svc); return <p className="mt-1"><span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${TONE_CLASS[d.tone]}`} data-testid="order-domain-state">Domínio: {d.label}</span></p> })()}
                   <p className="text-xs text-[#64748B]">Renova por {kz(it.renewal_price)} / {CYCLE[it.billing_cycle] ?? 'ano'}</p>
                   {svc && <p className="text-xs mt-1 text-amber-700" data-testid="order-service-status">{SERVICE_STATUS[svc.provisioning_status] ?? svc.provisioning_status}</p>}
