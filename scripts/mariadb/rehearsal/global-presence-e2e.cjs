@@ -59,8 +59,14 @@ const overlaps = boxes => { const out = []; for (let i = 0; i < boxes.length; i+
         await p.locator('[data-testid=gp-country][data-code=GB]').hover(); await p.waitForTimeout(250)
         ok(await p.locator('[data-testid=gp-map] text', { hasText: 'Reino Unido' }).count() === 1, 'passar o rato em «Reino Unido» mostra o nome no mapa')
         ok(await p.locator('[data-testid=gp-marker][data-code=GB] rect').first().getAttribute('stroke') === '#F5B700', 'e destaca o marcador GB')
-        await p.locator('[data-testid=gp-marker][data-code=HK]').hover(); await p.waitForTimeout(250)
-        ok(await p.locator('[data-testid=gp-country][data-code=HK]').evaluate(e => /F5B700/i.test(getComputedStyle(e).backgroundColor) || e.className.includes('bg-[#F5B700]')), 'passar no marcador HK destaca «Hong Kong» na lista')
+        // centrar o marcador (fora do cabeçalho fixo do site) antes de passar o rato
+        // (depois de deslocar a página, o Chromium envia um movimento sintético: esperar que assente)
+        await p.mouse.move(5, 5)
+        await p.locator('[data-testid=gp-marker][data-code=HK]').evaluate(e => e.scrollIntoView({ block: 'center' })); await p.waitForTimeout(800)
+        const hb = await p.locator('[data-testid=gp-marker][data-code=HK] rect').first().boundingBox()
+        for (const dx of [0, 4]) { await p.mouse.move(hb.x + hb.width / 2 + dx, hb.y + hb.height / 2, { steps: 4 }); await p.waitForTimeout(250) }
+        const hk = await p.locator('[data-testid=gp-country][data-code=HK]').evaluate(e => new Promise(res => { let n = 0; const t = setInterval(() => { if (e.className.includes('bg-[#F5B700]') || ++n > 20) { clearInterval(t); res(e.className.includes('bg-[#F5B700]')) } }, 50) }))
+        ok(hk, 'passar no marcador HK destaca «Hong Kong» na lista')
         await p.mouse.move(5, 5)
       } else {
         const sc = p.getByTestId('gp-map-scroll')
