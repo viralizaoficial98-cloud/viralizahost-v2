@@ -1,4 +1,4 @@
-// VPS: ciclo de 3 meses retirado das novas compras (painel, pré-visualização, página, compra, carrinho, checkout e
+// VPS: ciclos de 3 meses, 6 meses e 3 anos retirados das novas compras (à venda: 1 mês, 1 ano e 2 anos) (painel, pré-visualização, página, compra, carrinho, checkout e
 // servidor), preservando encomendas/renovações; KVM 2 com ciclos sem item de preço da Hostinger do mesmo período
 // (guardados como não publicados; publicação automática bloqueada; item de outro período recusado).
 // Ensaio, API Hostinger simulada (mock-hostinger.mjs: KVM 2 só tem itens de 1, 12 e 24 meses). Repõe tudo no fim.
@@ -58,133 +58,155 @@ async function ctxFor(b, opts, cookie, initCart) {
   const API = '/api/admin/catalog/vps-plans', INT = '/api/admin/integrations/hostinger-vps'
   const plans = async () => (await adm.req(API)).json.plans
   const b = await chromium.launch()
-  let fixtureService = null
+  const fixtures = []
   try {
     const pl = await plans()
     const p1 = pl.find(p => p.slug === 'vps-nvme2') ?? pl[0], p2 = pl.find(p => p.slug === 'vps-nvme4') ?? pl[1]
     const line = (slug, cycle) => ({ type: 'product', slug, cycle, quantity: 1, options: { location: '21', image: '1130' } })
 
-    // ── 1. Migração e preservação ──
-    console.log('\n1. Migração 20: preço de 3 meses desactivado, linha preservada')
-    const r3 = await all("SELECT pp.active FROM product_prices pp JOIN products p ON p.id = pp.product_id WHERE p.category = 'vps' AND p.subcategory IS NULL AND pp.cycle = '3months'")
-    ok(r3.length > 0 && r3.every(r => Number(r.active) === 0), `planos VPS: ${r3.length} preço(s) de 3 meses guardados e desactivados`)
-    const sub3 = await all("SELECT pp.active FROM product_prices pp JOIN products p ON p.id = pp.product_id WHERE p.category = 'vps' AND p.subcategory IS NOT NULL AND pp.cycle = '3months'")
-    ok(sub3.every(r => Number(r.active) === 1) || !sub3.length, `VPS com subcategoria (n8n, Evolution…) não afectados (${sub3.length})`)
+    const RETIRED = [['3months', '3 meses'], ['6months', '6 meses'], ['3years', '3 anos']]
+    const FOR_SALE = ['monthly', '1year', '2years']
 
-    // ── 2. Painel e página pública ──
-    console.log('\n2. Painel, pré-visualização, página e compra sem «3 meses»')
-    ok(pl.every(p => p.periods.every(x => x.cycle !== '3months')), 'editor: nenhum plano oferece o ciclo de 3 meses')
+    // ── 1. Migrações 20 e 21 ──
+    console.log('\n1. Migrações: 3 meses, 6 meses e 3 anos despublicados, linhas preservadas')
+    for (const [c, l] of RETIRED) {
+      const rr = await all("SELECT pp.active FROM product_prices pp JOIN products p ON p.id = pp.product_id WHERE p.category = 'vps' AND p.subcategory IS NULL AND pp.cycle = ?", [c])
+      ok(rr.length > 0 && rr.every(r => Number(r.active) === 0), `planos VPS: ${rr.length} preço(s) de ${l} guardados e despublicados`)
+    }
+    const subR = await all("SELECT pp.cycle, pp.active FROM product_prices pp JOIN products p ON p.id = pp.product_id WHERE p.category = 'vps' AND p.subcategory IS NOT NULL AND pp.cycle IN ('3months','6months','3years')")
+    ok(subR.every(r => Number(r.active) === 1) || !subR.length, `VPS com subcategoria (n8n, Evolution…) não afectados (${subR.length} preços activos)`)
+    const others = await all("SELECT p.category, pp.cycle, COUNT(*) n FROM product_prices pp JOIN products p ON p.id = pp.product_id WHERE NOT (p.category = 'vps' AND p.subcategory IS NULL) AND pp.cycle IN ('6months','3years') AND pp.active = 1 GROUP BY 1, 2")
+    ok(others.length > 0, `restantes produtos mantêm 6 meses/3 anos (${others.map(x => `${x.category} ${x.cycle}: ${x.n}`).join('; ')})`)
+
+    // ── 2. Painel, pré-visualização, página e compra ──
+    console.log('\n2. Painel, pré-visualização, página e compra: só 1 mês, 1 ano e 2 anos')
+    ok(pl.every(p => JSON.stringify(p.periods.map(x => x.cycle)) === JSON.stringify(FOR_SALE)), `editor: ciclos ${FOR_SALE.join(', ')} em todos os planos`)
     let { ctx, p } = await ctxFor(b, DESKTOP, adm.cookie)
     await p.goto(BASE + '/admin/site/catalog?cat=vps', { waitUntil: 'domcontentloaded' })
     const row = p.locator(`[data-testid=vps-plan-admin][data-slug="${p1.slug}"]`); await row.waitFor()
     await row.locator('summary').click()
     const form = row.getByTestId('vps-plan-form'); await form.waitFor()
-    ok(await form.getByTestId('vp-period-3months').count() === 0 && await form.getByTestId('vp-preview-3months').count() === 0 && await form.getByTestId('vp-period-6months').count() === 1, 'formulário e pré-visualização: sem 3 meses (os outros períodos mantêm-se)')
+    const rows = await form.locator('[data-testid^=vp-period-]').evaluateAll(e => e.map(x => x.dataset.testid.replace('vp-period-', '')))
+    const prevs = await form.locator('[data-testid^=vp-preview-]').evaluateAll(e => e.map(x => x.dataset.testid.replace('vp-preview-', '')))
+    ok(JSON.stringify(rows) === JSON.stringify(FOR_SALE) && JSON.stringify(prevs) === JSON.stringify(FOR_SALE), `formulário e pré-visualização: ${rows.join(', ')}`)
     await ctx.close()
     ;({ ctx, p } = await ctxFor(b, DESKTOP))
     await p.goto(BASE + '/servidor-vps', { waitUntil: 'domcontentloaded' }); await p.locator('[data-testid=vps-plan]').first().waitFor()
-    ok(await p.getByTestId('vps-period-3months').count() === 0 && !/3 meses/.test(await p.locator('[data-testid=vps-plans-section]').innerText()), 'página /servidor-vps: sem 3 meses')
-    await p.goto(`${BASE}/comprar/${p1.slug}?ciclo=3months`, { waitUntil: 'domcontentloaded' }); await p.locator('[data-testid^=cycle-]').first().waitFor()
-    ok(await p.getByTestId('cycle-3months').count() === 0 && await p.locator('[data-testid^=cycle-]').count() >= 1, 'configuração da compra: «3 meses» não aparece, mesmo com ?ciclo=3months')
+    const pub = await p.locator('[data-testid^=vps-period-]').evaluateAll(e => e.map(x => x.dataset.testid.replace('vps-period-', '')).filter(x => x !== 'badge'))
+    ok(pub.every(c => FOR_SALE.includes(c)) && !/(3|6) meses|3 anos/.test(await p.locator('[data-testid=vps-plans-section]').innerText()), `página /servidor-vps: ${pub.join(', ')}`)
+    for (const [c] of RETIRED) {
+      await p.goto(`${BASE}/comprar/${p1.slug}?ciclo=${c}`, { waitUntil: 'domcontentloaded' }); await p.locator('[data-testid^=cycle-]').first().waitFor()
+      const cs = await p.locator('[data-testid^=cycle-]').evaluateAll(e => e.map(x => x.dataset.testid.replace('cycle-', '')).filter(x => x !== 'discount'))
+      ok(cs.every(x => FOR_SALE.includes(x)) && !cs.includes(c), `configuração da compra com ?ciclo=${c}: só ${cs.join(', ')}`)
+    }
     await ctx.close()
 
     // ── 3. Servidor ──
-    console.log('\n3. Servidor recusa 3 meses em novas compras')
-    let q = (await c1.req('/api/checkout/quote', { method: 'POST', body: { lines: [line(p1.slug, '3months')] } })).json
-    ok(q?.quote?.lines?.[0]?.error?.code === 'cycle_retired' && !q.quote.lines[0].cycles.some(c => c.cycle === '3months') && q.quote.lines[0].cycles.length >= 1, `cotação: «${q?.quote?.lines?.[0]?.error?.message}» e ciclos alternativos`)
+    console.log('\n3. Servidor rejeita os ciclos retirados em novas compras')
     const ordersBefore = Number((await one('SELECT COUNT(*) n FROM orders')).n)
-    let r = await c1.req('/api/checkout/orders', { method: 'POST', body: { idempotencyKey: `ensaio-${randomUUID()}`, lines: [line(p1.slug, '3months')], acceptedTotal: 1, paymentMethod: 'bank_transfer', proofFile: null } })
-    ok(r.status >= 400 && Number((await one('SELECT COUNT(*) n FROM orders')).n) === ordersBefore, `pedido directo de encomenda com 3 meses → ${r.status}, nenhuma encomenda criada`)
-    r = await adm.req(API, { method: 'PUT', body: { ...p1, providerSpecs: p1.providerSpecs, periods: [{ cycle: '3months', discount: 0, publish: true }] } })
-    ok(r.status === 400 && /3 meses/.test(r.json?.error), 'painel: gravar o ciclo de 3 meses → 400')
+    for (const [c, l] of RETIRED) {
+      const q = (await c1.req('/api/checkout/quote', { method: 'POST', body: { lines: [line(p1.slug, c)] } })).json
+      ok(q?.quote?.lines?.[0]?.error?.code === 'cycle_retired' && q.quote.lines[0].cycles.every(x => FOR_SALE.includes(x.cycle)), `cotação ${l}: «${q?.quote?.lines?.[0]?.error?.message}», alternativas ${q?.quote?.lines?.[0]?.cycles?.map(x => x.cycle).join(', ')}`)
+      const r = await c1.req('/api/checkout/orders', { method: 'POST', body: { idempotencyKey: `ensaio-${randomUUID()}`, lines: [line(p1.slug, c)], acceptedTotal: 1, paymentMethod: 'bank_transfer', proofFile: null } })
+      ok(r.status >= 400, `encomenda directa com ${l} → ${r.status}`)
+      const r2 = await adm.req(API, { method: 'PUT', body: { ...p1, periods: [{ cycle: c, discount: 0, publish: false }] } })
+      ok(r2.status === 400 && new RegExp(`${l} deixou de estar à venda`).test(r2.json?.error), `painel: gravar ${l} → 400`)
+    }
+    ok(Number((await one('SELECT COUNT(*) n FROM orders')).n) === ordersBefore, 'nenhuma encomenda criada com ciclos retirados')
+    const qOk = (await c1.req('/api/checkout/quote', { method: 'POST', body: { lines: FOR_SALE.map(c => line(p1.slug, c)) } })).json
+    ok(qOk?.quote?.lines?.every(x => !x.error || x.error.code === 'duplicate_line'), 'ciclos à venda continuam a cotar normalmente')
 
     // ── 4. Carrinho antigo ──
-    console.log('\n4. Carrinho antigo com VPS de 3 meses')
+    console.log('\n4. Carrinho antigo com VPS de 6 meses e de 3 anos')
     const dom = `carrinho-antigo-${randomUUID().slice(0, 6)}.com`
-    const cart = JSON.stringify({ state: { lines: [{ key: 'k-vps', type: 'product', slug: p1.slug, cycle: '3months', quantity: 1, options: { location: '21', image: '1130' } }, { key: 'k-dom', type: 'domain', domain: dom, operation: 'register', years: 1 }], idempotencyKey: null }, version: 0 })
+    const cart = JSON.stringify({ state: { lines: [
+      { key: 'k-6m', type: 'product', slug: p1.slug, cycle: '6months', quantity: 1, options: { location: '21', image: '1130' } },
+      { key: 'k-3y', type: 'product', slug: p2.slug, cycle: '3years', quantity: 1, options: { location: '21', image: '1130' } },
+      { key: 'k-dom', type: 'domain', domain: dom, operation: 'register', years: 1 }], idempotencyKey: null }, version: 0 })
     for (const [label, opts] of [['desktop', DESKTOP], ['iphone', IPHONE]]) {
       ;({ ctx, p } = await ctxFor(b, opts, null, cart))
       await p.goto(BASE + '/carrinho', { waitUntil: 'domcontentloaded' })
-      await p.getByTestId('summary-total').or(p.locator('[role=alert]').first()).first().waitFor()
-      await p.waitForTimeout(800)
+      await p.getByTestId('summary-total').or(p.locator('[role=alert]').first()).first().waitFor(); await p.waitForTimeout(800)
       const lines = p.getByTestId('cart-line')
-      ok(await lines.count() === 2, `${label}: os dois itens continuam no carrinho`)
-      const vline = lines.filter({ hasText: /VPS/ }).first()
-      ok(/deixou de estar disponível/.test(await vline.innerText()) && !/deixou de estar/.test(await lines.filter({ hasText: dom }).innerText()), `${label}: o VPS pede outro período; o domínio fica intacto`)
-      ok(await p.getByTestId('finalize').isDisabled(), `${label}: «Finalizar» bloqueado até escolher outro período`)
-      const sel = vline.getByTestId('line-cycle')
-      const opts3 = await sel.locator('option').evaluateAll(o => o.map(x => ({ v: x.value, d: x.disabled, t: x.textContent })))
-      ok(opts3.some(o => o.v === '3months' && o.d && /escolha outro período/.test(o.t)) && opts3.filter(o => !o.d).every(o => o.v !== '3months'), `${label}: selector com «— escolha outro período —» e só ciclos à venda`)
-      if (label === 'desktop') await p.screenshot({ path: `${OUT}/desktop-carrinho-antigo-3meses.png`, fullPage: true })
-      await sel.selectOption('1year'); await p.waitForTimeout(1200)
-      ok(!/deixou de estar/.test(await vline.innerText()) && await p.getByTestId('finalize').isEnabled(), `${label}: escolhido «1 ano» → linha válida e «Finalizar» disponível`)
-      ok(await lines.count() === 2 && await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, `${label}: restantes itens mantidos, sem deslocamento horizontal`)
-      if (label === 'iphone') await p.screenshot({ path: `${OUT}/iphone-carrinho-corrigido.png`, fullPage: true })
+      ok(await lines.count() === 3, `${label}: os três itens continuam no carrinho`)
+      const l6 = lines.filter({ hasText: p1.name }).first(), l3 = lines.filter({ hasText: p2.name }).first(), ld = lines.filter({ hasText: dom }).first()
+      ok(/deixou de estar disponível/.test(await l6.innerText()) && /deixou de estar disponível/.test(await l3.innerText()) && !/deixou de estar/.test(await ld.innerText()), `${label}: cada VPS (6 meses, 3 anos) indica que precisa de outro período; o domínio fica intacto`)
+      ok(await p.getByTestId('finalize').isDisabled(), `${label}: «Finalizar» bloqueado até corrigir`)
+      for (const [ln, c] of [[l6, '6months'], [l3, '3years']]) {
+        const o = await ln.getByTestId('line-cycle').locator('option').evaluateAll(x => x.map(y => ({ v: y.value, d: y.disabled })))
+        ok(o.some(x => x.v === c && x.d) && o.filter(x => !x.d).every(x => FOR_SALE.includes(x.v)), `${label}: selector do item ${c} com «escolha outro período» e só ${FOR_SALE.join('/')}`)
+      }
+      if (label === 'desktop') await p.screenshot({ path: `${OUT}/desktop-carrinho-antigo-6m-3a.png`, fullPage: true })
+      await l6.getByTestId('line-cycle').selectOption('1year'); await p.waitForTimeout(1000)
+      ok(!/deixou de estar/.test(await l6.innerText()) && /deixou de estar/.test(await l3.innerText()) && await p.getByTestId('finalize').isDisabled(), `${label}: corrigido o primeiro, o segundo continua assinalado`)
+      await l3.getByTestId('line-cycle').selectOption('2years'); await p.waitForTimeout(1000)
+      ok(await p.getByTestId('finalize').isEnabled() && await lines.count() === 3 && await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, `${label}: ambos corrigidos → «Finalizar»; itens mantidos; sem deslocamento horizontal`)
       await ctx.close()
     }
 
-    // ── 5. Renovação de um VPS já contratado a 3 meses ──
-    console.log('\n5. Encomendas e renovações existentes')
+    // ── 5. Renovações existentes ──
+    console.log('\n5. Contratos e renovações existentes (3 meses, 6 meses, 3 anos)')
     const c1id = (await one("SELECT id FROM profiles WHERE email = 'cliente1@ensaio.test'")).id
-    fixtureService = randomUUID()
-    await db.query("INSERT INTO services (id, profile_id, product_id, service_type, service_name, status, billing_cycle, price, renewal_price, next_due_date, provisioning_status) VALUES (?, ?, ?, 'vps', 'VPS de ensaio (3 meses, contratado antes)', 'active', '3months', 82200, 82200, CURRENT_DATE + INTERVAL 10 DAY, 'active')", [fixtureService, c1id, p1.id])
-    q = (await c1.req('/api/checkout/quote', { method: 'POST', body: { lines: [{ type: 'renewal', serviceId: fixtureService }] } })).json
-    ok(!q?.quote?.lines?.[0]?.error && Number(q?.quote?.lines?.[0]?.lineTotal) === 82200 && q.quote.lines[0].cycle === '3months', `renovação de um VPS contratado a 3 meses continua possível (${q?.quote?.lines?.[0]?.lineTotal} Kz, ${q?.quote?.lines?.[0]?.cycle})`, JSON.stringify(q?.quote?.lines?.[0]?.error))
+    for (const [c, l, price] of [['3months', '3 meses', 82200], ['6months', '6 meses', 156180], ['3years', '3 anos', 790000]]) {
+      const id = randomUUID(); fixtures.push(id)
+      await db.query("INSERT INTO services (id, profile_id, product_id, service_type, service_name, status, billing_cycle, price, renewal_price, next_due_date, provisioning_status) VALUES (?, ?, ?, 'vps', ?, 'active', ?, ?, ?, CURRENT_DATE + INTERVAL 10 DAY, 'active')", [id, c1id, p1.id, `VPS de ensaio (${l}, contratado antes)`, c, price, price])
+      const q = (await c1.req('/api/checkout/quote', { method: 'POST', body: { lines: [{ type: 'renewal', serviceId: id }] } })).json
+      ok(!q?.quote?.lines?.[0]?.error && Number(q?.quote?.lines?.[0]?.lineTotal) === price && q.quote.lines[0].cycle === c, `renovação de um VPS contratado a ${l} continua possível (${q?.quote?.lines?.[0]?.lineTotal} Kz)`, JSON.stringify(q?.quote?.lines?.[0]?.error))
+    }
 
-    // ── 6. KVM 2: ciclos sem item do mesmo período ──
-    console.log('\n6. KVM 2: 6 meses e 3 anos sem item de preço na Hostinger')
+    // ── 6. KVM 2 com os ciclos elegíveis ──
+    console.log('\n6. KVM 2: guardado com 1 mês, 1 ano e 2 anos (itens do mesmo período)')
     await adm.req(INT, { method: 'POST', body: { mode: 'test', apiUrl: MOCK, secret: 'hostinger-de-ensaio', hostnameSuffix: 'srv.ensaio.test' } })
     await adm.req(INT, { method: 'POST', body: { action: 'test' } })
     const prov = (await adm.req(`${API}?provider=1`)).json.provider
     const kvm2 = prov.items.find(i => i.id === 'hostingercom-vps-kvm2')
     const months = x => x.period_unit === 'year' ? x.period * 12 : x.period
-    ok(kvm2 && !kvm2.prices.some(x => [6, 36].includes(months(x))), `catálogo simulado: KVM 2 com itens de ${[...new Set(kvm2.prices.map(months))].join(', ')} meses (sem 6 nem 36)`)
     const it = m => kvm2.prices.find(x => months(x) === m)
     const prov1 = m => ({ providerItemId: it(m).id, providerCostMinor: it(m).first_period_price ?? it(m).price, providerCurrency: 'USD', providerCostLimitMinor: Math.ceil((it(m).first_period_price ?? it(m).price) * 1.1) })
     const specs2 = { vcpu: 2, ramGb: 8, diskGb: 100, diskType: 'NVMe', traffic: { value: 8, unit: 'TB' }, network: { value: 1, unit: 'Gbps' } }
-    const body = per => ({ id: p2.id, name: p2.name, description: p2.description, saleStatus: p2.saleStatus, position: p2.position, badge: p2.badge, highlight: p2.highlight, baseMonthly: p2.baseMonthly,
-      specs: specs2, features: p2.features, providerProductId: 'hostingercom-vps-kvm2', providerSpecs: kvm2.specs, providerMode: 'auto', periods: per })
-    const base = (pub6 = false, pub36 = false, item6 = {}) => [
-      { cycle: 'monthly', discount: 0, publish: true, ...prov1(1) }, { cycle: '6months', discount: 5, publish: pub6, providerItemId: '', providerCostMinor: '', providerCurrency: '', providerCostLimitMinor: '', ...item6 },
-      { cycle: '1year', discount: 10, publish: true, ...prov1(12) }, { cycle: '2years', discount: 15, publish: true, ...prov1(24) }, { cycle: '3years', discount: 20, publish: pub36, providerItemId: '', providerCostMinor: '', providerCurrency: '', providerCostLimitMinor: '' },
-    ]
-    r = await adm.req(API, { method: 'PUT', body: body(base(false, false)) })
-    ok(r.status === 200, 'KVM 2 em automático guardado com 6 meses e 3 anos NÃO publicados', r.json?.error)
+    const body = (per, mode = 'auto') => ({ id: p2.id, name: p2.name, description: p2.description, saleStatus: p2.saleStatus, position: p2.position, badge: p2.badge, highlight: p2.highlight, baseMonthly: p2.baseMonthly,
+      specs: specs2, features: p2.features, providerProductId: 'hostingercom-vps-kvm2', providerSpecs: kvm2.specs, providerMode: mode, periods: per })
+    const eligible = (over = {}) => [{ cycle: 'monthly', discount: 0, publish: true, ...prov1(1), ...(over.monthly ?? {}) }, { cycle: '1year', discount: 10, publish: true, ...prov1(12), ...(over['1year'] ?? {}) }, { cycle: '2years', discount: 15, publish: true, ...prov1(24), ...(over['2years'] ?? {}) }]
+    let r = await adm.req(API, { method: 'PUT', body: body(eligible()) })
+    ok(r.status === 200, 'KVM 2 em activação automática guardado e publicado com 1 mês, 1 ano e 2 anos', r.json?.error)
     let saved = (await plans()).find(x => x.id === p2.id)
-    ok(['6months', '3years'].every(c => { const x = saved.periods.find(y => y.cycle === c); return x.exists && !x.active && !x.providerItemId }) && saved.periods.find(y => y.cycle === '1year').active, 'ciclos sem item guardados (preço e desconto) como não publicados; 1 mês, 1 e 2 anos publicados')
-    r = await adm.req(API, { method: 'PUT', body: body(base(true, false)) })
-    ok(r.status === 400 && /6 meses: para publicar em activação automática falta item de preço da Hostinger de 6 mês\(es\)/.test(r.json?.error), `publicar 6 meses em automático sem item → 400: «${r.json?.error}»`)
-    r = await adm.req(API, { method: 'PUT', body: body(base(false, true)) })
-    ok(r.status === 400 && /3 anos/.test(r.json?.error), 'publicar 3 anos em automático sem item → 400')
-    r = await adm.req(API, { method: 'PUT', body: body(base(true, false, prov1(12))) })
-    ok(r.status === 400 && /é de 12 mês\(es\); use um item de 6 mês/.test(r.json?.error), `item de 12 meses no ciclo de 6 meses → recusado: «${r.json?.error}»`)
-    r = await adm.req(API, { method: 'PUT', body: body(base(false, false, prov1(12))) })
-    ok(r.status === 400, 'mesmo não publicado, o item de outro período não é aceite')
-    r = await adm.req(API, { method: 'PUT', body: body(base(true, false, { providerItemId: 'hostingercom-vps-kvm2-usd-6m', providerCostMinor: 3000, providerCurrency: 'USD', providerCostLimitMinor: 3300 })) })
-    ok(r.status === 400 && /não pertence ao produto/.test(r.json?.error), 'item inventado (inexistente no catálogo) → recusado')
-    r = await adm.req(API, { method: 'PUT', body: { ...body(base(true, true)), providerMode: 'manual' } })
-    ok(r.status === 200, 'em modo Manual os mesmos ciclos podem ser publicados (a equipa trata da aquisição)', r.json?.error)
-    await adm.req(API, { method: 'PUT', body: body(base(false, false)) })
+    ok(FOR_SALE.every(c => { const x = saved.periods.find(y => y.cycle === c); return x.active && x.providerItemId === it(c === 'monthly' ? 1 : c === '1year' ? 12 : 24).id }), 'cada ciclo com o item da Hostinger do MESMO período')
+    const old = await all("SELECT cycle, price, active, provider_item_id FROM product_prices WHERE product_id = ? AND cycle IN ('3months','6months','3years') ORDER BY cycle", [p2.id])
+    ok(old.length >= 1 && old.every(x => Number(x.active) === 0), `linhas retiradas guardadas e despublicadas (${old.map(x => x.cycle).join(', ')})`)
+    r = await adm.req(API, { method: 'PUT', body: body(eligible({ '1year': prov1(24) })) })
+    ok(r.status === 400 && /é de 24 mês\(es\); use um item de 12 mês/.test(r.json?.error), `item de 24 meses no ciclo de 1 ano → recusado: «${r.json?.error}»`)
+    r = await adm.req(API, { method: 'PUT', body: body(eligible({ monthly: { providerItemId: '', providerCostMinor: '', providerCurrency: '', providerCostLimitMinor: '' } })) })
+    ok(r.status === 400 && /1 mês: para publicar em activação automática falta item de preço da Hostinger de 1 mês/.test(r.json?.error), 'publicar em automático sem item → 400')
+    r = await adm.req(API, { method: 'PUT', body: body(eligible({ monthly: { publish: false, providerItemId: '', providerCostMinor: '', providerCurrency: '', providerCostLimitMinor: '' } })) })
+    ok(r.status === 200, 'sem item: guardado como não publicado')
+    await adm.req(API, { method: 'PUT', body: body(eligible()) })
 
-    // Painel: dados em falta e publicação bloqueada no formulário
+    // Falha temporária do catálogo: erro de ligação, ciclos guardados intactos
+    const before = JSON.stringify(await all('SELECT cycle, price, active, provider_item_id, provider_cost_minor, provider_cost_limit_minor FROM product_prices WHERE product_id = ? ORDER BY cycle', [p2.id]))
+    const apiUrl = (await one('SELECT api_url FROM vps_provider_settings WHERE id = 1')).api_url
+    await db.query("UPDATE vps_provider_settings SET api_url = 'http://127.0.0.1:9' WHERE id = 1")
+    r = await adm.req(API, { method: 'PUT', body: body(eligible({ '1year': { discount: 30 } })) })
+    ok(r.status === 503 && r.json?.field === 'connection' && /Erro de ligação ao catálogo da Hostinger/.test(r.json?.error) && /nada foi alterado/.test(r.json?.error), `catálogo indisponível → 503 «${r.json?.error}»`)
+    ok(JSON.stringify(await all('SELECT cycle, price, active, provider_item_id, provider_cost_minor, provider_cost_limit_minor FROM product_prices WHERE product_id = ? ORDER BY cycle', [p2.id])) === before, 'ciclos, preços e itens guardados sem qualquer alteração')
     ;({ ctx, p } = await ctxFor(b, DESKTOP, adm.cookie))
     await p.goto(BASE + '/admin/site/catalog?cat=vps', { waitUntil: 'domcontentloaded' })
-    const row2 = p.locator(`[data-testid=vps-plan-admin][data-slug="${p2.slug}"]`); await row2.waitFor()
-    await row2.locator('summary').click()
+    let row2 = p.locator(`[data-testid=vps-plan-admin][data-slug="${p2.slug}"]`); await row2.waitFor(); await row2.locator('summary').click()
+    ok(/Erro de ligação ao catálogo da Hostinger/.test(await row2.getByTestId('vp-catalog-error').innerText()), 'editor: o erro aparece como erro de ligação')
+    await row2.getByTestId('vp-save').click(); await row2.getByTestId('vp-msg').waitFor()
+    ok(/Erro de ligação/.test(await row2.getByTestId('vp-msg').innerText()), 'editor: «Guardar» com o catálogo em baixo → erro de ligação, nada gravado')
+    await ctx.close()
+    await db.query('UPDATE vps_provider_settings SET api_url = ? WHERE id = 1', [apiUrl])
+
+    // Editor com a ligação reposta: só os ciclos elegíveis
+    ;({ ctx, p } = await ctxFor(b, DESKTOP, adm.cookie))
+    await p.goto(BASE + '/admin/site/catalog?cat=vps', { waitUntil: 'domcontentloaded' })
+    row2 = p.locator(`[data-testid=vps-plan-admin][data-slug="${p2.slug}"]`); await row2.waitFor(); await row2.locator('summary').click()
     const f2 = row2.getByTestId('vps-plan-form'); await f2.waitFor()
-    for (const c of ['6months', '3years']) {
-      const m = f2.getByTestId(`vp-missing-${c}`)
-      ok(await m.count() === 1 && /sem item de (6|36) mês\(es\) no catálogo da Hostinger/.test(await m.innerText()) && /custo/.test(await m.innerText()) && /Pode guardar como não publicado/.test(await m.innerText()), `formulário ${c}: «${(await m.innerText().catch(() => '')).trim()}»`)
-      ok(await f2.getByTestId(`vp-publish-${c}`).isDisabled(), `formulário ${c}: «Publicado» bloqueado em activação automática`)
-    }
-    ok(await f2.getByTestId('vp-missing-1year').count() === 0 && await f2.getByTestId('vp-publish-1year').isEnabled(), 'ciclos completos (1 ano) sem aviso')
-    ok((await f2.getByTestId('vp-item-6months').evaluate(e => e.tagName)) === 'INPUT', '6 meses: não é oferecido nenhum item de outro período (só campo vazio)')
-    await f2.getByTestId('vp-provider-mode').selectOption('manual'); await p.waitForTimeout(150)
-    ok(await f2.getByTestId('vp-publish-6months').isEnabled() && /Em modo Manual pode ser publicado/.test(await f2.getByTestId('vp-missing-6months').innerText()), 'em Manual: pode publicar, com a indicação do que faltaria')
-    await f2.getByTestId('vp-provider-mode').selectOption('auto'); await p.waitForTimeout(150)
+    const checked = await Promise.all(FOR_SALE.map(c => f2.getByTestId(`vp-publish-${c}`).isChecked()))
+    ok(await f2.locator('[data-testid^=vp-missing-]').count() === 0 && checked.every(Boolean), 'editor do KVM 2: 1 mês, 1 ano e 2 anos publicados e completos, sem avisos')
     await p.addStyleTag({ content: 'header, [class*=sticky], [class*=fixed] { position: relative !important }' })
-    await p.setViewportSize({ width: 1440, height: 2600 }); await f2.getByTestId('vp-period-monthly').scrollIntoViewIfNeeded()
-    await f2.locator('table').first().screenshot({ path: `${OUT}/painel-kvm2-ciclos-sem-item.png` })
+    await p.setViewportSize({ width: 1440, height: 3000 }); await f2.scrollIntoViewIfNeeded(); await p.waitForTimeout(300)
+    await f2.screenshot({ path: `${OUT}/painel-editor-vps-kvm2.png` })
     await ctx.close()
 
     // ── 7. Âmbito ──
@@ -192,7 +214,7 @@ async function ctxFor(b, opts, cookie, initCart) {
     ok((await history()) === historyBefore, 'encomendas, itens, facturas e serviços anteriores inalterados')
   } catch (e) { ok(false, 'execução', e.stack) } finally {
     try {
-      if (fixtureService) await db.query('DELETE FROM services WHERE id = ?', [fixtureService])
+      for (const id of fixtures) await db.query('DELETE FROM services WHERE id = ?', [id])
       await db.beginTransaction()
       const cols = ['name', 'description', 'sale_status', 'position', 'badge', 'popular', 'base_monthly_price', 'plan_specs', 'image_path', 'provider_product_id', 'provider_mode', 'provider_specs']
       for (const pr of snapProducts) await db.query(`UPDATE products SET ${cols.map(c => `${c} = ?`).join(', ')} WHERE id = ?`, [...cols.map(c => val(pr[c])), pr.id])

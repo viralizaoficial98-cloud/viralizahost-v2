@@ -37,7 +37,7 @@ async function save(req: NextRequest, create: boolean) {
     const plans = await loadVpsPlans(), saved = plans.find(p => p.id === id)
     return NextResponse.json({ ok: true, id, plans, warnings: saved?.specWarnings ?? [], unverified: saved?.specUnverified ?? [] }, { status: create ? 201 : 200 })
   } catch (e) {
-    if (e instanceof VpsPlanError) return NextResponse.json({ error: e.message, field: e.field ?? null }, { status: 400 })
+    if (e instanceof VpsPlanError) return NextResponse.json({ error: e.message, field: e.field ?? null }, { status: e.status })
     console.error('[admin/vps-plans]', (e as Error).message)
     return NextResponse.json({ error: 'Não foi possível guardar o plano.' }, { status: 500 })
   }

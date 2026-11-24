@@ -261,7 +261,7 @@ function PlanForm({ plan, provider, onSaved, onCancel }: { plan?: Plan; provider
             </select>
           </label>
         </div>
-        {provider?.error && <p className="text-[11px] text-[#64748B]">Catálogo da Hostinger indisponível: {provider.error}</p>}
+        {provider?.error && <p className="text-[11px] text-red-700" role="alert" data-testid="vp-catalog-error">Erro de ligação ao catálogo da Hostinger: {provider.error}. Os ciclos e itens guardados mantêm-se; a publicação automática fica por confirmar até a ligação voltar.</p>}
         {d.providerProductId && (pSpecs
           ? <div className="text-[11px] text-[#475569] space-y-0.5" data-testid="vp-provider-specs">
               <p>Produto: {pSpecs.vcpu ?? '?'} vCPU · {pSpecs.ramGb ?? '?'} GB RAM · {pSpecs.diskGb ?? '?'} GB disco · tráfego {pSpecs.trafficUnlimited ? 'ilimitado' : pSpecs.trafficGb != null ? formatTrafficGb(pSpecs.trafficGb) : 'não validado'}</p>
