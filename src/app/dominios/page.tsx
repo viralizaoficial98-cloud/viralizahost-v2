@@ -1,16 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { kz as kzFmt } from '@/lib/commerce/status'
-import { Suspense } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { DomainShop } from '@/components/purchase/DomainShop'
+import { BannerHero } from '@/components/service/BannerHero'
+import { DomainSearchBar } from '@/components/landing/DomainSearchBar'
 import { listExtensions } from '@/lib/commerce/domain-catalog'
 import { PageLinksSection } from '@/components/site/PageLinksSection'
 import { pagesInSection } from '@/lib/site/pages'
 
-// Página principal de Domínios (link directo no menu): pesquisa, extensões e — em secções — as opções do antigo
-// submenu (registo, transferência e renovação; gestão e segurança; recursos), cada uma com ligação ao seu fluxo.
+// Página principal de Domínios (link directo no menu), por esta ordem:
+//   1. Hero (BannerHero, configuração própria em Painel → Site → Banners de páginas, slug «dominios»; único H1)
+//   2. Registo de domínios (DomainSearchBar variant «page»: pesquisa + extensões em destaque do catálogo de domínios)
+//   3. Todas as extensões e preços; 4–6. opções do antigo submenu (registo/transferência/renovação; gestão; recursos).
 const cards = (section: string, cta: string) => pagesInSection(section).map(p => ({ href: p.path, title: p.title, desc: p.desc, icon: p.icon, cta }))
 
 export const dynamic = 'force-dynamic'
@@ -23,26 +25,24 @@ const kz = (n: number | null) => (n == null ? '—' : kzFmt(Math.round(n)))
 export default async function DominiosPage() {
   let exts: Awaited<ReturnType<typeof listExtensions>> | null = null
   try { exts = await listExtensions() } catch { exts = null }
+  // «A partir de» do registo (1.º ano), calculado do catálogo de domínios
+  const cheapest = exts?.filter(e => e.status === 'active' && e.register != null).reduce<number | null>((m, e) => (m == null || e.register! < m ? e.register! : m), null) ?? null
+  const fromPrice = cheapest != null ? `A partir de ${kz(cheapest)}/1.º ano` : null
   return (
     <>
       <Header />
       <main>
-        <section className="bg-[#0A0A0A] pt-28 pb-12 text-center px-4">
-          <p className="text-[#F5B700] text-xs font-bold tracking-widest uppercase mb-4">Registo de Domínios</p>
-          <h1 className="text-4xl md:text-5xl font-black text-white mb-4 leading-tight">Encontre o seu <span className="text-[#F5B700]">domínio</span></h1>
-          <p className="text-[#999] text-base md:text-lg max-w-2xl mx-auto">Disponibilidade, alternativas e preços de registo e renovação em kwanzas.</p>
-          <nav className="flex flex-wrap justify-center gap-2 mt-6" aria-label="Acções de domínios" data-testid="domain-actions">
-            {[['/dominios/pesquisar', 'Pesquisar e registar'], ['/dominios/transferir', 'Transferir'], ['/dominios/renovar', 'Renovar'], ['#gestao', 'Gestão e segurança'], ['/dominios/precos', 'Preços']].map(([h, l]) => (
-              <Link key={h} href={h} className="px-4 py-2 rounded-xl text-sm font-bold border border-white/15 text-white hover:border-[#F5B700] hover:text-[#F5B700]">{l}</Link>
-            ))}
-          </nav>
-        </section>
-        <section className="bg-[#F7F7F7] py-10 px-4">
-          <div className="max-w-4xl mx-auto"><Suspense><DomainShop /></Suspense></div>
-        </section>
-        <section className="bg-white py-14 px-4" aria-labelledby="ext-title">
+        <BannerHero slug="dominios" testId="domains-hero" price={fromPrice} defaults={{
+          breadcrumb: 'Domínios', tag: 'Domínios', title: 'Registe a sua identidade online com o domínio certo',
+          subtitle: 'Pesquise a disponibilidade, compare extensões nacionais e internacionais e registe o seu domínio com preços em kwanzas.',
+          cta: 'Pesquisar domínio', ctaHref: '#registo-de-dominios', ctaSecondary: 'Transferir domínio', ctaSecondaryHref: '/dominios/transferir',
+          bgImage: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=1920&q=80&auto=format&fit=crop', bgColor: '#080d1a',
+          highlights: ['Preços em kwanzas', 'Extensões .ao e internacionais', 'Transferência com código EPP'], guarantee: false,
+        }} />
+        <DomainSearchBar variant="page" />
+        <section className="bg-white py-14 px-4" aria-labelledby="ext-title" data-section="extensions" id="extensoes">
           <div className="max-w-5xl mx-auto">
-            <h2 id="ext-title" className="text-2xl font-black text-[#0A0A0A] mb-6">Extensões e preços (1 ano)</h2>
+            <h2 id="ext-title" className="text-2xl font-black text-[#0A0A0A] mb-6">Todas as extensões e preços (1 ano)</h2>
             {!exts ? (
               <p className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700" role="alert">Não foi possível carregar os preços. Recarregue a página dentro de instantes.</p>
             ) : !exts.length ? (

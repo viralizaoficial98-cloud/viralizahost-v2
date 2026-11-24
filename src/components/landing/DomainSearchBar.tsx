@@ -28,7 +28,13 @@ const trustItems = [
   { icon: Headphones, text: 'Suporte especializado' },
 ]
 
-export function DomainSearchBar() {
+/**
+ * Pesquisa de domínios + extensões em destaque (catálogo de Administração → Catálogo e Preços → Domínios).
+ * variant «home»: página inicial (onda decorativa, link «Ver todos os domínios», barra de benefícios).
+ * variant «page»: secção «Registo de domínios» de /dominios, logo a seguir à hero (sem os elementos da página inicial).
+ */
+export function DomainSearchBar({ variant = 'home' }: { variant?: 'home' | 'page' }) {
+  const page = variant === 'page'
   const { formatCurrency, currency } = useLocale()
   const fmtAOA = (n: number) => formatCurrency(convertFromAOA(n, currency))
   const [query, setQuery] = useState('')
@@ -89,7 +95,7 @@ export function DomainSearchBar() {
   return (
     <>
       {/* Premium LED wave separator */}
-      <div className="relative w-full overflow-hidden" style={{ background: '#000000', marginBottom: '-1px' }}>
+      {!page && <div className="relative w-full overflow-hidden" style={{ background: '#000000', marginBottom: '-1px' }}>
         <style>{`
           @keyframes wave-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
           @keyframes wave-shift { 0%, 100% { transform: translateX(0px); } 50% { transform: translateX(6px); } }
@@ -109,10 +115,11 @@ export function DomainSearchBar() {
           <path className="led-wave-line" d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22" fill="none" stroke="#FFFFFF" strokeWidth="1.2" opacity="0.7" />
           <path className="led-wave-line" d="M0,38 C180,20 360,8 540,12 C720,16 900,36 1080,32 C1260,28 1350,18 1440,22" fill="none" stroke="#F5B700" strokeWidth="2" opacity="1" />
         </svg>
-      </div>
+      </div>}
 
       {/* Domain Section */}
-      <section className="bg-white pt-0 pb-20">
+      <section {...(page ? { id: 'registo-de-dominios', 'data-section': 'domain-register', 'data-testid': 'domain-register', 'aria-labelledby': 'registo-title' } : {})}
+        className={page ? 'bg-[#FAFAFA] py-16 md:py-20 scroll-mt-24' : 'bg-white pt-0 pb-20'}>
         <style>{`
           @keyframes domain-slide-up {
             from { opacity: 0; transform: translateY(10px); }
@@ -145,48 +152,51 @@ export function DomainSearchBar() {
               <p className="text-[#F5B700] text-xs font-bold tracking-widest uppercase">Registo de Domínios</p>
               <div className="h-px w-16 bg-gradient-to-l from-transparent to-[#F5B700]" />
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-[#0A0A0A] leading-tight mb-4">
-              Encontra o{' '}<span className="text-[#F5B700]">domínio ideal</span>{' '}para<br className="hidden md:block" /> o seu negócio
+            <h2 id={page ? 'registo-title' : undefined} className="text-3xl md:text-4xl lg:text-5xl font-black text-[#0A0A0A] leading-tight mb-4">
+              {page ? 'Encontre' : 'Encontra'} o{' '}<span className="text-[#F5B700]" data-testid="domain-register-highlight">domínio ideal</span>{' '}para<br className="hidden md:block" /> o seu negócio
             </h2>
             <p className="text-[#666] text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-              Pesquise, registe e proteja o nome da sua marca com rapidez,<br className="hidden md:block" /> segurança e o melhor preço.
+              {page ? 'Pesquise, registe e proteja o nome da sua marca com rapidez e segurança.'
+                : <>Pesquise, registe e proteja o nome da sua marca com rapidez,<br className="hidden md:block" /> segurança e o melhor preço.</>}
             </p>
           </div>
 
           {/* Search bar */}
           <div className="max-w-3xl mx-auto mb-5">
             <div
-              className="flex items-center bg-white rounded-[20px] border transition-all duration-300"
+              className="flex flex-col sm:flex-row sm:items-center sm:h-[72px] gap-2 sm:gap-0 p-2 sm:p-0 bg-white rounded-[20px] border transition-all duration-300"
               style={{
-                height: 72,
                 borderColor: results.length > 0 ? '#F5B700' : '#E8E8E8',
                 boxShadow: results.length > 0
                   ? '0 8px 40px rgba(245,183,0,0.18), 0 2px 8px rgba(245,183,0,0.10)'
                   : '0 8px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(245,183,0,0.08)',
               }}
             >
-              <div className="flex items-center pl-5 pr-3 shrink-0">
+              <div className="flex items-center flex-1 min-w-0 h-12 sm:h-auto">
+              <div className="flex items-center pl-3 sm:pl-5 pr-3 shrink-0">
                 <Search size={22} className={`transition-colors duration-200 ${searching ? 'text-[#F5B700]' : 'text-[#BBB]'}`} />
               </div>
               <input
+                aria-label="Nome do domínio"
+                data-testid="domain-search-input"
                 type="text"
                 value={query}
                 onChange={e => { setQuery(e.target.value); setResults([]); setRevealed([]) }}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 placeholder="Digite o nome do domínio desejado"
-                className="flex-1 text-[#0A0A0A] text-base md:text-lg outline-none bg-transparent placeholder:text-[#C0C0C0] pr-3"
+                className="flex-1 min-w-0 text-[#0A0A0A] text-base md:text-lg outline-none bg-transparent placeholder:text-[#C0C0C0] pr-3"
               />
-              <div className="pr-2 shrink-0">
+              </div>
+              <div className="sm:pr-2 shrink-0">
                 <button
                   onClick={handleSearch}
                   disabled={searching}
-                  className="h-[54px] px-7 rounded-[14px] font-bold text-sm md:text-base transition-all duration-200 flex items-center gap-2 shrink-0"
+                  data-testid="domain-search-submit"
+                  className="h-[54px] w-full sm:w-auto sm:min-w-[180px] px-7 rounded-[14px] font-bold text-sm md:text-base transition-all duration-200 flex items-center justify-center gap-2 shrink-0"
                   style={{
                     background: searching ? '#0A0A0A' : '#F5B700',
                     color: searching ? '#F5B700' : '#0A0A0A',
                     boxShadow: '0 4px 20px rgba(245,183,0,0.35)',
-                    minWidth: 180,
-                    justifyContent: 'center',
                   }}
                   onMouseEnter={e => { if (!searching) { e.currentTarget.style.background = '#0A0A0A'; e.currentTarget.style.color = '#F5B700' } }}
                   onMouseLeave={e => { if (!searching) { e.currentTarget.style.background = '#F5B700'; e.currentTarget.style.color = '#0A0A0A' } }}
@@ -294,7 +304,7 @@ export function DomainSearchBar() {
           </div>
 
           {/* Trust bar */}
-          <div className="flex flex-wrap justify-center gap-6 mb-14">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mb-14" data-testid="domain-trust">
             {trustItems.map(({ icon: Icon, text }) => (
               <div key={text} className="flex items-center gap-2 text-[#555] text-sm">
                 <Icon size={14} className="text-[#F5B700]" />
@@ -324,9 +334,10 @@ export function DomainSearchBar() {
                   </span>
                 )}
                 <div className="text-2xl font-black text-[#0A0A0A] mb-1">{tld}</div>
-                <div className="text-[11px] text-[#999] mb-3 leading-tight">{label}</div>
-                <div className="text-[13px] font-bold text-[#0A0A0A] mb-4">{fmtAOA(priceNum)}/1.º ano</div>
+                <div className="text-[11px] text-[#999] mb-3 leading-tight" data-testid="ext-card-desc">{label}</div>
+                <div className="text-[13px] font-bold text-[#0A0A0A] mb-4" data-testid="ext-card-price">{fmtAOA(priceNum)}<span className="whitespace-nowrap">/1.º ano</span></div>
                 <button
+                  data-testid="ext-card-register"
                   onClick={() => handleRegisterTld(tld)}
                   className="w-full py-2 rounded-xl text-xs font-bold transition-all duration-200 border"
                   style={{ background: popular ? '#F5B700' : 'transparent', borderColor: popular ? '#F5B700' : '#D0D0D0', color: popular ? '#0A0A0A' : '#444' }}
@@ -339,6 +350,13 @@ export function DomainSearchBar() {
             ))}
           </div>
 
+          {page ? (
+            <nav className="flex flex-wrap justify-center gap-2" aria-label="Outras acções de domínios" data-testid="domain-actions">
+              {[['/dominios/pesquisar', 'Pesquisar e registar'], ['/dominios/transferir', 'Transferir'], ['/dominios/renovar', 'Renovar'], ['#gestao', 'Gestão e segurança'], ['/dominios/precos', 'Tabela de preços']].map(([h, l]) => (
+                <a key={h} href={h} className="px-4 py-2 rounded-xl text-sm font-bold border border-[#E2E2E2] bg-white text-[#0A0A0A] hover:border-[#F5B700]">{l}</a>
+              ))}
+            </nav>
+          ) : (<>
           {/* CTA link */}
           <div className="text-center mb-16">
             <a href="/dominios" className="inline-flex items-center gap-2 text-[#F5B700] font-bold text-sm hover:gap-3 transition-all duration-200">
@@ -364,6 +382,7 @@ export function DomainSearchBar() {
             ))}
           </div>
 
+          </>)}
         </div>
       </section>
     </>

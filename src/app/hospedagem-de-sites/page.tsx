@@ -8,8 +8,7 @@ import { FinalCTA } from '@/components/service/FinalCTA'
 import { HostingPlansSection } from '@/components/service/HostingPlansSection'
 import { BuildSiteSection, SecuritySection, type SslCoverage } from '@/components/service/HostingSiteSections'
 import { getPool } from '@/lib/db/pool'
-import { ServiceHero } from '@/components/service/ServiceHero'
-import { getBannerPage } from '@/lib/banner-pages'
+import { BannerHero } from '@/components/service/BannerHero'
 import { fromPriceText } from '@/lib/commerce/from-price'
 
 // /hospedagem-de-sites — ordem fixa (ver docs/hospedagem-de-sites.md):
@@ -53,30 +52,19 @@ async function sslCoverage(): Promise<SslCoverage> {
 }
 
 export default async function HospedagemDeSitesPage() {
-  const [ssl, banner, fromPrice] = await Promise.all([sslCoverage(), getBannerPage('hospedagem-de-sites'), fromPriceText('hosting')])
+  const [ssl, fromPrice] = await Promise.all([sslCoverage(), fromPriceText('hosting')])
   return (
     <>
       <Header />
       <main>
-        {/* 0. Hero (configuração em Painel → Site → Banners de páginas) */}
-        <div data-section="hero" data-testid="hosting-hero">
-          <ServiceHero
-            breadcrumb={banner?.breadcrumb ?? 'Hospedagem de Sites'}
-            tag={banner?.tag ?? 'Hospedagem Premium'}
-            title={banner?.title ?? 'Hospedagem de Sites Premium para o seu Negócio'}
-            subtitle={banner?.subtitle ?? 'Performance ultrarrápida com LiteSpeed, NVMe SSD, SSL grátis, cPanel e suporte técnico especializado 24/7.'}
-            price={fromPrice ?? undefined}
-            cta={banner?.button_primary_text ?? 'Ver Planos'}
-            ctaHref={banner?.button_primary_link ?? '#planos'}
-            ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
-            ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
-            bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80&auto=format&fit=crop'}
-            bgColor={banner?.bg_color ?? '#080d1a'}
-            highlights={banner?.highlights?.length ? banner.highlights : ["LiteSpeed Enterprise","NVMe SSD Gen4","Uptime 99.9%","cPanel Incluído"]}
-            guarantee={banner?.show_guarantee ?? true}
-            layout="split"
-          />
-        </div>
+        {/* 0. Hero (configuração em Painel → Site → Banners de páginas, slug hospedagem-de-sites) */}
+        <BannerHero slug="hospedagem-de-sites" testId="hosting-hero" price={fromPrice} defaults={{
+          breadcrumb: 'Hospedagem de Sites', tag: 'Hospedagem Premium', title: 'Hospedagem de Sites Premium para o seu Negócio',
+          subtitle: 'Performance ultrarrápida com LiteSpeed, NVMe SSD, SSL grátis, cPanel e suporte técnico especializado 24/7.',
+          cta: 'Ver Planos', ctaHref: '#planos', ctaSecondary: 'Falar com Especialista', ctaSecondaryHref: '/tickets',
+          bgImage: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80&auto=format&fit=crop', bgColor: '#080d1a',
+          highlights: ['LiteSpeed Enterprise', 'NVMe SSD Gen4', 'Uptime 99.9%', 'cPanel Incluído'], guarantee: true,
+        }} />
         {/* 1. Escolha o seu plano (só hospedagem de sites, a partir do catálogo) */}
         <div data-section="plans">
           <HostingPlansSection
