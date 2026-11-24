@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
+import { emailConfirmationRequired } from '@/lib/auth/account-settings'
 import { emailConfig, recentEmails, refreshDeliveryEvents, senderDomainStatus, sendTestEmail } from '@/lib/admin/email-status'
 import { clientIp, rateLimit } from '@/lib/auth/rate-limit'
 
@@ -10,7 +11,7 @@ async function admin() { try { return await requireAdminRole() } catch (e) { ret
 
 export async function GET() {
   const a = await admin(); if (typeof a !== 'string') return NextResponse.json({ error: 'Sem permissão.' }, { status: a.status })
-  return NextResponse.json({ config: emailConfig(), recent: await recentEmails() })
+  return NextResponse.json({ config: { ...emailConfig(), confirmationRequired: await emailConfirmationRequired() }, recent: await recentEmails() })
 }
 
 export async function POST(req: NextRequest) {

@@ -3,6 +3,33 @@
 import type { SchemaMeta } from './types'
 
 export const SCHEMA_META: SchemaMeta = {
+  "account_settings": {
+    "pk": [
+      "id"
+    ],
+    "unique": [],
+    "columns": {
+      "id": {
+        "kind": "int"
+      },
+      "email_confirmation_required": {
+        "kind": "bool",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "updated_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
   "activity_logs": {
     "pk": [
       "id"

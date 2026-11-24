@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, Eye, EyeOff, ImagePlus, Info, Loader2, Plus, Save, Trash2 } from 'lucide-react'
 import { MAX_DISCOUNT, exactPeriodTotal, impliedDiscount } from '@/lib/commerce/period-pricing'
-import { VPS_CYCLES, VPS_FEATURE_ICONS, specMismatches, type ProviderSpecs, type VpsFeature, type VpsIcon, type VpsSpecs } from '@/lib/commerce/vps-shared'
+import { TRAFFIC_UNITS, VPS_CYCLES, VPS_FEATURE_ICONS, compareSpecs, formatRaw, formatTrafficGb, type ProviderSpecs, type TrafficUnit, type VpsFeature, type VpsIcon, type VpsSpecs } from '@/lib/commerce/vps-shared'
 import { VpsPlanBand, type VpsBandPlan } from '@/components/service/VpsPlansSection'
 
 // Catálogo e Preços → VPS: criar, editar, ordenar, publicar/despublicar; ficha, imagem, características com ícone,
@@ -13,16 +13,17 @@ type Period = { cycle: string; months: number; exists: boolean; active: boolean;
   providerItemId: string | null; providerCostMinor: number | null; providerCurrency: string | null; providerCostLimitMinor: number | null }
 type Plan = { id: string; slug: string; name: string; description: string | null; saleStatus: 'active' | 'draft' | 'on_request'; position: number; badge: string | null; highlight: boolean
   baseMonthly: number | null; imageUrl: string | null; specs: VpsSpecs; features: VpsFeature[]; providerProductId: string | null; providerMode: 'auto' | 'manual'
-  providerSpecs: ProviderSpecs | null; specWarnings: string[]; periods: Period[] }
+  providerSpecs: ProviderSpecs | null; specWarnings: string[]; specUnverified?: string[]; periods: Period[] }
 type ProviderItem = { id: string; name: string; specs: ProviderSpecs | null; prices: { id: string; currency: string; price: number; first_period_price?: number | null; period: number; period_unit: string }[] }
 type PD = { cycle: string; discount: string | null; publish: boolean; renewal: string; providerItemId: string; providerCost: string; providerCurrency: string; providerLimit: string }
 type Draft = { id?: string; name: string; description: string; saleStatus: Plan['saleStatus']; position: string; badge: string; highlight: boolean; baseMonthly: string
-  vcpu: string; ramGb: string; diskGb: string; diskType: '' | 'NVMe' | 'SSD'; trafficMode: '' | 'value' | 'unlimited'; trafficValue: string; trafficUnit: 'GB' | 'TB'
+  vcpu: string; ramGb: string; diskGb: string; diskType: '' | 'NVMe' | 'SSD'; trafficMode: '' | 'value' | 'unlimited'; trafficValue: string; trafficUnit: TrafficUnit
   networkValue: string; networkUnit: 'Mbps' | 'Gbps'; features: { text: string; icon: VpsIcon | '' }[]
   providerProductId: string; providerMode: 'manual' | 'auto'; providerSpecs: ProviderSpecs | null; providerSpecsConfirmed: boolean; periods: PD[] }
 
 const input = 'w-full border border-[#E5E7EB] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-[#F5B700] bg-white'
 const lbl = 'text-xs text-[#64748B] block'
+const field = input.replace('w-full', 'min-w-0')   // para campos lado a lado (flex)
 const kz = (v: number) => `${Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\s/g, ' ')} Kz`
 const money = (minor: number, cur: string) => `${(minor / 100).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} ${cur}`
 const BADGES = ['Mais popular', 'Disponibilidade limitada', 'Melhor valor', 'Novo']
@@ -70,7 +71,9 @@ function PlanForm({ plan, provider, onSaved, onCancel }: { plan?: Plan; provider
   const base = Number(d.baseMonthly), baseOk = Number.isFinite(base) && base > 0
   const item = provider?.items.find(x => x.id === d.providerProductId) ?? null
   const pSpecs = item?.specs ?? d.providerSpecs
-  const mismatches = d.providerProductId ? specMismatches(specsPreview(d), pSpecs) : []
+  // Mesma regra do servidor (compareSpecs): automático bloqueia divergências; manual grava com aviso
+  const { mismatches, unverified } = d.providerProductId ? compareSpecs(specsPreview(d), pSpecs) : { mismatches: [] as string[], unverified: [] as string[] }
+  const auto = d.providerMode === 'auto'
 
   const result = (i: number) => {
     const c = VPS_CYCLES[i], pd = d.periods[i], cur = plan?.periods.find(x => x.cycle === c.cycle)
@@ -110,7 +113,8 @@ function PlanForm({ plan, provider, onSaved, onCancel }: { plan?: Plan; provider
       const res = await fetch('/api/admin/catalog/vps-plans', { method: d.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const j = await res.json()
       if (!res.ok) { setMsg({ ok: false, text: j.error ?? `HTTP ${res.status}`, field: j.field ?? undefined }); return }
-      setMsg({ ok: true, text: d.id ? 'Guardado' : 'Plano criado' })
+      const sv = (j.plans as Plan[] | undefined)?.find(x => x.id === j.id)
+      setMsg({ ok: true, text: `${d.id ? 'Guardado' : 'Plano criado'}${sv?.specWarnings.length ? ' — com avisos de características (modo manual)' : ''}` })
       onSaved(j.plans)
     } catch (e) { setMsg({ ok: false, text: (e as Error).message }) } finally { setBusy(false) }
   }
@@ -143,19 +147,19 @@ function PlanForm({ plan, provider, onSaved, onCancel }: { plan?: Plan; provider
 
       <div>
         <p className="text-xs font-bold text-[#334155] mb-2">Especificações (com ícone na página)</p>
-        <div className="grid sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <label className={lbl}>vCPU<input type="number" min={1} className={`${input} ${bad('vcpu')}`} value={d.vcpu} onChange={e => set('vcpu', e.target.value)} data-testid="vp-vcpu" /></label>
           <label className={lbl}>RAM (GB)<input type="number" min={0.5} step="0.5" className={`${input} ${bad('ramGb')}`} value={d.ramGb} onChange={e => set('ramGb', e.target.value)} data-testid="vp-ram" /></label>
           <label className={lbl}>Disco (GB)<input type="number" min={1} className={`${input} ${bad('diskGb')}`} value={d.diskGb} onChange={e => set('diskGb', e.target.value)} data-testid="vp-disk" /></label>
           <label className={lbl}>Tipo de disco<select className={input} value={d.diskType} onChange={e => set('diskType', e.target.value as Draft['diskType'])} data-testid="vp-disk-type"><option value="">—</option><option>NVMe</option><option>SSD</option></select></label>
-          <div className={lbl}>Tráfego
+          <div className={`${lbl} lg:col-span-2`}>Tráfego
             <div className="flex gap-1">
-              <select className={`${input} ${bad('traffic')}`} value={d.trafficMode} onChange={e => set('trafficMode', e.target.value as Draft['trafficMode'])} data-testid="vp-traffic-mode"><option value="">—</option><option value="value">Limite</option><option value="unlimited">Ilimitado</option></select>
-              {d.trafficMode === 'value' && <><input type="number" min={1} className={input} value={d.trafficValue} onChange={e => set('trafficValue', e.target.value)} data-testid="vp-traffic" /><select className={`${input} w-16`} value={d.trafficUnit} onChange={e => set('trafficUnit', e.target.value as 'GB' | 'TB')} data-testid="vp-traffic-unit"><option>GB</option><option>TB</option></select></>}
+              <select className={`${field} ${bad('traffic')} w-32 shrink-0`} value={d.trafficMode} onChange={e => set('trafficMode', e.target.value as Draft['trafficMode'])} data-testid="vp-traffic-mode"><option value="">—</option><option value="value">Limite</option><option value="unlimited">Ilimitado</option></select>
+              {d.trafficMode === 'value' && <><input type="number" min={1} className={`${field} flex-1`} value={d.trafficValue} onChange={e => set('trafficValue', e.target.value)} data-testid="vp-traffic" /><select className={`${field} w-20 shrink-0`} value={d.trafficUnit} onChange={e => set('trafficUnit', e.target.value as TrafficUnit)} data-testid="vp-traffic-unit" title="GB/TB: decimais (1 TB = 1000 GB) · GiB/TiB: binárias (1 TiB = 1024 GiB)">{TRAFFIC_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></>}
             </div>
           </div>
-          <div className={lbl}>Velocidade de rede
-            <div className="flex gap-1"><input type="number" min={1} className={`${input} ${bad('network')}`} value={d.networkValue} onChange={e => set('networkValue', e.target.value)} data-testid="vp-network" /><select className={`${input} w-20`} value={d.networkUnit} onChange={e => set('networkUnit', e.target.value as 'Mbps' | 'Gbps')}><option>Mbps</option><option>Gbps</option></select></div>
+          <div className={`${lbl} lg:col-span-2`}>Velocidade de rede
+            <div className="flex gap-1"><input type="number" min={1} className={`${field} ${bad('network')} flex-1`} value={d.networkValue} onChange={e => set('networkValue', e.target.value)} data-testid="vp-network" /><select className={`${field} w-24 shrink-0`} value={d.networkUnit} onChange={e => set('networkUnit', e.target.value as 'Mbps' | 'Gbps')}><option>Mbps</option><option>Gbps</option></select></div>
           </div>
         </div>
         {d.trafficMode === 'unlimited' && <p className="text-[11px] text-amber-800 mt-1">Use «Ilimitado» só se o pacote da Hostinger o oferecer de facto (validado contra o produto associado).</p>}
@@ -244,9 +248,19 @@ function PlanForm({ plan, provider, onSaved, onCancel }: { plan?: Plan; provider
         </div>
         {provider?.error && <p className="text-[11px] text-[#64748B]">Catálogo da Hostinger indisponível: {provider.error}</p>}
         {d.providerProductId && (pSpecs
-          ? <p className="text-[11px] text-[#475569]" data-testid="vp-provider-specs">Produto: {pSpecs.vcpu ?? '?'} vCPU · {pSpecs.ramGb ?? '?'} GB RAM · {pSpecs.diskGb ?? '?'} GB disco · tráfego {pSpecs.trafficUnlimited ? 'ilimitado' : pSpecs.trafficGb != null ? `${pSpecs.trafficGb >= 1024 ? `${pSpecs.trafficGb / 1024} TB` : `${pSpecs.trafficGb} GB`}` : '?'}</p>
-          : <label className="text-[11px] text-amber-900 flex items-start gap-2"><input type="checkbox" checked={d.providerSpecsConfirmed} onChange={e => set('providerSpecsConfirmed', e.target.checked)} data-testid="vp-specs-confirm" /> O catálogo não indica as características deste produto: confirmo que correspondem ao anunciado (necessário para o modo automático).</label>)}
-        {mismatches.length > 0 && <ul className="text-[11px] text-red-700 list-disc pl-5" role="alert" data-testid="vp-mismatch">{mismatches.map(m => <li key={m}>{m}</li>)}</ul>}
+          ? <div className="text-[11px] text-[#475569] space-y-0.5" data-testid="vp-provider-specs">
+              <p>Produto: {pSpecs.vcpu ?? '?'} vCPU · {pSpecs.ramGb ?? '?'} GB RAM · {pSpecs.diskGb ?? '?'} GB disco · tráfego {pSpecs.trafficUnlimited ? 'ilimitado' : pSpecs.trafficGb != null ? formatTrafficGb(pSpecs.trafficGb) : 'não validado'}</p>
+              {pSpecs.raw && Object.keys(pSpecs.raw).length > 0 && <p className="text-[#94A3B8]" data-testid="vp-provider-raw">Valores brutos da Hostinger: {(['vcpu', 'ram', 'disk', 'traffic'] as const).filter(k => pSpecs.raw?.[k]).map(k => formatRaw(pSpecs.raw![k])).join(' · ')} (MB da Hostinger ÷ 1024 = GB anunciados; tráfego comparado em GB decimais, 1 TB = 1000 GB)</p>}
+            </div>
+          : null)}
+        {d.providerProductId && (!pSpecs || unverified.length > 0) && <label className="text-[11px] text-amber-900 flex items-start gap-2"><input type="checkbox" checked={d.providerSpecsConfirmed} onChange={e => set('providerSpecsConfirmed', e.target.checked)} data-testid="vp-specs-confirm" /> {pSpecs ? 'Há valores da Hostinger que não foi possível validar' : 'O catálogo não indica as características deste produto'}: confirmo que correspondem ao anunciado (necessário para o modo automático).</label>}
+        {unverified.length > 0 && <ul className="text-[11px] text-amber-800 list-disc pl-5" data-testid="vp-unverified">{unverified.map(m => <li key={m}>{m}</li>)}</ul>}
+        {mismatches.length > 0 && (
+          <div className={`text-[11px] rounded-lg p-2 ${auto ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-900'}`} role="alert" data-testid="vp-mismatch" data-severity={auto ? 'block' : 'warning'}>
+            <p className="font-bold">{auto ? 'Divergências com o produto da Hostinger — o modo Automático não permite guardar:' : 'Aviso (modo Manual — a equipa trata da aquisição): divergências com o produto da Hostinger'}</p>
+            <ul className="list-disc pl-5">{mismatches.map(m => <li key={m}>{m}</li>)}</ul>
+          </div>
+        )}
         <p className="text-[11px] text-[#64748B]">Custo e limite em unidades mínimas da moeda do fornecedor (ex.: 699 = 6,99 USD). A compra automática é recusada se o preço actual da Hostinger exceder o limite ou mudar de moeda.</p>
       </div>
 
@@ -303,7 +317,7 @@ export function VpsPlansEditor({ onSaved }: { onSaved?: () => void }) {
             {p.badge && <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#F5B700] text-black">{p.badge}</span>}
             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${p.saleStatus === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`} data-testid="vps-status">{STATUS[p.saleStatus].split(' (')[0]}</span>
             <span className="text-xs text-[#64748B]">{p.providerProductId ? `Hostinger: ${p.providerProductId} · ${p.providerMode === 'auto' ? 'automático' : 'manual'}` : 'activação manual'}</span>
-            {p.specWarnings.length > 0 && <span className="text-xs font-bold text-red-700">características ≠ produto</span>}
+            {p.specWarnings.length > 0 && <span className={`text-xs font-bold ${p.providerMode === 'auto' ? 'text-red-700' : 'text-amber-700'}`} data-testid="vps-spec-warning">{p.providerMode === 'auto' ? 'características ≠ produto' : 'aviso: características ≠ produto'}</span>}
             <span className="ml-auto inline-flex gap-2" onClick={e => e.preventDefault()}>
               <button type="button" onClick={() => listAction({ action: 'publish', id: p.id, published: p.saleStatus !== 'active' })} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[#E5E7EB] text-xs font-bold" data-testid="vps-toggle-publish">
                 {p.saleStatus === 'active' ? <><EyeOff size={12} /> Despublicar</> : <><Eye size={12} /> Publicar</>}

@@ -504,6 +504,18 @@ export default function AdminSettingsPage() {
         </div>
       </div>
 
+      {/* ── Contas ─────────────────────────────────────────────────────────── */}
+      <Link href="/admin/settings/contas" id="contas" style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, scrollMarginTop: 80 }} data-testid="settings-accounts-link">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(245,183,0,0.10)', border: '1px solid rgba(245,183,0,0.20)' }}>
+          <Users size={15} style={{ color: '#D9A300' }} />
+        </div>
+        <div className="flex-1">
+          <h2 className="font-bold text-sm" style={{ color: '#0B0B0D' }}>Contas</h2>
+          <p className="text-[11px]" style={{ color: '#64748B' }}>Registo de novos clientes: exigir confirmação de e-mail</p>
+        </div>
+        <ExternalLink size={14} style={{ color: '#94A3B8' }} />
+      </Link>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* ── WHM / cPanel ─────────────────────────────────────────────────── */}

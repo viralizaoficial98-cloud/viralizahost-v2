@@ -96,22 +96,5 @@ export function hostingerVpsClient({ token, baseUrl = HOSTINGER_API, timeoutMs =
 }
 export type HostingerVpsClient = ReturnType<typeof hostingerVpsClient>
 
-/** Especificações do produto a partir dos metadados do catálogo (chaves não documentadas: tenta as habituais). */
-export function specsFromMetadata(meta: Record<string, unknown> | null | undefined) {
-  if (!meta || typeof meta !== 'object') return null
-  const num = (...keys: string[]) => { for (const k of keys) { const v = Number((meta as any)[k]); if (Number.isFinite(v) && v > 0) return v } return null }
-  const cpus = num('cpus', 'cpu', 'vcpu', 'vcpus', 'cores')
-  const memMb = num('memory', 'ram', 'memory_mb', 'ram_mb')
-  const diskMb = num('disk', 'disk_space', 'storage', 'disk_mb')
-  const bwMb = num('bandwidth', 'traffic', 'bandwidth_mb')
-  if (!cpus && !memMb && !diskMb && !bwMb) return null
-  // Os campos da VM vêm em MB; nos metadados assume-se o mesmo quando o valor é grande (>= 512)
-  const gb = (v: number | null) => v == null ? null : v >= 512 ? Math.round(v / 1024) : v
-  return { vcpu: cpus, ramGb: gb(memMb), diskGb: gb(diskMb), trafficGb: gb(bwMb), trafficUnlimited: bwMb == null ? null : false }
-}
-
-/** Especificações reais de uma VM (MB → GB) para comparar com o anunciado. */
-export const specsFromVm = (vm: VirtualMachine) => ({
-  vcpu: vm.cpus ?? null, ramGb: vm.memory ? Math.round(vm.memory / 1024) : null, diskGb: vm.disk ? Math.round(vm.disk / 1024) : null,
-  trafficGb: vm.bandwidth ? Math.round(vm.bandwidth / 1024) : null, trafficUnlimited: vm.bandwidth ? false : null,
-})
+// Leitura das especificações (unidades): módulo sem dependências de servidor, testado em scripts/vps/vps-specs.test.mjs
+export { specsFromMetadata, specsFromVm } from './hostinger-specs'

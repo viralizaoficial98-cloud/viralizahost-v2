@@ -18,31 +18,34 @@ const stats = [
     lon=180 → x=1000  lat=-90→ y=500
 */
 
-// Country nodes — flag shown always on the map
-const nodes = [
-  { id:'ao', flag:'🇦🇴', name:'Angola',      x:551, y:283 },
-  { id:'br', flag:'🇧🇷', name:'Brasil',      x:360, y:278 },
-  { id:'pt', flag:'🇵🇹', name:'Portugal',    x:475, y:148 },
-  { id:'us', flag:'🇺🇸', name:'EUA',         x:210, y:155 },
-  { id:'gb', flag:'🇬🇧', name:'Reino Unido', x:489, y:108 },
-  { id:'ca', flag:'🇨🇦', name:'Canadá',      x:225, y:92  },
-  { id:'fr', flag:'🇫🇷', name:'França',      x:508, y:122 },
-  { id:'de', flag:'🇩🇪', name:'Alemanha',    x:527, y:110 },
-  { id:'mx', flag:'🇲🇽', name:'México',      x:215, y:200 },
-  { id:'co', flag:'🇨🇴', name:'Colômbia',    x:285, y:244 },
-  { id:'cl', flag:'🇨🇱', name:'Chile',       x:302, y:345 },
-  { id:'pe', flag:'🇵🇪', name:'Peru',        x:276, y:275 },
-  { id:'bo', flag:'🇧🇴', name:'Bolívia',     x:318, y:305 },
-  { id:'uy', flag:'🇺🇾', name:'Uruguai',     x:348, y:352 },
-  { id:'ar', flag:'🇦🇷', name:'Argentina',   x:318, y:360 },
-  { id:'tr', flag:'🇹🇷', name:'Turquia',     x:597, y:143 },
-  { id:'ru', flag:'🇷🇺', name:'Rússia',      x:660, y:82  },
-  { id:'in', flag:'🇮🇳', name:'Índia',       x:708, y:208 },
-  { id:'cn', flag:'🇨🇳', name:'China',       x:775, y:155 },
-  { id:'hk', flag:'🇭🇰', name:'Hong Kong',   x:800, y:202 },
-  { id:'my', flag:'🇲🇾', name:'Malásia',     x:790, y:248 },
-  { id:'sg', flag:'🇸🇬', name:'Singapura',   x:775, y:258 },
-  { id:'id', flag:'🇮🇩', name:'Indonésia',   x:830, y:268 },
+// Localizações: código ISO 3166-1 alfa-2 (GB = Reino Unido, HK = Hong Kong) → bandeira local em /flags/<id>.png
+// (flag-icons, MIT, rasterizadas a 96×72). pos = lado do rótulo (bandeira + código) em relação ao ponto, escolhido
+// para não se sobreporem nas zonas densas (Europa, Cone Sul, Sudeste Asiático).
+type Side = 't'|'b'|'l'|'r'
+const nodes: { id:string; code:string; pos:Side; name:string; x:number; y:number }[] = [
+  { id:'ao', code:'AO', pos:'t', name:'Angola',      x:551, y:283 },
+  { id:'br', code:'BR', pos:'t', name:'Brasil',      x:360, y:278 },
+  { id:'pt', code:'PT', pos:'l', name:'Portugal',    x:475, y:148 },
+  { id:'us', code:'US', pos:'t', name:'EUA',         x:210, y:155 },
+  { id:'gb', code:'GB', pos:'t', name:'Reino Unido', x:489, y:108 },
+  { id:'ca', code:'CA', pos:'t', name:'Canadá',      x:225, y:92  },
+  { id:'fr', code:'FR', pos:'b', name:'França',      x:508, y:122 },
+  { id:'de', code:'DE', pos:'r', name:'Alemanha',    x:527, y:110 },
+  { id:'mx', code:'MX', pos:'l', name:'México',      x:215, y:200 },
+  { id:'co', code:'CO', pos:'t', name:'Colômbia',    x:285, y:244 },
+  { id:'cl', code:'CL', pos:'l', name:'Chile',       x:302, y:345 },
+  { id:'pe', code:'PE', pos:'l', name:'Peru',        x:276, y:275 },
+  { id:'bo', code:'BO', pos:'r', name:'Bolívia',     x:318, y:305 },
+  { id:'uy', code:'UY', pos:'r', name:'Uruguai',     x:348, y:352 },
+  { id:'ar', code:'AR', pos:'b', name:'Argentina',   x:318, y:360 },
+  { id:'tr', code:'TR', pos:'r', name:'Turquia',     x:597, y:143 },
+  { id:'ru', code:'RU', pos:'t', name:'Rússia',      x:660, y:82  },
+  { id:'in', code:'IN', pos:'t', name:'Índia',       x:708, y:208 },
+  { id:'cn', code:'CN', pos:'t', name:'China',       x:775, y:155 },
+  { id:'hk', code:'HK', pos:'r', name:'Hong Kong',   x:800, y:202 },
+  { id:'my', code:'MY', pos:'r', name:'Malásia',     x:790, y:248 },
+  { id:'sg', code:'SG', pos:'l', name:'Singapura',   x:775, y:258 },
+  { id:'id', code:'ID', pos:'b', name:'Indonésia',   x:830, y:268 },
 ]
 
 const connections: [string,string][] = [
@@ -54,6 +57,20 @@ const connections: [string,string][] = [
 ]
 
 function nd(id:string){ return nodes.find(n=>n.id===id)! }
+const flagSrc = (id:string) => `/flags/${id}.png`
+
+/* Rótulo dos marcadores com tamanho em PIXELS de ecrã (convertidos para unidades do viewBox com k = 1000/largura),
+   para ficar legível tanto no desktop como no telemóvel. */
+const LBL = { flagW:16, flagH:12, font:10.5, pad:4, gap:4, h:18, dist:7 }
+function labelBox(n:{x:number;y:number;code:string;pos:Side}, k:number, hasFlag:boolean, side:Side = n.pos, text = n.code, font = LBL.font) {
+  // largura aproximada por letra (fonte a negrito): M/W largas, I estreita
+  const textW = [...text].reduce((t, ch) => t + font * (/[MW]/.test(ch) ? 0.98 : /[Iil]/.test(ch) ? 0.36 : ch === ' ' ? 0.3 : 0.74), 0)
+  const w = (LBL.pad*2 + (hasFlag ? LBL.flagW + LBL.gap : 0) + textW) * k, h = LBL.h * k, d = LBL.dist * k
+  const x = side==='l' ? n.x - d - w : side==='r' ? n.x + d : n.x - w/2
+  const y = side==='t' ? n.y - d - h : side==='b' ? n.y + d : n.y - h/2
+  return { x, y, w, h }
+}
+const OPP: Record<Side,Side> = { t:'b', b:'t', l:'r', r:'l' }
 
 /*
   Real geographic continent paths (simplified Mercator, viewBox 0 0 1000 500)
@@ -240,6 +257,21 @@ export function GlobalPresenceSection() {
   const [active, setActive] = useState<string|null>(null)
   const [visible, setVisible] = useState(false)
   const sectionRef = useRef<HTMLElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const mapScroll = useRef<HTMLDivElement>(null)
+  const [k, setK] = useState(1000/1600)                 // unidades do viewBox por pixel de ecrã
+  const [noFlag, setNoFlag] = useState<Record<string,boolean>>({})
+  const flagFailed = (id:string) => setNoFlag(f => f[id] ? f : { ...f, [id]: true })
+
+  useEffect(()=>{
+    const el = svgRef.current; if(!el) return
+    const ro = new ResizeObserver(()=>{ const w = el.getBoundingClientRect().width; if(w>0) setK(1000/w) })
+    ro.observe(el)
+    // Telemóvel: o mapa tem largura mínima e desloca-se dentro do cartão; começa centrado no Atlântico
+    const sc = mapScroll.current
+    if(sc && sc.scrollWidth > sc.clientWidth) sc.scrollLeft = (sc.scrollWidth - sc.clientWidth) * 0.42
+    return ()=>ro.disconnect()
+  },[])
 
   useEffect(()=>{
     const obs = new IntersectionObserver(([e])=>{if(e.isIntersecting) setVisible(true)},{threshold:0.06})
@@ -302,7 +334,8 @@ export function GlobalPresenceSection() {
           className={`bg-white border border-[#E2E8F0] rounded-3xl shadow-lg overflow-hidden mb-10 ${visible?'gp-show':'opacity-0'}`}
           style={{animationDelay:'0.18s',padding:'1.5rem 1.5rem 1rem'}}
         >
-          <svg viewBox="0 0 1000 500" className="w-full" xmlns="http://www.w3.org/2000/svg">
+          <div ref={mapScroll} className="overflow-x-auto overscroll-x-contain -mx-2 px-2" data-testid="gp-map-scroll">
+          <svg ref={svgRef} viewBox="0 0 1000 500" className="w-full min-w-[680px] sm:min-w-0" xmlns="http://www.w3.org/2000/svg" data-testid="gp-map">
             <defs>
               <filter id="gp-drop" x="-5%" y="-5%" width="110%" height="110%">
                 <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#8fabc7" floodOpacity="0.22"/>
@@ -355,10 +388,6 @@ export function GlobalPresenceSection() {
             {nodes.map(node=>{
               const isActive = active===node.id
               const delay = ((node.x*3+node.y*7)%2800)/2800*2.8
-              /* Flag pill dimensions (SVG units) */
-              const pillW = 28, pillH = 17, pillR = 4
-              const pillX = node.x - pillW/2
-              const pillY = node.y - pillH - 8
               return (
                 <g key={node.id}
                   style={{cursor:'pointer'}}
@@ -385,58 +414,44 @@ export function GlobalPresenceSection() {
                     style={{animationDelay:`${delay}s`,transition:'r 0.2s'}}
                     filter={isActive?'url(#gp-glow)':undefined}
                   />
-                  {/*
-                    Flag badge: white pill + emoji text.
-                    Font-size 14 (SVG units) — large enough to render on Chromium
-                    desktop without anti-aliasing / emoji rasterisation issues.
-                    A white background rect ensures legibility on any continent fill.
-                  */}
-                  <rect
-                    x={pillX} y={pillY}
-                    width={pillW} height={pillH}
-                    rx={pillR}
-                    fill="white"
-                    stroke={isActive?'#F5B700':'#DDE6F0'}
-                    strokeWidth={isActive?'1.5':'0.8'}
-                    opacity="0.92"
-                    filter="url(#gp-drop)"
-                    style={{transition:'stroke 0.2s'}}
-                  />
-                  <text
-                    x={node.x}
-                    y={pillY + pillH - 3}
-                    textAnchor="middle"
-                    fontSize="12"
-                    dominantBaseline="auto"
-                    style={{
-                      userSelect:'none',
-                      fontFamily:'"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif',
-                    }}
-                  >
-                    {node.flag}
-                  </text>
-                  {/* Country name on hover */}
-                  {isActive&&(
-                    <g>
-                      <rect
-                        x={node.x-42} y={node.y+6}
-                        width="84" height="18"
-                        rx="4" fill="white"
-                        stroke="#DDE6F0" strokeWidth="1"
-                        filter="url(#gp-drop)"
-                      />
-                      <text x={node.x} y={node.y+18}
-                        textAnchor="middle"
-                        fontSize="9" fontWeight="700" fill="#0A0A0A"
-                      >
-                        {node.name}
-                      </text>
-                    </g>
-                  )}
+                  {/* Rótulo: bandeira (decorativa) + código ISO, sempre legível mesmo sem a imagem */}
+                  {(()=>{
+                    const hasFlag = !noFlag[node.id]
+                    const bx = labelBox(node, k, hasFlag)
+                    const fx = bx.x + LBL.pad*k, fy = bx.y + (LBL.h-LBL.flagH)/2*k
+                    return (
+                      <g data-testid="gp-marker" data-code={node.code}>
+                        <rect x={bx.x} y={bx.y} width={bx.w} height={bx.h} rx={4*k}
+                          fill="white" stroke={isActive?'#F5B700':'#CBD8E6'} strokeWidth={(isActive?1.5:0.8)*k}
+                          filter="url(#gp-drop)" style={{transition:'stroke 0.2s'}}/>
+                        {hasFlag && (
+                          <image href={flagSrc(node.id)} x={fx} y={fy} width={LBL.flagW*k} height={LBL.flagH*k}
+                            preserveAspectRatio="xMidYMid slice" aria-hidden="true" data-testid="gp-marker-flag"
+                            onError={()=>flagFailed(node.id)}/>
+                        )}
+                        {hasFlag && <rect x={fx} y={fy} width={LBL.flagW*k} height={LBL.flagH*k} fill="none" stroke="rgba(0,0,0,0.18)" strokeWidth={0.6*k} aria-hidden="true"/>}
+                        <text x={hasFlag ? fx + (LBL.flagW + LBL.gap)*k : bx.x + LBL.pad*k} y={bx.y + bx.h/2} textAnchor="start" dominantBaseline="central"
+                          fontSize={LBL.font*k} fontWeight="800" fill="#0A0A0A" style={{userSelect:'none',letterSpacing:0.2*k}}
+                          data-testid="gp-marker-code">{node.code}</text>
+                      </g>
+                    )
+                  })()}
+                  {/* Nome ao passar o rato: do lado oposto ao rótulo */}
+                  {isActive&&(()=>{
+                    const nb = labelBox(node, k, false, OPP[node.pos], node.name, 11)
+                    return (
+                      <g>
+                        <rect x={nb.x} y={nb.y} width={nb.w} height={nb.h} rx={4*k} fill="#0A0A0A" opacity="0.88"/>
+                        <text x={nb.x+nb.w/2} y={nb.y+nb.h/2} textAnchor="middle" dominantBaseline="central" fontSize={11*k} fontWeight="700" fill="white">{node.name}</text>
+                      </g>
+                    )
+                  })()}
                 </g>
               )
             })}
           </svg>
+          </div>
+          <p className="sm:hidden text-center text-[11px] text-gray-400 mt-1" data-testid="gp-map-hint">Deslize o mapa para ver todas as localizações ↔</p>
 
           {/* Legend */}
           <div className="flex items-center justify-center gap-8 mt-2 text-xs text-gray-400">
@@ -455,9 +470,10 @@ export function GlobalPresenceSection() {
 
         {/* Country pill buttons — flag + full name */}
         <div className={`flex flex-wrap justify-center gap-2 ${visible?'gp-show':'opacity-0'}`} style={{animationDelay:'0.28s'}}>
-          {nodes.map(({id,flag,name})=>(
+          {nodes.map(({id,code,name})=>(
             <button
               key={id}
+              data-testid="gp-country" data-code={code}
               onMouseEnter={()=>setActive(id)}
               onMouseLeave={()=>setActive(null)}
               className={`flex items-center gap-1.5 border rounded-full px-3.5 py-1.5 text-sm font-medium transition-all duration-200 ${
@@ -466,7 +482,12 @@ export function GlobalPresenceSection() {
                   :'bg-white border-[#E2E8F0] text-gray-600 hover:border-[#F5B700] hover:bg-[#FFFBEA] hover:text-[#0A0A0A]'
               }`}
             >
-              <span className="text-base leading-none">{flag}</span>
+              {!noFlag[id] && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={flagSrc(id)} alt="" aria-hidden="true" width={20} height={15} loading="lazy" decoding="async"
+                  className="w-5 h-[15px] rounded-[2px] object-cover ring-1 ring-black/10 shrink-0" data-testid="gp-country-flag"
+                  onError={()=>flagFailed(id)}/>
+              )}
               <span className="text-xs font-semibold">{name}</span>
             </button>
           ))}

@@ -61,6 +61,29 @@
 
 **Metadados do catálogo:** o campo `metadata` é «flexível, varia por categoria». As chaves das especificações (CPU, RAM, disco, tráfego) **não estão documentadas**.
 
+## Unidades das especificações (tráfego, RAM, disco)
+
+| Origem | Campo | Unidade | Estado |
+|---|---|---|---|
+| `VirtualMachineResource` (VM criada) | `memory`, `disk`, `bandwidth` | **megabytes**, tal como a especificação os descreve. Os exemplos oficiais (`memory` 8192 = 8 GB, `disk` 51200 = 50 GB) mostram que GB = MB ÷ 1024 | **Confirmado** na especificação |
+| Catálogo (`metadata`) | `bandwidth` (e `memory`, `disk_space`) | Lido como os campos da VM com o mesmo nome: MB, e GB = MB ÷ 1024 | **Inferido**: ver abaixo |
+| Catálogo (`metadata`) | qualquer outra chave sem unidade explícita (ex.: `traffic`) | desconhecida | O valor **não é validado** e o painel diz isso |
+
+**Caso do KVM 1** (`hostingercombr-vps-kvm1`):
+- O painel mostrava «4 TB anunciados ≠ 3,90625 TB». Com a conversão anterior, esse número só sai de um valor bruto de ≈ 4 096 000.
+- 4 096 000 MB ÷ 1024 = **4 000 GB**: exactamente os «4 TB» que a Hostinger anuncia. A Hostinger faz GB → MB com ×1024 e chama «4 TB» a 4 000 GB (**TB decimal**).
+- O erro estava na conversão antiga, que voltava a dividir 4 000 GB por 1024 (3,90625 «TB» binários).
+- Este ambiente de ensaio não consegue chamar a API real: a rede bloqueia `developers.hostinger.com` e o token de produção não está aqui.
+  - Por isso, **o valor bruto deve ser confirmado em produção**. O formulário do plano mostra «Valores brutos da Hostinger» (chave, valor e unidade) a partir do catálogo, em modo só de leitura.
+  - Se a chave real não for `bandwidth`, ou o valor não for coerente com MB, o painel mostra «não foi possível validar» em vez de adivinhar.
+
+**Regra de comparação** (`compareSpecs`, `src/lib/commerce/vps-shared.ts`, a mesma no painel e no servidor):
+- Tudo é convertido para **GB decimais** antes de comparar: GB = 1, TB = 1000 GB, GiB = 1,0737 GB, TiB = 1099,51 GB.
+- Rótulos: `GB`/`TB` para unidades decimais e `GiB`/`TiB` para unidades binárias.
+- **Modo Automático:** uma divergência real bloqueia a gravação, e um valor não validado exige confirmação explícita da equipa.
+- **Modo Manual:** o plano é gravado e as divergências aparecem como aviso.
+- Testes de regressão: `node --test scripts/vps/vps-specs.test.mjs`.
+
 ## Cobrança ao fornecedor
 - **Quem paga:** a compra é paga com um método de pagamento **guardado na conta Hostinger** (o predefinido, ou o indicado em `payment_method_id`). Nenhum dado de pagamento do cliente é enviado.
 - **Renovação:** as subscrições renovam-se automaticamente. A API permite activar ou desactivar a renovação (`PATCH …/auto-renewal/enable`, `DELETE …/auto-renewal/disable`) e renovar (`POST …/renew`).

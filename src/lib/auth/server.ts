@@ -48,7 +48,7 @@ const parseJson = (v: unknown) => {
 }
 
 interface UserRow {
-  id: string; email: string; encrypted_password: string | null; email_confirmed_at: string | null
+  id: string; email: string; encrypted_password: string | null; email_confirmed_at: string | null; email_verification_exempt?: number | null
   raw_user_meta_data: unknown; raw_app_meta_data: unknown; password_reset_required: number
   banned_until: string | null; last_sign_in_at: string | null; created_at: string; updated_at: string
 }
@@ -163,7 +163,9 @@ export async function signInWithPassword(email: string, password: string): Promi
   const ok = await bcrypt.compare(password ?? '', hash).catch(() => false)
   if (!r || !ok || !r.encrypted_password) return { error: authError('Invalid login credentials', 400, 'invalid_credentials') }
   if (r.banned_until && new Date(fromDbDatetime(r.banned_until)) > new Date()) return { error: authError('User is banned', 400, 'user_banned') }
-  if (!r.email_confirmed_at && process.env.AUTH_EMAIL_CONFIRMATION !== 'false') {
+  // Sem e-mail confirmado só entra quem foi registado com a confirmação desactivada (isenção guardada na conta):
+  // mudar a opção depois não altera a situação das contas existentes.
+  if (!r.email_confirmed_at && !Number(r.email_verification_exempt)) {
     return { error: authError('Email not confirmed', 400, 'email_not_confirmed') }
   }
   return { user: toAuthUser(r) }
@@ -173,6 +175,8 @@ export interface CreateUserInput {
   email: string
   password?: string
   email_confirm?: boolean
+  /** Registo com a confirmação desactivada: e-mail fica por verificar, mas a conta pode iniciar sessão. */
+  email_verification_exempt?: boolean
   user_metadata?: Record<string, any>
   app_metadata?: Record<string, any>
   id?: string
@@ -193,9 +197,9 @@ export async function createUser(input: CreateUserInput): Promise<{ user: AuthUs
       const [exists] = await conn.query('SELECT id FROM auth_users WHERE email = ? FOR UPDATE', [email])
       if ((exists as unknown[]).length) throw Object.assign(new Error('dup'), { dup: true })
       await conn.query(
-        `INSERT INTO auth_users (id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, raw_app_meta_data)
-         VALUES (?, ?, ?, ${input.email_confirm ? 'CURRENT_TIMESTAMP(6)' : 'NULL'}, ?, ?)`,
-        [id, email, input.password ? await hashPassword(input.password) : null, JSON.stringify(meta), JSON.stringify(input.app_metadata ?? {})],
+        `INSERT INTO auth_users (id, email, encrypted_password, email_confirmed_at, email_verification_exempt, raw_user_meta_data, raw_app_meta_data)
+         VALUES (?, ?, ?, ${input.email_confirm ? 'CURRENT_TIMESTAMP(6)' : 'NULL'}, ?, ?, ?)`,
+        [id, email, input.password ? await hashPassword(input.password) : null, input.email_verification_exempt ? 1 : 0, JSON.stringify(meta), JSON.stringify(input.app_metadata ?? {})],
       )
       await handleNewUser(conn, id, email, meta)
     })

@@ -20,7 +20,17 @@ export const VPS_FEATURE_ICONS = {
 export type VpsIcon = keyof typeof VPS_FEATURE_ICONS
 export const isVpsIcon = (v: unknown): v is VpsIcon => typeof v === 'string' && v in VPS_FEATURE_ICONS
 
-export type VpsTraffic = { unlimited: true } | { value: number; unit: 'GB' | 'TB' }
+/**
+ * Unidades do tráfego anunciado. Decimais: GB = 10⁹ B, TB = 1000 GB. Binárias: GiB = 2³⁰ B, TiB = 1024 GiB.
+ * As comparações fazem-se sempre em GB decimais (ver trafficToGb).
+ */
+export const TRAFFIC_UNITS = ['GB', 'TB', 'GiB', 'TiB'] as const
+export type TrafficUnit = (typeof TRAFFIC_UNITS)[number]
+export const isTrafficUnit = (u: unknown): u is TrafficUnit => typeof u === 'string' && (TRAFFIC_UNITS as readonly string[]).includes(u)
+const GB_PER: Record<TrafficUnit, number> = { GB: 1, TB: 1000, GiB: 2 ** 30 / 1e9, TiB: 2 ** 40 / 1e9 }
+/** Valor do plano convertido para GB decimais. */
+export const trafficToGb = (value: number, unit: TrafficUnit) => value * GB_PER[unit]
+export type VpsTraffic = { unlimited: true } | { value: number; unit: TrafficUnit }
 export interface VpsSpecs {
   vcpu?: number | null
   ramGb?: number | null
@@ -43,22 +53,51 @@ export function vpsSpecLines(s: VpsSpecs): { key: 'vcpu' | 'ram' | 'disk' | 'tra
   return out
 }
 
-/** Especificações do produto do fornecedor que têm de coincidir com as anunciadas. */
-export interface ProviderSpecs { vcpu?: number | null; ramGb?: number | null; diskGb?: number | null; trafficGb?: number | null; trafficUnlimited?: boolean | null }
-/** Diferenças entre o anunciado e o produto do fornecedor (vazio = coincidem). */
-export function specMismatches(s: VpsSpecs, p: ProviderSpecs | null | undefined): string[] {
-  if (!p) return []
-  const out: string[] = []
-  if (p.vcpu != null && s.vcpu != null && Number(s.vcpu) !== Number(p.vcpu)) out.push(`vCPU anunciado ${s.vcpu} ≠ produto ${p.vcpu}`)
-  if (p.ramGb != null && s.ramGb != null && Number(s.ramGb) !== Number(p.ramGb)) out.push(`RAM anunciada ${s.ramGb} GB ≠ produto ${p.ramGb} GB`)
-  if (p.diskGb != null && s.diskGb != null && Number(s.diskGb) !== Number(p.diskGb)) out.push(`armazenamento anunciado ${s.diskGb} GB ≠ produto ${p.diskGb} GB`)
-  if (s.traffic && 'unlimited' in s.traffic && p.trafficUnlimited === false) out.push('tráfego anunciado «ilimitado» mas o produto tem limite')
-  if (s.traffic && 'value' in s.traffic && p.trafficGb != null) {
-    const gb = s.traffic.unit === 'TB' ? s.traffic.value * 1024 : s.traffic.value
-    if (Math.abs(gb - Number(p.trafficGb)) > 0.5) out.push(`tráfego anunciado ${s.traffic.value} ${s.traffic.unit} ≠ produto ${p.trafficGb >= 1024 ? `${p.trafficGb / 1024} TB` : `${p.trafficGb} GB`}`)
-  }
-  return out
+/** Valor bruto lido do fornecedor, com a unidade de origem (null = não foi possível determinar). */
+export interface ProviderRaw { key: string; value: number; unit: string | null }
+/**
+ * Especificações do produto do fornecedor, já normalizadas: RAM e disco em GB, tráfego em GB DECIMAIS
+ * (1 TB = 1000 GB). Um campo com unidade de origem desconhecida fica a null e consta de `unverified`.
+ */
+export interface ProviderSpecs {
+  vcpu?: number | null; ramGb?: number | null; diskGb?: number | null; trafficGb?: number | null; trafficUnlimited?: boolean | null
+  unverified?: ('vcpu' | 'ram' | 'disk' | 'traffic')[]
+  raw?: Partial<Record<'vcpu' | 'ram' | 'disk' | 'traffic', ProviderRaw>>
 }
+const fmtNum = (v: number) => v.toLocaleString('pt-PT', { maximumFractionDigits: 3 }).replace(/\s/g, ' ')
+/** Tráfego em GB decimais com o rótulo adequado (≥ 1000 GB → TB). */
+export const formatTrafficGb = (gb: number) => gb >= 1000 ? `${fmtNum(gb / 1000)} TB` : `${fmtNum(gb)} GB`
+export const formatRaw = (r: ProviderRaw | undefined) => r ? `${r.key} = ${fmtNum(r.value)}${r.unit ? ` ${r.unit}` : ' (unidade desconhecida)'}` : ''
+const SAME = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.5, Math.abs(b) * 0.001)
+
+/**
+ * Regra ÚNICA de comparação (painel e servidor). `mismatches`: divergências reais entre o anunciado e o produto;
+ * `unverified`: valores do produto cuja unidade não foi possível determinar (não validados).
+ */
+export function compareSpecs(s: VpsSpecs, p: ProviderSpecs | null | undefined): { mismatches: string[]; unverified: string[] } {
+  const mismatches: string[] = [], unverified: string[] = []
+  if (!p) return { mismatches, unverified }
+  const unv = new Set(p.unverified ?? [])
+  if (p.vcpu != null && s.vcpu != null && Number(s.vcpu) !== Number(p.vcpu)) mismatches.push(`vCPU anunciado ${s.vcpu} ≠ produto ${p.vcpu}`)
+  if (p.ramGb != null && s.ramGb != null && !SAME(Number(s.ramGb), Number(p.ramGb))) mismatches.push(`RAM anunciada ${fmtNum(Number(s.ramGb))} GB ≠ produto ${fmtNum(Number(p.ramGb))} GB`)
+  if (p.diskGb != null && s.diskGb != null && !SAME(Number(s.diskGb), Number(p.diskGb))) mismatches.push(`armazenamento anunciado ${fmtNum(Number(s.diskGb))} GB ≠ produto ${fmtNum(Number(p.diskGb))} GB`)
+  if (s.traffic && 'unlimited' in s.traffic && p.trafficUnlimited === false) mismatches.push('tráfego anunciado «ilimitado» mas o produto tem limite')
+  if (s.traffic && 'value' in s.traffic && p.trafficGb != null) {
+    const gb = trafficToGb(Number(s.traffic.value), s.traffic.unit)
+    if (!SAME(gb, Number(p.trafficGb))) {
+      const said = `${fmtNum(Number(s.traffic.value))} ${s.traffic.unit}`, norm = formatTrafficGb(gb)
+      mismatches.push(`tráfego anunciado ${said}${norm === said ? '' : ` (${norm})`} ≠ produto ${formatTrafficGb(Number(p.trafficGb))}`)
+    }
+  }
+  const label = { vcpu: 'vCPU', ram: 'RAM', disk: 'armazenamento', traffic: 'tráfego' } as const
+  const given = { vcpu: s.vcpu != null, ram: s.ramGb != null, disk: s.diskGb != null, traffic: !!s.traffic }
+  for (const k of ['vcpu', 'ram', 'disk', 'traffic'] as const) {
+    if (unv.has(k) && given[k]) unverified.push(`${label[k]}: não foi possível validar — unidade do valor da Hostinger desconhecida${p.raw?.[k] ? ` (${formatRaw(p.raw[k])})` : ''}`)
+  }
+  return { mismatches, unverified }
+}
+/** Só as divergências reais (ex.: VM criada vs anunciado). */
+export const specMismatches = (s: VpsSpecs, p: ProviderSpecs | null | undefined) => compareSpecs(s, p).mismatches
 
 /** Opções da encomenda (localização e sistema operativo/imagem). */
 export interface VpsOption { id: string; label: string }
