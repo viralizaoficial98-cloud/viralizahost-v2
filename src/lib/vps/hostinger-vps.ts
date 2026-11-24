@@ -17,13 +17,18 @@ export interface VirtualMachine {
 }
 export interface PurchaseRequest {
   item_id: string; payment_method_id?: number
-  setup: { template_id: number; data_center_id: number; hostname?: string }
+  setup: { template_id: number; data_center_id: number; hostname?: string; ssh_keys?: string[] }
 }
 export type PurchaseOutcome =
   | { kind: 'ok'; orderId: string | null; subscriptionId: string | null; orderStatus: string | null; vm: VirtualMachine | null; total: number | null; currency: string | null }
   | { kind: 'processing'; orderId: string | null; subscriptionId: string | null; message: string | null }
   | { kind: 'refused'; status: number; message: string }       // a Hostinger recusou: nada foi comprado
   | { kind: 'unknown'; message: string }                       // sem resposta conclusiva: NÃO repetir sem conciliar
+
+export interface VpsAction { id: number; name?: string; state: 'success' | 'error' | 'delayed' | 'sent' | 'created' | 'started' | 'cancelled' | string; created_at?: string; updated_at?: string }
+export const ACTION_PENDING = ['created', 'sent', 'started', 'delayed']
+/** Resultado de uma operação de gestão (start/stop/restart/recreate/root-password/ssh-keys). */
+export type ManageOutcome = { ok: true; action: VpsAction | null } | { ok: false; status: number; message: string }
 
 export class VpsApiError extends Error { constructor(message: string, public status: number) { super(message) } }
 const safe = (s: unknown) => String(s ?? '').replace(/Bearer\s+\S+/gi, 'Bearer [oculto]').replace(/https?:\/\/\S+/g, '[url]').slice(0, 300)
@@ -84,6 +89,28 @@ export function hostingerVpsClient({ token, baseUrl = HOSTINGER_API, timeoutMs =
       if (r.status === 202) return { kind: 'processing', orderId: j.id != null ? String(j.id) : null, subscriptionId: j.subscription_id ?? null, message: safe(j.message) || null }
       if (r.status === 401 || r.status === 422 || r.status === 400 || r.status === 403) return { kind: 'refused', status: r.status, message: safe(j.error ?? j.message ?? `HTTP ${r.status}`) }
       return { kind: 'unknown', message: `Resposta inconclusiva da Hostinger (HTTP ${r.status}).` }
+    },
+    /** Histórico de acções da VM (mais recentes primeiro). */
+    async actions(id: number | string): Promise<VpsAction[]> {
+      const items = list<VpsAction>(await read(`/api/vps/v1/virtual-machines/${encodeURIComponent(String(id))}/actions`))
+      return items.sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')) || b.id - a.id)
+    },
+    async action(id: number | string, actionId: number | string): Promise<VpsAction | null> {
+      try { const j = await read(`/api/vps/v1/virtual-machines/${encodeURIComponent(String(id))}/actions/${encodeURIComponent(String(actionId))}`); return (j?.data ?? j) as VpsAction } catch { return null }
+    },
+    /** Gestão (sem custo): ligar, desligar, reiniciar, reinstalar, palavra-passe root, chaves SSH. */
+    async manage(id: number | string, op: 'start' | 'stop' | 'restart' | 'recreate' | 'root-password' | 'ssh-keys-add' | 'ssh-keys-remove', body?: Record<string, unknown>): Promise<ManageOutcome> {
+      const vm = `/api/vps/v1/virtual-machines/${encodeURIComponent(String(id))}`
+      const [method, path] = op === 'root-password' ? ['PUT', `${vm}/root-password`] : op === 'ssh-keys-add' ? ['POST', `${vm}/ssh-keys`] : op === 'ssh-keys-remove' ? ['DELETE', `${vm}/ssh-keys`] : ['POST', `${vm}/${op}`]
+      let r
+      try { r = await call(method, path, body) } catch (e) { return { ok: false, status: 0, message: (e as Error).name === 'TimeoutError' ? 'A Hostinger não respondeu dentro do tempo limite.' : 'Ligação à Hostinger falhou.' } }
+      if (r.status >= 200 && r.status < 300) { const a = r.json?.data ?? r.json; return { ok: true, action: a && typeof a === 'object' && 'state' in a ? a as VpsAction : null } }
+      // Nunca devolver o corpo enviado (pode conter a palavra-passe): só a mensagem do fornecedor, higienizada
+      return { ok: false, status: r.status, message: safe(r.json?.error ?? r.json?.message ?? `HTTP ${r.status}`) }
+    },
+    async sshKeys(id: number | string): Promise<string[]> {
+      const j = await read(`/api/vps/v1/virtual-machines/${encodeURIComponent(String(id))}/ssh-keys`)
+      return list<any>(j).map(k => (typeof k === 'string' ? k : k?.key ?? k?.public_key ?? '')).filter(Boolean)
     },
     /** Conclui a configuração de uma VM já paga no estado «initial» (sem nova compra). */
     async setup(id: number | string, setup: PurchaseRequest['setup']): Promise<{ ok: boolean; status: number; message: string | null }> {

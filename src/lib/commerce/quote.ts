@@ -14,7 +14,7 @@ export const CYCLE_LABEL: Record<Cycle, string> = { monthly: 'Mensal', '3months'
 
 export type DomainMode = 'register' | 'transfer' | 'existing'
 export type CartLineInput =
-  | { type: 'product'; slug: string; cycle: Cycle; quantity?: number; domain?: string; domainMode?: DomainMode; options?: { location?: string; image?: string } }
+  | { type: 'product'; slug: string; cycle: Cycle; quantity?: number; domain?: string; domainMode?: DomainMode; options?: { location?: string; image?: string; later?: boolean } }
   | { type: 'domain'; domain: string; operation: 'register' | 'transfer' | 'renew'; years?: number; eppCode?: string; nameservers?: { useDefault?: boolean; ns?: string[] } }
   | { type: 'renewal'; serviceId: string }
 
@@ -48,11 +48,19 @@ export interface QuoteLine {
   /** Desconto do período (%) e preço de tabela da linha sem desconto (preço base × meses × quantidade). */
   discountPct?: number
   /** VPS: localização e sistema operativo/imagem escolhidos (validados contra as opções activas) */
-  options?: { location?: { id: string; label: string } | null; image?: { id: string; label: string } | null } | null
+  options?: VpsLineOptions | null
   listTotal?: number | null
   /** Desconto configurado para a renovação (%); 0 = renova ao preço base. */
   renewalDiscountPct?: number
   error?: { code: string; message: string }
+}
+
+/** VPS: escolhas aceites (localização, instalação e licença) guardadas no carrinho e em order_items.options. */
+export interface VpsLineOptions {
+  location?: { id: string; label: string } | null
+  image?: { id: string; label: string; category?: string; name?: string; version?: string | null; includedOs?: string | null; license?: { type: 'included' | 'paid'; monthlyKz: number; total: number } } | null
+  /** «Escolher mais tarde»: a instalação é escolhida em «Os meus VPS» depois do pagamento. */
+  later?: boolean
 }
 
 export interface Quote {
@@ -96,13 +104,19 @@ const MSG: Record<string, string> = {
   renewal_pending: 'Já existe uma renovação por pagar para este serviço — veja as Encomendas.',
   duplicate_line: 'Item repetido no carrinho.',
   nameservers_invalid: 'Nameservers inválidos.',
-  options_required: 'Escolha a localização e o sistema operativo do VPS.',
-  options_invalid: 'Localização ou sistema operativo indisponível: escolha de novo.',
+  options_required: 'Escolha a localização e o que instalar no VPS.',
+  options_invalid: 'Localização ou instalação indisponível: escolha de novo.',
+  image_incompatible: 'A instalação escolhida não está disponível nesta localização ou neste plano: escolha outra.',
+  choose_later_unavailable: '«Escolher mais tarde» não está disponível: escolha o que instalar.',
 }
 const err = (code: string) => ({ code, message: MSG[code] ?? code })
 /** Opções de VPS activas (Integrações → Hostinger VPS). Lidas da base, sem chamar o fornecedor. */
-async function vpsOptions(): Promise<{ locations: { id: string; label: string }[]; images: { id: string; label: string }[] }> {
-  try { const { publicVpsOptions } = await import('@/lib/vps/settings'); return await publicVpsOptions() } catch { return { locations: [], images: [] } }
+async function vpsOptions(plan: { slug: string; ramGb: number | null }) {
+  try { const { publicVpsOptions } = await import('@/lib/vps/settings'); return await publicVpsOptions(plan) } catch { return { locations: [], images: [], allowChooseLater: false } }
+}
+/** Todas as opções activas (sem filtro de plano), para distinguir «incompatível» de «inexistente». */
+async function allVpsImages() {
+  try { const { publicVpsOptions } = await import('@/lib/vps/settings'); return (await publicVpsOptions(null)).images } catch { return [] }
 }
 
 export async function getTaxSettings(db: Queryable = getPool()) {
@@ -189,7 +203,7 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
     // Produto
     const slug = String((raw as { slug?: string })?.slug ?? '')
     const cycle = (raw as { cycle?: Cycle })?.cycle as Cycle
-    const [prod] = await rows(db, 'SELECT id, slug, name, active, sale_status, service_type, provisioning, quantity_unit, max_quantity, base_monthly_price, category, subcategory FROM products WHERE slug = ?', [slug])
+    const [prod] = await rows(db, 'SELECT id, slug, name, active, sale_status, service_type, provisioning, quantity_unit, max_quantity, base_monthly_price, category, subcategory, plan_specs FROM products WHERE slug = ?', [slug])
     const base: QuoteLine = { index, type: 'product', slug, name: prod?.name ?? slug, serviceType: prod?.service_type ?? 'other', provisioning: prod?.provisioning, quantity: 1, unitPrice: 0, lineTotal: 0, renewalPrice: 0, cycle, quantityUnit: prod?.quantity_unit ?? null, maxQuantity: Number(prod?.max_quantity ?? 1) }
     if (!prod || !prod.active) { lines.push({ ...base, error: err('product_not_found') }); continue }
     base.productId = prod.id
@@ -207,16 +221,35 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
     Object.assign(base, { months: c.months, quantity: qty, unitPrice: c.price, lineTotal: round2(c.price * qty), renewalPrice: round2(c.renewal * qty),
       discountPct: c.discount ?? 0, renewalDiscountPct: c.renewalDiscount ?? 0,
       listTotal: prod.base_monthly_price != null && (c.discount ?? 0) > 0 ? round2(Number(prod.base_monthly_price) * c.months * qty) : null })
-    // VPS (/servidor-vps): localização e sistema operativo, quando o administrador activou opções
+    // VPS (/servidor-vps): localização e instalação (sistema, painel ou aplicação), validadas contra as opções activas
+    // e a compatibilidade com o plano e a localização. Licença paga: preço mensal × meses, somado à linha e à renovação.
     if (prod.category === 'vps' && !prod.subcategory) {
-      const avail = await vpsOptions()
-      const want = ((raw as { options?: { location?: string; image?: string } }).options ?? {})
-      const pick = (list: { id: string; label: string }[], id?: string) => (id ? list.find(o => o.id === String(id)) ?? undefined : null)
-      const loc = avail.locations.length ? pick(avail.locations, want.location) : null
-      const img = avail.images.length ? pick(avail.images, want.image) : null
-      if (loc === undefined || img === undefined) { lines.push({ ...base, error: err('options_invalid') }); continue }
-      if ((avail.locations.length && !loc) || (avail.images.length && !img)) { lines.push({ ...base, error: err('options_required') }); continue }
-      if (loc || img) base.options = { location: loc, image: img }
+      let specs: { ramGb?: number | null } = {}
+      try { specs = (typeof prod.plan_specs === 'string' ? JSON.parse(prod.plan_specs) : prod.plan_specs) ?? {} } catch { /* sem especificações */ }
+      const avail = await vpsOptions({ slug: prod.slug, ramGb: specs.ramGb ?? null })
+      const want = ((raw as { options?: { location?: string; image?: string; later?: boolean } }).options ?? {})
+      const loc = avail.locations.length ? (want.location ? avail.locations.find(o => o.id === String(want.location)) ?? undefined : null) : null
+      if (loc === undefined) { lines.push({ ...base, error: err('options_invalid') }); continue }
+      if (avail.locations.length && !loc) { lines.push({ ...base, error: err('options_required') }); continue }
+      let img: (typeof avail.images)[number] | null = null
+      // Sem opções activas no painel: a encomenda segue sem instalação escolhida (tarefa manual), como antes
+      if (avail.images.length) {
+        if (want.later && !want.image) {
+          if (!avail.allowChooseLater) { lines.push({ ...base, error: err('choose_later_unavailable') }); continue }
+        } else if (!want.image) { if (avail.images.length) { lines.push({ ...base, error: err('options_required') }); continue } }
+        else {
+          img = avail.images.find(o => o.id === String(want.image)) ?? null
+          if (!img) { lines.push({ ...base, error: err((await allVpsImages()).some(o => o.id === String(want.image)) ? 'image_incompatible' : 'options_invalid') }); continue }
+          if (loc && img.locations.length && !img.locations.includes(loc.id)) { lines.push({ ...base, error: err('image_incompatible') }); continue }
+        }
+      }
+      const lic = img && img.license.type === 'paid' ? Math.round(img.license.monthlyKz * c.months * 100) / 100 : 0
+      if (lic > 0) Object.assign(base, { unitPrice: round2(c.price + lic), lineTotal: round2((c.price + lic) * qty), renewalPrice: round2((c.renewal + lic) * qty), listTotal: base.listTotal != null ? round2(base.listTotal + lic * qty) : null })
+      if (loc || img || (want.later && avail.images.length)) base.options = {
+        location: loc,
+        image: img ? { id: img.id, label: img.label, category: img.category, name: img.name, version: img.version, includedOs: img.includedOs, license: { type: img.license.type, monthlyKz: img.license.monthlyKz, total: lic } } : null,
+        ...(want.later && !img && avail.images.length ? { later: true } : {}),
+      }
     }
     if (base.serviceType === 'hosting' || base.serviceType === 'email') {
       const d = normalizeDomain((raw as { domain?: string }).domain)

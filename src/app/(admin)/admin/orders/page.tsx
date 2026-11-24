@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Check, ExternalLink, FlaskConical, Loader2, RefreshCw, RotateCcw, X } from 'lucide-react'
 import { HostingerRegisterDialog } from '@/components/admin/HostingerRegisterDialog'
 import { PAYMENT_STATUS, TONE_CLASS, activationState, domainState, kz } from '@/lib/commerce/status'
+import { describeVpsOptions } from '@/lib/vps/install-shared'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Service = { id: string; order_item_id: string; service_name: string; service_type: string; provisioning_status: string; provisioning_error: string | null; provisioning_attempts: number; external_ref: string | null; domain: string | null; activation_source: string | null
@@ -41,7 +42,8 @@ const EVENT_LABEL: Record<string, string> = {
 }
 const OPEN_CASE = ['manual_review', 'alternative', 'refund_manual']
 const VPS_STATUS: Record<string, string> = { pending: 'por enviar', submitting: 'a enviar à Hostinger', submitted: 'comprado — a preparar', payment_processing: 'pagamento ao fornecedor em processamento', unknown: 'RESULTADO POR CONFIRMAR', failed: 'recusado pela Hostinger (nada comprado)', active: 'activo' }
-const optsText = (v: unknown) => { try { const o = (typeof v === 'string' ? JSON.parse(v) : v) as { location?: { label: string } | null; image?: { label: string } | null } | null; return o ? [o.location ? `Localização: ${o.location.label}` : '', o.image ? `Sistema: ${o.image.label}` : ''].filter(Boolean).join(' · ') : '' } catch { return '' } }
+// Configuração completa do VPS (localização, instalação, sistema incluído, licença, «escolher mais tarde»)
+const optsText = (v: unknown) => { try { return describeVpsOptions((typeof v === 'string' ? JSON.parse(v) : v) as Parameters<typeof describeVpsOptions>[0], kz) ?? '' } catch { return '' } }
 
 // Estado do serviço (texto) — distinto dos botões de acção
 const svcLabel = (s: Service) => {
@@ -243,6 +245,7 @@ function OrdersInner() {
                                 <span className="inline-flex flex-wrap justify-end gap-1 mr-1 mb-1">
                                   {s.vps_op && <button disabled={!!acting} onClick={() => act(s.id + 'vr', { action: 'vps_reconcile', serviceId: s.id })} className="px-2 py-1 rounded-lg border border-[#1D4ED8] text-[#1D4ED8] text-xs font-bold" data-testid="vps-reconcile">Consultar Hostinger</button>}
                                   {!['submitting', 'submitted', 'payment_processing'].includes(s.vps_op?.status ?? '') && <button disabled={!!acting} onClick={() => { const vm = window.prompt('Associar o VPS adquirido pela equipa.\nNúmero da VM na Hostinger (hPanel → VPS):'); if (vm) act(s.id + 'vl', { action: 'vps_link', serviceId: s.id, vmId: vm.trim() }) }} className="px-2 py-1 rounded-lg border border-green-600 text-green-700 text-xs font-bold" data-testid="vps-link">Associar VPS…</button>}
+                                  {!['submitting', 'submitted', 'payment_processing', 'unknown'].includes(s.vps_op?.status ?? '') && s.provisioning_status !== 'active' && <button disabled={!!acting} onClick={() => { const ip = window.prompt('Confirmar a entrega manual (sem VM da Hostinger).\nIPv4 público do VPS:'); if (!ip) return; const note = window.prompt('Nota para o histórico (opcional, sem palavras-passe):') ?? ''; act(s.id + 'vd', { action: 'vps_deliver', serviceId: s.id, ip: ip.trim(), notes: note }) }} className="px-2 py-1 rounded-lg border border-[#555] text-[#333] text-xs font-bold" data-testid="vps-deliver">Confirmar entrega…</button>}
                                   {['unknown', 'failed'].includes(s.vps_op?.status ?? '') && <button disabled={!!acting} onClick={() => { const note = window.prompt('Confirmou no hPanel que NADA foi comprado para esta encomenda?\nDescreva a verificação (fica no histórico). Uma nova compra automática será tentada.'); if (note) act(s.id + 'vc', { action: 'vps_confirm_not_purchased', serviceId: s.id, notes: note }) }} className="px-2 py-1 rounded-lg border border-red-300 text-red-700 text-xs font-bold" data-testid="vps-confirm-not-purchased">Confirmar não comprado…</button>}
                                 </span>
                               )}

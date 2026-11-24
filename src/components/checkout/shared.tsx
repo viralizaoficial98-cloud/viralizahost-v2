@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Check, ChevronRight, Loader2 } from 'lucide-react'
 import { useCart, toApiLine, type CartLine, type Cycle, type DomainMode } from '@/store/cartStore'
+import { describeVpsOptions } from '@/lib/vps/install-shared'
 
 // Peças comuns ao carrinho, à configuração do domínio e ao checkout (mesmo aspecto ViralizaHost).
 
@@ -69,9 +70,7 @@ export function periodOf(l: QuoteLine) {
 }
 /** VPS: localização e sistema escolhidos («Localização: Lisboa · Sistema: Ubuntu 24.04»). */
 export function optionsOf(l: QuoteLine): string | null {
-  const o = l.options; if (!o) return null
-  const parts = [o.location ? `Localização: ${o.location.label}` : null, o.image ? `Sistema: ${o.image.label}` : null].filter(Boolean)
-  return parts.length ? parts.join(' · ') : null
+  return describeVpsOptions(l.options, kz)
 }
 /** Desconto do período (só quando existe): «Desconto 70% (−Kz 19 908)». */
 export function discountOf(l: QuoteLine): string | null {

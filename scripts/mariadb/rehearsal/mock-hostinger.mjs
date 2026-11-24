@@ -32,6 +32,10 @@
  *   tempo limite), …-perdido-… (sem resposta e sem compra), …-recusa-… (422, sem compra), …-pagamento-… (202;
  *   POST /_vps_pay?subscription=… conclui: VM em «initial», precisa de /setup), …-caro-… (preço acima de qualquer limite).
  *   GET /_stats → vpsPurchases (compras efectivas por hostname), vpsPurchaseCalls, vpsSetups.
+ *   Gestão: GET …/{id}/actions[/{actionId}], POST …/{id}/start|stop|restart|recreate, PUT …/{id}/root-password,
+ *   GET|POST|DELETE …/{id}/ssh-keys. Cada instalação cria a acção «vps_install» (painéis/aplicações terminam
+ *   --vps-ready ms depois da VM «running»; o template 1299 termina em «error»). Stats: vpsPowerCalls, vpsRecreates,
+ *   vpsRootPasswords (só a contagem), vpsSshKeys.
  */
 import http from 'node:http'
 
@@ -69,13 +73,41 @@ const vpsCatalogExtra = () => [
     prices: [{ id: 'hostingercom-vps-semunidade-usd-1m', name: 'sem unidade 1m', currency: 'USD', price: 1199, first_period_price: 499, period: 1, period_unit: 'month' }] },
 ]
 const vpsItem = id => { for (const it of vpsCatalog()) { const pr = it.prices.find(x => x.id === id); if (pr) return { it, pr } } return null }
-const vmView = vm => ({ ...vm, state: vm.state === 'creating' && Date.now() >= vm._readyAt ? 'running' : vm.state, _readyAt: undefined })
+// Templates (só id, name, description — como na API real). Painéis e aplicações: «<SO> with <X>».
+// 1299 é um template de ensaio cuja instalação termina em erro.
+const TEMPLATES = [
+  { id: 1130, name: 'Ubuntu 24.04', description: 'Ubuntu 24.04 LTS' }, { id: 1077, name: 'Debian 12', description: 'Debian 12' },
+  { id: 1155, name: 'Ubuntu 24.04 com Docker', description: 'Docker' }, { id: 1203, name: 'Rocky Linux 9', description: 'Rocky Linux 9' },
+  { id: 1200, name: 'AlmaLinux 9 with cPanel', description: 'cPanel & WHM (licença paga)' }, { id: 1201, name: 'Ubuntu 24.04 with CyberPanel', description: 'CyberPanel + OpenLiteSpeed' },
+  { id: 1204, name: 'Ubuntu 24.04 with Plesk', description: 'Plesk Obsidian (licença paga)' }, { id: 1202, name: 'Ubuntu 24.04 with n8n', description: 'n8n (automação)' },
+  { id: 1299, name: 'Debian 12 with Ensaio Erro', description: 'Instalação que falha (ensaio)' },
+]
+const isPanelOrApp = id => / with /.test(TEMPLATES.find(t => t.id === Number(id))?.name ?? '')
+// Estado derivado do tempo: criação/instalação, ligar/desligar/reiniciar e reinstalação terminam sozinhos
+function vmState(vm) {
+  const t = Date.now()
+  if (vm.state === 'creating' && t >= vm._readyAt) vm.state = 'running'
+  if (vm._transition && t >= vm._transition.at) { vm.state = vm._transition.to; vm._transition = null }
+  return vm.state
+}
+const actView = a => ({ id: a.id, name: a.name, state: Date.now() >= a._doneAt ? a._final : 'started', created_at: a.created_at, updated_at: Date.now() >= a._doneAt ? new Date(a._doneAt).toISOString() : a.created_at })
+function addAction(vm, name, doneAt, final = 'success') { const a = { id: ++seq, name, created_at: now(), _doneAt: doneAt, _final: final }; vm._actions.push(a); return a }
+const vmView = vm => {
+  vmState(vm)
+  const busy = vm._actions.some(a => Date.now() < a._doneAt)
+  const { _readyAt, _actions, _transition, _keys, ...pub } = vm; void _readyAt; void _actions; void _transition; void _keys
+  return { ...pub, actions_lock: busy ? 'locked' : 'unlocked' }
+}
+const installAction = (vm, templateId, base) => addAction(vm, 'vps_install', base + (isPanelOrApp(templateId) ? VPS_READY : 0), Number(templateId) === 1299 ? 'error' : 'success')
+const ROOT_PW = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[-().&@?'#;/,+])[A-Za-z\d\-().&@?'#;/,+]{12,50}$/
+const LEAKED = ['Password123#', 'Viraliza#Teste1']
 function createVm(it, setup, subscription, state = 'creating', count = true) {
   const id = ++seq
   const vm = { id, subscription_id: subscription, data_center_id: setup?.data_center_id ?? null, plan: it.name, hostname: setup?.hostname || `srv${id}.hstgr.cloud`, state,
     actions_lock: 'unlocked', cpus: it.metadata.cpus, memory: it.metadata.memory, disk: it.metadata.disk_space, bandwidth: it.metadata.bandwidth,
     ipv4: [{ id: id + 1, address: `198.51.100.${id % 250}`, ptr: null }], ipv6: [], template: setup?.template_id ? { id: setup.template_id, name: `Template ${setup.template_id}` } : null,
-    created_at: now(), _readyAt: Date.now() + VPS_READY }
+    created_at: now(), _readyAt: Date.now() + VPS_READY, _actions: [], _transition: null, _keys: [...(setup?.ssh_keys ?? [])] }
+  if (state === 'creating' && setup?.template_id) installAction(vm, setup.template_id, vm._readyAt)
   vms.set(id, vm)
   if (count) vpsPurchases.set(vm.hostname, (vpsPurchases.get(vm.hostname) ?? 0) + 1)
   return vm
@@ -156,7 +188,7 @@ http.createServer(async (req, res) => {
   if (req.method === 'GET' && p === '/api/billing/v1/catalog') { stats.reads++; return send(res, 200, url.searchParams.get('category') === 'VPS' ? vpsCatalog() : catalog(url.searchParams.get('name'))) }
   // ── VPS ──
   if (req.method === 'GET' && p === '/api/vps/v1/data-centers') { stats.reads++; return send(res, 200, [{ id: 19, name: 'fra', location: 'de', city: 'Frankfurt', continent: 'Europe' }, { id: 21, name: 'lis', location: 'pt', city: 'Lisboa', continent: 'Europe' }, { id: 17, name: 'bos', location: 'us', city: 'Boston', continent: 'North America' }]) }
-  if (req.method === 'GET' && p === '/api/vps/v1/templates') { stats.reads++; return send(res, 200, [{ id: 1130, name: 'Ubuntu 24.04', description: 'Ubuntu 24.04 LTS' }, { id: 1077, name: 'Debian 12', description: 'Debian 12' }, { id: 1155, name: 'Ubuntu 24.04 com Docker', description: 'Docker' }]) }
+  if (req.method === 'GET' && p === '/api/vps/v1/templates') { stats.reads++; return send(res, 200, TEMPLATES) }
   if (req.method === 'GET' && p === '/api/vps/v1/virtual-machines') { stats.reads++; return send(res, 200, [...vms.values()].map(vmView)) }
   let vmm = p.match(/^\/api\/vps\/v1\/virtual-machines\/(\d+)$/)
   if (req.method === 'GET' && vmm) { stats.reads++; const vm = vms.get(Number(vmm[1])); return vm ? send(res, 200, vmView(vm)) : send(res, 404, { error: 'Virtual machine not found' }) }
@@ -167,7 +199,51 @@ http.createServer(async (req, res) => {
     if (vm.state !== 'initial') return send(res, 422, { error: 'Virtual machine is already set up' })
     if (!b.template_id || !b.data_center_id) return send(res, 422, { error: 'The given data was invalid.' })
     stats.vpsSetups++; vm.state = 'creating'; vm._readyAt = Date.now() + VPS_READY; vm.template = { id: b.template_id, name: `Template ${b.template_id}` }; vm.data_center_id = b.data_center_id
+    installAction(vm, b.template_id, vm._readyAt)
     return send(res, 200, vmView(vm))
+  }
+  // Gestão (sem custo): acções, energia, reinstalação, palavra-passe root, chaves SSH
+  vmm = p.match(/^\/api\/vps\/v1\/virtual-machines\/(\d+)\/(actions|start|stop|restart|recreate|root-password|ssh-keys)(?:\/(\d+))?$/)
+  if (vmm) {
+    const vm = vms.get(Number(vmm[1])); const op = vmm[2]
+    if (!vm) return send(res, 404, { error: 'Virtual machine not found' })
+    const st = vmState(vm); const busy = vm._actions.some(a => Date.now() < a._doneAt)
+    if (op === 'actions' && req.method === 'GET') {
+      stats.reads++
+      if (vmm[3]) { const a = vm._actions.find(x => x.id === Number(vmm[3])); return a ? send(res, 200, actView(a)) : send(res, 404, { error: 'Action not found' }) }
+      return send(res, 200, { data: [...vm._actions].reverse().map(actView), meta: { current_page: 1, per_page: 50, total: vm._actions.length } })
+    }
+    if (op === 'ssh-keys') {
+      if (req.method === 'GET') { stats.reads++; return send(res, 200, { data: vm._keys.map((k, i) => ({ id: i + 1, key: k })) }) }
+      const b = await body(req)
+      if (!Array.isArray(b.keys) || !b.keys.length || b.keys.some(k => !/^(ssh-|ecdsa-|sk-)/.test(String(k)))) return send(res, 422, { error: 'The given data was invalid.' })
+      stats.vpsSshKeys = (stats.vpsSshKeys ?? 0) + 1
+      if (req.method === 'POST') vm._keys.push(...b.keys.filter(k => !vm._keys.includes(k)))
+      if (req.method === 'DELETE') vm._keys = vm._keys.filter(k => !b.keys.includes(k))
+      return send(res, 200, actView(addAction(vm, 'ssh_keys_update', Date.now())))
+    }
+    if (op === 'root-password' && req.method === 'PUT') {
+      const b = await body(req)
+      if (!ROOT_PW.test(String(b.password ?? ''))) return send(res, 422, { error: 'Password does not meet requirements.' })
+      if (LEAKED.includes(b.password)) return send(res, 422, { error: 'Password has been found in a data leak.' })
+      stats.vpsRootPasswords = (stats.vpsRootPasswords ?? 0) + 1   // o valor nunca é guardado
+      return send(res, 200, actView(addAction(vm, 'set_root_password', Date.now() + 500)))
+    }
+    if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed' })
+    if (busy) return send(res, 422, { error: 'Another action is in progress.' })
+    stats.vpsPowerCalls = (stats.vpsPowerCalls ?? 0) + 1
+    if (op === 'start') { if (st !== 'stopped') return send(res, 422, { error: 'Virtual machine is not stopped.' }); vm.state = 'starting'; vm._transition = { to: 'running', at: Date.now() + 1500 }; return send(res, 200, actView(addAction(vm, 'vps_start', Date.now() + 1500))) }
+    if (op === 'stop') { if (st !== 'running') return send(res, 422, { error: 'Virtual machine is not running.' }); vm.state = 'stopping'; vm._transition = { to: 'stopped', at: Date.now() + 1500 }; return send(res, 200, actView(addAction(vm, 'vps_stop', Date.now() + 1500))) }
+    if (op === 'restart') { if (st !== 'running') return send(res, 422, { error: 'Virtual machine is not running.' }); vm.state = 'stopping'; vm._transition = { to: 'running', at: Date.now() + 2000 }; return send(res, 200, actView(addAction(vm, 'vps_restart', Date.now() + 2000))) }
+    if (op === 'recreate') {
+      const b = await body(req)
+      if (!TEMPLATES.some(t => t.id === Number(b.template_id))) return send(res, 422, { error: 'Invalid template_id.' })
+      if (b.password && !ROOT_PW.test(String(b.password))) return send(res, 422, { error: 'Password does not meet requirements.' })
+      stats.vpsRecreates = (stats.vpsRecreates ?? 0) + 1
+      const at = Date.now() + VPS_READY
+      vm.state = 'recreating'; vm._transition = { to: 'running', at }; vm.template = { id: Number(b.template_id), name: TEMPLATES.find(t => t.id === Number(b.template_id)).name }
+      return send(res, 200, actView(installAction(vm, b.template_id, at)))
+    }
   }
   if (req.method === 'POST' && p === '/api/vps/v1/virtual-machines') {
     stats.vpsPurchaseCalls++

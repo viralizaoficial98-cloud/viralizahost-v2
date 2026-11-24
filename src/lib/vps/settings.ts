@@ -3,6 +3,7 @@ import { getPool } from '@/lib/db/pool'
 import { decryptSecret, encryptSecret } from '@/lib/crypto'
 import { HOSTINGER_API, hostingerVpsClient, VpsApiError, type HostingerVpsClient } from './hostinger-vps'
 import type { VpsOption } from '@/lib/commerce/vps-shared'
+import { classifyTemplate, fitsPlan, normalizeRow, sellable, type InstallOptionRow, type PublicVpsOptions } from './install-shared'
 
 // Integrações → Hostinger VPS (linha única vps_provider_settings.id = 1).
 // Credencial cifrada com WHM_ENCRYPTION_KEY (como o Registrador); nunca sai do servidor. Sem token próprio, usa o
@@ -13,9 +14,12 @@ import type { VpsOption } from '@/lib/commerce/vps-shared'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export interface OptionRow extends VpsOption { enabled: boolean; detail?: string | null }
+export type ImageRow = ReturnType<typeof normalizeRow>
 export interface VpsSettings {
   mode: 'test' | 'live'; apiUrl: string | null; hasSecret: boolean; usesRegistrarToken: boolean; autoProvision: boolean
-  paymentMethodId: number | null; hostnameSuffix: string; locations: OptionRow[]; images: OptionRow[]
+  paymentMethodId: number | null; hostnameSuffix: string; locations: OptionRow[]; images: ImageRow[]
+  /** «Escolher mais tarde»: o cliente paga e escolhe a instalação depois, em «Os meus VPS». */
+  allowChooseLater: boolean
   lastTest: { at: string | null; ok: boolean | null; message: string | null }
 }
 export class VpsConfigError extends Error {}
@@ -35,16 +39,34 @@ export async function loadVpsSettings(): Promise<VpsSettings> {
     usesRegistrarToken: !r?.secret_enc && !!(await registrarHostingerSecret().catch(() => null)),
     autoProvision: !!r?.auto_provision, paymentMethodId: r?.payment_method_id != null ? Number(r.payment_method_id) : null,
     hostnameSuffix: typeof o.hostnameSuffix === 'string' && o.hostnameSuffix ? o.hostnameSuffix : 'srv.viralizahost.com',
-    locations: Array.isArray(o.locations) ? o.locations : [], images: Array.isArray(o.images) ? o.images : [],
+    locations: Array.isArray(o.locations) ? o.locations : [], images: (Array.isArray(o.images) ? o.images : []).map((x: InstallOptionRow) => normalizeRow(x)),
+    allowChooseLater: o.allowChooseLater === true,
     lastTest: { at: r?.last_test_at ?? null, ok: r?.last_test_ok == null ? null : !!r.last_test_ok, message: r?.last_test_message ?? null },
   }
 }
 
-/** Opções que o cliente pode escolher (só as activadas pelo administrador). */
-export async function publicVpsOptions(): Promise<{ locations: VpsOption[]; images: VpsOption[] }> {
+/**
+ * Opções que o cliente pode escolher: só as activadas, com licença vendável e compatíveis com o plano
+ * (planos permitidos / RAM mínima). As localizações de cada imagem ficam restritas às activadas.
+ */
+export async function publicVpsOptions(plan?: { slug: string; ramGb?: number | null } | null): Promise<PublicVpsOptions> {
   const s = await loadVpsSettings()
-  const pick = (l: OptionRow[]) => l.filter(x => x.enabled).map(x => ({ id: String(x.id), label: x.label }))
-  return { locations: pick(s.locations), images: pick(s.images) }
+  const locations = s.locations.filter(x => x.enabled).map(x => ({ id: String(x.id), label: x.label }))
+  const locIds = locations.map(l => l.id)
+  const images = s.images.filter(r => sellable(r) && (!plan || fitsPlan(r, plan)))
+    .map(r => ({ r, locs: r.locations.filter(l => locIds.includes(l)) }))
+    .filter(({ r, locs }) => !r.locations.length || !locIds.length || locs.length > 0)
+    .map(({ r, locs }) => ({
+      id: r.id, label: r.label, category: r.category, name: r.name, version: r.version, icon: r.icon ?? "generic", includedOs: r.includedOs,
+      license: { type: r.license.type, monthlyKz: r.license.type === 'paid' ? Number(r.license.monthlyKz ?? 0) : 0 },
+      locations: r.locations.length ? locs : [], description: r.detail,
+    }))
+  return { locations, images, allowChooseLater: s.allowChooseLater && images.length > 0 }
+}
+/** Linha completa (interna) de uma imagem: sistema incluído, acesso, utilizador SSH, origem. */
+export async function imageRow(id: string | null | undefined): Promise<ImageRow | null> {
+  if (!id) return null
+  return (await loadVpsSettings()).images.find(x => x.id === String(id)) ?? null
 }
 
 /** Cliente da API (ou o motivo por que não há). purchase=true aplica as salvaguardas das compras. */
@@ -66,7 +88,33 @@ export async function vpsClient(purpose: 'read' | 'purchase' = 'read'): Promise<
   return { client: hostingerVpsClient({ token, baseUrl, timeoutMs: t || 20000, purchaseTimeoutMs: t || 30000 }), mode }
 }
 
-export async function saveVpsSettings(input: { mode?: unknown; apiUrl?: unknown; secret?: unknown; paymentMethodId?: unknown; hostnameSuffix?: unknown; autoProvision?: unknown; confirmAuto?: unknown; enabledLocations?: unknown; enabledImages?: unknown }, adminId: string) {
+/** Valida a configuração de uma opção de instalação vinda do painel. */
+function imageConfig(raw: any, prev: ImageRow | undefined): InstallOptionRow {
+  const str = (v: unknown, max = 80) => (v == null ? null : String(v).trim().slice(0, max) || null)
+  const cat = ['os', 'panel', 'app'].includes(raw?.category) ? raw.category : prev?.category ?? 'os'
+  const licType = raw?.license?.type === 'paid' ? 'paid' : raw?.license?.type === 'included' ? 'included' : prev?.license.type ?? 'included'
+  const monthly = raw?.license?.monthlyKz === undefined ? prev?.license.monthlyKz ?? null : raw.license.monthlyKz === null || raw.license.monthlyKz === '' ? null : Number(raw.license.monthlyKz)
+  if (monthly != null && (!Number.isFinite(monthly) || monthly < 0 || monthly > 10_000_000)) throw new VpsConfigError(`Preço da licença inválido em «${raw?.label ?? prev?.label}».`)
+  const enabled = raw?.enabled === undefined ? !!prev?.enabled : raw.enabled === true
+  if (enabled && licType === 'paid' && !(monthly && monthly > 0)) throw new VpsConfigError(`«${raw?.label ?? prev?.label}» tem licença paga: indique o preço mensal da licença antes de a activar.`)
+  const url = raw?.accessUrl === undefined ? prev?.accessUrl ?? null : str(raw.accessUrl, 200)
+  if (url && !/^https?:\/\/[^\s]*\{ip\}[^\s]*$/.test(url)) throw new VpsConfigError('Endereço de acesso inválido: use, por exemplo, https://{ip}:8090')
+  const minRam = raw?.minRamGb === undefined ? prev?.minRamGb ?? null : raw.minRamGb === null || raw.minRamGb === '' ? null : Number(raw.minRamGb)
+  if (minRam != null && (!Number.isFinite(minRam) || minRam < 0 || minRam > 4096)) throw new VpsConfigError('RAM mínima inválida.')
+  const list = (v: unknown, p: string[] | undefined) => (Array.isArray(v) ? v.map(x => String(x).trim()).filter(Boolean).slice(0, 100) : p ?? [])
+  const user = raw?.sshUser === undefined ? prev?.sshUser ?? 'root' : str(raw.sshUser, 32) ?? 'root'
+  if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(user)) throw new VpsConfigError('Utilizador SSH inválido.')
+  return {
+    id: String(raw?.id ?? prev?.id), label: str(raw?.label, 120) ?? prev?.label ?? String(raw?.id), enabled, detail: raw?.detail === undefined ? prev?.detail ?? null : str(raw.detail, 300),
+    source: prev?.source ?? (raw?.source === 'manual' ? 'manual' : 'api'), category: cat, name: str(raw?.name) ?? prev?.name ?? raw?.label,
+    version: raw?.version === undefined ? prev?.version ?? null : str(raw.version, 40), icon: str(raw?.icon, 30) ?? prev?.icon ?? 'generic',
+    includedOs: cat === 'os' ? null : raw?.includedOs === undefined ? prev?.includedOs ?? null : str(raw.includedOs),
+    license: { type: licType, monthlyKz: licType === 'paid' ? monthly : null, note: raw?.license?.note === undefined ? prev?.license.note ?? null : str(raw.license.note, 160) },
+    locations: list(raw?.locations, prev?.locations), minRamGb: minRam || null, plans: list(raw?.plans, prev?.plans), accessUrl: url, sshUser: user,
+  }
+}
+
+export async function saveVpsSettings(input: { mode?: unknown; apiUrl?: unknown; secret?: unknown; paymentMethodId?: unknown; hostnameSuffix?: unknown; autoProvision?: unknown; confirmAuto?: unknown; enabledLocations?: unknown; enabledImages?: unknown; images?: unknown; addManualImage?: unknown; removeImage?: unknown; allowChooseLater?: unknown }, adminId: string) {
   const prev = await row()
   const mode = input.mode === 'live' ? 'live' : input.mode === 'test' ? 'test' : (prev?.mode ?? 'test')
   const apiUrlRaw = input.apiUrl === undefined ? prev?.api_url ?? null : String(input.apiUrl ?? '').trim() || null
@@ -92,7 +140,29 @@ export async function saveVpsSettings(input: { mode?: unknown; apiUrl?: unknown;
   }
   const flag = (list: OptionRow[], ids: unknown) => Array.isArray(ids) ? list.map(x => ({ ...x, enabled: ids.map(String).includes(String(x.id)) })) : list
   o.locations = flag(Array.isArray(o.locations) ? o.locations : [], input.enabledLocations)
-  o.images = flag(Array.isArray(o.images) ? o.images : [], input.enabledImages)
+  let imgs: ImageRow[] = (Array.isArray(o.images) ? o.images : []).map((x: InstallOptionRow) => normalizeRow(x))
+  if (Array.isArray(input.enabledImages)) imgs = imgs.map(x => ({ ...x, enabled: (input.enabledImages as unknown[]).map(String).includes(x.id) }))
+  if (Array.isArray(input.images)) {
+    for (const raw of input.images as any[]) {
+      const i = imgs.findIndex(x => x.id === String(raw?.id))
+      if (i < 0) throw new VpsConfigError(`Opção de instalação desconhecida: ${String(raw?.id).slice(0, 40)}.`)
+      imgs[i] = normalizeRow(imageConfig(raw, imgs[i]))
+    }
+  }
+  // Opções manuais (activação manual): o que a equipa sabe entregar, sem template da Hostinger
+  if (input.addManualImage && typeof input.addManualImage === 'object') {
+    const raw = input.addManualImage as any
+    if (!String(raw.label ?? '').trim()) throw new VpsConfigError('Indique o nome da opção manual.')
+    const id = `m-${Date.now().toString(36)}`
+    imgs.push(normalizeRow(imageConfig({ ...raw, id, source: 'manual', enabled: raw.enabled === true }, { ...normalizeRow({ id, label: String(raw.label), enabled: false, ...classifyTemplate(String(raw.label)) }), source: 'manual' })))
+  }
+  if (input.removeImage) {
+    const r = imgs.find(x => x.id === String(input.removeImage))
+    if (!r || r.source !== 'manual') throw new VpsConfigError('Só as opções manuais podem ser removidas (as da Hostinger desactivam-se).')
+    imgs = imgs.filter(x => x !== r)
+  }
+  o.images = imgs
+  if (input.allowChooseLater !== undefined) o.allowChooseLater = input.allowChooseLater === true
   const changed = !prev || prev.mode !== mode || (prev.api_url ?? null) !== apiUrl || !!secretEnc
   let auto = input.autoProvision === undefined ? !!prev?.auto_provision : input.autoProvision === true
   if (changed) auto = false // nova configuração: volta a testar antes de automatizar
@@ -124,7 +194,16 @@ export async function testVpsConnection() {
       const prev = await row(); const o = parse(prev?.options)
       const old = (l: OptionRow[] | undefined, id: string) => (l ?? []).find(x => String(x.id) === id)?.enabled ?? false
       o.locations = dcs.map(d => ({ id: String(d.id), label: [d.city, d.location].filter(Boolean).join(', ') || d.name || `Centro ${d.id}`, detail: d.name ?? null, enabled: old(o.locations, String(d.id)) }))
-      o.images = tpls.map(t => ({ id: String(t.id), label: t.name, detail: t.description ?? null, enabled: old(o.images, String(t.id)) }))
+      // Templates: mantém a configuração do administrador (categoria, licença, compatibilidade); novos ficam desactivados
+      const prevImgs: InstallOptionRow[] = Array.isArray(o.images) ? o.images : []
+      o.images = [
+        ...tpls.map(t => {
+          const p = prevImgs.find(x => String(x.id) === String(t.id))
+          return p ? { ...p, label: t.name, detail: t.description ?? null, source: 'api' } : { id: String(t.id), label: t.name, detail: t.description ?? null, enabled: false, source: 'api', ...classifyTemplate(t.name) }
+        }),
+        ...prevImgs.filter(x => x.source === 'manual'),
+      ]
+
       await getPool().query('UPDATE vps_provider_settings SET options = ? WHERE id = 1', [JSON.stringify(o)])
       result = { ok: true, message: `Ligação OK (${c.mode === 'live' ? 'produção' : 'ensaio'}): ${catalog.length} produto(s) VPS no catálogo, ${dcs.length} centro(s) de dados, ${tpls.length} sistema(s)/imagem(ns), ${vms.length} VPS na conta, ${pms.length} método(s) de pagamento.`,
         detail: { catalog: catalog.map(i => ({ id: i.id, name: i.name, metadata: i.metadata ?? null, prices: i.prices })), paymentMethods: pms.map(p => ({ id: p.id, label: `${p.name ?? 'Método'} ${p.identifier ?? ''}`.trim(), isDefault: !!p.is_default, unusable: !!(p.is_expired || p.is_suspended) })) } }

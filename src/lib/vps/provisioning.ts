@@ -1,8 +1,9 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { getPool, type Queryable } from '@/lib/db/pool'
-import { loadVpsSettings, vpsClient } from './settings'
-import { specsFromVm, type VirtualMachine } from './hostinger-vps'
+import { imageRow, loadVpsSettings, vpsClient } from './settings'
+import { ACTION_PENDING, specsFromVm, type VirtualMachine } from './hostinger-vps'
+import { AWAITING_CHOICE_MSG, describeVpsOptions } from './install-shared'
 import { VPS_CYCLES, specMismatches, type VpsSpecs } from '@/lib/commerce/vps-shared'
 
 // Aprovisionamento de VPS depois do pagamento validado (chamado por provisionService).
@@ -45,8 +46,8 @@ export const isServerVps = (s: { category?: string | null; subcategory?: string 
 function manualTask(c: any, reason: string) {
   const o = json(c.options) ?? {}
   const cyc = VPS_CYCLES.find(x => x.cycle === c.billing_cycle)?.label ?? c.billing_cycle
-  const opts = [o.location?.label ? `localização ${o.location.label}` : null, o.image?.label ? `sistema ${o.image.label}` : null].filter(Boolean).join(', ')
-  return `Tarefa da equipa: adquirir o VPS «${c.name}» (${cyc}${opts ? `; ${opts}` : ''}) na Hostinger e associá-lo em «Associar VPS…». ${reason}`.trim()
+  const opts = describeVpsOptions(o, n => `Kz ${n}`)
+  return `Tarefa da equipa: preparar o VPS «${c.name}» (${cyc}${opts ? `; ${opts}` : ''}) e associá-lo em «Associar VPS…» ou confirmar a entrega. ${reason}`.trim()
 }
 
 /** Ponto de entrada (pagamento já validado; provisionService já reservou o serviço). */
@@ -62,11 +63,15 @@ export async function provisionVps(serviceId: string): Promise<VpsOutcome> {
   // Já houve tentativa: nunca comprar de novo aqui — conciliar (excepto recusa explícita sem encomenda)
   if (op && !(op.status === 'failed' && !op.provider_order_id) && op.status !== 'pending') return reconcileVps(serviceId)
 
-  // Salvaguardas: qualquer falta → tarefa manual (sem compra)
+  // «Escolher mais tarde»: nada é comprado até o cliente escolher a instalação em «Os meus VPS»
   const o = json(c.options) ?? {}
+  if (o.later && !o.image?.id) return done('manual_required', AWAITING_CHOICE_MSG)
+  // Salvaguardas: qualquer falta → tarefa manual (sem compra)
   if (!c.provider_product_id || c.provider_mode !== 'auto') return done('manual_required', manualTask(c, 'Plano em activação manual.'))
   if (!c.provider_item_id || c.provider_cost_limit_minor == null || !c.provider_currency) return done('manual_required', manualTask(c, 'Falta o item de preço ou o limite de custo deste ciclo.'))
   if (!o.location?.id || !o.image?.id) return done('manual_required', manualTask(c, 'A encomenda não tem localização e sistema operativo.'))
+  const img = await imageRow(o.image.id)
+  if (img?.source === 'manual' || !/^\d+$/.test(String(o.image.id))) return done('manual_required', manualTask(c, 'Instalação de entrega manual (sem template da Hostinger).'))
   const cl = await vpsClient('purchase')
   if ('error' in cl) return done('manual_required', manualTask(c, cl.error))
   const settings = await loadVpsSettings()
@@ -172,6 +177,18 @@ export async function reconcileVps(serviceId: string, actor: string | null = nul
       return done('in_progress', `VM ${vm.id} a configurar na Hostinger.`)
     }
     if (vm.state === 'running') {
+      // «Pronto a utilizar» só depois de terminada a instalação: nenhuma acção pendente e a última sem erro
+      const acts = await cl.client.actions(vm.id).catch(() => null)
+      if (!acts) return done('in_progress', `VM ${vm.id} em execução; a confirmar o fim da instalação.`)
+      const pending = acts.find(a => ACTION_PENDING.includes(String(a.state)))
+      if (pending) return done('in_progress', `VM ${vm.id} em execução; instalação em curso (${pending.name ?? 'acção'}: ${pending.state}).`)
+      if (acts[0]?.state === 'error' && !req.install_error_seen) {
+        req.install_error_seen = true
+        await db.query('UPDATE vps_provider_orders SET request = ? WHERE id = ?', [JSON.stringify(req), op.id])
+        await event(op.id, 'install_error', `acção ${acts[0].id} (${acts[0].name ?? '—'}) terminou com erro`, actor)
+        return done('manual_required', `VM ${vm.id} criada mas a instalação falhou na Hostinger (acção ${acts[0].name ?? acts[0].id}). Verificar no hPanel e reinstalar ou associar.`)
+      }
+      if (acts[0]?.state === 'error') return done('manual_required', `VM ${vm.id}: a última instalação falhou na Hostinger. Verificar no hPanel.`)
       await db.query("UPDATE vps_provider_orders SET status = 'active', message = NULL WHERE id = ?", [op.id])
       const c = await context(serviceId)
       const warn = specMismatches((json(c?.plan_specs) ?? {}) as VpsSpecs, specsFromVm(vm))
@@ -221,6 +238,34 @@ export async function linkVps(serviceId: string, vmId: string, adminId: string):
   const ip = vm?.ipv4?.[0]?.address
   await setService(serviceId, 'active', null, { external_ref: `VM ${id}${ip ? ` · ${ip}` : ''}`, next_due_date: addMonths(months), activation_source: 'manual' })
   return { serviceId, status: 'active', message: `VM ${id} associada.${warn.length ? ` Atenção: ${warn.join('; ')}` : ''}` }
+}
+
+/**
+ * Activação manual sem VM da Hostinger (ex.: infra própria): a equipa confirma a entrega com o IP.
+ * Nenhuma palavra-passe é guardada nem enviada: o acesso inicial é configurado pelo cliente em «Os meus VPS»
+ * (chave SSH) ou entregue pela equipa por canal seguro.
+ */
+export async function deliverManualVps(serviceId: string, input: { ip?: unknown; note?: unknown }, adminId: string): Promise<VpsOutcome> {
+  const ip = String(input.ip ?? '').trim()
+  if (!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip) || ip.split('.').some(x => Number(x) > 255)) throw new Error('Indique o IPv4 público do VPS.')
+  const note = String(input.note ?? '').trim().slice(0, 300)
+  const db = getPool()
+  const c = await context(serviceId)
+  if (!c) throw new Error('Serviço inexistente.')
+  if (!isServerVps(c)) throw new Error('Só para serviços Servidor VPS.')
+  if (c.payment_status !== 'paid') throw new Error('Pagamento ainda não validado: confirme a entrega depois da validação.')
+  const o = json(c.options) ?? {}
+  if (o.later && !o.image?.id) throw new Error('O cliente ainda não escolheu a instalação.')
+  const [op] = await rows(db, 'SELECT id, status FROM vps_provider_orders WHERE service_id = ?', [serviceId])
+  if (op && ['submitting', 'submitted', 'payment_processing', 'unknown'].includes(op.status)) throw new Error('Há uma compra automática em curso ou por confirmar: concilie primeiro.')
+  const opId = op?.id ?? randomUUID()
+  if (!op) await db.query(`INSERT INTO vps_provider_orders (id, service_id, order_item_id, provider, mode, client_ref, item_id, status, provider_status, ipv4, request)
+    VALUES (?, ?, ?, 'manual', 'manual', ?, 'manual', 'active', 'delivered', ?, NULL)`, [opId, serviceId, c.order_item_id, `man${serviceId.replace(/-/g, '').slice(0, 14)}`, ip])
+  else await db.query("UPDATE vps_provider_orders SET status = 'active', provider = 'manual', provider_status = 'delivered', ipv4 = ? WHERE id = ?", [ip, opId])
+  await event(opId, 'manual_delivery', `entrega confirmada pela equipa (${ip})${note ? `: ${note}` : ''}`, adminId)
+  const months = Number(c.months ?? VPS_CYCLES.find(x => x.cycle === c.billing_cycle)?.months ?? 1)
+  await setService(serviceId, 'active', null, { external_ref: `Manual · ${ip}`, next_due_date: addMonths(months), activation_source: 'manual' })
+  return { serviceId, status: 'active', message: `Entrega confirmada (${ip}).` }
 }
 
 /** Revisão manual concluída: a equipa confirmou no hPanel que NADA foi comprado — permite uma nova tentativa. */

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { confirmNotPurchased, linkVps, reconcileVps } from '@/lib/vps/provisioning'
+import { confirmNotPurchased, deliverManualVps, linkVps, reconcileVps } from '@/lib/vps/provisioning'
 import { createAdminWriteClient, createServiceClient } from '@/lib/supabase/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { getPool } from '@/lib/db/pool'
@@ -83,7 +83,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   let adminId: string
   try { adminId = await requireAdminRole() } catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  const body = await req.json().catch(() => ({})) as { vmId?: string; domain?: string; confirmed?: boolean; caseAction?: 'propose' | 'replace' | 'refund' | 'resolve'; orderItemId?: string; available?: boolean; orderId?: string; serviceId?: string; paymentId?: string; action?: string; notes?: string; reason?: string; externalRef?: string; flag?: string | null }
+  const body = await req.json().catch(() => ({})) as { vmId?: string; ip?: string; domain?: string; confirmed?: boolean; caseAction?: 'propose' | 'replace' | 'refund' | 'resolve'; orderItemId?: string; available?: boolean; orderId?: string; serviceId?: string; paymentId?: string; action?: string; notes?: string; reason?: string; externalRef?: string; flag?: string | null }
   const db = getPool()
   const log = (action: string, entity: string, id: string, description: string) =>
     db.query("INSERT INTO activity_logs (id, profile_id, action, entity_type, entity_id, description) VALUES (UUID(), ?, 'update', ?, ?, ?)", [adminId, entity, id, `${action}: ${description}`]).catch(() => {})
@@ -167,6 +167,13 @@ export async function POST(req: NextRequest) {
         const [[s]] = await db.query('SELECT order_id FROM services WHERE id = ?', [body.serviceId]) as any
         if (s) await refreshOrderActivation(s.order_id)
         await log('vps_link', 'service', body.serviceId!, r.message)
+        return NextResponse.json({ ok: true, result: r })
+      }
+      case 'vps_deliver': {
+        const r = await deliverManualVps(body.serviceId!, { ip: body.ip, note: body.notes }, adminId)
+        const [[s]] = await db.query('SELECT order_id FROM services WHERE id = ?', [body.serviceId]) as any
+        if (s) await refreshOrderActivation(s.order_id)
+        await log('vps_deliver', 'service', body.serviceId!, r.message)
         return NextResponse.json({ ok: true, result: r })
       }
       case 'vps_confirm_not_purchased': {
