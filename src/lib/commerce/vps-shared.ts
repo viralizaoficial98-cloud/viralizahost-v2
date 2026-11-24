@@ -1,17 +1,19 @@
 // Servidor VPS — partilhado pelo painel, pela página pública e pelo servidor (sem dependências de servidor).
 
-/** Ciclos que um plano VPS pode publicar (os mesmos do catálogo). */
-/** Ciclos à venda para novos VPS. «3 meses» foi retirado: encomendas, facturas e renovações já contratadas mantêm-se. */
+/**
+ * Ciclos à venda para novos VPS (planos do Servidor VPS, associáveis à Hostinger): 1 mês, 1 ano e 2 anos.
+ * «3 meses», «6 meses» e «3 anos» foram retirados: encomendas, facturas, contratos e renovações já existentes mantêm-se
+ * (as renovações usam o preço aceite no serviço) e as linhas de preço ficam guardadas, despublicadas.
+ */
 export const VPS_CYCLES = [
   { cycle: 'monthly', months: 1, label: '1 mês' },
-  { cycle: '6months', months: 6, label: '6 meses' },
   { cycle: '1year', months: 12, label: '1 ano' },
   { cycle: '2years', months: 24, label: '2 anos' },
-  { cycle: '3years', months: 36, label: '3 anos' },
 ] as const
 export type VpsCycle = (typeof VPS_CYCLES)[number]['cycle']
-/** Ciclos retirados da venda de VPS (servidor recusa-os em novas compras). */
-export const VPS_RETIRED_CYCLES: readonly string[] = ['3months']
+/** Ciclos retirados da venda de VPS (o servidor recusa-os em novas compras). */
+export const VPS_RETIRED_CYCLES: readonly string[] = ['3months', '6months', '3years']
+export const VPS_RETIRED_LABEL: Record<string, string> = { '3months': '3 meses', '6months': '6 meses', '3years': '3 anos' }
 export const isVpsCycleForSale = (c: unknown) => VPS_CYCLES.some(x => x.cycle === c)
 
 /** Lista CONTROLADA de ícones para as características extras (o painel só oferece estes). */

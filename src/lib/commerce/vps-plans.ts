@@ -4,7 +4,7 @@ import { revalidateTag } from 'next/cache'
 import { getPool, withTransaction, type Queryable } from '@/lib/db/pool'
 import { MAX_DISCOUNT, exactPeriodTotal, matchesRule } from './period-pricing'
 import { syncDisplay } from './catalog-admin'
-import { VPS_CYCLES, VPS_RETIRED_CYCLES, compareSpecs, isTrafficUnit, isVpsIcon, type ProviderSpecs, type VpsFeature, type VpsSpecs } from './vps-shared'
+import { VPS_CYCLES, VPS_RETIRED_CYCLES, VPS_RETIRED_LABEL, compareSpecs, isTrafficUnit, isVpsIcon, type ProviderSpecs, type VpsFeature, type VpsSpecs } from './vps-shared'
 
 // Catálogo e Preços → VPS (categoria «vps» sem subcategoria — a página /servidor-vps).
 // Ficha em products.plan_specs, imagem em products.image_path (armazenamento «catalog-assets»), características
@@ -15,7 +15,7 @@ import { VPS_CYCLES, VPS_RETIRED_CYCLES, compareSpecs, isTrafficUnit, isVpsIcon,
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const rows = async <T = any>(db: Queryable, sql: string, p: unknown[] = []) => (await db.query(sql, p))[0] as T[]
-export class VpsPlanError extends Error { constructor(message: string, public field?: string) { super(message) } }
+export class VpsPlanError extends Error { constructor(message: string, public field?: string, public status = 400) { super(message) } }
 export const VPS_IMAGE_BUCKET = 'catalog-assets'
 export const vpsImageUrl = (path: string | null | undefined) => path ? `/storage/v1/object/public/${VPS_IMAGE_BUCKET}/${path.split('/').map(encodeURIComponent).join('/')}` : null
 
@@ -160,7 +160,7 @@ export async function saveVpsPlan(input: VpsPlanInput): Promise<string> {
 
   const per = new Map((input.periods ?? []).map(p => [String(p?.cycle), p]))
   for (const c of per.keys()) {
-    if (VPS_RETIRED_CYCLES.includes(c)) throw new VpsPlanError('O ciclo de 3 meses deixou de estar à venda para VPS.', 'periods')
+    if (VPS_RETIRED_CYCLES.includes(c)) throw new VpsPlanError(`O ciclo de ${VPS_RETIRED_LABEL[c] ?? c} deixou de estar à venda para VPS (ciclos disponíveis: 1 mês, 1 ano e 2 anos).`, 'periods')
     if (!VPS_CYCLES.some(p => p.cycle === c)) throw new VpsPlanError(`Ciclo inválido: ${c}.`, 'periods')
   }
   // Itens de preço da Hostinger: confirmados no catálogo (produto e PERÍODO) — nunca o item de outro período
@@ -219,7 +219,8 @@ export async function saveVpsPlan(input: VpsPlanInput): Promise<string> {
       if (providerMode === 'auto' && publish) {
         const missing = [!itemId && `item de preço da Hostinger de ${c.months} mês(es)`, cost == null && 'custo esperado', !currency && 'moeda', limit == null && 'limite de custo'].filter(Boolean)
         if (missing.length) throw new VpsPlanError(`${c.label}: para publicar em activação automática falta ${missing.join(', ')}. Guarde o ciclo como não publicado ou mude para Manual.`, `provider-${c.cycle}`)
-        if (catalog?.error) throw new VpsPlanError(`${c.label}: não foi possível confirmar o item no catálogo da Hostinger (${catalog.error}); guarde o ciclo como não publicado e tente mais tarde.`, `provider-${c.cycle}`)
+        // Falha temporária ao carregar o catálogo: erro de ligação; NADA é gravado (os ciclos guardados ficam como estavam)
+        if (catalog?.error) throw new VpsPlanError(`Erro de ligação ao catálogo da Hostinger (${catalog.error}). Não foi possível confirmar o item de ${c.label}; nada foi alterado — tente novamente dentro de instantes.`, 'connection', 503)
       }
       if (!(price > 0)) throw new VpsPlanError(`${c.label}: o total tem de ser maior que 0.`, `discount-${c.cycle}`)
       await conn.query(`INSERT INTO product_prices (id, product_id, cycle, months, price, renewal_price, currency, active, discount_pct, provider_item_id, provider_cost_minor, provider_currency, provider_cost_limit_minor, reference)

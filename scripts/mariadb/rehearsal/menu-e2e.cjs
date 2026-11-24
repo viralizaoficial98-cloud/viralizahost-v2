@@ -13,6 +13,9 @@ const ok = (c, n, x = '') => { c ? pass++ : fail++; console.log(`  ${c ? '✓' :
 const DESKTOP = { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 }
 const IPHONE = devices['iPhone 13']
 const GROUPS = ['Hospedagem e site', 'Domínios', 'E-mail corporativo', 'Serviços', 'Empresa']
+const SERVICES = ['Hospedagem de site|/hospedagem-de-sites', 'Revenda de hospedagem|/revenda-de-hospedagem', 'Servidor VPS|/servidor-vps', 'Servidor dedicado Linux|/servidor-dedicado',
+  'Servidor dedicado Windows|/servidor-dedicado-windows', 'Domínios|/dominios', 'Transferir Domínio|/dominios/transferir', 'Renovar domínio|/dominios/renovar',
+  'E-mail corporativo|/email-corporativo', 'Microsoft 365 Outlook|/email/microsoft-365-outlook']
 const status = async (path, redirect = 'manual') => { const r = await fetch(BASE + path, { redirect }); return { status: r.status, location: r.headers.get('location') } }
 
 // Links do antigo menu: continuam a responder (função própria) ou encaminham para a secção equivalente
@@ -51,12 +54,24 @@ const OLD_LINKS = [
     const infra = cols.find(c => /Infraestrutura/i.test(c.title))
     ok(infra && JSON.stringify(infra.items.map(i => i.label)) === JSON.stringify(['Servidor VPS', 'Servidor Dedicado Linux', 'Servidor Dedicado Windows']), `Infraestrutura: ${infra?.items.map(i => i.label).join(', ')}`)
     ok(!cols.some(c => c.items.some(i => /WordPress/.test(i.label) && /hospedagem/i.test(i.label)) || c.items.some(i => i.href === '/hospedagem-wordpress')), 'sem «Hospedagem WordPress» no submenu')
+    {
+      const grid = p.getByTestId('nav-panel').getByTestId('nav-panel-grid'), aside = p.getByTestId('nav-panel').getByTestId('nav-aside')
+      const tpl = await grid.evaluate(e => e.style.gridTemplateColumns), ab = await aside.boundingBox()
+      ok(tpl === '1fr 1fr 1.4fr 260px' && Math.abs(ab.width - 260) <= 1 && await aside.getByTestId('nav-aside-image').evaluate(i => i.complete && i.naturalWidth > 0), `Hospedagem: painel de imagem com as proporções anteriores (${tpl}; ${Math.round(ab.width)} px)`)
+    }
     await p.screenshot({ path: `${OUT}/desktop-01-hospedagem.png` })
     await p.keyboard.press('Escape'); await p.waitForTimeout(200)
     ok((await p.getByTestId('nav-panel').getAttribute('data-group')) === '', 'Escape fecha o painel')
     cols = await panelItems('servicos')
     const svc = cols.flatMap(c => c.items)
-    ok(cols.length === 5 && JSON.stringify(cols.map(c => c.title)) === JSON.stringify(['Hospedagem e sites', 'Servidores', 'Domínios', 'E-mail corporativo', 'Segurança e desempenho']), `Serviços por categoria: ${cols.map(c => `${c.title} (${c.items.length})`).join(', ')}`)
+    ok(JSON.stringify(cols.map(c => c.title)) === JSON.stringify(['Hospedagem', 'Infraestrutura', 'Domínios', 'E-mail']), `Serviços em quatro grupos: ${cols.map(c => `${c.title} (${c.items.length})`).join(', ')}`)
+    ok(JSON.stringify(svc.map(i => `${i.label}|${i.href}`)) === JSON.stringify(SERVICES), `exactamente os dez links, por ordem: ${svc.map(i => i.label).join(' · ')}`, JSON.stringify(svc.map(i => `${i.label}|${i.href}`)))
+    ok(!/Segurança e desempenho|Certificado SSL|CDN Premium|VPS n8n/.test(await p.getByTestId('nav-panel').innerText()), 'sem «Segurança e desempenho» nem outras entradas')
+    {
+      const aside = p.getByTestId('nav-panel').getByTestId('nav-aside')
+      const [ab, lastCol] = [await aside.boundingBox(), await p.getByTestId('nav-panel').getByTestId('nav-column').last().boundingBox()]
+      ok(await aside.count() === 1 && ab.x > lastCol.x + lastCol.width - 1 && await aside.getByTestId('nav-aside-image').evaluate(i => i.complete && i.naturalWidth > 0), `imagem à direita dos links (x=${Math.round(ab.x)} > ${Math.round(lastCol.x + lastCol.width)}), carregada`)
+    }
     ok(!svc.some(i => /^\/(admin|dashboard|checkout|carrinho|login|register|orders|billing)/.test(i.href)), 'Serviços sem páginas administrativas, privadas ou de checkout')
     const sm = await (await fetch(BASE + '/sitemap.xml')).text()
     ok(svc.every(i => sm.includes(`https://viralizahost.com${i.href}<`)), `todas as ${svc.length} páginas de Serviços estão publicadas (sitemap)`)
@@ -84,10 +99,12 @@ const OLD_LINKS = [
     await p.waitForTimeout(400)
     ok(await p.evaluate(() => [...document.querySelectorAll('[data-floating]')].every(e => getComputedStyle(e).visibility === 'hidden')), 'botões flutuantes (chat/WhatsApp) escondidos enquanto o menu está aberto')
     await p.getByTestId('mnav-servicos').click()
-    const cats = p.getByTestId('mnav-category')
-    ok(await cats.count() === 5 && await p.getByTestId('mnav-item').count() === 0, 'Serviços: 5 categorias recolhidas (lista longa utilizável)')
-    await cats.nth(1).click()
-    ok(await p.getByTestId('mnav-item').count() === 7, 'categoria «Servidores» aberta (7 páginas)')
+    const mItems = await p.getByTestId('mnav-panel').getByTestId('mnav-item').evaluateAll(as => as.map(a => `${a.textContent.trim()}|${a.getAttribute('href')}`))
+    ok(JSON.stringify(mItems) === JSON.stringify(SERVICES), `Serviços no telemóvel: os mesmos dez links, todos visíveis (${mItems.length})`)
+    ok(JSON.stringify(await p.getByTestId('mnav-panel').getByTestId('mnav-column-title').allInnerTexts()) === JSON.stringify(['HOSPEDAGEM', 'INFRAESTRUTURA', 'DOMÍNIOS', 'E-MAIL']) || JSON.stringify((await p.getByTestId('mnav-panel').getByTestId('mnav-column-title').allTextContents()).map(x => x.trim())) === JSON.stringify(['Hospedagem', 'Infraestrutura', 'Domínios', 'E-mail']), 'quatro grupos no telemóvel')
+    const ma = p.getByTestId('mnav-panel').getByTestId('mnav-aside')
+    const mab = await ma.boundingBox(), lastItem = await p.getByTestId('mnav-panel').getByTestId('mnav-item').last().boundingBox()
+    ok(mab && mab.y > lastItem.y && mab.x + mab.width <= 390 + 0.5, 'painel de imagem adaptado: por baixo dos links, dentro do ecrã')
     ok(await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, 'sem deslocamento horizontal')
     await p.screenshot({ path: `${OUT}/iphone-01-servicos.png` })
     await p.getByTestId('mnav-empresa').click()
