@@ -9,9 +9,11 @@ import { persist } from 'zustand/middleware'
 export interface NameserverChoice { useDefault: boolean; ns: string[] }
 export type Cycle = 'monthly' | '3months' | '6months' | '1year' | '2years' | '3years'
 export type DomainMode = 'register' | 'transfer' | 'existing'
+/** Opções de um VPS (ids das opções activadas no painel): localização e sistema operativo/imagem. */
+export interface ProductOptions { location?: string; image?: string }
 
 export type CartLine =
-  | { key: string; type: 'product'; slug: string; cycle: Cycle; quantity: number; domain?: string; domainMode?: DomainMode; flowId?: string }
+  | { key: string; type: 'product'; slug: string; cycle: Cycle; quantity: number; domain?: string; domainMode?: DomainMode; flowId?: string; options?: ProductOptions }
   | { key: string; type: 'domain'; domain: string; operation: 'register' | 'transfer' | 'renew'; eppCode?: string; years?: number; flowId?: string; nameservers?: NameserverChoice }
   | { key: string; type: 'renewal'; serviceId: string; label?: string }
 
@@ -117,5 +119,5 @@ export const useCart = create<CartState>()(
 export function toApiLine(l: CartLine) {
   if (l.type === 'renewal') return { type: 'renewal', serviceId: l.serviceId }
   if (l.type === 'domain') return { type: 'domain', domain: l.domain, operation: l.operation, years: l.years ?? 1, ...(l.eppCode ? { eppCode: l.eppCode } : {}), ...(l.nameservers ? { nameservers: l.nameservers } : {}) }
-  return { type: 'product', slug: l.slug, cycle: l.cycle, quantity: l.quantity, ...(l.domain ? { domain: l.domain, domainMode: l.domainMode ?? 'existing' } : {}) }
+  return { type: 'product', slug: l.slug, cycle: l.cycle, quantity: l.quantity, ...(l.domain ? { domain: l.domain, domainMode: l.domainMode ?? 'existing' } : {}), ...(l.options ? { options: l.options } : {}) }
 }

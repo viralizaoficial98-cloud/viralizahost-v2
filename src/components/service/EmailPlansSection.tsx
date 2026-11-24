@@ -158,7 +158,7 @@ export function EmailPlansSection({ id = 'planos', tag = 'Planos e Preços', tit
 
                     <Link href={onRequest ? `/comprar/${plan.slug}` : `/comprar/${plan.slug}?ciclo=${active}`} data-testid="email-plan-cta"
                       className={`mt-auto block w-full text-center py-3 rounded-xl font-bold text-sm transition-all ${dark ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#E5A800]' : 'bg-[#0A0A0A] text-white hover:bg-[#222]'}`}>
-                      {onRequest ? 'Pedir proposta' : 'Configurar'}
+                      {onRequest ? 'Pedir proposta' : 'Comprar agora'}
                     </Link>
                   </div>
                 </div>

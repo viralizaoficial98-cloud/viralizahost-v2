@@ -9,13 +9,14 @@ import { PAYMENT_STATUS, TONE_CLASS, activationState, domainState, kz } from '@/
 type Service = { id: string; order_item_id: string; service_name: string; service_type: string; provisioning_status: string; provisioning_error: string | null; provisioning_attempts: number; external_ref: string | null; domain: string | null; activation_source: string | null
   registrar_op?: { provider: string; status: string; provider_status: string | null; provider_order_id: string | null; ns_status: string | null; dns_status: string | null; cost_amount: number | null; cost_currency: string | null } | null
   /** Calculado no servidor com a configuração actual do registrador. */
-  hostinger?: { eligible: boolean; reason: string | null } | null }
+  hostinger?: { eligible: boolean; reason: string | null } | null
+  vps_op?: { mode: string; status: string; item_id: string; expected_cost_minor: number | null; cost_limit_minor: number | null; currency: string | null; provider_vm_id: string | null; provider_order_id: string | null; provider_subscription_id: string | null; provider_status: string | null; ipv4: string | null; attempts: number; message: string | null; events: { event: string; detail: string | null; at: string }[] } | null }
 type Order = {
   id: string; order_number: string | null; created_at: string; paid_at: string | null; status: string; payment_status: string; activation_status: string; hold_reason?: string | null
   review_flag: 'test' | 'real' | null; review_note: string | null
   amount: number; currency: string | null; payment_method: string | null; transfer_ref: string | null; proof_url: string | null
   profiles: { full_name: string; email: string; role: string } | null
-  order_items: { id: string; service_name: string; quantity: number; line_total: number | null; unit_price: number | null; renewal_price: number | null; billing_cycle: string | null; domain_case?: string | null; domain_case_note?: string | null; proposed_domain?: string | null; domain_name: string | null; domain_operation: string | null; availability?: string | null; years?: number | null; nameservers?: unknown }[]
+  order_items: { id: string; service_name: string; quantity: number; line_total: number | null; unit_price: number | null; renewal_price: number | null; billing_cycle: string | null; options?: unknown; domain_case?: string | null; domain_case_note?: string | null; proposed_domain?: string | null; domain_name: string | null; domain_operation: string | null; availability?: string | null; years?: number | null; nameservers?: unknown }[]
   services: Service[]; invoice: { invoice_number: string; status: string } | null
   payments: { id: string; status: string; amount: number; currency: string; paid_at: string | null; created_at: string }[]
   domain_events?: { order_item_id: string; action: string; domain: string | null; proposed_domain: string | null; note: string | null; created_at: string; admin_name: string | null }[]
@@ -26,6 +27,7 @@ const FILTERS = {
   'por-pagar': { label: 'Por pagar / validar', test: (o: Order) => o.status !== 'rejected' && o.status !== 'cancelled' && o.payment_status !== 'paid' },
   comprovativos: { label: 'Comprovativos por validar', test: (o: Order) => o.payment_status === 'proof_submitted' && !['rejected', 'cancelled'].includes(o.status) },
   dominios: { label: 'Domínios a confirmar / em tratamento', test: (o: Order) => !['rejected', 'cancelled'].includes(o.status) && o.order_items.some(i => i.availability === 'confirm' || ['manual_review', 'alternative', 'refund_manual'].includes(i.domain_case ?? '')) },
+  vps: { label: 'VPS: tarefas e compras', test: (o: Order) => o.services.some(s => s.service_type === 'vps' && s.provisioning_status !== 'active') && !['rejected', 'cancelled'].includes(o.status) },
   activacao: { label: 'Activação pendente', test: (o: Order) => o.payment_status === 'paid' && o.services.some(s => ['pending', 'manual_required', 'failed'].includes(s.provisioning_status)) },
   concluidas: { label: 'Concluídas', test: (o: Order) => o.activation_status === 'active' || ['rejected', 'cancelled'].includes(o.status) },
   todas: { label: 'Todas', test: () => true },
@@ -38,10 +40,12 @@ const EVENT_LABEL: Record<string, string> = {
   domain_replaced: 'Domínio substituído', refund_forwarded: 'Encaminhado para reembolso (manual)', case_resolved: 'Caso encerrado',
 }
 const OPEN_CASE = ['manual_review', 'alternative', 'refund_manual']
+const VPS_STATUS: Record<string, string> = { pending: 'por enviar', submitting: 'a enviar à Hostinger', submitted: 'comprado — a preparar', payment_processing: 'pagamento ao fornecedor em processamento', unknown: 'RESULTADO POR CONFIRMAR', failed: 'recusado pela Hostinger (nada comprado)', active: 'activo' }
+const optsText = (v: unknown) => { try { const o = (typeof v === 'string' ? JSON.parse(v) : v) as { location?: { label: string } | null; image?: { label: string } | null } | null; return o ? [o.location ? `Localização: ${o.location.label}` : '', o.image ? `Sistema: ${o.image.label}` : ''].filter(Boolean).join(' · ') : '' } catch { return '' } }
 
 // Estado do serviço (texto) — distinto dos botões de acção
 const svcLabel = (s: Service) => {
-  if (s.provisioning_status === 'active') return s.activation_source === 'registrar' ? 'Activo — confirmado pelo registrador' : s.activation_source === 'manual' ? 'Activo — marcado pela equipa' : 'Activo'
+  if (s.provisioning_status === 'active') return s.activation_source === 'registrar' ? 'Activo — confirmado pelo registrador' : s.activation_source === 'provider' ? 'Activo — VM confirmada na Hostinger' : s.activation_source === 'manual' ? 'Activo — marcado pela equipa' : 'Activo'
   if (s.service_type === 'domain') return s.provisioning_status === 'failed' ? 'Registo falhou' : 'A aguardar registo'
   return { pending: 'Activação por iniciar', in_progress: 'Em activação', manual_required: 'Activação manual pendente', failed: 'Activação falhou' }[s.provisioning_status] ?? s.provisioning_status
 }
@@ -88,9 +92,9 @@ function OrdersInner() {
       if (!res.ok) setNotice({ ok: false, text: j.error ?? 'Falhou.' })
       else if (j.provisioning) {
         const counts = j.provisioning.reduce((a: any, r: any) => ({ ...a, [r.status]: (a[r.status] ?? 0) + 1 }), {})
-        const L: Record<string, string> = { active: 'activo(s)', manual_required: 'manual(is)', failed: 'falhado(s)', skipped: 'em espera' }
+        const L: Record<string, string> = { active: 'activo(s)', manual_required: 'manual(is)', failed: 'falhado(s)', skipped: 'em espera', in_progress: 'em activação' }
         setNotice({ ok: true, text: `Pagamento ${j.payment === 'paid' ? 'confirmado' : 'já estava confirmado'}. Activação: ${Object.entries(counts).map(([k, v]) => `${v} ${L[k] ?? k}`).join(', ')}.` })
-      } else if (j.result) setNotice({ ok: j.ok, text: `${j.result.status === 'active' ? 'Activado' : 'Não activado'}: ${j.result.message}` })
+      } else if (j.result) setNotice({ ok: j.ok, text: `${j.result.status === 'active' ? 'Activado' : j.result.status === 'in_progress' ? 'Em activação' : 'Não activado'}: ${j.result.message}` })
       else setNotice({ ok: true, text: 'Feito.' })
       await load()
     } catch { setNotice({ ok: false, text: 'Falha de rede.' }) } finally { setActing(null) }
@@ -183,6 +187,7 @@ function OrdersInner() {
                           <tr key={it.id} className="border-t border-[#F3F3F3] align-top" data-testid="order-item">
                             <td className="py-2 pr-2">{it.service_name}{it.quantity > 1 ? ` × ${it.quantity}` : ''}{it.domain_name ? <span className="block text-xs text-[#888]">{it.domain_name}</span> : null}
                               {nsText(it.nameservers) && <span className="block text-[11px] text-[#666] font-mono" data-testid="item-ns">NS: {nsText(it.nameservers)}</span>}
+                              {optsText(it.options) && <span className="block text-[11px] text-[#555]" data-testid="item-options">{optsText(it.options)}</span>}
                               {it.availability === 'confirm' && (
                                 <span className="mt-1 flex flex-wrap items-center gap-1" data-testid="domain-confirm">
                                   <span className="text-xs font-bold text-amber-800">A confirmar pela equipa:</span>
@@ -218,10 +223,29 @@ function OrdersInner() {
                               {s?.registrar_op?.provider === 'hostinger' && s.registrar_op.status !== 'succeeded' && s.registrar_op.status !== 'pending' && (
                                 <span className="block text-xs text-[#1D4ED8]" data-testid="hostinger-op">Hostinger: {s.registrar_op.provider_status === 'payment_pending' ? 'pagamento ao fornecedor pendente' : s.registrar_op.provider_status === 'awaiting_setup' ? 'pago, a aguardar configuração' : s.registrar_op.status === 'unknown' ? 'inconclusivo — revisão manual' : s.registrar_op.status === 'failed' ? 'recusado' : 'pedido enviado'}</span>
                               )}
+                              {s?.vps_op && (
+                                <span className={`block text-xs mt-1 ${s.vps_op.status === 'unknown' ? 'text-red-700 font-bold' : 'text-[#1D4ED8]'}`} data-testid="vps-op" data-status={s.vps_op.status}>
+                                  Hostinger ({s.vps_op.mode === 'live' ? 'produção' : s.vps_op.mode === 'manual' ? 'associação manual' : 'ensaio'}): {VPS_STATUS[s.vps_op.status] ?? s.vps_op.status}
+                                  {s.vps_op.provider_vm_id ? ` · VM ${s.vps_op.provider_vm_id}` : ''}{s.vps_op.ipv4 ? ` · ${s.vps_op.ipv4}` : ''}{s.vps_op.provider_status ? ` · ${s.vps_op.provider_status}` : ''}
+                                  {s.vps_op.expected_cost_minor != null && s.vps_op.currency ? ` · custo ${(s.vps_op.expected_cost_minor / 100).toFixed(2)} ${s.vps_op.currency} (limite ${((s.vps_op.cost_limit_minor ?? 0) / 100).toFixed(2)})` : ''}
+                                  {s.vps_op.message ? ` · ${s.vps_op.message}` : ''}
+                                </span>
+                              )}
+                              {s?.vps_op?.events?.length ? (
+                                <details className="text-[11px] text-[#555]" data-testid="vps-events"><summary className="cursor-pointer">Histórico da compra ({s.vps_op.events.length})</summary>
+                                  <ul className="pl-3 list-disc">{s.vps_op.events.map((e, k) => <li key={k} data-event={e.event}>{String(e.at).slice(0, 19).replace('T', ' ')} · {e.event}{e.detail ? ` — ${e.detail}` : ''}</li>)}</ul></details>
+                              ) : null}
                               {s?.registrar_op?.status === 'succeeded' && s.registrar_op.ns_status === 'failed' && <span className="block text-xs text-red-700" data-testid="ns-failed">Nameservers por aplicar</span>}
                               {s?.registrar_op?.status === 'succeeded' && s.registrar_op.dns_status !== 'confirmed' && <span className="block text-xs text-amber-800" data-testid="dns-pending">DNS pendente</span>}
                             </td>
                             <td className="py-2 text-right whitespace-nowrap">
+                              {s && s.service_type === 'vps' && o.payment_status === 'paid' && s.provisioning_status !== 'active' && (
+                                <span className="inline-flex flex-wrap justify-end gap-1 mr-1 mb-1">
+                                  {s.vps_op && <button disabled={!!acting} onClick={() => act(s.id + 'vr', { action: 'vps_reconcile', serviceId: s.id })} className="px-2 py-1 rounded-lg border border-[#1D4ED8] text-[#1D4ED8] text-xs font-bold" data-testid="vps-reconcile">Consultar Hostinger</button>}
+                                  {!['submitting', 'submitted', 'payment_processing'].includes(s.vps_op?.status ?? '') && <button disabled={!!acting} onClick={() => { const vm = window.prompt('Associar o VPS adquirido pela equipa.\nNúmero da VM na Hostinger (hPanel → VPS):'); if (vm) act(s.id + 'vl', { action: 'vps_link', serviceId: s.id, vmId: vm.trim() }) }} className="px-2 py-1 rounded-lg border border-green-600 text-green-700 text-xs font-bold" data-testid="vps-link">Associar VPS…</button>}
+                                  {['unknown', 'failed'].includes(s.vps_op?.status ?? '') && <button disabled={!!acting} onClick={() => { const note = window.prompt('Confirmou no hPanel que NADA foi comprado para esta encomenda?\nDescreva a verificação (fica no histórico). Uma nova compra automática será tentada.'); if (note) act(s.id + 'vc', { action: 'vps_confirm_not_purchased', serviceId: s.id, notes: note }) }} className="px-2 py-1 rounded-lg border border-red-300 text-red-700 text-xs font-bold" data-testid="vps-confirm-not-purchased">Confirmar não comprado…</button>}
+                                </span>
+                              )}
                               {s && hostingerEligible(o, s) && (s.provisioning_status !== 'active' || s.registrar_op?.status === 'succeeded') && (
                                 <button disabled={!!acting} onClick={() => setHostinger(s.id)} className="mr-1 mb-1 px-2 py-1 rounded-lg bg-[#673DE6] text-white text-xs font-bold" data-testid="hostinger-open">
                                   {s.provisioning_status === 'active' ? 'Hostinger…' : s.registrar_op && !['pending', 'failed'].includes(s.registrar_op.status) ? 'Hostinger: estado…' : 'Registar na Hostinger…'}

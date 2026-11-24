@@ -24,6 +24,14 @@
  * O filtro do catálogo é por prefixo (como na API real); a compra recusa item_id de outra extensão (stats.wrongItem).
  * WHOIS: país diferente de AO sem «zip» → 422 errors.whois_details.zip.
  * GET /_stats: compras efectivas por domínio, chamadas de compra/setup e leituras.
+ *
+ * VPS (especificação OpenAPI 3.7.0): GET /api/billing/v1/catalog?category=VPS, GET /api/vps/v1/data-centers,
+ *   GET /api/vps/v1/templates, GET|POST /api/vps/v1/virtual-machines, GET /api/vps/v1/virtual-machines/{id},
+ *   POST /api/vps/v1/virtual-machines/{id}/setup. A VM fica «running» --vps-ready ms depois de criada (3000).
+ *   Cenários pelo item de preço do produto «hostingercom-vps-ensaio»: …-lento-… (compra feita, resposta depois do
+ *   tempo limite), …-perdido-… (sem resposta e sem compra), …-recusa-… (422, sem compra), …-pagamento-… (202;
+ *   POST /_vps_pay?subscription=… conclui: VM em «initial», precisa de /setup), …-caro-… (preço acima de qualquer limite).
+ *   GET /_stats → vpsPurchases (compras efectivas por hostname), vpsPurchaseCalls, vpsSetups.
  */
 import http from 'node:http'
 
@@ -34,7 +42,35 @@ const TOKEN = process.env.MOCK_HOSTINGER_TOKEN || 'hostinger-de-ensaio'
 
 const domains = new Map()   // domínio → { id, status, registered_at, verification, ns }
 const purchases = new Map() // domínio → n.º de compras efectivas
-const stats = { purchaseCalls: 0, setupCalls: 0, nsCalls: 0, whoisCreated: 0, reads: 0 }
+const stats = { purchaseCalls: 0, setupCalls: 0, nsCalls: 0, whoisCreated: 0, reads: 0, vpsPurchaseCalls: 0, vpsSetups: 0 }
+const VPS_READY = Number(args['vps-ready'] || 3000)
+const vms = new Map()          // id → VM
+const vpsPurchases = new Map() // hostname → n.º de compras efectivas
+const vpsPending = new Map()   // subscription_id → dados da compra (202)
+const VPS_ITEMS = [
+  ['kvm1', 'KVM 1', 1, 4096, 51200, 4194304, [[1, 1199, 499], [12, 7188, 5988], [24, 14376, 11976]]],
+  ['kvm2', 'KVM 2', 2, 8192, 102400, 8388608, [[1, 1799, 699], [12, 10788, 8388], [24, 21576, 16776]]],
+  ['kvm4', 'KVM 4', 4, 16384, 204800, 16777216, [[1, 2999, 999], [12, 17988, 11988], [24, 35976, 23976]]],
+  ['kvm8', 'KVM 8', 8, 32768, 409600, 33554432, [[1, 5999, 1999], [12, 35988, 23988], [24, 71976, 47976]]],
+]
+const vpsCatalog = () => [
+  ...VPS_ITEMS.map(([k, name, cpus, memory, disk, bandwidth, prices]) => ({ id: `hostingercom-vps-${k}`, name, category: 'VPS', metadata: { cpus, memory, disk_space: disk, bandwidth },
+    prices: prices.map(([m, price, first]) => ({ id: `hostingercom-vps-${k}-usd-${m}m`, name: `${name} (${m} mês/meses)`, currency: 'USD', price, first_period_price: first, period: m, period_unit: 'month' })) })),
+  { id: 'hostingercom-vps-ensaio', name: 'KVM 2 (cenários de ensaio)', category: 'VPS', metadata: { cpus: 2, memory: 8192, disk_space: 102400, bandwidth: 8388608 },
+    prices: ['lento', 'perdido', 'recusa', 'pagamento', 'caro'].flatMap(sc => [1, 12].map(m => ({ id: `hostingercom-vps-ensaio-${sc}-usd-${m}m`, name: `Ensaio ${sc} ${m}m`, currency: 'USD', price: sc === 'caro' ? 999999 : 1799 * m, first_period_price: sc === 'caro' ? 999999 : 699 * m, period: m, period_unit: 'month' }))) },
+]
+const vpsItem = id => { for (const it of vpsCatalog()) { const pr = it.prices.find(x => x.id === id); if (pr) return { it, pr } } return null }
+const vmView = vm => ({ ...vm, state: vm.state === 'creating' && Date.now() >= vm._readyAt ? 'running' : vm.state, _readyAt: undefined })
+function createVm(it, setup, subscription, state = 'creating', count = true) {
+  const id = ++seq
+  const vm = { id, subscription_id: subscription, data_center_id: setup?.data_center_id ?? null, plan: it.name, hostname: setup?.hostname || `srv${id}.hstgr.cloud`, state,
+    actions_lock: 'unlocked', cpus: it.metadata.cpus, memory: it.metadata.memory, disk: it.metadata.disk_space, bandwidth: it.metadata.bandwidth,
+    ipv4: [{ id: id + 1, address: `198.51.100.${id % 250}`, ptr: null }], ipv6: [], template: setup?.template_id ? { id: setup.template_id, name: `Template ${setup.template_id}` } : null,
+    created_at: now(), _readyAt: Date.now() + VPS_READY }
+  vms.set(id, vm)
+  if (count) vpsPurchases.set(vm.hostname, (vpsPurchases.get(vm.hostname) ?? 0) + 1)
+  return vm
+}
 const whois = []
 let seq = 5000
 const label = d => d.split('.')[0]
@@ -74,7 +110,13 @@ function register(d, extra = {}) {
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`)
   const p = url.pathname
-  if (p === '/_stats') return send(res, 200, { ...stats, purchases: Object.fromEntries(purchases), whois: whois.length })
+  if (p === '/_stats') return send(res, 200, { ...stats, purchases: Object.fromEntries(purchases), whois: whois.length, vpsPurchases: Object.fromEntries(vpsPurchases) })
+  if (p === '/_vps_pay' && req.method === 'POST') {
+    const sub = url.searchParams.get('subscription'); const x = vpsPending.get(sub)
+    if (!x) return send(res, 404, { message: 'sem pagamento pendente' })
+    vpsPending.delete(sub); const vm = createVm(x.it, { ...x.setup, hostname: x.setup.hostname }, sub, 'initial', false)
+    return send(res, 200, { ok: true, vm: vm.id })
+  }
   if (p === '/_pay' && req.method === 'POST') {
     const d = url.searchParams.get('domain'); const x = domains.get(d)
     if (x?.status === 'payment_processing') { x.status = 'pending_setup'; return send(res, 200, { ok: true }) }
@@ -101,7 +143,39 @@ http.createServer(async (req, res) => {
     const taken = /^ocupado/.test(b.domain) || domains.has(d)
     return send(res, 200, [{ domain: d, is_available: !taken, is_alternative: false, is_premium: /^premium/.test(b.domain), restriction: null }])
   }
-  if (req.method === 'GET' && p === '/api/billing/v1/catalog') { stats.reads++; return send(res, 200, catalog(url.searchParams.get('name'))) }
+  if (req.method === 'GET' && p === '/api/billing/v1/catalog') { stats.reads++; return send(res, 200, url.searchParams.get('category') === 'VPS' ? vpsCatalog() : catalog(url.searchParams.get('name'))) }
+  // ── VPS ──
+  if (req.method === 'GET' && p === '/api/vps/v1/data-centers') { stats.reads++; return send(res, 200, [{ id: 19, name: 'fra', location: 'de', city: 'Frankfurt', continent: 'Europe' }, { id: 21, name: 'lis', location: 'pt', city: 'Lisboa', continent: 'Europe' }, { id: 17, name: 'bos', location: 'us', city: 'Boston', continent: 'North America' }]) }
+  if (req.method === 'GET' && p === '/api/vps/v1/templates') { stats.reads++; return send(res, 200, [{ id: 1130, name: 'Ubuntu 24.04', description: 'Ubuntu 24.04 LTS' }, { id: 1077, name: 'Debian 12', description: 'Debian 12' }, { id: 1155, name: 'Ubuntu 24.04 com Docker', description: 'Docker' }]) }
+  if (req.method === 'GET' && p === '/api/vps/v1/virtual-machines') { stats.reads++; return send(res, 200, [...vms.values()].map(vmView)) }
+  let vmm = p.match(/^\/api\/vps\/v1\/virtual-machines\/(\d+)$/)
+  if (req.method === 'GET' && vmm) { stats.reads++; const vm = vms.get(Number(vmm[1])); return vm ? send(res, 200, vmView(vm)) : send(res, 404, { error: 'Virtual machine not found' }) }
+  vmm = p.match(/^\/api\/vps\/v1\/virtual-machines\/(\d+)\/setup$/)
+  if (req.method === 'POST' && vmm) {
+    const vm = vms.get(Number(vmm[1])); const b = await body(req)
+    if (!vm) return send(res, 404, { error: 'Virtual machine not found' })
+    if (vm.state !== 'initial') return send(res, 422, { error: 'Virtual machine is already set up' })
+    if (!b.template_id || !b.data_center_id) return send(res, 422, { error: 'The given data was invalid.' })
+    stats.vpsSetups++; vm.state = 'creating'; vm._readyAt = Date.now() + VPS_READY; vm.template = { id: b.template_id, name: `Template ${b.template_id}` }; vm.data_center_id = b.data_center_id
+    return send(res, 200, vmView(vm))
+  }
+  if (req.method === 'POST' && p === '/api/vps/v1/virtual-machines') {
+    stats.vpsPurchaseCalls++
+    const b = await body(req); const found = vpsItem(String(b.item_id || ''))
+    if (!found) return send(res, 422, { error: 'Invalid item_id.' })
+    if (!b.setup?.template_id || !b.setup?.data_center_id) return send(res, 422, { error: 'setup.template_id and setup.data_center_id are required.' })
+    if (b.setup.password) stats.vpsPasswordSent = (stats.vpsPasswordSent ?? 0) + 1
+    stats.vpsLastBody = b   // para o ensaio confirmar que só seguem o produto e os parâmetros necessários
+    const sc = (String(b.item_id).match(/-ensaio-(\w+)-usd/) ?? [])[1]
+    const sub = `Azz${(++seq).toString(36)}`
+    const order = { id: ++seq, subscription_id: sub, status: 'completed', currency: 'USD', subtotal: found.pr.first_period_price ?? found.pr.price, total: found.pr.first_period_price ?? found.pr.price, created_at: now(), updated_at: now() }
+    if (sc === 'recusa') return send(res, 422, { error: 'Payment method declined.' })
+    if (sc === 'perdido') { await sleep(DELAY); return send(res, 504, { error: 'Gateway timeout' }) }
+    if (sc === 'pagamento') { vpsPending.set(sub, { it: found.it, setup: b.setup }); vpsPurchases.set(b.setup.hostname, (vpsPurchases.get(b.setup.hostname) ?? 0) + 1); return send(res, 202, { id: order.id, subscription_id: sub, status: 'payment_initiated', message: 'Payment is being processed.' }) }
+    const vm = createVm(found.it, b.setup, sub)
+    if (sc === 'lento') { await sleep(DELAY); return send(res, 200, { order, virtual_machine: vmView(vm) }) }
+    return send(res, 200, { order, virtual_machine: vmView(vm) })
+  }
   if (req.method === 'GET' && p === '/api/billing/v1/payment-methods') {
     stats.reads++
     return send(res, 200, [{ id: 7001, name: 'Visa', identifier: '**** 4242', payment_method: 'card', is_default: true, is_expired: false, is_suspended: false }, { id: 7002, name: 'PayPal', identifier: 'conta@exemplo', is_default: false }])

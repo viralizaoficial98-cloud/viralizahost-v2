@@ -3,6 +3,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { DomainExtensionsEditor, type DomainExtension } from '@/components/admin/DomainExtensionsEditor'
 import { EmailPlansEditor } from '@/components/admin/EmailPlansEditor'
 import { HostingPlansEditor } from '@/components/admin/HostingPlansEditor'
+import { VpsPlansEditor } from '@/components/admin/VpsPlansEditor'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Save, ExternalLink, AlertTriangle } from 'lucide-react'
 import { AdminPageShell } from '@/components/admin/AdminPageShell'
@@ -32,7 +33,7 @@ function ProductRow({ p, onSaved }: { p: Product; onSaved: () => void }) {
   async function save() {
     setBusy(true); setMsg(null)
     try {
-      const res = await fetch('/api/admin/catalog', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'product', id: p.id, ...draft, prices: p.category === 'email' ? [] : draft.prices.filter(x => (x.active || p.prices.some(y => y.cycle === x.cycle)) && !(p.category === 'hosting' && PLAN_CYCLES.includes(x.cycle))) }) })
+      const res = await fetch('/api/admin/catalog', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'product', id: p.id, ...draft, prices: p.category === 'email' || (p.category === 'vps' && !p.subcategory) ? [] : draft.prices.filter(x => (x.active || p.prices.some(y => y.cycle === x.cycle)) && !(p.category === 'hosting' && PLAN_CYCLES.includes(x.cycle))) }) })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error)
       setMsg({ ok: true, text: 'Guardado' }); onSaved()
@@ -63,7 +64,7 @@ function ProductRow({ p, onSaved }: { p: Product; onSaved: () => void }) {
           </label>
         </div>
         {p.category === 'hosting' && <p className="text-xs text-[#64748B]">Ficha, preço base e descontos de 1 mês, 1, 2 e 3 anos: editar em «Planos de Hospedagem Premium» acima. Aqui: estado, pacote WHM (quotas reais), nota e os outros ciclos.</p>}
-        {p.category === 'email' ? <p className="text-xs text-[#64748B]">Preços, descontos e ficha deste plano: editar em «Planos de e-mail» acima. Aqui só o estado, o pacote WHM (quota técnica) e a nota.</p> : <div className="overflow-x-auto">
+        {p.category === 'vps' && !p.subcategory ? <p className="text-xs text-[#64748B]">Ficha, preços por ciclo e produto Hostinger: editar em «Planos VPS» acima. Aqui: estado e nota.</p> : p.category === 'email' ? <p className="text-xs text-[#64748B]">Preços, descontos e ficha deste plano: editar em «Planos de e-mail» acima. Aqui só o estado, o pacote WHM (quota técnica) e a nota.</p> : <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[520px]">
             <thead><tr className="text-left text-[11px] uppercase text-[#64748B]"><th className="py-1">Ciclo</th><th>Preço (Kz)</th><th>Renovação (Kz)</th><th>Activo</th></tr></thead>
             <tbody>
@@ -94,6 +95,7 @@ const CAT_GROUPS: Record<string, { label: string; categories: string[] | null }>
   all: { label: 'Tudo', categories: null },
   hosting: { label: 'Hospedagem', categories: ['hosting', 'wordpress', 'website-builder', 'reseller'] },
   email: { label: 'E-mail', categories: ['email'] },
+  vps: { label: 'VPS', categories: ['vps'] },
   servidores: { label: 'VPS e dedicados', categories: ['vps', 'dedicated', 'dedicated-windows'] },
   outros: { label: 'Outros', categories: ['ssl', 'backup', 'protection', 'domain', 'microsoft365'] },
   dominios: { label: 'Domínios', categories: [] },
@@ -157,6 +159,10 @@ function Catalog() {
             ))}
           </div>
           {cat !== 'dominios' && <input className={`${input} max-w-sm`} placeholder="Filtrar planos…" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filtrar planos" />}
+          {(cat === 'all' || cat === 'vps' || cat === 'servidores') && <section data-testid="vps-plans-admin">
+            <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">Planos VPS (/servidor-vps) — ficha, imagem, preços por ciclo e produto Hostinger</h2>
+            <VpsPlansEditor onSaved={load} />
+          </section>}
           {(cat === 'all' || cat === 'hosting') && <section data-testid="hosting-plans-admin">
             <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">Planos de Hospedagem Premium — ficha, preço base e descontos por período</h2>
             <HostingPlansEditor onSaved={load} />

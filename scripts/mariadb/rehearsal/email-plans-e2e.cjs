@@ -121,7 +121,7 @@ class S {
         const k = cards.find(x => x.slug === v.slug); const base = Number(v.base_monthly_price)
         if (!k || num(k.monthly) !== base || num(k.total) !== base * months || k.list || k.discount || !/por caixa de correio/.test(k.text) || k.cta !== `/comprar/${v.slug}?ciclo=${c}`) bad.push(`${v.slug}:${JSON.stringify(k)}`)
       }
-      ok(!bad.length, `${label}: preços actuais, sem etiqueta nem preço riscado, «por caixa de correio», «Configurar» com ?ciclo=${c}`, bad.join(' '))
+      ok(!bad.length, `${label}: preços actuais, sem etiqueta nem preço riscado, «por caixa de correio», «Comprar agora» com ?ciclo=${c}`, bad.join(' '))
       ok(!(await periodBadge(c)), `${label}: selector sem «Poupe/Até» com desconto 0`)
     }
     await pick('monthly')
@@ -264,7 +264,7 @@ class S {
     await p.getByRole('radio', { name: 'Usar um domínio que já tenho' }).click()
     await p.getByPlaceholder('empresa.ao').fill(`mail-${rnd()}.ao`)
     await p.getByTestId('continue-own-domain').click(); await p.waitForURL('**passo=duracao**')
-    ok(await p.getByTestId('cycle-3years').getAttribute('aria-checked') === 'true', '«Configurar» leva o período escolhido (3 anos)')
+    ok(await p.getByTestId('cycle-3years').getAttribute('aria-checked') === 'true', '«Comprar agora» leva o período escolhido (3 anos)')
     for (let i = 0; i < 3; i++) await p.getByRole('button', { name: 'Mais uma caixa' }).click()
     const flowTotal = num(await p.getByTestId('flow-total').innerText())
     ok(flowTotal === 8532 * 4, `configuração: 4 caixas × 8 532 = ${flowTotal}`)

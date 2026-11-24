@@ -1,4 +1,5 @@
 import 'server-only'
+import { isServerVps, provisionVps } from '@/lib/vps/provisioning'
 import { randomUUID } from 'node:crypto'
 import { getPool, type Queryable } from '@/lib/db/pool'
 import { loadWhmConfig } from '@/lib/whm/config'
@@ -13,7 +14,7 @@ import { hostingerForDomain, providerRequiresAuthorization } from '@/lib/registr
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const rows = async <T = any>(db: Queryable, sql: string, p: unknown[] = []) => (await db.query(sql, p))[0] as T[]
 
-export type ProvisionOutcome = { serviceId: string; status: 'active' | 'manual_required' | 'failed' | 'skipped'; message: string }
+export type ProvisionOutcome = { serviceId: string; status: 'active' | 'manual_required' | 'failed' | 'skipped' | 'in_progress'; message: string }
 
 /** Erros do fornecedor sem credenciais/URLs (nunca registar tokens nem ligações temporárias). */
 const safeError = (e: unknown) => String((e as Error)?.message ?? e).replace(/https?:\/\/\S+/g, '[url]').replace(/(token|password|pass|secret)=\S+/gi, '$1=[oculto]').slice(0, 300)
@@ -45,7 +46,7 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
   ) as any
   if (!claim.affectedRows) return { serviceId, status: 'skipped', message: 'Já activo ou em curso.' }
 
-  const [s] = await rows(db, `SELECT s.*, o.payment_status, o.ns1, o.ns2, o.ns3, o.ns4, oi.months, oi.years, oi.domain_operation, oi.epp_code_enc, oi.nameservers AS item_ns, p.provisioning, p.whm_package, p.whm_server_id, p.slug
+  const [s] = await rows(db, `SELECT s.*, o.payment_status, o.ns1, o.ns2, o.ns3, o.ns4, oi.months, oi.years, oi.domain_operation, oi.epp_code_enc, oi.nameservers AS item_ns, p.provisioning, p.whm_package, p.whm_server_id, p.slug, p.category, p.subcategory
     FROM services s JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id LEFT JOIN products p ON p.id = s.product_id
     WHERE s.id = ?`, [serviceId])
   const done = async (status: ProvisionOutcome['status'], message: string, extra: Record<string, unknown> = {}) => {
@@ -88,6 +89,8 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
       }
       return await done('manual_required', 'Renovação paga: confirmar a renovação no fornecedor e marcar como concluída.')
     }
+    // Servidor VPS: compra automática na Hostinger (com salvaguardas) ou tarefa manual — ver lib/vps/provisioning.ts
+    if (isServerVps(s)) return await provisionVps(serviceId)
     if (s.service_type === 'domain') {
       const op = s.domain_operation === 'transfer' ? 'transfer' : s.domain_operation === 'renew' ? 'renew' : 'register'
       const label = op === 'transfer' ? 'Transferência' : op === 'renew' ? 'Renovação' : 'Registo'

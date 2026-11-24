@@ -14,6 +14,7 @@ export interface QuoteLine {
   nameservers?: { useDefault: boolean; ns: string[] }
   cycles?: { cycle: Cycle; months: number; price: number; renewal: number; discount?: number }[]
   discountPct?: number; listTotal?: number | null; renewalDiscountPct?: number
+  options?: { location?: { id: string; label: string } | null; image?: { id: string; label: string } | null } | null
   error?: { code: string; message: string }
 }
 export interface Quote { currency: 'AKZ'; lines: QuoteLine[]; subtotal: number; taxRate: number; taxLabel: string; tax: number; total: number; valid: boolean; needsConfirmation?: boolean }
@@ -66,6 +67,12 @@ export function periodOf(l: QuoteLine) {
   if (!l.cycle) return '—'
   return l.months && l.months > 1 ? `${CYCLE_LABEL[l.cycle]} — ${l.months} meses pagos antecipadamente` : CYCLE_LABEL[l.cycle]
 }
+/** VPS: localização e sistema escolhidos («Localização: Lisboa · Sistema: Ubuntu 24.04»). */
+export function optionsOf(l: QuoteLine): string | null {
+  const o = l.options; if (!o) return null
+  const parts = [o.location ? `Localização: ${o.location.label}` : null, o.image ? `Sistema: ${o.image.label}` : null].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
+}
 /** Desconto do período (só quando existe): «Desconto 70% (−Kz 19 908)». */
 export function discountOf(l: QuoteLine): string | null {
   if (!l.discountPct || l.discountPct <= 0) return null
@@ -86,7 +93,7 @@ export function Summary({ quote, loading, title = 'Resumo' }: { quote: Quote | n
           <ul className="space-y-3 mb-4">
             {quote.lines.filter(l => !l.error).map(l => (
               <li key={l.index} className="flex justify-between gap-3 text-sm">
-                <span className="text-[#333] min-w-0 break-words">{l.name}{l.quantity > 1 ? ` × ${l.quantity}` : ''}<span className="block text-xs text-[#999]">{periodOf(l)} · renova por {renewalOf(l)}</span>{discountOf(l) && <span className="block text-xs text-green-700" data-testid="summary-discount">{discountOf(l)}</span>}</span>
+                <span className="text-[#333] min-w-0 break-words">{l.name}{l.quantity > 1 ? ` × ${l.quantity}` : ''}<span className="block text-xs text-[#999]">{periodOf(l)} · renova por {renewalOf(l)}</span>{discountOf(l) && <span className="block text-xs text-green-700" data-testid="summary-discount">{discountOf(l)}</span>}{optionsOf(l) && <span className="block text-xs text-[#555]" data-testid="summary-options">{optionsOf(l)}</span>}</span>
                 <span className="font-bold whitespace-nowrap">{kz(l.lineTotal)}</span>
               </li>
             ))}

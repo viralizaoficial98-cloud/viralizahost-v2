@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { AlertCircle, ChevronRight, Clock, Globe, Loader2, Minus, Pencil, Plus, Server, ShoppingCart, Trash2 } from 'lucide-react'
 import { useCart, type CartLine, type Cycle, type DomainMode } from '@/store/cartStore'
 import { flushCart } from '@/store/cartSync'
-import { CYCLE_LABEL, PurchaseSteps, Summary, btnGhost, btnPrimary, card, discountOf, input, kz, periodOf, renewalOf, useCartHydrated, useQuote, type QuoteLine } from '@/components/checkout/shared'
+import { CYCLE_LABEL, PurchaseSteps, Summary, btnGhost, btnPrimary, card, discountOf, input, kz, optionsOf, periodOf, renewalOf, useCartHydrated, useQuote, type QuoteLine } from '@/components/checkout/shared'
 
 // Carrinho: todos os itens (domínios, alojamento, e-mail, renovações) com período, preço agora e
 // renovação calculados no servidor. Editar, remover, continuar a comprar, esvaziar e «Finalizar»
@@ -37,6 +37,7 @@ function Line({ l, q, onRemove }: { l: CartLine; q?: QuoteLine; onRemove: () => 
               {q.type !== 'renewal' && <div><dt className="inline">Renovação: </dt><dd className="inline font-semibold text-[#333]" data-testid="line-renewal">{renewalOf(q)}</dd></div>}
               {(q.quantity > 1 || q.quantityUnit) && <div><dt className="inline">Quantidade: </dt><dd className="inline font-semibold text-[#333]" data-testid="line-quantity">{q.quantity}{q.quantityUnit === 'caixa' ? ` ${q.quantity === 1 ? 'caixa de correio' : 'caixas de correio'}` : ''}</dd></div>}
               {discountOf(q) && <div><dt className="sr-only">Desconto: </dt><dd className="inline font-semibold text-green-700" data-testid="line-discount">{discountOf(q)}</dd></div>}
+              {optionsOf(q) && <div><dt className="sr-only">Opções: </dt><dd className="inline text-[#333]" data-testid="line-options">{optionsOf(q)}</dd></div>}
             </dl>
           )}
           {q?.error && (

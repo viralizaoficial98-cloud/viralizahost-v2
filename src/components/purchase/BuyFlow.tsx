@@ -18,12 +18,14 @@ export interface BuyPlan {
   quantityUnit: string | null; maxQuantity: number; needsDomain: boolean; features: string[]
   prices: { cycle: Cycle; months: number; price: number; renewal: number; discount?: number; renewalDiscount?: number }[]
   baseMonthly?: number | null
+  /** VPS: localização e sistema operativo (só quando o administrador activou opções) */
+  vpsOptions?: { locations: { id: string; label: string }[]; images: { id: string; label: string }[] } | null
 }
 type Mode = 'register' | 'transfer' | 'existing'
 type Status = 'available' | 'unavailable' | 'confirm' | 'on_request'
 interface Ext { extension: string; status: 'active' | 'on_request'; register: number | null; renew: number | null; transfer: number | null; eppRequired: boolean; national: boolean; maxYears: number }
 interface Result extends Ext { domain: string; availability: Status }
-interface Selection { mode: Mode | null; domain: string; availability: Status | null; years: number; cycle: Cycle | null; quantity: number; flowId: string }
+interface Selection { mode: Mode | null; domain: string; availability: Status | null; years: number; cycle: Cycle | null; quantity: number; flowId: string; location?: string; image?: string }
 
 const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`)
 const useSelections = create<{ by: Record<string, Selection>; set: (slug: string, patch: Partial<Selection>) => void }>()(
@@ -63,9 +65,12 @@ function useHydrated() {
   )
 }
 
-function Steps({ current, needsDomain }: { current: 'domain' | 'cycle'; needsDomain: boolean }) {
-  const steps = [['Plano', true], ...(needsDomain ? [['Domínio', current === 'cycle']] : []), ['Duração', false], ['Carrinho', false], ['Checkout', false]] as [string, boolean][]
-  const active = current === 'domain' ? 'Domínio' : 'Duração'
+function Steps({ current, needsDomain, vps }: { current: 'domain' | 'cycle' | 'options'; needsDomain: boolean; vps?: boolean }) {
+  // VPS (referência: compra na Hostinger): plano e período → localização e sistema → rever → pagar → activação
+  const steps = (vps
+    ? [['Plano e período', current === 'options'], ['Localização e sistema', false], ['Rever', false], ['Pagar', false], ['Activação', false]]
+    : [['Plano', true], ...(needsDomain ? [['Domínio', current === 'cycle']] : []), ['Duração', false], ['Carrinho', false], ['Checkout', false]]) as [string, boolean][]
+  const active = vps ? (current === 'options' ? 'Localização e sistema' : 'Plano e período') : current === 'domain' ? 'Domínio' : 'Duração'
   return (
     <ol className="flex flex-wrap items-center gap-2 text-xs sm:text-sm mb-6" aria-label="Passos da compra">
       {steps.map(([s, done], i) => (
@@ -246,9 +251,11 @@ function DomainStep({ plan, sel, update, exts, extsError, reloadExts, onDone, ep
 
 /* ───────────────────────── Passo «Duração» ───────────────────────── */
 
-function CycleStep({ plan, sel, update, exts, onBack, onAdd, adding }: {
+function CycleStep({ plan, sel, update, exts, onBack, onAdd, adding, onNext }: {
   plan: BuyPlan; sel: Selection; update: (p: Partial<Selection>) => void; exts: Ext[] | null
   onBack: (() => void) | null; onAdd: () => void; adding: boolean
+  /** VPS com opções: «Continuar» para a localização e o sistema (em vez de adicionar já ao carrinho) */
+  onNext?: (() => void) | null
 }) {
   const qty = plan.quantityUnit ? Math.max(1, Math.min(sel.quantity || 1, plan.maxQuantity)) : 1
   const chosen = plan.prices.find(p => p.cycle === sel.cycle) ?? null
@@ -325,7 +332,44 @@ function CycleStep({ plan, sel, update, exts, onBack, onAdd, adding }: {
         <p className="text-sm text-[#555]">Total a pagar agora: <strong className="text-xl text-[#0A0A0A]" data-testid="flow-total">{chosen ? kz(total) : '—'}</strong></p>
         <div className="flex gap-2">
           {onBack && <button className={btnGhost} onClick={onBack}><ChevronLeft size={16} /> Voltar</button>}
-          <button className={btnPrimary} disabled={!chosen || adding} onClick={onAdd} data-testid="add-to-cart">{adding ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />} Adicionar ao carrinho</button>
+          {onNext
+            ? <button className={btnPrimary} disabled={!chosen} onClick={onNext} data-testid="to-options">Continuar <ChevronRight size={16} /></button>
+            : <button className={btnPrimary} disabled={!chosen || adding} onClick={onAdd} data-testid="add-to-cart">{adding ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />} Adicionar ao carrinho</button>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ───────────────────────── VPS: localização e sistema ───────────────────────── */
+
+function OptionsStep({ plan, sel, update, onBack, onAdd, adding }: { plan: BuyPlan; sel: Selection; update: (p: Partial<Selection>) => void; onBack: () => void; onAdd: () => void; adding: boolean }) {
+  const o = plan.vpsOptions ?? { locations: [], images: [] }
+  const chosen = plan.prices.find(p => p.cycle === sel.cycle) ?? null
+  const ok = chosen && (!o.locations.length || o.locations.some(x => x.id === sel.location)) && (!o.images.length || o.images.some(x => x.id === sel.image))
+  const group = (title: string, list: { id: string; label: string }[], value: string | undefined, key: 'location' | 'image') => list.length > 0 && (
+    <fieldset className="mb-6">
+      <legend className="text-sm font-bold text-[#0A0A0A] mb-2">{title}</legend>
+      <div role="radiogroup" aria-label={title} className="grid sm:grid-cols-2 gap-2">
+        {list.map(x => (
+          <button key={x.id} type="button" role="radio" aria-checked={value === x.id} onClick={() => update({ [key]: x.id })} data-testid={`opt-${key}-${x.id}`}
+            className={`text-left p-3 rounded-xl border-2 text-sm font-semibold ${value === x.id ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#EEE] hover:border-[#F5B700]/50'}`}>{x.label}</button>
+        ))}
+      </div>
+    </fieldset>
+  )
+  return (
+    <div className={card}>
+      <h1 className="text-2xl font-black text-[#0A0A0A] mb-1">Localização e sistema operativo</h1>
+      <p className="text-sm text-[#666] mb-5">{plan.name}{chosen ? <> · {CYCLE_NAME[chosen.cycle]} <button className="underline text-[#555]" onClick={onBack}>alterar período</button></> : null}</p>
+      {group('Localização do servidor', o.locations, sel.location, 'location')}
+      {group('Sistema operativo / imagem', o.images, sel.image, 'image')}
+      <p className="text-xs text-[#888] mb-6">A localização e o sistema não alteram o preço. Revê a configuração e o total no carrinho antes de pagar.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[#EEE] pt-4">
+        <p className="text-sm text-[#555]">Total a pagar agora: <strong className="text-xl text-[#0A0A0A]" data-testid="flow-total">{chosen ? kz(chosen.price) : '—'}</strong></p>
+        <div className="flex gap-2">
+          <button className={btnGhost} onClick={onBack}><ChevronLeft size={16} /> Voltar</button>
+          <button className={btnPrimary} disabled={!ok || adding} onClick={onAdd} data-testid="add-to-cart">{adding ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />} Rever no carrinho</button>
         </div>
       </div>
     </div>
@@ -363,7 +407,12 @@ export function BuyFlow({ plan, initialCycle }: { plan: BuyPlan; initialCycle?: 
     if (!sel.flowId) update({ flowId: newId() })
   }, [hydrated, initialCycle, plan.prices, sel.cycle, sel.flowId, update])
 
-  const step: 'domain' | 'cycle' = !plan.needsDomain ? 'cycle' : params.get('passo') === 'duracao' && sel.domain ? 'cycle' : 'domain'
+  const hasOptions = !!plan.vpsOptions && (plan.vpsOptions.locations.length > 0 || plan.vpsOptions.images.length > 0)
+  const isVps = plan.vpsOptions !== undefined && plan.vpsOptions !== null
+  const step: 'domain' | 'cycle' | 'options' = hasOptions && params.get('passo') === 'opcoes' && sel.cycle ? 'options'
+    : !plan.needsDomain ? 'cycle' : params.get('passo') === 'duracao' && sel.domain ? 'cycle' : 'domain'
+  const goOptions = () => router.push(`/comprar/${plan.slug}?passo=opcoes`)
+  const goCycleOnly = () => router.push(`/comprar/${plan.slug}`)
   const goCycle = () => router.push(`/comprar/${plan.slug}?passo=duracao`)
   const goDomain = () => router.push(`/comprar/${plan.slug}?passo=dominio`)
 
@@ -374,6 +423,7 @@ export function BuyFlow({ plan, initialCycle }: { plan: BuyPlan; initialCycle?: 
     const lines: NewCartLine[] = [{
       type: 'product', slug: plan.slug, cycle: chosen.cycle, quantity: plan.quantityUnit ? Math.max(1, sel.quantity || 1) : 1,
       ...(plan.needsDomain ? { domain: sel.domain, domainMode: sel.mode === 'existing' ? 'existing' : sel.mode === 'transfer' ? 'transfer' : 'register' } : {}),
+      ...(hasOptions ? { options: { ...(sel.location ? { location: sel.location } : {}), ...(sel.image ? { image: sel.image } : {}) } } : {}),
     }]
     if (plan.needsDomain && (sel.mode === 'register' || sel.mode === 'transfer')) {
       lines.push({ type: 'domain', domain: sel.domain, operation: sel.mode, years: sel.mode === 'register' ? sel.years || 1 : 1, ...(sel.mode === 'transfer' && epp ? { eppCode: epp } : {}) })
@@ -387,12 +437,14 @@ export function BuyFlow({ plan, initialCycle }: { plan: BuyPlan; initialCycle?: 
 
   return (
     <div>
-      <Steps current={step} needsDomain={plan.needsDomain} />
+      <Steps current={step} needsDomain={plan.needsDomain} vps={isVps} />
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         <div className="flex-1 w-full">
           {step === 'domain'
             ? <DomainStep plan={plan} sel={sel} update={update} exts={exts} extsError={extsError} reloadExts={loadExts} onDone={goCycle} epp={epp} setEpp={setEpp} />
-            : <CycleStep plan={plan} sel={sel} update={update} exts={exts} onBack={plan.needsDomain ? goDomain : null} onAdd={addToCart} adding={adding} />}
+            : step === 'options'
+              ? <OptionsStep plan={plan} sel={sel} update={update} onBack={goCycleOnly} onAdd={addToCart} adding={adding} />
+              : <CycleStep plan={plan} sel={sel} update={update} exts={exts} onBack={plan.needsDomain ? goDomain : null} onAdd={addToCart} adding={adding} onNext={hasOptions ? goOptions : null} />}
         </div>
         <aside className="w-full lg:w-80 shrink-0 bg-white rounded-2xl border border-[#E8E8E8] shadow-sm p-5" aria-label="Plano escolhido">
           <p className="text-xs font-black uppercase tracking-widest text-[#888] mb-2">Plano escolhido</p>

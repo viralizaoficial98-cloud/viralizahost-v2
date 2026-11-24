@@ -120,12 +120,14 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
       const epp = l.type === 'domain' && l.operation === 'transfer' && raw?.eppCode ? secretEpp(String(raw.eppCode)) : null
       await conn.query(
         `INSERT INTO order_items (id, order_id, service_name, service_type, price, quantity, product_id, product_slug, billing_cycle, months,
-           unit_price, line_total, renewal_price, domain_name, domain_operation, epp_code_enc, renews_service_id, years, availability, nameservers)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           unit_price, line_total, renewal_price, domain_name, domain_operation, epp_code_enc, renews_service_id, years, availability, nameservers, options)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [itemId, orderId, l.name, l.serviceType, l.unitPrice, l.quantity, l.productId ?? null, l.slug ?? null, l.cycle ?? null, l.months ?? null,
           l.unitPrice, l.lineTotal, l.renewalPrice, l.domain ?? null, l.type === 'domain' ? l.operation : (l.domainMode ?? null), epp, l.renewsServiceId ?? null,
           l.type === 'domain' ? (l.years ?? 1) : null, l.type === 'domain' ? (l.availability?.status ?? null) : null,
-          l.type === 'domain' && l.nameservers ? JSON.stringify(l.nameservers) : null],
+          l.type === 'domain' && l.nameservers ? JSON.stringify(l.nameservers) : null,
+          // Opções aceites (VPS: localização e sistema), com o rótulo visto pelo cliente
+          l.options ? JSON.stringify(l.options) : null],
       )
       // Serviço (um por item) — a activação acontece só depois do pagamento confirmado
       const serviceType = l.type === 'domain' ? 'domain' : l.serviceType
