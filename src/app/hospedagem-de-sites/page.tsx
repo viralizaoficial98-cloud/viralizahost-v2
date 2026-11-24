@@ -5,18 +5,22 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
 import { HostingPlansSection } from '@/components/service/HostingPlansSection'
 import { BuildSiteSection, SecuritySection, type SslCoverage } from '@/components/service/HostingSiteSections'
 import { getPool } from '@/lib/db/pool'
+import { ServiceHero } from '@/components/service/ServiceHero'
+import { getBannerPage } from '@/lib/banner-pages'
+import { fromPriceText } from '@/lib/commerce/from-price'
 
 // /hospedagem-de-sites — ordem fixa (ver docs/hospedagem-de-sites.md):
-//   1. Hospedagem de sites — Escolha o seu plano (#planos; inclui os planos WordPress em #planos-wordpress)
+//   0. Hero (ServiceHero + «Banners de páginas» do painel, slug hospedagem-de-sites; único H1)
+//   1. Hospedagem de sites — Escolha o seu plano (#planos; só planos de hospedagem de sites)
 //   2. Todos os planos incluem
 //   3. Crie e publique o seu site (#crie-o-seu-site; «Use WordPress» em #wordpress)
 //   4. Segurança para o seu site (#seguranca)
 //   5. Comece hoje (botão → #planos)
-// Preços, ciclos, descontos e «Comprar agora» vêm do catálogo (HostingPlansSection / DynamicServicePricing).
+// Preços, ciclos, descontos e «Comprar agora» vêm do catálogo (HostingPlansSection). Os planos WordPress não são
+// mostrados aqui, mas continuam no catálogo e à venda (/construtor-wordpress, /comprar/wp-…).
 
 export const metadata: Metadata = {
   title: 'Hospedagem de Sites',
@@ -49,19 +53,35 @@ async function sslCoverage(): Promise<SslCoverage> {
 }
 
 export default async function HospedagemDeSitesPage() {
-  const ssl = await sslCoverage()
+  const [ssl, banner, fromPrice] = await Promise.all([sslCoverage(), getBannerPage('hospedagem-de-sites'), fromPriceText('hosting')])
   return (
     <>
       <Header />
       <main>
-        {/* 1. Escolha o seu plano (hospedagem + WordPress, a partir do catálogo) */}
+        {/* 0. Hero (configuração em Painel → Site → Banners de páginas) */}
+        <div data-section="hero" data-testid="hosting-hero">
+          <ServiceHero
+            breadcrumb={banner?.breadcrumb ?? 'Hospedagem de Sites'}
+            tag={banner?.tag ?? 'Hospedagem Premium'}
+            title={banner?.title ?? 'Hospedagem de Sites Premium para o seu Negócio'}
+            subtitle={banner?.subtitle ?? 'Performance ultrarrápida com LiteSpeed, NVMe SSD, SSL grátis, cPanel e suporte técnico especializado 24/7.'}
+            price={fromPrice ?? undefined}
+            cta={banner?.button_primary_text ?? 'Ver Planos'}
+            ctaHref={banner?.button_primary_link ?? '#planos'}
+            ctaSecondary={banner?.button_secondary_text ?? 'Falar com Especialista'}
+            ctaSecondaryHref={banner?.button_secondary_link ?? '/tickets'}
+            bgImage={banner?.bg_image ?? 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80&auto=format&fit=crop'}
+            bgColor={banner?.bg_color ?? '#080d1a'}
+            highlights={banner?.highlights?.length ? banner.highlights : ["LiteSpeed Enterprise","NVMe SSD Gen4","Uptime 99.9%","cPanel Incluído"]}
+            guarantee={banner?.show_guarantee ?? true}
+            layout="split"
+          />
+        </div>
+        {/* 1. Escolha o seu plano (só hospedagem de sites, a partir do catálogo) */}
         <div data-section="plans">
-          <HostingPlansSection headingAs="h1" className="pt-32 md:pt-36 pb-16"
+          <HostingPlansSection
             title="Hospedagem de sites — Escolha o seu plano"
-            subtitle={<>Escolha o plano e o período; depois o domínio e os extras. Vai usar WordPress? <Link href="#planos-wordpress" className="font-bold text-[#0A0A0A] underline decoration-[#F5B700] decoration-2 underline-offset-4" data-testid="link-wordpress">Veja os planos WordPress</Link>.</>} />
-          <DynamicServicePricing id="planos-wordpress" category="wordpress" cols={3} showBillingToggle
-            title="Planos WordPress"
-            subtitle="Hospedagem para sites WordPress. Escolha o plano, depois o domínio e a duração." />
+            subtitle="Escolha o plano e o período; depois o domínio e os extras." />
         </div>
         {/* 2. Todos os planos incluem */}
         <div data-section="included" id="incluido" className="scroll-mt-24">

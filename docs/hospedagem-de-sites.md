@@ -6,31 +6,32 @@ O cabeçalho global aparece no topo da página e o rodapé global no fim.
 
 | # | Secção | Âncora | Componente |
 |---|---|---|---|
-| 1 | **Hospedagem de sites — Escolha o seu plano** (H1 único) | `#planos`, `#planos-wordpress` | `HostingPlansSection` (`headingAs="h1"`) + `DynamicServicePricing category="wordpress"` |
+| 0 | **Hero** (único H1) | — | `ServiceHero` com a configuração de **Painel → Site → Banners de páginas** (`page_slug = hospedagem-de-sites`): título, subtítulo, etiqueta, destaques, botões, imagem e cor. Sem configuração activa, usa os textos por omissão anteriores. |
+| 1 | Hospedagem de sites — Escolha o seu plano (H2) | `#planos` | `HostingPlansSection` (**só** planos de hospedagem de sites) |
 | 2 | Todos os planos incluem | `#incluido` | `IncludedFeatures` |
 | 3 | Crie e publique o seu site | `#crie-o-seu-site` (opções `#wordpress`, `#editor-visual`, `#site-pela-equipa`) | `BuildSiteSection` |
 | 4 | Segurança para o seu site | `#seguranca` | `SecuritySection` |
 | 5 | Comece hoje (botão → `#planos`) | — | `FinalCTA` |
 
-### O que foi removido
+### Planos WordPress
 
-- **Banner (ServiceHero)**: era o H1 e usava a configuração «Banners de páginas» da página `hospedagem-de-sites`. Essa configuração deixa de ter efeito nesta rota.
-- **Faixa «Vai usar WordPress?»**: o link passou para o subtítulo da secção 1.
-- **Secção autónoma «Hospedagem WordPress optimizada»**:
-  - a informação passou para «Use WordPress»;
-  - os planos WordPress continuam na secção 1 (`#planos-wordpress`), através do catálogo.
+A grelha de planos WordPress **não é apresentada nesta página**:
 
-### Links e encaminhamentos actualizados
+- Os registos do catálogo (`category = 'wordpress'`), os preços e os percursos de compra (`/comprar/wp-…`) continuam iguais.
+- `/construtor-wordpress` continua a mostrar os planos WordPress Builder.
+- «Use WordPress» é um bloco informativo, sem botão.
 
-- O encaminhamento `/hospedagem-wordpress` aponta para `/hospedagem-de-sites#planos-wordpress` (308; antes apontava para `#wordpress`).
-- O link «Hospedagem WordPress» do rodapé aponta para `#planos-wordpress`.
-- A âncora `#wordpress` continua a existir (opção «Use WordPress»), por isso links antigos não ficam partidos.
-- Não há links guardados na base de dados para âncoras desta página (verificado em todas as tabelas de texto).
-- O menu principal liga a `/hospedagem-de-sites` sem âncora.
+### Links e encaminhamentos
+
+- O encaminhamento `/hospedagem-wordpress` aponta para `/hospedagem-de-sites#wordpress` (308): o bloco «Use WordPress».
+- O link «Hospedagem WordPress» do rodapé aponta para `#wordpress`.
+- Não há links para `#planos-wordpress`.
+- Os cartões de planos carregam depois da página e empurram o conteúdo para baixo. Quando terminam de carregar, a página volta a posicionar a âncora do endereço (ex.: `#wordpress`), para o visitante ficar no bloco certo.
+- Não há links guardados na base de dados para âncoras desta página.
 
 ### Preços e compra
 
-Preços, ciclos, descontos e «Comprar agora» / «Escolher plano» vêm do catálogo (`/api/products`), sem alterações. O percurso continua a ser `/comprar/<slug>` → domínio → duração → carrinho.
+Preços, ciclos, descontos e «Comprar agora» vêm do catálogo (`/api/products?category=hosting`), sem alterações. O percurso continua a ser `/comprar/<slug>` → domínio → duração → carrinho.
 
 ## Conteúdo e o que foi confirmado
 
@@ -42,7 +43,9 @@ Preços, ciclos, descontos e «Comprar agora» / «Escolher plano» vêm do cat�
 | Conta cPanel própria por cliente | Integração WHM | «Cada conta no seu espaço» |
 | Criador de sites e Construtor WordPress | Páginas `/criador-de-sites` e `/construtor-wordpress` | Opção «Crie com um editor visual», com descrição genérica |
 
-Saíram desta página por não estarem confirmadas: LiteSpeed «até 6x», «uptime 99,9%», «Proteção DDoS» e «WordPress pré-instalado».
+As secções criadas pela equipa (2 a 5) não usam afirmações por confirmar (LiteSpeed «até 6x», «uptime 99,9%», «Proteção DDoS», «WordPress pré-instalado»).
+
+A **hero** mostra o conteúdo configurado no painel. Os textos e destaques actuais (ex.: «LiteSpeed Enterprise», «Uptime 99.9%») devem ser revistos pela equipa em «Banners de páginas» se não estiverem confirmados.
 
 ### Pendências: não anunciadas por falta de confirmação
 
@@ -60,13 +63,15 @@ BASE_URL=http://localhost:3000 OUT=/tmp/hosting-page node --env-file=.env.local 
 
 O ensaio corre em desktop e iPhone e verifica:
 
-- a ordem das secções, sem outros blocos, e o H1 único;
+- a hero: título, subtítulo, imagem e botão vêm de «Banners de páginas», e alterar o título no painel altera a página;
+- que a grelha de planos WordPress desapareceu e não há links para `#planos-wordpress`, mantendo os planos WordPress no catálogo e o percurso `/comprar/wp-…`;
+- a ordem das secções, sem outros blocos, e o H1 único (na hero);
 - os títulos das secções;
 - os planos do catálogo, incluindo os WordPress;
 - que «Todos os planos incluem» só tem benefícios comuns e não repete SSL nem cópias;
 - que não aparecem afirmações por confirmar;
 - os links e as âncoras, e que «Comece hoje» leva a `#planos`;
-- o encaminhamento 308;
+- o encaminhamento 308 para `#wordpress`, que abre o bloco «Use WordPress» no ecrã;
 - que a nota de SSL acompanha o catálogo (o teste retira o SSL de um plano e repõe-no);
 - o percurso «Comprar agora» → domínio → duração, com o preço do catálogo;
 - que não há deslocamento horizontal.
@@ -75,4 +80,4 @@ Capturas: `docs/capturas/hospedagem-de-sites/`.
 
 ## Publicação
 
-Não há migração. Usar o bloco de publicação de `docs/vps-ciclos-submenus.md` (backup, código, build, reinício **só** de `viralizahost`, confirmação do commit em `/api/version`). Depois, verificar `/hospedagem-de-sites` e `/hospedagem-wordpress` (308 → `#planos-wordpress`) em desktop e telemóvel. **A publicação fica para aprovação.**
+Não há migração. Usar o bloco de publicação de `docs/vps-ciclos-submenus.md` (backup, código, build, reinício **só** de `viralizahost`, confirmação do commit em `/api/version`). Depois, verificar `/hospedagem-de-sites` e `/hospedagem-wordpress` (308 → `#wordpress`) em desktop e telemóvel. **A publicação fica para aprovação.**
