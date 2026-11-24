@@ -48,13 +48,14 @@ export function DedicatedPlansSection({ kind, id = 'planos', title, subtitle }: 
     fetch(`/api/products?category=${K.category}`, { cache: 'no-store' })
       .then(async r => { const j = await r.json(); if (!r.ok || !j.success) throw new Error(j.message ?? `HTTP ${r.status}`); return j })
       .then(j => {
-        const list = (j.data as ApiPlan[]).filter(p => p.sale_status === 'active' && (p.product_prices ?? []).some(x => on(x.active)))
+        // Publicados com período activo; e os «sob consulta» (pedido de proposta, como antes)
+        const list = (j.data as ApiPlan[]).filter(p => (p.sale_status === 'active' && (p.product_prices ?? []).some(x => on(x.active))) || p.sale_status === 'on_request')
         setPlans(list); setState(list.length ? 'ok' : 'empty')
       })
       .catch(() => setState('error'))
   }, [attempt, K.category])
   const cycles = useMemo(() => DEDICATED_CYCLES.map(c => {
-    const bands = plans.map(p => toDedicatedBand(p, c.cycle)).filter(b => b.period)
+    const bands = plans.filter(p => p.sale_status === 'active').map(p => toDedicatedBand(p, c.cycle)).filter(b => b.period)
     return { ...c, available: bands.length > 0, badge: selectorBadge(bands.map(b => b.period!.discount)) }
   }).filter(c => c.available), [plans])
   const active = cycles.some(c => c.cycle === cycle) ? cycle : cycles[0]?.cycle ?? 'monthly'
@@ -95,7 +96,10 @@ export function DedicatedPlansSection({ kind, id = 'planos', title, subtitle }: 
         )}
         {state === 'ok' && (
           <div className="space-y-5 max-w-6xl mx-auto">
-            {plans.map(p => { const b = toDedicatedBand(p, active); return <VpsPlanBand key={p.id} tid="ded" plan={b} fmt={fmt} href={b.period ? `/comprar/${p.slug}?ciclo=${active}` : undefined} /> })}
+            {plans.map(p => {
+              const onRequest = p.sale_status === 'on_request', b = { ...toDedicatedBand(p, active), onRequest }
+              return <VpsPlanBand key={p.id} tid="ded" plan={b} fmt={fmt} href={onRequest ? `/comprar/${p.slug}` : b.period ? `/comprar/${p.slug}?ciclo=${active}` : undefined} />
+            })}
           </div>
         )}
         <p className="text-center text-gray-400 text-xs sm:text-sm mt-8">Escolha o plano e o período e reveja o total antes de pagar. A equipa activa o servidor depois do pagamento confirmado.</p>

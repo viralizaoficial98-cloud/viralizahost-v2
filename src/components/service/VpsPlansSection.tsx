@@ -25,6 +25,8 @@ export type VpsBandPlan = {
   specs: VpsSpecs; features: VpsFeature[]; base: number | null
   /** Linhas de especificação já preparadas (servidores dedicados); sem elas usa as do VPS */
   specLines?: { key: string; label: string; value: string }[]
+  /** Plano «sob consulta»: sem preço; o botão pede proposta (fluxo de cotação em /comprar/<plano>) */
+  onRequest?: boolean
   period: { cycle: string; months: number; label: string; total: number; renewal: number | null; discount: number } | null
 }
 
@@ -69,7 +71,14 @@ export function VpsPlanBand({ plan, fmt, href, preview = false, tid = 'vps' }: {
         </div>
         {/* Preço e botão */}
         <div className="lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-l border-[#F0F0F0] p-5 sm:p-6 flex flex-col justify-center bg-[#FCFCFC]">
-          {pr && perMonth != null ? (
+          {plan.onRequest ? (
+            <>
+              <p className="text-lg font-black text-[#0A0A0A]" data-testid={`${tid}-plan-on-request`}>Preço sob consulta</p>
+              <p className="text-xs text-[#666] mt-1">Configuração à medida: enviamos a proposta com o hardware e o período que precisa.</p>
+              {href ? <Link href={href} className="mt-4 inline-flex justify-center items-center w-full py-3 rounded-xl text-sm font-black bg-[#0A0A0A] text-white hover:bg-[#222]" data-testid={`${tid}-plan-quote`}>Pedir proposta</Link>
+                : <span className="mt-4 inline-flex justify-center w-full py-3 rounded-xl text-sm font-black bg-[#0A0A0A] text-white">Pedir proposta</span>}
+            </>
+          ) : pr && perMonth != null ? (
             <>
               <div className="flex items-center gap-2 min-h-5 flex-wrap">
                 {pr.discount > 0 && plan.base != null && plan.base > perMonth && <span className="text-sm line-through text-[#999]" data-testid={`${tid}-plan-list`}>{fmt(plan.base)}</span>}

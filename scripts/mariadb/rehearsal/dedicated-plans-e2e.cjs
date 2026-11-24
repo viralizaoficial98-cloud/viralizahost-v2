@@ -169,7 +169,13 @@ const mockStats = async () => { try { return await (await fetch(`${MOCK}/_stats`
       await p.goto(BASE + '/servidor-dedicado', { waitUntil: 'domcontentloaded' })
       const band = p.locator(`[data-testid=ded-plan][data-slug="${L.slug}"]`); await band.waitFor()
       const slugs = await p.locator('[data-testid=ded-plan]').evaluateAll(e => e.map(x => x.dataset.slug))
-      ok(slugs.includes(L.slug) && !slugs.includes(W.slug) && !slugs.some(s => ['ded-16', 'ded-32', 'ded-64'].includes(s)), `${label}: Linux só com planos Linux publicados (${slugs.join(', ')}); «sob consulta» não aparecem`)
+      ok(slugs.includes(L.slug) && !slugs.includes(W.slug), `${label}: Linux só com planos Linux (${slugs.join(', ')})`)
+      const onReq = snapProducts.filter(x => x.category === 'dedicated' && x.sale_status === 'on_request' && Number(x.active))
+      for (const o of onReq.slice(0, 1)) {
+        const ob = p.locator(`[data-testid=ded-plan][data-slug="${o.slug}"]`)
+        ok(await ob.getByTestId('ded-plan-on-request').isVisible() && await ob.getByTestId('ded-plan-quote').getAttribute('href') === `/comprar/${o.slug}` && await ob.getByTestId('ded-plan-total').count() === 0,
+          `${label}: plano «sob consulta» (${o.slug}) sem preço, com «Pedir proposta» (fluxo de cotação mantido)`)
+      }
       ok(await p.getByTestId('ded-period-2years').count() === 0 && await p.getByTestId('ded-period-1year').count() === 1, `${label}: só períodos publicados`)
       const keys = await band.locator('[data-testid^=ded-spec-]').evaluateAll(els => els.map(e => e.dataset.testid.replace('ded-spec-', '') + (e.querySelector('svg') ? '' : '!')))
       ok(keys.length === 9 && keys.every(k => !k.endsWith('!')), `${label}: especificações com ícone (${keys.join(' ')})`)
@@ -182,12 +188,14 @@ const mockStats = async () => { try { return await (await fetch(`${MOCK}/_stats`
       }
       await p.getByTestId('ded-period-1year').click(); await p.waitForTimeout(150)
       ok(num(await band.getByTestId('ded-plan-total').innerText()) === totalOf(150000, 12, 10) && /Poupe 10%/.test(await band.getByTestId('ded-plan-discount').innerText()) && /Comprar agora/.test(await band.getByTestId('ded-plan-cta').innerText()), `${label}: 1 ano ${await band.getByTestId('ded-plan-total').innerText()}, «Poupe 10%», «Comprar agora»`)
+      await p.addStyleTag({ content: 'header, [data-floating] { display: none !important }' })
       await band.scrollIntoViewIfNeeded()
       await band.screenshot({ path: `${OUT}/${label}-01-faixa-linux.png` })
       await p.goto(BASE + '/servidor-dedicado-windows', { waitUntil: 'domcontentloaded' })
       const bw = p.locator(`[data-testid=ded-plan][data-slug="${W.slug}"]`); await bw.waitFor()
       ok(await p.locator(`[data-testid=ded-plan][data-slug="${L.slug}"]`).count() === 0 && /Windows Server 2022 Standard incluída/.test(await bw.getByTestId('ded-spec-license').innerText()), `${label}: Windows só com planos Windows, licença indicada`)
       ok(await p.getByTestId('ded-compatibility').isVisible() && /ASP\.NET/.test(await p.getByTestId('ded-compatibility').innerText()), `${label}: compatibilidade Windows (ASP.NET, MS SQL, RDP)`)
+      await p.addStyleTag({ content: 'header, [data-floating] { display: none !important }' })
       await p.locator('[data-testid=ded-plans-section]').screenshot({ path: `${OUT}/${label}-02-planos-windows.png` })
       ok(p.errors.length === 0, `${label}: sem erros JS`, p.errors.join(' | '))
       await ctx.close()
