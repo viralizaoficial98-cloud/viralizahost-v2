@@ -66,7 +66,7 @@ Depois de publicar, com sessão de administrador, abrir **Integrações → E-ma
    RESEND_FROM_NAME=ViralizaHost
    NEXT_PUBLIC_SITE_URL=https://viralizahost.com
    ```
-   `AUTH_EMAIL_CONFIRMATION` não deve ser `false`.
+   A exigência de confirmação controla-se em **Configurações → Contas** (ver `docs/publicacao-vps-contas-bandeiras.md`); `AUTH_EMAIL_CONFIRMATION` só define o valor inicial.
 6. Reiniciar o processo: `pm2 restart viralizahost`. Se `NEXT_PUBLIC_SITE_URL` mudou, compilar antes com `npm run build`.
 7. Testar e confirmar a entrega:
    - **Integrações → E-mail transaccional → Enviar teste** para uma caixa da equipa;

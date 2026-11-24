@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createSession, createUser, deleteUser, setSessionCookie } from '@/lib/auth/server'
 import { sendVerificationEmail } from '@/lib/auth/verification'
+import { emailConfirmationRequired } from '@/lib/auth/account-settings'
 import { clientIp, rateLimit } from '@/lib/auth/rate-limit'
 import { claimCookieCart } from '@/lib/commerce/cart-server'
 import { CustomerError, saveCustomer } from '@/lib/commerce/customer'
@@ -9,7 +10,7 @@ import { REQUIRED_FIELDS, fieldError, FIELD_LABEL, type CustomerField } from '@/
 export const dynamic = 'force-dynamic'
 
 // Cadastro a partir do carrinho: cria a conta com os dados do titular e associa-lhe o carrinho.
-// Com verificação de e-mail obrigatória (AUTH_EMAIL_CONFIRMATION != 'false'), a sessão só começa
+// Com «Exigir confirmação de e-mail para novos clientes» activa (Configurações → Contas), a sessão só começa
 // depois do link; o link leva a /carrinho/finalizar e a compra continua com o mesmo carrinho.
 export async function POST(req: Request) {
   if (!rateLimit(`signup:${clientIp(req)}`, Number(process.env.SIGNUP_RATE_LIMIT) || 10, 60 * 60_000)) {
@@ -27,9 +28,9 @@ export async function POST(req: Request) {
   }
   if (Object.keys(errors).length) return NextResponse.json({ error: 'Corrija os campos assinalados.', errors }, { status: 400 })
 
-  const confirm = process.env.AUTH_EMAIL_CONFIRMATION !== 'false'
+  const confirm = await emailConfirmationRequired()
   const r = await createUser({
-    email, password, email_confirm: !confirm,
+    email, password, email_confirm: false, email_verification_exempt: !confirm,
     user_metadata: { full_name: String(b.full_name).trim(), phone: String(b.phone).trim(), country: String(b.country), role: 'client', source: 'checkout' },
   })
   if ('error' in r) {

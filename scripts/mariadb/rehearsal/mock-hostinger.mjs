@@ -48,16 +48,25 @@ const vms = new Map()          // id → VM
 const vpsPurchases = new Map() // hostname → n.º de compras efectivas
 const vpsPending = new Map()   // subscription_id → dados da compra (202)
 const VPS_ITEMS = [
-  ['kvm1', 'KVM 1', 1, 4096, 51200, 4194304, [[1, 1199, 499], [12, 7188, 5988], [24, 14376, 11976]]],
-  ['kvm2', 'KVM 2', 2, 8192, 102400, 8388608, [[1, 1799, 699], [12, 10788, 8388], [24, 21576, 16776]]],
-  ['kvm4', 'KVM 4', 4, 16384, 204800, 16777216, [[1, 2999, 999], [12, 17988, 11988], [24, 35976, 23976]]],
-  ['kvm8', 'KVM 8', 8, 32768, 409600, 33554432, [[1, 5999, 1999], [12, 35988, 23988], [24, 71976, 47976]]],
+  ['kvm1', 'KVM 1', 1, 4096, 51200, 4096000, [[1, 1199, 499], [12, 7188, 5988], [24, 14376, 11976]]],
+  ['kvm2', 'KVM 2', 2, 8192, 102400, 8192000, [[1, 1799, 699], [12, 10788, 8388], [24, 21576, 16776]]],
+  ['kvm4', 'KVM 4', 4, 16384, 204800, 16384000, [[1, 2999, 999], [12, 17988, 11988], [24, 35976, 23976]]],
+  ['kvm8', 'KVM 8', 8, 32768, 409600, 32768000, [[1, 5999, 1999], [12, 35988, 23988], [24, 71976, 47976]]],
 ]
 const vpsCatalog = () => [
+  ...vpsCatalogExtra(),
   ...VPS_ITEMS.map(([k, name, cpus, memory, disk, bandwidth, prices]) => ({ id: `hostingercom-vps-${k}`, name, category: 'VPS', metadata: { cpus, memory, disk_space: disk, bandwidth },
     prices: prices.map(([m, price, first]) => ({ id: `hostingercom-vps-${k}-usd-${m}m`, name: `${name} (${m} mês/meses)`, currency: 'USD', price, first_period_price: first, period: m, period_unit: 'month' })) })),
-  { id: 'hostingercom-vps-ensaio', name: 'KVM 2 (cenários de ensaio)', category: 'VPS', metadata: { cpus: 2, memory: 8192, disk_space: 102400, bandwidth: 8388608 },
+  { id: 'hostingercom-vps-ensaio', name: 'KVM 2 (cenários de ensaio)', category: 'VPS', metadata: { cpus: 2, memory: 8192, disk_space: 102400, bandwidth: 8192000 },
     prices: ['lento', 'perdido', 'recusa', 'pagamento', 'caro'].flatMap(sc => [1, 12].map(m => ({ id: `hostingercom-vps-ensaio-${sc}-usd-${m}m`, name: `Ensaio ${sc} ${m}m`, currency: 'USD', price: sc === 'caro' ? 999999 : 1799 * m, first_period_price: sc === 'caro' ? 999999 : 699 * m, period: m, period_unit: 'month' }))) },
+]
+// Tráfego como a Hostinger o devolve: GB anunciados × 1024 (KVM 1 «4 TB» = 4 000 GB = 4 096 000 MB).
+// Também: o mesmo KVM 1 na loja brasileira (hostingercombr-…) e um produto cuja chave de tráfego não tem unidade.
+const vpsCatalogExtra = () => [
+  { id: 'hostingercombr-vps-kvm1', name: 'KVM 1 (BR)', category: 'VPS', metadata: { cpus: 1, memory: 4096, disk_space: 51200, bandwidth: 4096000 },
+    prices: [[1, 1199, 499], [12, 7188, 5988]].map(([m, price, first]) => ({ id: `hostingercombr-vps-kvm1-usd-${m}m`, name: `KVM 1 BR (${m})`, currency: 'USD', price, first_period_price: first, period: m, period_unit: 'month' })) },
+  { id: 'hostingercom-vps-semunidade', name: 'KVM 1 (tráfego sem unidade)', category: 'VPS', metadata: { cpus: 1, memory: 4096, disk_space: 51200, traffic: 4 },
+    prices: [{ id: 'hostingercom-vps-semunidade-usd-1m', name: 'sem unidade 1m', currency: 'USD', price: 1199, first_period_price: 499, period: 1, period_unit: 'month' }] },
 ]
 const vpsItem = id => { for (const it of vpsCatalog()) { const pr = it.prices.find(x => x.id === id); if (pr) return { it, pr } } return null }
 const vmView = vm => ({ ...vm, state: vm.state === 'creating' && Date.now() >= vm._readyAt ? 'running' : vm.state, _readyAt: undefined })
@@ -72,7 +81,8 @@ function createVm(it, setup, subscription, state = 'creating', count = true) {
   return vm
 }
 const whois = []
-let seq = 5000
+// Números distintos em cada arranque (VMs de execuções anteriores continuam associadas na base de ensaio)
+let seq = 5000 + (Math.floor(Date.now() / 1000) % 100000) * 100
 const label = d => d.split('.')[0]
 const send = (res, status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)) }
 const body = req => new Promise(r => { let b = ''; req.on('data', c => (b += c)); req.on('end', () => { try { r(JSON.parse(b || '{}')) } catch { r({}) } }) })

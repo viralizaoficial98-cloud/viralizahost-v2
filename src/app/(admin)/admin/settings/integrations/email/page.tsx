@@ -66,7 +66,7 @@ export default function EmailIntegrationPage() {
           <Item ok={cfg.keyPresent}>{cfg.keyPresent ? <><code>RESEND_API_KEY</code> disponível ao processo</> : <><code>RESEND_API_KEY</code> em falta: nenhum e-mail é enviado (registos ficam «por verificar»)</>}</Item>
           <Item ok={cfg.fromEmailSet} warn>Remetente: <strong>{cfg.fromName} &lt;{cfg.fromEmail}&gt;</strong>{!cfg.fromEmailSet && ' (valor por omissão — defina RESEND_FROM_EMAIL)'}{!cfg.fromNameSet && ' · RESEND_FROM_NAME por omissão'}</Item>
           <Item ok={cfg.linkBaseOk} warn>Links dos e-mails começam por <strong>{cfg.linkBase}</strong>{!cfg.linkBaseOk && ' — em produção deve ser https://viralizahost.com (NEXT_PUBLIC_SITE_URL, fixado no build)'}</Item>
-          <Item ok={cfg.confirmationRequired} warn>{cfg.confirmationRequired ? 'Novas contas só entram depois de confirmar o e-mail' : 'AUTH_EMAIL_CONFIRMATION=false: contas entram sem confirmar o e-mail'}</Item>
+          <Item ok={cfg.confirmationRequired} warn>{cfg.confirmationRequired ? 'Novos clientes só entram depois de confirmar o e-mail' : 'Novos clientes entram sem confirmar o e-mail (o endereço fica por verificar)'} — <a href="/admin/settings/contas" className="underline">Configurações → Contas</a></Item>
           {cfg.simulated && <Item ok={false} warn>RESEND_API_URL definido: envios vão para um simulador (só ensaio)</Item>}
         </ul>
         <div className="flex flex-wrap gap-2 mt-4">

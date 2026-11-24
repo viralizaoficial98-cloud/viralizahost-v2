@@ -34,7 +34,8 @@ async function save(req: NextRequest, create: boolean) {
   try {
     const id = await saveVpsPlan({ ...body, id: create ? undefined : String(body.id) })
     await log(adminId, create ? 'create' : 'update', id, `VPS: ${String(body.name ?? '').slice(0, 80)} base=${body.baseMonthly} estado=${body.saleStatus} fornecedor=${body.providerProductId ?? '—'} (${body.providerMode ?? 'manual'})`)
-    return NextResponse.json({ ok: true, id, plans: await loadVpsPlans() }, { status: create ? 201 : 200 })
+    const plans = await loadVpsPlans(), saved = plans.find(p => p.id === id)
+    return NextResponse.json({ ok: true, id, plans, warnings: saved?.specWarnings ?? [], unverified: saved?.specUnverified ?? [] }, { status: create ? 201 : 200 })
   } catch (e) {
     if (e instanceof VpsPlanError) return NextResponse.json({ error: e.message, field: e.field ?? null }, { status: 400 })
     console.error('[admin/vps-plans]', (e as Error).message)

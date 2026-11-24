@@ -18,6 +18,7 @@ await c.query(\"DELETE FROM hosting_accounts WHERE cpanel_username='mariaacu'\")
 await c.query(\"DELETE FROM whm_accounts WHERE whm_username IN ('joaoconc','mariaacu','semdono','dupdom')\");await c.end()})()"
 fail=0
 run() { echo; echo "=== $1"; shift; "$@" || fail=$((fail+1)); }
+run "Regras: catálogo de domínios Hostinger e especificações VPS (unidades)" node --test scripts/registrar/hostinger-catalog.test.mjs scripts/vps/vps-specs.test.mjs
 run "Compras, pagamentos e activação" node --env-file=.env.local scripts/mariadb/rehearsal/commerce-e2e.mjs
 run "Área do Cliente, renovações, catálogo" node --env-file=.env.local scripts/mariadb/rehearsal/client-area-e2e.mjs
 run "Importação WHM" node --env-file=.env.local scripts/mariadb/rehearsal/whm-import-e2e.mjs
@@ -36,6 +37,8 @@ else
   run "Hospedagem Premium: períodos, descontos e fichas de plano (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/hosting-plans-e2e.cjs
   run "E-mail Corporativo: períodos, descontos e fichas de plano (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/email-plans-e2e.cjs
   run "Servidor VPS: planos, compra, comprovativo e Hostinger VPS simulada (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/vps-purchase-e2e.cjs
+  run "Configurações → Contas: confirmação de e-mail configurável (registo e checkout)" node --env-file=.env.local scripts/mariadb/rehearsal/account-settings-e2e.cjs
+  run "Presença Global: bandeiras no mapa e na lista (desktop + telemóvel)" node scripts/mariadb/rehearsal/global-presence-e2e.cjs
   run "Percursos de compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/purchase-flows-e2e.cjs
   run "Interface desktop + iPhone" node scripts/mariadb/rehearsal/ui-e2e.cjs
   run "Painel: menu, acções pendentes, integrações (desktop + iPhone)" node scripts/mariadb/rehearsal/admin-ui-e2e.cjs

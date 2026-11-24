@@ -49,6 +49,10 @@ export default function RegisterPage() {
         setError(authError.message === 'A user with this email address has already been registered'
           ? 'Já existe uma conta com este e-mail. Inicie sessão ou recupere a senha.'
           : authError.message)
+      } else if (data.session) {
+        // Confirmação de e-mail desactivada (Configurações → Contas): conta criada e sessão iniciada
+        router.push('/dashboard?bemvindo=1')
+        router.refresh()
       } else {
         setEmailSent(data.emailSent !== false)
         setSuccess(true)

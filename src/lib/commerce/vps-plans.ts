@@ -4,7 +4,7 @@ import { revalidateTag } from 'next/cache'
 import { getPool, withTransaction, type Queryable } from '@/lib/db/pool'
 import { MAX_DISCOUNT, exactPeriodTotal, matchesRule } from './period-pricing'
 import { syncDisplay } from './catalog-admin'
-import { VPS_CYCLES, isVpsIcon, specMismatches, type ProviderSpecs, type VpsFeature, type VpsSpecs } from './vps-shared'
+import { VPS_CYCLES, compareSpecs, isTrafficUnit, isVpsIcon, type ProviderSpecs, type VpsFeature, type VpsSpecs } from './vps-shared'
 
 // Catálogo e Preços → VPS (categoria «vps» sem subcategoria — a página /servidor-vps).
 // Ficha em products.plan_specs, imagem em products.image_path (armazenamento «catalog-assets»), características
@@ -26,7 +26,7 @@ export interface VpsPeriod {
 export interface VpsPlan {
   id: string; slug: string; name: string; description: string | null; saleStatus: 'active' | 'draft' | 'on_request'; position: number
   badge: string | null; highlight: boolean; baseMonthly: number | null; imageUrl: string | null; specs: VpsSpecs; features: VpsFeature[]
-  providerProductId: string | null; providerMode: 'auto' | 'manual'; providerSpecs: ProviderSpecs | null; specWarnings: string[]; periods: VpsPeriod[]
+  providerProductId: string | null; providerMode: 'auto' | 'manual'; providerSpecs: ProviderSpecs | null; specWarnings: string[]; specUnverified: string[]; periods: VpsPeriod[]
 }
 
 const json = (v: unknown) => { if (!v) return null; try { return typeof v === 'string' ? JSON.parse(v) : v } catch { return null } }
@@ -46,7 +46,7 @@ export async function loadVpsPlans(db: Queryable = getPool()): Promise<VpsPlan[]
       badge: p.badge ?? null, highlight: !!Number(p.popular), baseMonthly: base, imageUrl: vpsImageUrl(p.image_path), specs,
       features: feats.filter(f => f.product_id === p.id).map(f => ({ text: String(f.feature), icon: isVpsIcon(f.icon) ? f.icon : null })),
       providerProductId: p.provider_product_id ?? null, providerMode: p.provider_mode === 'auto' ? 'auto' : 'manual', providerSpecs,
-      specWarnings: specMismatches(specs, providerSpecs),
+      ...(({ mismatches, unverified }) => ({ specWarnings: mismatches, specUnverified: unverified }))(compareSpecs(specs, providerSpecs)),
       periods: VPS_CYCLES.map(c => {
         const r = prices.find(x => x.product_id === p.id && x.cycle === c.cycle)
         const price = r ? Number(r.price) : null, discount = r ? Number(r.discount_pct ?? 0) : 0
@@ -88,7 +88,7 @@ export function validateVpsSpecs(s: any): VpsSpecs {
   const t = s.traffic
   if (t && typeof t === 'object' && (t.unlimited === true || !isEmpty(t.value))) {
     if (t.unlimited === true) { if (!isEmpty(t.value)) throw new VpsPlanError('Tráfego: escolha um valor OU «Ilimitado».', 'traffic'); out.traffic = { unlimited: true } }
-    else { if (!['GB', 'TB'].includes(t.unit)) throw new VpsPlanError('Tráfego: unidade GB ou TB.', 'traffic'); out.traffic = { value: intIn(t.value, 'traffic', 'Tráfego mensal', 1, 1_000_000), unit: t.unit } }
+    else { if (!isTrafficUnit(t.unit)) throw new VpsPlanError('Tráfego: unidade GB, TB (decimais), GiB ou TiB (binárias).', 'traffic'); out.traffic = { value: intIn(t.value, 'traffic', 'Tráfego mensal', 1, 1_000_000), unit: t.unit } }
   }
   const nw = s.network
   if (nw && typeof nw === 'object' && !isEmpty(nw.value)) {
@@ -134,15 +134,26 @@ export async function saveVpsPlan(input: VpsPlanInput): Promise<string> {
   let providerSpecs: ProviderSpecs | null = null
   if (input.providerSpecs && typeof input.providerSpecs === 'object') {
     const ps = input.providerSpecs as any, num = (v: unknown) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v))
-    providerSpecs = { vcpu: num(ps.vcpu), ramGb: num(ps.ramGb), diskGb: num(ps.diskGb), trafficGb: num(ps.trafficGb), trafficUnlimited: ps.trafficUnlimited == null ? null : !!ps.trafficUnlimited }
+    const FIELDS = ['vcpu', 'ram', 'disk', 'traffic'] as const
+    const raw: NonNullable<ProviderSpecs['raw']> = {}
+    for (const f of FIELDS) {
+      const r = ps.raw?.[f]
+      if (r && typeof r === 'object' && Number.isFinite(Number(r.value))) raw[f] = { key: text(r.key, 40), value: Number(r.value), unit: r.unit ? text(r.unit, 8) : null }
+    }
+    providerSpecs = { vcpu: num(ps.vcpu), ramGb: num(ps.ramGb), diskGb: num(ps.diskGb), trafficGb: num(ps.trafficGb), trafficUnlimited: ps.trafficUnlimited == null ? null : !!ps.trafficUnlimited,
+      unverified: Array.isArray(ps.unverified) ? FIELDS.filter(f => ps.unverified.includes(f)) : [], raw }
   }
-  if (providerProductId) {
-    const mism = specMismatches(specs, providerSpecs)
-    if (mism.length) throw new VpsPlanError(`As características anunciadas não correspondem ao produto da Hostinger: ${mism.join('; ')}.`, 'specs')
-  }
+  // Mesma regra do painel (compareSpecs). Automático: divergência real bloqueia; valor não validado exige confirmação.
+  // Manual: a equipa trata da aquisição — grava e mostra as divergências como aviso.
+  const cmp = providerProductId ? compareSpecs(specs, providerSpecs) : { mismatches: [], unverified: [] }
   if (providerMode === 'auto') {
     if (!providerProductId) throw new VpsPlanError('Modo automático: associe o produto exacto da Hostinger.', 'providerProductId')
-    if (!providerSpecs && input.providerSpecsConfirmed !== true) throw new VpsPlanError('Modo automático: o catálogo não indica as características do produto; confirme que correspondem ao anunciado.', 'providerSpecsConfirmed')
+    if (cmp.mismatches.length) throw new VpsPlanError(`Modo automático: as características anunciadas não correspondem ao produto da Hostinger: ${cmp.mismatches.join('; ')}. Corrija-as ou use o modo Manual.`, 'specs')
+    if ((!providerSpecs || cmp.unverified.length) && input.providerSpecsConfirmed !== true) {
+      throw new VpsPlanError(cmp.unverified.length
+        ? `Modo automático: ${cmp.unverified.join('; ')}. Confirme que correspondem ao anunciado.`
+        : 'Modo automático: o catálogo não indica as características do produto; confirme que correspondem ao anunciado.', 'providerSpecsConfirmed')
+    }
   }
 
   const per = new Map((input.periods ?? []).map(p => [String(p?.cycle), p]))
