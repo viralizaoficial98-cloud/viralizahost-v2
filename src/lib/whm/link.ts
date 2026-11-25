@@ -2,10 +2,16 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { getPool, withTransaction, type Queryable } from '@/lib/db/pool'
 import { WHM_CONFIG_NAME } from './config'
+import { emailConfirmationRequired } from '@/lib/auth/account-settings'
 
 // Associação MANUAL de uma conta WHM importada a um cliente do portal.
-//   * Só clientes elegíveis: papel 'client', conta activa e e-mail confirmado no portal.
+//   * Só clientes elegíveis: papel 'client' e conta activa; o e-mail confirmado no portal só é exigido quando
+//     a opção «Configurações → Contas → confirmação de e-mail» está activa (mesma fonte e mesmo valor por omissão
+//     do registo, lidos em cada pedido). Com a opção desactivada, clientes novos ou antigos sem confirmação são
+//     elegíveis; o estado real de confirmação da conta nunca é alterado pela associação.
 //     Contas administrativas (role 'admin') nunca são candidatas nem seleccionáveis.
+//   * A regra é a MESMA na pesquisa do modal e na gravação (clientEligibility); a gravação relê a opção vigente,
+//     por isso uma alteração da opção entre a pesquisa e a gravação é respeitada no servidor.
 //   * O e-mail de contacto do WHM (ex.: comercial@…) fica como veio: não precisa de
 //     coincidir com o e-mail do cliente — a titularidade é confirmada pelo administrador.
 //   * Uma conta WHM só pode ter um titular: a linha é bloqueada (FOR UPDATE) e um
@@ -21,38 +27,58 @@ export class LinkError extends Error {
   constructor(public code: string, message: string, public status = 400, public details: Record<string, unknown> = {}) { super(message) }
 }
 
-/** Condição SQL de cliente elegível (alias p = profiles, u = auth_users). */
+/** Condição SQL da associação AUTOMÁTICA por e-mail na importação (import.ts): exige sempre e-mail confirmado.
+ *  Não é usada na associação manual (ver clientEligibility). Alias p = profiles, u = auth_users. */
 export const ELIGIBLE_SQL = `p.role = 'client' AND p.is_active = 1 AND u.email_confirmed_at IS NOT NULL`
 
-export interface ClientOption { id: string; full_name: string; email: string; eligible: boolean; reason: string | null }
+export interface ClientOption { id: string; full_name: string; email: string; eligible: boolean; reason: string | null; email_confirmed: boolean }
+
+export const EMAIL_NOT_CONFIRMED_REASON = 'E-mail ainda não confirmado no portal'
+
+/**
+ * Regra ÚNICA de elegibilidade da associação manual (pesquisa do modal e gravação).
+ * Devolve o motivo de inelegibilidade (null = elegível). requireConfirmation = opção vigente em Configurações → Contas.
+ */
+export function clientEligibility(p: { role?: string | null; is_active: unknown; email_confirmed_at: unknown }, requireConfirmation: boolean): { code: string; reason: string } | null {
+  if (p.role != null && p.role !== 'client') return { code: 'not_client', reason: 'Só contas de cliente podem ser titulares de uma hospedagem (contas administrativas excluídas).' }
+  if (!Number(p.is_active)) return { code: 'inactive', reason: 'Conta inactiva' }
+  if (requireConfirmation && !p.email_confirmed_at) return { code: 'email_not_confirmed', reason: EMAIL_NOT_CONFIRMED_REASON }
+  return null
+}
 
 /**
  * Pesquisa de clientes por nome ou e-mail. Contas administrativas são excluídas.
- * Clientes ainda não elegíveis (inactivos ou e-mail por confirmar) aparecem com o motivo,
- * sem poderem ser seleccionados.
+ * Clientes ainda não elegíveis (inactivos, ou e-mail por confirmar quando a confirmação está activa)
+ * aparecem com o motivo, sem poderem ser seleccionados.
  */
 export async function searchClients(q: string, limit = 10): Promise<ClientOption[]> {
   const term = q.trim().toLowerCase()
   if (term.length < 2) return []
   const like = `%${term.replace(/[\\%_]/g, m => '\\' + m)}%`
+  const requireConfirmation = await emailConfirmationRequired()
   const found = await rows(getPool(), `
     SELECT p.id, p.full_name, p.email, p.is_active, u.email_confirmed_at
     FROM profiles p LEFT JOIN auth_users u ON u.id = p.id
     WHERE p.role = 'client' AND (LOWER(p.email) LIKE ? OR LOWER(p.full_name) LIKE ?)
-    ORDER BY (p.is_active = 1 AND u.email_confirmed_at IS NOT NULL) DESC, p.full_name
-    LIMIT ?`, [like, like, limit])
+    ORDER BY (p.is_active = 1 AND (? = 0 OR u.email_confirmed_at IS NOT NULL)) DESC, p.full_name
+    LIMIT ?`, [like, like, requireConfirmation ? 1 : 0, limit])
   return found.map(r => {
-    const reason = !Number(r.is_active) ? 'Conta inactiva' : !r.email_confirmed_at ? 'E-mail ainda não confirmado no portal' : null
-    return { id: r.id, full_name: r.full_name || '', email: r.email, eligible: !reason, reason }
+    const block = clientEligibility({ role: 'client', is_active: r.is_active, email_confirmed_at: r.email_confirmed_at }, requireConfirmation)
+    return { id: r.id, full_name: r.full_name || '', email: r.email, eligible: !block, reason: block?.reason ?? null, email_confirmed: !!r.email_confirmed_at }
   })
 }
 
 async function eligibleClient(db: Queryable, profileId: string) {
   const [p] = await rows(db, `SELECT p.id, p.full_name, p.email, p.role, p.is_active, u.email_confirmed_at FROM profiles p LEFT JOIN auth_users u ON u.id = p.id WHERE p.id = ?`, [profileId])
   if (!p) throw new LinkError('client_not_found', 'Cliente não encontrado.', 404)
-  if (p.role !== 'client') throw new LinkError('client_not_eligible', 'Só contas de cliente podem ser titulares de uma hospedagem (contas administrativas excluídas).', 422)
-  if (!Number(p.is_active)) throw new LinkError('client_not_eligible', 'A conta do cliente está inactiva.', 422)
-  if (!p.email_confirmed_at) throw new LinkError('client_not_eligible', 'O cliente ainda não confirmou o e-mail no portal.', 422)
+  // Opção vigente NO MOMENTO da gravação (pode ter mudado depois de abrir o modal): a decisão é do servidor
+  const block = clientEligibility(p, await emailConfirmationRequired())
+  if (block?.code === 'not_client') throw new LinkError('client_not_eligible', block.reason, 422)
+  if (block?.code === 'inactive') throw new LinkError('client_not_eligible', 'A conta do cliente está inactiva.', 422)
+  if (block?.code === 'email_not_confirmed') {
+    throw new LinkError('email_not_confirmed', 'A confirmação de e-mail está activa (Configurações → Contas) e este cliente ainda não confirmou o e-mail no portal. A associação fica disponível depois de o cliente concluir a confirmação.', 422)
+  }
+  // Nunca altera auth_users.email_confirmed_at: o estado real de confirmação do cliente mantém-se
   return p
 }
 
