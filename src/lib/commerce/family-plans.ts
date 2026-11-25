@@ -5,7 +5,26 @@ import { getPool, withTransaction, type Queryable } from '@/lib/db/pool'
 import { MAX_DISCOUNT, exactPeriodTotal, impliedDiscount, matchesRule } from './period-pricing'
 import { syncDisplay } from './catalog-admin'
 import { FAMILY_PERIODS, PLAN_FAMILIES, type PlanFamily } from './plan-families'
-import { isVpsIcon, type VpsFeature } from './vps-shared'
+import { isVpsIcon, type VpsIcon } from './vps-shared'
+
+/** Característica de um plano: texto livre, ícone da lista controlada e «incluída» (planos antigos podiam ter
+ *  características marcadas como não incluídas — são preservadas e mostradas riscadas). */
+export interface FamilyFeature { text: string; icon: VpsIcon | null; included: boolean }
+
+/**
+ * Lê uma linha de product_features em qualquer formato conhecido: texto simples (editores actuais e o editor
+ * antigo de produtos, sem ícone e com posição a partir de 0) ou texto guardado como JSON ({text|feature|label, icon}).
+ * Nunca inventa texto: uma linha só com ícone fica com texto vazio (o painel assinala-a; o site não a mostra).
+ */
+export function readFeature(row: { feature: unknown; icon?: unknown; included?: unknown }): FamilyFeature {
+  let text = String(row.feature ?? '')
+  let icon: unknown = row.icon
+  const t = text.trim()
+  if (t.startsWith('{') && t.endsWith('}')) {
+    try { const o = JSON.parse(t); if (o && typeof o === 'object') { text = String(o.text ?? o.feature ?? o.label ?? ''); icon = icon ?? o.icon } } catch { /* texto normal */ }
+  }
+  return { text: text.trim(), icon: isVpsIcon(icon) ? icon : null, included: row.included === undefined ? true : !!Number(row.included) }
+}
 
 // Catálogo e Preços → planos de Revenda de Hospedagem, Criador de Sites e Construtor WordPress.
 // Mesmo modelo de preços da Hospedagem (period-pricing.ts): base mensal + desconto por período (0% incluído),
@@ -24,7 +43,7 @@ export interface FamilyPlan {
   position: number; badge: string | null; highlight: boolean
   /** Preço mensal base: o guardado ou, se ainda não existir, o do período de 1 mês (baseDerived). */
   baseMonthly: number | null; baseDerived: boolean
-  features: VpsFeature[]; periods: FamilyPeriod[]; otherCycles: { cycle: string; months: number; price: number; active: boolean }[]
+  features: FamilyFeature[]; periods: FamilyPeriod[]; otherCycles: { cycle: string; months: number; price: number; active: boolean }[]
 }
 const where = (f: PlanFamily) => {
   const d = PLAN_FAMILIES[f]
@@ -36,7 +55,8 @@ export async function loadFamilyPlans(family: PlanFamily, db: Queryable = getPoo
   const prods = await rows(db, `SELECT id, slug, name, description, sale_status, position, badge, popular, base_monthly_price FROM products WHERE ${w.sql} AND active = 1 ORDER BY position, name`, w.args)
   if (!prods.length) return []
   const ids = prods.map(p => p.id), inIds = `(${ids.map(() => '?').join(',')})`
-  const feats = await rows(db, `SELECT product_id, feature, icon FROM product_features WHERE product_id IN ${inIds} AND included = 1 ORDER BY position`, ids)
+  // TODAS as linhas (incluídas e não incluídas), pela ordem gravada
+  const feats = await rows(db, `SELECT product_id, feature, icon, included FROM product_features WHERE product_id IN ${inIds} ORDER BY position, id`, ids)
   const prices = await rows(db, `SELECT product_id, cycle, months, price, renewal_price, discount_pct, active FROM product_prices WHERE product_id IN ${inIds} ORDER BY months`, ids)
   return prods.map(p => {
     const mine = prices.filter(x => x.product_id === p.id)
@@ -46,7 +66,7 @@ export async function loadFamilyPlans(family: PlanFamily, db: Queryable = getPoo
     return {
       id: p.id, slug: p.slug, name: p.name, description: p.description ?? null, saleStatus: p.sale_status, position: Number(p.position ?? 0),
       badge: p.badge ?? null, highlight: !!Number(p.popular), baseMonthly: base, baseDerived: stored == null && base != null,
-      features: feats.filter(f => f.product_id === p.id).map(f => ({ text: String(f.feature), icon: isVpsIcon(f.icon) ? f.icon : null })),
+      features: feats.filter(f => f.product_id === p.id).map(readFeature),
       periods: FAMILY_PERIODS.map(per => {
         const r = mine.find(x => x.cycle === per.cycle)
         const price = r ? Number(r.price) : null, discount = r ? Number(r.discount_pct ?? 0) : 0
@@ -61,13 +81,14 @@ export async function loadFamilyPlans(family: PlanFamily, db: Queryable = getPoo
 /** Cartão público: só planos à venda (com pelo menos um dos 4 períodos publicado) ou sob consulta. */
 export interface PublicFamilyPlan {
   slug: string; name: string; description: string | null; badge: string | null; highlight: boolean; onRequest: boolean; base: number | null
-  features: VpsFeature[]; periods: { cycle: string; months: number; total: number; renewal: number; discount: number }[]
+  features: FamilyFeature[]; periods: { cycle: string; months: number; total: number; renewal: number; discount: number }[]
 }
 export async function publicFamilyPlans(family: PlanFamily): Promise<PublicFamilyPlan[]> {
   const plans = await loadFamilyPlans(family)
   return plans.filter(p => p.saleStatus === 'on_request' || (p.saleStatus === 'active' && p.periods.some(x => x.active && x.price != null)))
     .map(p => ({
-      slug: p.slug, name: p.name, description: p.description, badge: p.badge, highlight: p.highlight, onRequest: p.saleStatus === 'on_request', base: p.baseMonthly, features: p.features,
+      slug: p.slug, name: p.name, description: p.description, badge: p.badge, highlight: p.highlight, onRequest: p.saleStatus === 'on_request', base: p.baseMonthly,
+      features: p.features.filter(f => f.text), // linhas sem texto não aparecem no site
       periods: p.saleStatus === 'on_request' ? [] : p.periods.filter(x => x.active && x.price != null).map(x => ({
         cycle: x.cycle, months: x.months, total: x.price!, renewal: x.renewal ?? x.price!,
         // Desconto mostrado = o que o cliente poupa face ao preço base (0 → sem preço riscado nem «Poupe»)
@@ -77,7 +98,8 @@ export async function publicFamilyPlans(family: PlanFamily): Promise<PublicFamil
 }
 
 // ── validação ──
-const text = (v: unknown, max: number) => String(v ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max)
+// Texto simples: só se retiram caracteres de controlo; o site mostra-o sempre como texto (nunca como HTML)
+const text = (v: unknown, max: number) => String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
 const intIn = (v: unknown, field: string, label: string, min: number, max: number): number => {
   const n = Number(v)
   if (v === '' || v === null || v === undefined || !Number.isInteger(n) || n < min || n > max) throw new FamilyPlanError(`${label}: indique um número inteiro entre ${min} e ${max.toLocaleString('pt-PT')}.`, field)
@@ -113,15 +135,21 @@ export async function saveFamilyPlan(family: PlanFamily, input: FamilyPlanInput)
   const baseRaw = input.baseMonthly
   const base = (baseRaw === '' || baseRaw === null || baseRaw === undefined) && saleStatus !== 'active' ? null : money(baseRaw, 'baseMonthly', 'Preço mensal base')
 
-  const features: VpsFeature[] = []
-  for (const f of Array.isArray(input.features) ? input.features as any[] : []) {
-    const t = text(typeof f === 'string' ? f : f?.text, 120)
-    if (!t) continue
-    const icon = f?.icon == null || f.icon === '' ? null : f.icon
-    if (icon !== null && !isVpsIcon(icon)) throw new FamilyPlanError('Ícone fora da lista permitida.', 'features')
-    features.push({ text: t, icon })
+  // features ausente = manter as características gravadas (ex.: alterar só preços pela API)
+  const keepFeatures = input.features === undefined
+  const features: FamilyFeature[] = []
+  if (!keepFeatures) {
+    if (!Array.isArray(input.features)) throw new FamilyPlanError('Características inválidas.', 'features')
+    for (const [i, f] of (input.features as any[]).entries()) {
+      const t = text(typeof f === 'string' ? f : f?.text, 120)
+      // Nunca descartar em silêncio: uma linha só com ícone é um erro a corrigir no painel
+      if (!t) throw new FamilyPlanError(`Característica n.º ${i + 1}: escreva o «Texto da característica» (o ícone sozinho não descreve o plano) ou apague a linha.`, 'features')
+      const icon = typeof f === 'string' || f?.icon == null || f.icon === '' ? null : f.icon
+      if (icon !== null && !isVpsIcon(icon)) throw new FamilyPlanError(`Característica n.º ${i + 1}: ícone fora da lista permitida.`, 'features')
+      features.push({ text: t, icon, included: typeof f === 'string' ? true : f?.included !== false })
+    }
+    if (features.length > 30) throw new FamilyPlanError('No máximo 30 características.', 'features')
   }
-  if (features.length > 30) throw new FamilyPlanError('No máximo 30 características.', 'features')
 
   const per = new Map((input.periods ?? []).map(p => [String(p?.cycle), p]))
   for (const c of per.keys()) if (!FAMILY_PERIODS.some(p => p.cycle === c)) throw new FamilyPlanError(`Período indisponível para novas contratações: ${c}. Use 1 mês, 1 ano, 2 anos ou 3 anos.`, 'periods')
@@ -149,9 +177,11 @@ export async function saveFamilyPlan(family: PlanFamily, input: FamilyPlanInput)
           service_type, provisioning, max_quantity, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 1, 'AOA')`,
         [pid, slug, fam.category, fam.subcategory, name, description, saleStatus, position, badge, highlight ? 1 : 0, base, ref?.service_type ?? fam.serviceType, ref?.provisioning ?? fam.provisioning])
     }
-    await conn.query('DELETE FROM product_features WHERE product_id = ?', [pid])
-    for (const [i, f] of features.entries())
-      await conn.query('INSERT INTO product_features (id, product_id, feature, included, position, icon) VALUES (?, ?, ?, 1, ?, ?)', [randomUUID(), pid, f.text, i + 1, f.icon])
+    if (!keepFeatures) {
+      await conn.query('DELETE FROM product_features WHERE product_id = ?', [pid])
+      for (const [i, f] of features.entries())
+        await conn.query('INSERT INTO product_features (id, product_id, feature, included, position, icon) VALUES (?, ?, ?, ?, ?, ?)', [randomUUID(), pid, f.text, f.included ? 1 : 0, i + 1, f.icon])
+    }
 
     const existing = await rows(conn, 'SELECT cycle, price, renewal_price, discount_pct, active FROM product_prices WHERE product_id = ? FOR UPDATE', [pid])
     for (const p of FAMILY_PERIODS) {

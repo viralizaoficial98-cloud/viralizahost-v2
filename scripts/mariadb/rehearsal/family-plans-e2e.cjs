@@ -105,7 +105,7 @@ async function ctxFor(b, opts, cookie, initCart) {
       // Três características com ícones; a terceira sobe para segundo lugar
       const feats = [['Primeira característica', 'shield'], ['Segunda característica', 'zap'], ['Terceira característica', 'headphones']]
       for (let k = 0; k < 3; k++) {
-        if (k > 0) await form.getByTestId('fp-add-feature').click()
+        await form.getByTestId('fp-add-feature').click() // planos novos começam sem linhas
         await form.getByTestId('fp-feature-text').nth(k).fill(feats[k][0])
         await form.getByTestId('fp-feature-icon').nth(k).selectOption(feats[k][1])
       }

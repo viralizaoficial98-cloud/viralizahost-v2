@@ -1,12 +1,12 @@
 'use client'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { Check, Layers } from 'lucide-react'
+import { Check, Layers, X } from 'lucide-react'
 import { useLocale } from '@/hooks/useLocale'
 import { convertFromAOA } from '@/lib/currency'
 import { selectorBadge } from '@/lib/commerce/period-pricing'
 import { FAMILY_PERIODS } from '@/lib/commerce/plan-families'
-import { isVpsIcon, type VpsFeature } from '@/lib/commerce/vps-shared'
+import { isVpsIcon, type VpsIcon } from '@/lib/commerce/vps-shared'
 import { FEATURE_ICONS } from './VpsPlansSection'
 
 // Planos de Revenda, Criador de Sites e Construtor WordPress (Catálogo e Preços). Dados do servidor (catálogo):
@@ -15,7 +15,8 @@ import { FEATURE_ICONS } from './VpsPlansSection'
 
 export interface FamilyCardPlan {
   slug: string; name: string; description: string | null; badge: string | null; highlight: boolean; onRequest: boolean; base: number | null
-  features: VpsFeature[]; periods: { cycle: string; months: number; total: number; renewal: number; discount: number }[]
+  /** Pela ordem do painel; included=false (planos antigos) aparece riscado. Texto simples (nunca HTML). */
+  features: { text: string; icon: VpsIcon | null; included?: boolean }[]; periods: { cycle: string; months: number; total: number; renewal: number; discount: number }[]
 }
 const monthsLabel = (m: number) => (m === 1 ? '1 mês' : m % 12 === 0 ? `${m / 12} ${m === 12 ? 'ano' : 'anos'}` : `${m} meses`)
 
@@ -42,7 +43,7 @@ export function FamilyPlanCard({ plan, cycle, fmt, preview = false }: { plan: Fa
         </div>
         {plan.description && <p className={`text-xs mt-2 ${muted}`} data-testid="fam-plan-description">{plan.description}</p>}
 
-        <div className="my-5 min-h-[104px]">
+        <div className="my-5 sm:min-h-[104px]">
           {plan.onRequest ? (
             <span className={`text-2xl font-black ${dark ? 'text-[#F5B700]' : 'text-[#0A0A0A]'}`} data-testid="fam-plan-onrequest">Sob consulta</span>
           ) : pr && perMonth != null ? (
@@ -63,11 +64,17 @@ export function FamilyPlanCard({ plan, cycle, fmt, preview = false }: { plan: Fa
           )}
         </div>
 
-        {plan.features.length > 0 && (
-          <ul className="space-y-2 mb-6 flex-1">
-            {plan.features.map((f, i) => { const I = f.icon && isVpsIcon(f.icon) ? FEATURE_ICONS[f.icon] : Check; return (
-              <li key={i} className={`flex items-start gap-2 text-sm ${dark ? 'text-gray-200' : 'text-[#333]'}`} data-testid="fam-plan-feature"><I size={15} className="text-[#F5B700] shrink-0 mt-0.5" />{f.text}</li>
-            ) })}
+        {plan.features.some(f => f.text.trim()) && (
+          <ul className="space-y-2 mb-6 flex-1" data-testid="fam-plan-features">
+            {plan.features.filter(f => f.text.trim()).map((f, i) => {
+              const off = f.included === false
+              const I = off ? X : f.icon && isVpsIcon(f.icon) ? FEATURE_ICONS[f.icon] : Check
+              return (
+                <li key={i} className={`flex items-start gap-2 text-sm ${off ? `line-through ${muted}` : dark ? 'text-gray-200' : 'text-[#333]'}`} data-testid="fam-plan-feature" data-icon={off ? 'x' : f.icon ?? 'check'} data-included={off ? '0' : '1'}>
+                  <I size={15} className={`${off ? 'text-gray-400' : 'text-[#F5B700]'} shrink-0 mt-0.5`} aria-hidden="true" />{f.text}
+                </li>
+              )
+            })}
           </ul>
         )}
 
