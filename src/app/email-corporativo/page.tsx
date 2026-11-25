@@ -5,6 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { EmailPlansSection } from '@/components/service/EmailPlansSection'
 import { Mail, Shield, Lock, Calendar, Smartphone, Globe, Zap, Archive, Activity } from 'lucide-react'
 import { PageLinksSection } from '@/components/site/PageLinksSection'
+import { BannerHero } from '@/components/service/BannerHero'
 import { pagesInSection } from '@/lib/site/pages'
 
 // Página de E-mail Corporativo (link directo no menu): planos, períodos e compra (EmailPlansSection) e, em secções,
@@ -15,6 +16,8 @@ export const metadata: Metadata = {
   title: 'E-mail Corporativo Profissional',
   description: 'Comunicação empresarial segura com domínio personalizado e alta disponibilidade.',
 }
+
+export const dynamic = 'force-dynamic'
 
 export default function EmailCorporativoPage() {
   const features = [
@@ -33,33 +36,22 @@ export default function EmailCorporativoPage() {
     <>
       <Header />
       <main className="min-h-screen bg-white">
-        <section className="relative overflow-hidden pt-32 pb-20" style={{ background: 'linear-gradient(160deg,#090909 0%,#111 60%,#0d0d0d 100%)' }}>
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(245,183,0,0.18) 0%, transparent 70%)' }} />
-          <div className="container mx-auto px-4 lg:px-8 relative z-10 text-center max-w-4xl">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.30)', color: '#F5B700' }}>
-              E-MAIL CORPORATIVO
-            </div>
-            <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">
-              E-mail Corporativo <span style={{ color: '#F5B700' }}>Profissional</span>
-            </h1>
-            <p className="text-lg lg:text-xl leading-relaxed mb-10 max-w-2xl mx-auto" style={{ color: 'rgba(255,255,255,0.60)' }}>
-              Comunicação empresarial segura com domínio personalizado e alta disponibilidade.
-            </p>
-            <nav className="flex flex-wrap justify-center gap-2 mb-6" aria-label="Secções de e-mail" data-testid="email-actions">
-              {[['#planos', 'Planos e preços'], ['#planos-detalhe', 'Microsoft 365'], ['#seguranca', 'Segurança'], ['#produtividade', 'Produtividade']].map(([h, l]) => (
-                <Link key={h} href={h} className="px-4 py-2 rounded-xl text-sm font-bold border border-white/15 text-white hover:border-[#F5B700] hover:text-[#F5B700]">{l}</Link>
-              ))}
-            </nav>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="#planos" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-black transition-all duration-200 shadow-[0_8px_30px_rgba(245,183,0,0.35)]" style={{ background: '#F5B700', color: '#090909' }}>
-                Ver Planos de E-mail →
-              </Link>
-              <Link href="/suporte/tickets" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold transition-all duration-200" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.80)', border: '1px solid rgba(255,255,255,0.14)' }}>
-                Falar com Suporte
-              </Link>
-            </div>
+        {/* Hero: Painel → Site → Banners de páginas, slug «email-corporativo» (único H1) */}
+        <BannerHero slug="email-corporativo" testId="email-hero" defaults={{
+          breadcrumb: 'E-mail Corporativo', tag: 'E-mail Corporativo', title: 'E-mail Corporativo Profissional',
+          subtitle: 'Comunicação empresarial segura com domínio personalizado e alta disponibilidade.',
+          cta: 'Ver Planos de E-mail', ctaHref: '#planos', ctaSecondary: 'Falar com Suporte', ctaSecondaryHref: '/suporte/tickets',
+          bgImage: 'https://images.unsplash.com/photo-1557200134-90327ee9fafa?w=1920&q=80&auto=format&fit=crop', bgColor: '#080d1a',
+          highlights: [], guarantee: false,
+        }} />
+        {/* Atalhos para as secções da página (logo abaixo da hero) */}
+        <nav className="bg-[#0A0A0A] border-t border-white/10 px-4 py-4" aria-label="Secções de e-mail" data-testid="email-actions">
+          <div className="container mx-auto flex flex-wrap justify-center gap-2">
+            {[['#planos', 'Planos e preços'], ['#planos-detalhe', 'Microsoft 365'], ['#seguranca', 'Segurança'], ['#produtividade', 'Produtividade']].map(([h, l]) => (
+              <Link key={h} href={h} className="px-4 py-2 rounded-xl text-sm font-bold border border-white/15 text-white hover:border-[#F5B700] hover:text-[#F5B700]">{l}</Link>
+            ))}
           </div>
-        </section>
+        </nav>
 
         <EmailPlansSection
           title="Planos de e-mail corporativo"

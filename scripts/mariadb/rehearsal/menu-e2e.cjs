@@ -56,8 +56,8 @@ const OLD_LINKS = [
     ok(!cols.some(c => c.items.some(i => /WordPress/.test(i.label) && /hospedagem/i.test(i.label)) || c.items.some(i => i.href === '/hospedagem-wordpress')), 'sem «Hospedagem WordPress» no submenu')
     {
       const grid = p.getByTestId('nav-panel').getByTestId('nav-panel-grid'), aside = p.getByTestId('nav-panel').getByTestId('nav-aside')
-      const tpl = await grid.evaluate(e => e.style.gridTemplateColumns), ab = await aside.boundingBox()
-      ok(tpl === '1fr 1fr 1.4fr 260px' && Math.abs(ab.width - 260) <= 1 && await aside.getByTestId('nav-aside-image').evaluate(i => i.complete && i.naturalWidth > 0), `Hospedagem: painel de imagem com as proporções anteriores (${tpl}; ${Math.round(ab.width)} px)`)
+      const tpl = await grid.evaluate(e => e.style.gridTemplateColumns), ab = await aside.locator('..').boundingBox() // coluna de 260 px (cartão + margem)
+      ok(tpl === '1fr 1fr 1.4fr 260px' && Math.abs(ab.width - 260) <= 1 && await aside.getByTestId('nav-aside-image').evaluate(i => i.complete && i.naturalWidth > 0), `Hospedagem: cartão de imagem na coluna direita (${tpl}; ${Math.round(ab.width)} px)`)
     }
     await p.screenshot({ path: `${OUT}/desktop-01-hospedagem.png` })
     await p.keyboard.press('Escape'); await p.waitForTimeout(200)
@@ -70,7 +70,7 @@ const OLD_LINKS = [
     {
       const aside = p.getByTestId('nav-panel').getByTestId('nav-aside')
       const [ab, lastCol] = [await aside.boundingBox(), await p.getByTestId('nav-panel').getByTestId('nav-column').last().boundingBox()]
-      ok(await aside.count() === 1 && ab.x > lastCol.x + lastCol.width - 1 && await aside.getByTestId('nav-aside-image').evaluate(i => i.complete && i.naturalWidth > 0), `imagem à direita dos links (x=${Math.round(ab.x)} > ${Math.round(lastCol.x + lastCol.width)}), carregada`)
+      ok(await aside.count() === 1 && ab.x > lastCol.x + lastCol.width - 1 && await aside.getByTestId('nav-aside-image').evaluate(i => i.complete && i.naturalWidth > 0), `cartão de imagem à direita dos links (x=${Math.round(ab.x)} > ${Math.round(lastCol.x + lastCol.width)}), carregado`)
     }
     ok(!svc.some(i => /^\/(admin|dashboard|checkout|carrinho|login|register|orders|billing)/.test(i.href)), 'Serviços sem páginas administrativas, privadas ou de checkout')
     const sm = await (await fetch(BASE + '/sitemap.xml')).text()
@@ -104,7 +104,7 @@ const OLD_LINKS = [
     ok(JSON.stringify(await p.getByTestId('mnav-panel').getByTestId('mnav-column-title').allInnerTexts()) === JSON.stringify(['HOSPEDAGEM', 'INFRAESTRUTURA', 'DOMÍNIOS', 'E-MAIL']) || JSON.stringify((await p.getByTestId('mnav-panel').getByTestId('mnav-column-title').allTextContents()).map(x => x.trim())) === JSON.stringify(['Hospedagem', 'Infraestrutura', 'Domínios', 'E-mail']), 'quatro grupos no telemóvel')
     const ma = p.getByTestId('mnav-panel').getByTestId('mnav-aside')
     const mab = await ma.boundingBox(), lastItem = await p.getByTestId('mnav-panel').getByTestId('mnav-item').last().boundingBox()
-    ok(mab && mab.y > lastItem.y && mab.x + mab.width <= 390 + 0.5, 'painel de imagem adaptado: por baixo dos links, dentro do ecrã')
+    ok(mab && mab.y > lastItem.y && mab.x + mab.width <= 390 + 0.5, 'cartão de imagem por baixo dos links, dentro do ecrã')
     ok(await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, 'sem deslocamento horizontal')
     await p.screenshot({ path: `${OUT}/iphone-01-servicos.png` })
     await p.getByTestId('mnav-empresa').click()
