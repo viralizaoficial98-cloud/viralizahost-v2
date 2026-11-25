@@ -33,6 +33,7 @@ export function ResellerOffer({ plans, mode, prefill, notice }: { plans: FamilyC
   const btn = (dark: boolean) => `block w-full text-center py-3 rounded-xl font-bold text-sm transition-all ${dark ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#E5A800]' : 'bg-[#0A0A0A] text-white hover:bg-[#222]'}`
   const ctaFor = (p: FamilyCardPlan, cycle: string) => {
     const has = p.periods.some(x => x.cycle === cycle)
+    if (p.onRequest && mode !== 'closed') return <Link href={`/comprar/${p.slug}`} className={btn(p.highlight)} data-testid="fam-plan-cta" data-mode="on_request">Pedir proposta</Link>
     if (mode === 'closed' || p.onRequest) return <span className={`${btn(p.highlight)} opacity-60 cursor-not-allowed`} aria-disabled="true" data-testid="fam-plan-cta" data-mode="closed">Em breve</span>
     if (!has) return <span className={`${btn(p.highlight)} opacity-40`} data-testid="fam-plan-cta" data-mode="unavailable">Indisponível neste período</span>
     if (mode === 'automatic') return <Link href={`/comprar/${p.slug}?ciclo=${cycle}`} className={btn(p.highlight)} data-testid="fam-plan-cta" data-mode="automatic">Contratar agora</Link>
