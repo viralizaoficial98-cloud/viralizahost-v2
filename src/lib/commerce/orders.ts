@@ -31,6 +31,8 @@ export interface CreateOrderInput {
   transferRef?: string | null
   billingDetails?: Record<string, unknown> | null
   nameservers?: { useDefault: boolean; ns: string[] }
+  /** Revenda: encomenda criada pelo painel para um pedido tecnicamente aprovado (validado de novo na cotação) */
+  resellerRequestId?: string | null
 }
 
 export interface OrderSummary {
@@ -74,12 +76,12 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
   return withTransaction(async conn => {
     // Repetição (duplo clique, nova tentativa): devolve a encomenda existente
     const [prev] = await rows(conn, 'SELECT id FROM orders WHERE user_id = ? AND idempotency_key = ? FOR UPDATE', [input.userId, input.idempotencyKey])
-    if (prev) return { order: await summary(conn, prev.id, true), quote: await quoteCart(input.lines, { db: conn, userId: input.userId, checkAvailability: false }) }
+    if (prev) return { order: await summary(conn, prev.id, true), quote: await quoteCart(input.lines, { db: conn, userId: input.userId, checkAvailability: false, resellerRequestId: input.resellerRequestId }) }
 
     // Renovações: bloqueia o serviço original para impedir duas renovações por pagar em paralelo
     const renewIds = input.lines.filter(l => (l as any)?.type === 'renewal').map(l => String((l as any).serviceId))
     if (renewIds.length) await conn.query(`SELECT id FROM services WHERE id IN (${renewIds.map(() => '?').join(',')}) FOR UPDATE`, renewIds)
-    const quote = await quoteCart(input.lines, { db: conn, userId: input.userId, checkAvailability: true })
+    const quote = await quoteCart(input.lines, { db: conn, userId: input.userId, checkAvailability: true, resellerRequestId: input.resellerRequestId })
     if (!quote.valid) throw new OrderError('cart_invalid', 'Há itens que não podem ser encomendados.', 409, { quote })
     if (Math.round(quote.total * 100) !== Math.round(Number(input.acceptedTotal) * 100)) {
       throw new OrderError('price_changed', 'O total foi actualizado. Reveja a encomenda antes de confirmar.', 409, { quote })
@@ -181,7 +183,7 @@ export async function createOrder(input: CreateOrderInput, attempt = 1): Promise
     if ((e as { errno?: number }).errno === 1062 && /idempotency/.test(String((e as Error).message))) {
       const pool = (await import('@/lib/db/pool')).getPool()
       const [prev] = await rows(pool, 'SELECT id FROM orders WHERE user_id = ? AND idempotency_key = ?', [input.userId, input.idempotencyKey])
-      if (prev) return { order: await summary(pool, prev.id, true), quote: await quoteCart(input.lines, { userId: input.userId, checkAvailability: false }) }
+      if (prev) return { order: await summary(pool, prev.id, true), quote: await quoteCart(input.lines, { userId: input.userId, checkAvailability: false, resellerRequestId: input.resellerRequestId }) }
     }
     throw e
   })

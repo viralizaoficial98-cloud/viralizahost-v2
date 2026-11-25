@@ -151,16 +151,20 @@ export interface WHMCreateAccountParams {
   quota?: number
 }
 
-async function whmRequest(config: WHMConfig, fn: string, params: Record<string, string | number> = {}) {
+async function whmRequest(config: WHMConfig, fn: string, params: Record<string, string | number> = {}, method: 'GET' | 'POST' = 'GET') {
   const url = new URL(`${config.url.replace(/\/$/, '')}/json-api/${fn}`)
-  url.searchParams.set('api.version', '1')
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
+  const body = new URLSearchParams({ 'api.version': '1' })
+  Object.entries(params).forEach(([k, v]) => body.set(k, String(v)))
+  // GET: parâmetros no URL. POST (senhas): no corpo — nunca no URL, que fica nos registos de acesso do cPanel.
+  if (method === 'GET') body.forEach((v, k) => url.searchParams.set(k, v))
 
   const res = await fetch(url.toString(), {
-    method: 'GET',
+    method,
+    body: method === 'POST' ? body.toString() : undefined,
     headers: {
       Authorization: `whm ${config.username ?? 'root'}:${config.token}`,
       Accept: 'application/json',
+      ...(method === 'POST' ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
     },
     // Server-side only — no client exposure
     cache: 'no-store',
@@ -230,7 +234,7 @@ export async function terminateAccount(config: WHMConfig, username: string) {
 }
 
 export async function changePassword(config: WHMConfig, username: string, password: string) {
-  return whmRequest(config, 'passwd', { user: username, password })
+  return whmRequest(config, 'passwd', { user: username, password }, 'POST')
 }
 
 export async function getDiskUsage(config: WHMConfig, username: string) {

@@ -72,7 +72,8 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
     if (s.renews_service_id) {
       // Renovação paga: serviços no nosso WHM prolongam já; os restantes dependem do fornecedor
       const [orig] = await rows(db, 'SELECT o.service_type, o.domain, p.provisioning FROM services o LEFT JOIN products p ON p.id = o.product_id WHERE o.id = ?', [s.renews_service_id])
-      if (orig?.provisioning === 'whm') {
+      // Revenda: a renovação paga prolonga o serviço (a reactivação de uma suspensão é decisão do administrador)
+      if (orig?.provisioning === 'whm' || orig?.service_type === 'reseller') {
         await extendService(db, s.renews_service_id, Number(s.months ?? 12))
         return await done('active', 'Renovação aplicada.', { next_due_date: null, activation_source: 'whm' })
       }
@@ -91,6 +92,16 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
     }
     // Servidor VPS: compra automática na Hostinger (com salvaguardas) ou tarefa manual — ver lib/vps/provisioning.ts
     if (isServerVps(s)) return await provisionVps(serviceId)
+    // Revenda de Hospedagem: nunca cria contas só por estar paga — o pedido passa a «Pago» e o aprovisionamento
+    // exige a autorização expressa do administrador (ou a venda automática autorizada). Ver lib/reseller/provisioning.ts
+    if (s.service_type === 'reseller') {
+      const { afterPayment } = await import('@/lib/reseller/provisioning')
+      const r = await afterPayment(serviceId)
+      const [now] = await rows(db, 'SELECT provisioning_status FROM services WHERE id = ?', [serviceId])
+      // O motor pode já ter gravado o seu estado (ex.: a aguardar confirmação da ACL): não o sobrescrever
+      if (now?.provisioning_status !== 'in_progress') return { serviceId, status: now.provisioning_status, message: r.message }
+      return await done(r.status === 'active' ? 'manual_required' : r.status, r.message)
+    }
     if (s.service_type === 'domain') {
       const op = s.domain_operation === 'transfer' ? 'transfer' : s.domain_operation === 'renew' ? 'renew' : 'register'
       const label = op === 'transfer' ? 'Transferência' : op === 'renew' ? 'Renovação' : 'Registo'
