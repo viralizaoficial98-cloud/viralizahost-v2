@@ -412,6 +412,64 @@ export const SCHEMA_META: SchemaMeta = {
     },
     "relations": []
   },
+  "capacity_reservations": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "request_id"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "server_id": {
+        "kind": "uuid"
+      },
+      "request_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "service_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "storage_mb": {
+        "kind": "int"
+      },
+      "accounts": {
+        "kind": "int"
+      },
+      "status": {
+        "kind": "enum",
+        "values": [
+          "reserved",
+          "committed",
+          "released"
+        ],
+        "hasDefault": true
+      },
+      "created_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
   "clients": {
     "pk": [
       "id"
@@ -2841,6 +2899,17 @@ export const SCHEMA_META: SchemaMeta = {
         ],
         "name": "product_prices_product_id_fkey",
         "many": true
+      },
+      {
+        "columns": [
+          "id"
+        ],
+        "table": "reseller_plan_profiles",
+        "refColumns": [
+          "product_id"
+        ],
+        "name": "reseller_plan_profiles_product_fk",
+        "many": true
       }
     ]
   },
@@ -3636,6 +3705,686 @@ export const SCHEMA_META: SchemaMeta = {
     },
     "relations": []
   },
+  "reseller_plan_profiles": {
+    "pk": [
+      "product_id"
+    ],
+    "unique": [],
+    "columns": {
+      "product_id": {
+        "kind": "uuid"
+      },
+      "storage_mb": {
+        "kind": "int"
+      },
+      "bandwidth_mb": {
+        "kind": "int"
+      },
+      "max_accounts": {
+        "kind": "int"
+      },
+      "main_quota_mb": {
+        "kind": "int"
+      },
+      "acl_name": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "main_package": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "allowed_packages": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "server_ids": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "allow_own_packages": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "notes": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "updated_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": [
+      {
+        "columns": [
+          "product_id"
+        ],
+        "table": "products",
+        "refColumns": [
+          "id"
+        ],
+        "name": "reseller_plan_profiles_product_fk"
+      }
+    ]
+  },
+  "reseller_provision_events": {
+    "pk": [
+      "id"
+    ],
+    "unique": [],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "op_id": {
+        "kind": "uuid"
+      },
+      "step": {
+        "kind": "text"
+      },
+      "outcome": {
+        "kind": "enum",
+        "values": [
+          "ok",
+          "skipped",
+          "error",
+          "info"
+        ]
+      },
+      "whm_function": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "message": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "duration_ms": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      }
+    },
+    "relations": []
+  },
+  "reseller_provision_ops": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "service_id"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "service_id": {
+        "kind": "uuid"
+      },
+      "request_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "server_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "status": {
+        "kind": "enum",
+        "values": [
+          "queued",
+          "running",
+          "awaiting_confirmation",
+          "succeeded",
+          "failed",
+          "blocked"
+        ],
+        "hasDefault": true
+      },
+      "step": {
+        "kind": "text",
+        "hasDefault": true
+      },
+      "state": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "attempts": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "max_attempts": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "locked_until": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "lock_token": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "next_attempt_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "last_error": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "authorized_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
+  "reseller_requests": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "reference"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "reference": {
+        "kind": "text"
+      },
+      "kind": {
+        "kind": "enum",
+        "values": [
+          "new",
+          "upgrade"
+        ],
+        "hasDefault": true
+      },
+      "upgrade_service_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "full_name": {
+        "kind": "text"
+      },
+      "company": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "email": {
+        "kind": "text"
+      },
+      "phone": {
+        "kind": "text"
+      },
+      "domain": {
+        "kind": "text"
+      },
+      "product_id": {
+        "kind": "uuid"
+      },
+      "cycle": {
+        "kind": "enum",
+        "values": [
+          "monthly",
+          "3months",
+          "6months",
+          "1year",
+          "2years",
+          "3years"
+        ]
+      },
+      "estimated_clients": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "business_type": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "notes": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "status": {
+        "kind": "enum",
+        "values": [
+          "submitted",
+          "under_review",
+          "technically_approved",
+          "awaiting_payment",
+          "paid",
+          "provisioning_authorized",
+          "provisioning",
+          "awaiting_confirmation",
+          "active",
+          "rejected",
+          "cancelled",
+          "failed"
+        ],
+        "hasDefault": true
+      },
+      "server_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "quoted_total": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "order_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "service_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "internal_notes": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "decision_reason": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "reviewed_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "technical_approved_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "technical_approved_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "provisioning_authorized_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "provisioning_authorized_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "ip_hash": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "dedupe_key": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "is_test": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
+  "reseller_request_events": {
+    "pk": [
+      "id"
+    ],
+    "unique": [],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "request_id": {
+        "kind": "uuid"
+      },
+      "actor_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "from_status": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "to_status": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "action": {
+        "kind": "text"
+      },
+      "note": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      }
+    },
+    "relations": []
+  },
+  "reseller_services": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "service_id"
+      ],
+      [
+        "server_id",
+        "whm_username"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "service_id": {
+        "kind": "uuid"
+      },
+      "request_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "profile_id": {
+        "kind": "uuid"
+      },
+      "server_id": {
+        "kind": "uuid"
+      },
+      "product_id": {
+        "kind": "uuid"
+      },
+      "whm_username": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "domain": {
+        "kind": "text"
+      },
+      "status": {
+        "kind": "enum",
+        "values": [
+          "provisioning",
+          "awaiting_confirmation",
+          "active",
+          "suspended",
+          "failed",
+          "terminated"
+        ],
+        "hasDefault": true
+      },
+      "storage_mb": {
+        "kind": "int"
+      },
+      "bandwidth_mb": {
+        "kind": "int"
+      },
+      "max_accounts": {
+        "kind": "int"
+      },
+      "main_quota_mb": {
+        "kind": "int"
+      },
+      "acl_name": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "acl_confirmed_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "acl_confirmed_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "verified_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "verification": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "suspended_reason": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "activated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
+  "reseller_settings": {
+    "pk": [
+      "id"
+    ],
+    "unique": [],
+    "columns": {
+      "id": {
+        "kind": "int"
+      },
+      "mode": {
+        "kind": "enum",
+        "values": [
+          "disabled",
+          "test",
+          "request_only",
+          "automatic"
+        ],
+        "hasDefault": true
+      },
+      "automatic_authorized_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "automatic_authorized_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "infra_approved_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "infra_approved_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "infra_approval_note": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "notify_emails": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "request_notice": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "max_open_requests_per_email": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "default_nameservers": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "updated_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
+  "reseller_usage_snapshots": {
+    "pk": [
+      "id"
+    ],
+    "unique": [],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "reseller_service_id": {
+        "kind": "uuid"
+      },
+      "disk_used_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "disk_allocated_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "bandwidth_used_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "bandwidth_allocated_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "accounts_used": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "accounts_suspended": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "accounts_limit": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "source": {
+        "kind": "text",
+        "hasDefault": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      }
+    },
+    "relations": []
+  },
   "servers": {
     "pk": [
       "id"
@@ -3700,6 +4449,149 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "timestamp",
         "hasDefault": true,
         "autoUpdate": true
+      },
+      "provider": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "port": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "credential_ref": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "server_type": {
+        "kind": "text",
+        "hasDefault": true
+      },
+      "os_name": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "cpu_cores": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "ram_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "storage_total_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "storage_reserve_mb": {
+        "kind": "int",
+        "hasDefault": true
+      },
+      "storage_used_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "license_name": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "license_account_limit": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "accounts_existing": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "accounts_unlimited": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "quota_committed_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "unlimited_assumed_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "resellers_existing": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "operational_state": {
+        "kind": "enum",
+        "values": [
+          "active",
+          "maintenance",
+          "disabled"
+        ],
+        "hasDefault": true
+      },
+      "last_sync_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "last_sync_status": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "last_sync_message": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "services_allowed": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "environment": {
+        "kind": "enum",
+        "values": [
+          "test",
+          "production"
+        ],
+        "hasDefault": true
+      },
+      "reseller_authorized": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "reseller_authorized_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "reseller_authorized_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "reseller_authorization_note": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "protected_accounts": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": [

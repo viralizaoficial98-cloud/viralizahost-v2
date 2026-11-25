@@ -31,7 +31,7 @@ export interface PurchasePlan {
 }
 
 /** Serviços que precisam de domínio (alojamento e e-mail). VPS, dedicados, SSL, … não pedem domínio. */
-export const DOMAIN_SERVICES = ['hosting', 'email']
+export const DOMAIN_SERVICES = ['hosting', 'email', 'reseller']
 
 export async function getPurchasePlan(slug: string): Promise<PurchasePlan | null> {
   const db = getPool()
@@ -48,9 +48,9 @@ export async function getPurchasePlan(slug: string): Promise<PurchasePlan | null
     features: (feats as any[]).map(f => String(f.feature)),
     // E-mail Corporativo: oferta em 4 períodos (1 mês, 1, 2 e 3 anos)
     // Servidor VPS: só os ciclos à venda (3 meses retirado)
-    // Revenda, Criador de Sites e Construtor WordPress: só 1 mês, 1, 2 e 3 anos para novas contratações
+    // Revenda (mensal, trimestral, semestral, anual), Criador de Sites e Construtor WordPress (1 mês, 1, 2 e 3 anos)
     prices: (prices as any[]).filter(r => (p.category !== 'email' || EMAIL_PERIODS.some(x => x.cycle === r.cycle)) && (p.category !== 'vps' || p.subcategory || isVpsCycleForSale(r.cycle))
-        && (!familyOf(p.category, p.subcategory) || isFamilyCycleForSale(r.cycle)))
+        && (!familyOf(p.category, p.subcategory) || isFamilyCycleForSale(r.cycle, familyOf(p.category, p.subcategory))))
       .map(r => ({ cycle: r.cycle, months: Number(r.months), price: Number(r.price), renewal: Number(r.renewal_price), discount: Number(r.discount_pct ?? 0), renewalDiscount: Number(r.renewal_discount_pct ?? 0) })),
     baseMonthly: p.base_monthly_price == null ? null : Number(p.base_monthly_price),
     storageGb: p.storage_gb == null ? null : Number(p.storage_gb), sendLimitHour: p.send_limit_hour == null ? null : Number(p.send_limit_hour), badge: p.badge ?? null,

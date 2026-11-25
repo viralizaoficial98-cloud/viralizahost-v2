@@ -4,7 +4,7 @@ import { revalidateTag } from 'next/cache'
 import { getPool, withTransaction, type Queryable } from '@/lib/db/pool'
 import { MAX_DISCOUNT, exactPeriodTotal, impliedDiscount, matchesRule } from './period-pricing'
 import { syncDisplay } from './catalog-admin'
-import { FAMILY_PERIODS, PLAN_FAMILIES, type PlanFamily } from './plan-families'
+import { PLAN_FAMILIES, familyPeriods, familyPeriodsText, type PlanFamily } from './plan-families'
 import { isVpsIcon, type VpsIcon } from './vps-shared'
 
 /** Característica de um plano: texto livre, ícone da lista controlada e «incluída» (planos antigos podiam ter
@@ -52,6 +52,7 @@ const where = (f: PlanFamily) => {
 
 export async function loadFamilyPlans(family: PlanFamily, db: Queryable = getPool()): Promise<FamilyPlan[]> {
   const w = where(family)
+  const FAMILY_PERIODS = familyPeriods(family)
   const prods = await rows(db, `SELECT id, slug, name, description, sale_status, position, badge, popular, base_monthly_price FROM products WHERE ${w.sql} AND active = 1 ORDER BY position, name`, w.args)
   if (!prods.length) return []
   const ids = prods.map(p => p.id), inIds = `(${ids.map(() => '?').join(',')})`
@@ -151,8 +152,9 @@ export async function saveFamilyPlan(family: PlanFamily, input: FamilyPlanInput)
     if (features.length > 30) throw new FamilyPlanError('No máximo 30 características.', 'features')
   }
 
+  const FAMILY_PERIODS = familyPeriods(family)
   const per = new Map((input.periods ?? []).map(p => [String(p?.cycle), p]))
-  for (const c of per.keys()) if (!FAMILY_PERIODS.some(p => p.cycle === c)) throw new FamilyPlanError(`Período indisponível para novas contratações: ${c}. Use 1 mês, 1 ano, 2 anos ou 3 anos.`, 'periods')
+  for (const c of per.keys()) if (!FAMILY_PERIODS.some(p => p.cycle === c)) throw new FamilyPlanError(`Período indisponível para novas contratações: ${c}. Use ${familyPeriodsText(family)}.`, 'periods')
 
   const id = await withTransaction(async conn => {
     let pid = input.id ? String(input.id) : ''
@@ -203,9 +205,9 @@ export async function saveFamilyPlan(family: PlanFamily, input: FamilyPlanInput)
           reference = IF(price <> VALUES(price) OR renewal_price <> VALUES(renewal_price), JSON_SET(COALESCE(reference, '{}'), '$.edited_by_admin', TRUE), reference)`,
         [pid, p.cycle, p.months, price, renewal, publish ? 1 : 0, discount])
     }
-    // Outros ciclos (3 e 6 meses): ficam guardados como estavam (renovações e facturas antigas), mas não se vendem.
+    // Outros ciclos (fora dos períodos da família): ficam guardados como estavam (renovações e facturas antigas), mas não se vendem.
     const [n] = await rows(conn, `SELECT COUNT(*) n FROM product_prices WHERE product_id = ? AND active = 1 AND cycle IN (${FAMILY_PERIODS.map(() => '?').join(',')})`, [pid, ...FAMILY_PERIODS.map(p => p.cycle)])
-    if (saleStatus === 'active' && !Number(n.n)) throw new FamilyPlanError('Para pôr à venda, publique pelo menos um período (1 mês, 1 ano, 2 anos ou 3 anos).', 'periods')
+    if (saleStatus === 'active' && !Number(n.n)) throw new FamilyPlanError(`Para pôr à venda, publique pelo menos um período (${familyPeriodsText(family)}).`, 'periods')
     const [slugRow] = await rows(conn, 'SELECT slug FROM products WHERE id = ?', [pid])
     await syncDisplay(conn, pid, slugRow.slug)
     return pid
