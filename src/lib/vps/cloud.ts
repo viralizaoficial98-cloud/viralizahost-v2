@@ -1,5 +1,6 @@
 import 'server-only'
 import { getPool, type Queryable } from '@/lib/db/pool'
+import { PROTECTED_VM_IDS } from './protected'
 
 // Cloud VPS — regras comerciais, financeiras e de protecção partilhadas pelo painel, pela cotação, pelos pedidos,
 // pelo motor de compra (provisioning.ts) e pela área do cliente (manage.ts). Tudo aplicado NO SERVIDOR.
@@ -18,7 +19,7 @@ export type VpsMode = (typeof VPS_MODES)[number]
 export const VPS_MODE_LABEL: Record<VpsMode, string> = { disabled: 'Desactivado', test: 'Teste (só administradores)', request_only: 'Solicitação mediante aprovação', automatic: 'Automático' }
 
 /** VMs da infraestrutura de produção da ViralizaHost: protegidas SEMPRE, mesmo que a base seja alterada. */
-export const PROTECTED_VM_IDS = ['1564781'] as const
+export { PROTECTED_VM_IDS }
 
 export interface VpsAddon { id: string; label: string; kind: 'support' | 'backup' | 'license' | 'other'; monthlyKz: number; enabled: boolean; description: string | null }
 export interface VpsFinance { fxBrlAoa: number | null; fxUsdAoa: number | null; markupPct: number; bankFeePct: number; taxPct: number }

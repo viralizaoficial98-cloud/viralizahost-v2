@@ -1,4 +1,5 @@
 import 'server-only'
+import { protectedVmInRequest } from './protected'
 
 // Cliente da API Hostinger para VPS (especificação OpenAPI oficial 3.7.0 — ver docs/hostinger-vps-api.md).
 // Base https://developers.hostinger.com · Authorization: Bearer <token>. O token nunca é devolvido, registado
@@ -47,6 +48,9 @@ const safe = (s: unknown) => String(s ?? '').replace(/Bearer\s+\S+/gi, 'Bearer [
 export function hostingerVpsClient({ token, baseUrl = HOSTINGER_API, timeoutMs = 20000, purchaseTimeoutMs = 30000 }: { token: string; baseUrl?: string; timeoutMs?: number; purchaseTimeoutMs?: number }) {
   const base = baseUrl.replace(/\/+$/, '')
   async function call(method: string, path: string, body?: unknown, timeout = timeoutMs): Promise<{ status: number; json: any }> {
+    // VM de produção protegida: o pedido de alteração é recusado aqui, sem contactar a Hostinger
+    const blocked = protectedVmInRequest(method, path)
+    if (blocked) return { status: 403, json: { error: `A VM ${blocked} é infraestrutura protegida da ViralizaHost: operação recusada.` } }
     const res = await fetch(`${base}${path}`, {
       method, cache: 'no-store', signal: AbortSignal.timeout(timeout),
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },

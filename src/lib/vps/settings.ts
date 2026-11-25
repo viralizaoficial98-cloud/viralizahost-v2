@@ -70,6 +70,11 @@ export async function imageRow(id: string | null | undefined): Promise<ImageRow 
 }
 
 /** Cliente da API (ou o motivo por que não há). purchase=true aplica as salvaguardas das compras. */
+/** Endereço da API real da Hostinger (qualquer subdomínio de hostinger.com). */
+export function isRealHostingerApi(url: string): boolean {
+  try { return /(^|\.)hostinger\.[a-z.]+$/i.test(new URL(url).hostname) } catch { return false }
+}
+
 export async function vpsClient(purpose: 'read' | 'purchase' = 'read'): Promise<{ client: HostingerVpsClient; mode: 'test' | 'live' } | { error: string }> {
   const r = await row().catch(() => null)
   if (!r) return { error: 'Integração Hostinger VPS por configurar (Integrações → Hostinger VPS).' }
@@ -82,6 +87,8 @@ export async function vpsClient(purpose: 'read' | 'purchase' = 'read'): Promise<
     if (!r.auto_provision) return { error: 'Aprovisionamento automático desactivado (Integrações → Hostinger VPS).' }
     if (r.last_test_ok !== 1) return { error: 'Teste a ligação com sucesso antes de usar o aprovisionamento automático.' }
     if (mode === 'test' && process.env.REGISTRAR_TEST_PROVISIONING !== '1') return { error: 'Hostinger VPS em modo de ensaio: só o servidor de ensaio executa compras simuladas.' }
+    // O modo de ensaio nunca compra na API real (contornaria VPS_LIVE_PURCHASES)
+    if (mode === 'test' && isRealHostingerApi(baseUrl)) return { error: 'Modo de ensaio a apontar para a API real da Hostinger: compra recusada (use o modo «produção» com VPS_LIVE_PURCHASES=1).' }
     if (mode === 'live' && process.env.VPS_LIVE_PURCHASES !== '1') return { error: 'Compras reais de VPS por aprovar: falta VPS_LIVE_PURCHASES=1 no servidor.' }
   }
   const t = Number(process.env.VPS_PROVIDER_TIMEOUT_MS) || 0
@@ -122,6 +129,7 @@ export async function saveVpsSettings(input: { mode?: unknown; apiUrl?: unknown;
   if (apiUrlRaw && !/^https?:\/\/[^\s]+$/.test(apiUrlRaw)) throw new VpsConfigError('Endereço da API inválido.')
   if (mode === 'live' && apiUrlRaw && apiUrlRaw.replace(/\/+$/, '') !== HOSTINGER_API) throw new VpsConfigError(`Em produção a Hostinger usa sempre ${HOSTINGER_API}.`)
   if (mode === 'test' && !apiUrlRaw) throw new VpsConfigError('Em modo de ensaio indique o endereço da API simulada.')
+  if (mode === 'test' && apiUrlRaw && isRealHostingerApi(apiUrlRaw)) throw new VpsConfigError('Em modo de ensaio o endereço tem de ser o da API simulada, nunca o da Hostinger.')
   const apiUrl = mode === 'live' ? null : apiUrlRaw
   let secretEnc: string | null | undefined
   if (typeof input.secret === 'string' && input.secret.trim()) {
