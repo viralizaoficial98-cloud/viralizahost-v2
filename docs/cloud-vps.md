@@ -65,10 +65,40 @@ limite mensal de gasto, produto, template e datacenter activos, e ausência de c
 
 - «Sincronizar» importa as VMs do fornecedor para `vps_instances` **sem dono**. Associar a um cliente é uma acção explícita do
   administrador (cria um serviço `import` em modo manual). VMs internas nunca são associadas.
-- **VPS ID 1564781** (KVM 4, 16 GB, 200 GB, AlmaLinux 9 + cPanel — produção ViralizaHost): `PROTECTED_VM_IDS` em
-  `src/lib/vps/cloud.ts` **e** `vps_instances.is_protected = 1`. O backend recusa associação comercial, ligar/desligar/reiniciar,
-  reinstalar, senha, chaves SSH, backups, snapshots, firewall, eliminação e conciliação sobre esta VM — mesmo que a
-  base seja alterada, a lista em código prevalece.
+- **VPS ID 1564781** (KVM 4, 16 GB, 200 GB, AlmaLinux 9 + cPanel; produção ViralizaHost) tem duas barreiras independentes:
+  1. **Regras do módulo:** `PROTECTED_VM_IDS` (`src/lib/vps/protected.ts`) **e** `vps_instances.is_protected = 1`. Se a base
+     for alterada, a lista no código prevalece.
+  2. **Cliente da API Hostinger:** qualquer pedido que **altere** esta VM (não-GET) é recusado em
+     `src/lib/vps/hostinger-vps.ts`, sem contactar a Hostinger. Cobre também rotas, tarefas ou alterações futuras que se
+     esqueçam da verificação. As leituras (inventário, métricas) continuam permitidas.
+
+### Auditoria da protecção (verificada no código e no ensaio)
+
+| Ponto de entrada | Verificação | Prova no ensaio |
+|---|---|---|
+| Área do Cliente `/api/client/vps/[id]`: ligar, desligar, reiniciar, senha root, chave SSH, reinstalar, backups, snapshot, firewall, ficha | `managed()` → `assertVmNotProtected` (403) + barreira no cliente da API | adulteração da base: 9/9 operações e a ficha → 403 |
+| Painel → Encomendas `vps_link` | `linkVps` → `assertVmNotProtected` | associar 1564781 → recusado |
+| Painel → Cloud VPS `link_instance`, `set_internal`, `unlink_instance` | `inventory.ts` (403) | associar e retirar «interna» → 403 |
+| Aprovisionamento e conciliação (`reconcileVps`, `/setup`, hostname) | VM protegida encontrada → ignorada, revisão manual | conciliação nunca associa 1564781 |
+| Tarefa cron `/api/cron/vps-sync` | `CRON_SECRET` obrigatório (401/503) + `reconcileVps` | cron sem segredo → 401; com segredo → nada escrito na VM |
+| Inventário `sync_inventory` | só leitura; a VM fica `is_internal=1`, `is_protected=1`, `unlinked` | verificado após cada sincronização |
+| Cliente da API (todas as rotas) | `protectedVmInRequest` | `scripts/vps/vps-protected.test.mjs` (4/4); o simulador regista **0** escritas na VM 1564781 |
+
+### Compras reais: barreiras confirmadas
+
+1. **`VPS_LIVE_PURCHASES=1`** no processo. Sem ela, `vpsClient('purchase')` recusa em modo produção **antes** de criar o
+   cliente da API. O pagamento fica confirmado, nada é comprado e o caso passa a tratamento manual. Ensaio: «produção sem
+   VPS_LIVE_PURCHASES: pago mas NADA comprado».
+2. **Modo de ensaio nunca usa a API real** (novo). Um endereço `*.hostinger.*` é recusado ao gravar e na compra, para não
+   contornar a barreira 1 em servidores com `REGISTRAR_TEST_PROVISIONING`.
+3. **Modo comercial.**
+   - `automatic` exige o texto «AUTORIZO VENDA AUTOMATICA VPS» e, em produção, `VPS_LIVE_PURCHASES=1`.
+   - `request_only` (inicial) exige pedido aprovado, pagamento confirmado **e** «Autorizar aquisição» com «AUTORIZO AQUISICAO».
+4. **Aprovisionamento automático** activado na integração, com ligação testada com sucesso.
+5. **Controlos financeiros.**
+   - Limite de custo por plano e ciclo; o preço e a moeda actuais do item são verificados antes da compra.
+   - Limite mensal de despesas.
+   - Uma operação por serviço, sem repetição automática de respostas inconclusivas.
 
 ## 6. Área do Cliente (`/vps`)
 
@@ -124,29 +154,76 @@ custos desconhecidos, câmbio por definir, falhas de aprovisionamento; margem po
 
 ## 11. Testes (ensaio, API simulada)
 
-`scripts/mariadb/rehearsal/cloud-vps-e2e.cjs` (132 verificações, desktop + iPhone): página pública, planos, configurador, SO,
+`scripts/mariadb/rehearsal/cloud-vps-e2e.cjs` (desktop + iPhone): página pública, planos, configurador, SO,
 datacenters, pedidos, aprovação, checkout, pagamento, compra simulada, 202, conciliação, duplicados, limites financeiros, entrega,
 Área do Cliente, operações, isolamento entre clientes, protecção da VM interna, falhas de rede, responsividade. Os ensaios VPS
 anteriores (`vps-purchase`, `vps-install`, `vps-cycles`) correm em modo `automatic` e repõem o modo no fim.
 Capturas: `docs/capturas/cloud-vps/`.
 
-## 12. Publicação (feita pela equipa — nunca automática)
+## 11.1 Regressão e comparação com a `main` (bases limpas e isoladas)
 
-1. Cópia de segurança da base de produção (`mysqldump`).
-2. Em `/var/www/viralizahost-main`: `git fetch && git checkout main && git pull` (depois do merge do PR); copiar para
-   `/var/www/viralizahost` segundo o procedimento habitual (sem tocar em `.env.local`).
-3. `node --env-file=.env.local scripts/mariadb/migrate-schema.mjs --dry-run` → confirmar só a migração 24 pendente; depois sem `--dry-run`.
-4. **Não** definir `VPS_LIVE_PURCHASES`.
-5. `npm ci && npm run build && pm2 restart viralizahost`.
-6. Verificar: Painel → Cloud VPS → Fornecedores → «Testar ligação» (7 consultas, essenciais a verde) → «Sincronizar inventário»
-   (VM 1564781 aparece **interna e protegida**); `/servidor-vps` → «Configurar VPS»; Configurações → modo `request_only`.
+**Método.** Foram criadas duas bases de ensaio novas, com o mesmo processo e pela ordem de produção:
+
+1. esquema;
+2. dados-base;
+3. catálogo;
+4. migrações reaplicadas por cima;
+5. contas de ensaio.
+
+As bases são `viralizahost_ensaio_main`, com o código da `main` (sem a migração 24), e `viralizahost_ensaio_branch`. Cada uma correu na porta 3000, com os mesmos simuladores e os mesmos conjuntos. A `main` foi testada com os **seus próprios testes, sem alterações**.
+
+| Conjunto | `main` (base limpa) | Branch (base limpa) | Branch (base acumulada) | Conclusão |
+|---|---|---|---|---|
+| Compras, pagamentos e activação | 51/52: texto «activar manualmente» | 52/52 | 52/52 | Teste desactualizado: o texto mudou de propósito em 50ccc75 |
+| Importação WHM | 19/19 | 19/19 | 19/19 (*) | — |
+| Associação WHM | 44/44 | 46/46 | 46/46 (*) | Falhava só na base acumulada: a pesquisa era aplicada **só às 50 linhas da página** (bug real, corrigido) |
+| Contas: verificação de e-mail | 57/57 | 57/57 | 57/57 | Falhava só na base acumulada: o teste assumia a 1.ª página da lista (teste corrigido; a lista e a pesquisa estavam certas) |
+| Painel: acções pendentes, WHM | 78/79: «Testar ligação» | 87/88: «Testar ligação» | 88/89: «Testar ligação» | Falha pré-existente (porta 2087 forçada) → **PR separado #61**. Resumo de comprovativos: **bug real** (ver abaixo) |
+| Hospedagem Premium | 114/115: revenda-* | 115/115 | 115/115 | Teste desactualizado: a migração 23 (PR #57) cria revenda-* de propósito |
+| Servidor VPS (compra) | 141/142: histórico de eventos | 143/143 | 143/143 | **Bug real pré-existente**: eventos sem ordem (`JSON_ARRAYAGG` sem `ORDER BY`), corrigido |
+| Servidores Dedicados | 54/54 | 54/54 | 54/54 | **Regressão desta branch detectada pela comparação** (botão partilhado «Configurar VPS»), corrigida |
+| Painel: interface | 63/69: 5 contagens + WHM | 65/69: WHM | 62/66 (**) | «5 contagens»: teste desactualizado (6 categorias desde o PR #57). WHM: PR #61 |
+| Cloud VPS | — | 156/156 | 156/156 | — |
+| VPS instalação / ciclos | — | 121/121 · 52/52 | 121/121 · 52/52 | — |
+
+(*) Na base acumulada, a importação WHM e a Revenda (168/168) passam com o WHM simulado no estado inicial. Os ensaios nas bases limpas partilharam o mesmo simulador e recriaram contas `viralizaensa*` com outros domínios. A importação detectou correctamente esses conflitos. É um artefacto do ambiente de ensaio, não do código.
+
+(**) A execução completa (36 conjuntos) na base acumulada terminou só com estas falhas: «Testar ligação» WHM (PR #61) e o estado do simulador WHM (*).
+
+**Provas objectivas dos bugs na `main`** (base limpa, `prova-bugs`):
+
+- Pesquisa WHM: com 90 contas, «zz-prova-59» (última página) → **0 resultados** na `main`, **encontrada** na branch.
+- Comprovativos: 6 antigos + 1 novo por validar → o novo **não aparece** no resumo da `main` (mostra os 5 mais antigos) e **aparece** na branch.
+
+**Lista de comprovativos (nova).** Encomendas → «Comprovativos por validar» (`/admin/orders?filtro=comprovativos`):
+
+- servidor: `GET /api/admin/orders?lista=comprovativos&estado=&q=&ordem=&pagina=`;
+- pesquisa por número da encomenda, cliente, e-mail ou referência da transferência;
+- estados: por validar, validados, recusados/cancelados e todos (inclui os antigos);
+- ordenação: mais recentes, mais antigos, maior valor;
+- 20 por página;
+- o resumo do Dashboard mostra os mais recentes primeiro, com ligação ao registo.
+
+## 12. Publicação
+
+Ver **[publicacao-cloud-vps.md](publicacao-cloud-vps.md)**, que tem os comandos exactos para `/var/www/viralizahost-main` →
+`/var/www/viralizahost`, o PM2 `viralizahost` e o MariaDB:
+
+- verificação só de leitura;
+- cópias de segurança;
+- migrações com `--dry-run` antes e depois;
+- build e reinício;
+- verificações.
+
+**Não** definir `VPS_LIVE_PURCHASES`.
 
 ## 13. Reversão
 
-- Código: reverter o merge e `pm2 restart viralizahost`. As tabelas novas ficam sem uso.
-- Desligar sem reverter: Cloud VPS → Configurações → «Desactivado».
-- A migração não apaga dados; as colunas novas são opcionais para o código anterior.
-- Nada é comprado, parado ou alterado na Hostinger pela publicação.
+Ver [publicacao-cloud-vps.md](publicacao-cloud-vps.md#reversão-rollback):
+
+1. desligar a venda («Desactivado»);
+2. repor o código anterior (a base fica: a migração só acrescenta);
+3. só em último caso, repor o dump.
 
 ## 14. Limitações reais da API Hostinger
 
@@ -168,6 +245,23 @@ Capturas: `docs/capturas/cloud-vps/`.
 - [ ] Modo automático só depois do anterior, com o texto de autorização registado.
 - [ ] Planos Game Panel: **não publicar** (continuam fora do catálogo).
 
-## Capturas
+## Capturas (`docs/capturas/cloud-vps/`, ensaio com API simulada)
 
-Desktop e iPhone em [`capturas/cloud-vps/`](capturas/cloud-vps/): configurador (01, 02, 17), Área do Cliente (03, 04) e as 10 secções do painel (05–16).
+| Etapa | Desktop | iPhone |
+|---|---|---|
+| Dashboard Cloud VPS | `05-admin-visao-geral-desktop.jpg` | `15-admin-visao-geral-iphone.jpg` |
+| Servidores (VM 1564781 «Protegida») | `06-admin-servidores-desktop.jpg` | — |
+| Solicitações (detalhe, verificação do fornecedor) | `07-admin-solicitacoes-desktop.jpg` | `16-admin-solicitacoes-iphone.jpg` |
+| Planos e preços | `08-admin-planos-desktop.jpg` | — |
+| Fornecedores | `09-admin-fornecedores-desktop.jpg` | — |
+| SO e aplicações · Datacenters | `10-…`, `11-…` | — |
+| Aprovisionamento · Custos · Configurações | `12-…`, `13-…`, `14-…` | — |
+| Configurador público | `01-configurador-desktop.jpg`, `02-configurador-preenchido-desktop.jpg` | `17-configurador-iphone.jpg` |
+| Carrinho | `20-carrinho-desktop.jpg` | `30-carrinho-iphone.jpg` |
+| Checkout (pagamento, rever) | `21-checkout-pagamento-desktop.jpg`, `22-checkout-rever-desktop.jpg` | `31-checkout-iphone.jpg` |
+| Encomenda com comprovativo | `23-encomenda-comprovativo-desktop.jpg` | — |
+| Comprovativos por validar (nova lista) | `24-admin-comprovativos-desktop.jpg` | — |
+| Confirmação de pagamento | `25-admin-pagamento-confirmado-desktop.jpg` | — |
+| Aprovisionamento (compra registada) | `26-admin-aprovisionamento-compra-desktop.jpg` | — |
+| Painel VPS na Área do Cliente | `27-painel-vps-desktop.jpg`, `03-area-cliente-vps-desktop.jpg` | `32-painel-vps-iphone.jpg`, `04-area-cliente-vps-iphone.jpg` |
+| Firewall · Backups e snapshot | `28-firewall-desktop.jpg`, `29-backups-snapshot-desktop.jpg` | (incluídos em `32-…`) |
