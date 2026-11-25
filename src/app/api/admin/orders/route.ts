@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
   const allPays = [...(payments ?? []), ...extraPays.map((p: any) => ({ ...p, order_id: (invoices ?? []).find((i: any) => i.id === p.invoice_id)?.order_id }))]
   const svcIds = (services ?? []).map((s: any) => s.id)
   const [vpsOps] = svcIds.length ? await getPool().query(`SELECT v.service_id, v.mode, v.status, v.item_id, v.expected_cost_minor, v.cost_limit_minor, v.currency, v.provider_vm_id, v.provider_order_id, v.provider_subscription_id, v.provider_status, v.ipv4, v.attempts, v.message,
-      (SELECT JSON_ARRAYAGG(JSON_OBJECT('event', e.event, 'detail', e.detail, 'at', e.created_at)) FROM vps_provider_events e WHERE e.provider_order_id = v.id) events
+      (SELECT JSON_ARRAYAGG(JSON_OBJECT('event', e.event, 'detail', e.detail, 'at', e.created_at) ORDER BY e.created_at, e.id) FROM vps_provider_events e WHERE e.provider_order_id = v.id) events
     FROM vps_provider_orders v WHERE v.service_id IN (${svcIds.map(() => '?').join(',')})`, svcIds) as any : [[]]
   const ops = await operationsByService((services ?? []).filter((s: any) => s.service_type === 'domain').map((s: any) => s.id)).catch(() => ({} as Record<string, any>))
   const reg = await loadRegistrarSettings().catch(() => null)
