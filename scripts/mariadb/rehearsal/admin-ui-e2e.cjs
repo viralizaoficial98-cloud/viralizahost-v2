@@ -72,7 +72,7 @@ async function run(label, ctxOpts, shots) {
   await panel.getByTestId('pending-count').first().waitFor({ timeout: 15000 })
   ok(await panel.isVisible() && (await p.locator('h2#pending-title').count()) === 1, 'área «Acções pendentes» no topo do dashboard')
   const counts = await panel.getByTestId('pending-count').allTextContents()
-  ok(counts.length === 5 && counts.every(c => /^\d+$/.test(c.trim())), `5 contagens reais: ${counts.join(', ')}`)
+  ok(counts.length === 6 && counts.every(c => /^\d+$/.test(c.trim())), `6 contagens reais (inclui pedidos de Revenda): ${counts.join(', ')}`)
   const rev = await p.getByTestId('stat-revenue-value').textContent()
   ok(/Kz/.test(rev) && !/\$/.test(rev), `receita formatada em Kz (${rev.trim()})`)
   if (shots) await p.screenshot({ path: `${OUT}/${label}-dashboard.png`, fullPage: true })
