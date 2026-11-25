@@ -154,3 +154,44 @@ Depois, em **Catálogo e Preços → Hospedagem**:
 1. Rever cada plano das três famílias (características, etiqueta, desconto por período) e gravar. O preço base passa a ficar guardado.
 2. Em «Banners de páginas», carregar as imagens de Sobre nós, Parceria e Suporte.
 3. Se tudo estiver bem: `pm2 save`.
+
+## Correcção: características e descrições dos planos
+
+### Causa encontrada
+
+Reproduzida em ensaio com um plano existente (Reseller Growth):
+
+1. **Interface e perda silenciosa.**
+   - Na linha de cada característica, a lista de ícones mostrava rótulos como «Painel de controlo», «IP / rede» ou «Suporte», que parecem características. O campo de texto ao lado não tinha rótulo visível.
+   - Escolher só o ícone e gravar mostrava «Guardado». O servidor, porém, descartava sem aviso as linhas sem texto.
+   - O formulário continuava a mostrar as linhas não gravadas, por isso o cartão público ficava sem lista.
+2. **Formulário depois de gravar.** O formulário não voltava a ler o que tinha ficado gravado.
+3. **Dados antigos.** O editor antigo de produtos guarda características sem ícone e permite marcá-las como não incluídas (`included = 0`). O carregamento só lia as incluídas, e a gravação seguinte apagava as restantes.
+4. **API.** Um pedido de gravação sem `features` (só preços) apagava todas as características.
+
+### Correcção
+
+- **Editor**:
+  - cada linha tem os campos com rótulo «Ícone» (inicial: «Visto») e «Texto da característica» (texto livre), e a caixa «Incluída»;
+  - mantém-se acrescentar, subir, descer e apagar linhas;
+  - uma linha sem texto impede a gravação e indica o número da linha a corrigir;
+  - depois de gravar, o formulário mostra os valores lidos do catálogo.
+- **Servidor** (`family-plans.ts`):
+  - grava texto, ícone, ordem e «incluída»;
+  - recusa linhas sem texto (400, com a linha indicada);
+  - sem `features` no pedido, mantém as características gravadas;
+  - texto simples: só retira caracteres de controlo, e o site mostra-o como texto, nunca como HTML.
+- **Leitura de formatos antigos** (`readFeature`):
+  - texto simples sem ícone e com posição a partir de 0 (editor antigo);
+  - linhas não incluídas;
+  - texto guardado em JSON (`{"text": …, "icon": …}`).
+  - Uma linha só com ícone fica sem texto: o painel assinala-a e o site não a mostra.
+- **Cartão público**:
+  - descrição curta abaixo do nome;
+  - lista com ícones pela ordem do painel, com as não incluídas riscadas;
+  - lista também nos planos «Sob consulta», com «Pedir proposta».
+- As páginas são dinâmicas, por isso os dados novos aparecem logo depois de gravar, sem novo deploy.
+
+**Sem migração.** Preços, ciclos e fluxos de compra não mudam.
+
+Ensaio: `scripts/mariadb/rehearsal/family-features-e2e.cjs`. Capturas: `docs/capturas/planos-caracteristicas/`.

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Loader2, Plus, Save, Trash2 } from 'lucide-react'
 import { MAX_DISCOUNT, exactPeriodTotal, impliedDiscount, selectorBadge } from '@/lib/commerce/period-pricing'
 import { FAMILY_PERIODS, PLAN_FAMILIES, type PlanFamily } from '@/lib/commerce/plan-families'
-import { VPS_FEATURE_ICONS, type VpsFeature, type VpsIcon } from '@/lib/commerce/vps-shared'
+import { VPS_FEATURE_ICONS, type VpsIcon } from '@/lib/commerce/vps-shared'
 import { FamilyPlanCard, type FamilyCardPlan } from '@/components/service/FamilyPlansSection'
 
 // Catálogo e Preços → planos de Revenda de Hospedagem, Criador de Sites e Construtor WordPress.
@@ -14,10 +14,13 @@ import { FamilyPlanCard, type FamilyCardPlan } from '@/components/service/Family
 type Period = { cycle: string; months: number; exists: boolean; active: boolean; price: number | null; renewal: number | null; discount: number; matchesRule: boolean }
 type Plan = {
   id: string; slug: string; name: string; description: string | null; saleStatus: 'active' | 'draft' | 'on_request'; position: number; badge: string | null
-  highlight: boolean; baseMonthly: number | null; baseDerived: boolean; features: VpsFeature[]; periods: Period[]; otherCycles: { cycle: string; months: number; price: number; active: boolean }[]
+  highlight: boolean; baseMonthly: number | null; baseDerived: boolean; features: { text: string; icon: VpsIcon | null; included: boolean }[]; periods: Period[]; otherCycles: { cycle: string; months: number; price: number; active: boolean }[]
 }
 type PeriodDraft = { cycle: string; discount: string | null; publish: boolean; renewal: string }
-type Draft = { id?: string; name: string; description: string; saleStatus: Plan['saleStatus']; position: string; badge: string; highlight: boolean; baseMonthly: string; features: { text: string; icon: string }[]; periods: PeriodDraft[] }
+/** origEmpty: a linha veio do catálogo sem texto (só ícone) — o painel assinala-a, nunca inventa texto */
+type FeatureDraft = { text: string; icon: string; included: boolean; origEmpty?: boolean }
+type Draft = { id?: string; name: string; description: string; saleStatus: Plan['saleStatus']; position: string; badge: string; highlight: boolean; baseMonthly: string; features: FeatureDraft[]; periods: PeriodDraft[] }
+const NEW_FEATURE: FeatureDraft = { text: '', icon: 'check', included: true } // «Visto» como ícone inicial
 
 const input = 'w-full border border-[#E5E7EB] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-[#F5B700] bg-white'
 const lbl = 'text-xs text-[#64748B] block'
@@ -30,7 +33,8 @@ function toDraft(p?: Plan): Draft {
   return {
     id: p?.id, name: p?.name ?? '', description: p?.description ?? '', saleStatus: p?.saleStatus ?? 'draft', position: String(p?.position ?? 0),
     badge: p?.badge ?? '', highlight: p?.highlight ?? false, baseMonthly: p?.baseMonthly?.toString() ?? '',
-    features: p?.features.length ? p.features.map(f => ({ text: f.text, icon: f.icon ?? '' })) : [{ text: '', icon: 'check' }],
+    // Valores gravados, pela ordem gravada (planos novos começam sem linhas)
+    features: (p?.features ?? []).map(f => ({ text: f.text, icon: f.icon ?? '', included: f.included !== false, origEmpty: !f.text.trim() })),
     periods: FAMILY_PERIODS.map(per => {
       const x = p?.periods.find(y => y.cycle === per.cycle)
       // Preço que segue a regra → editável pelo desconto; preço personalizado → mantido até «Aplicar regra»
@@ -61,7 +65,7 @@ function PlanForm({ family, plan, onSaved, onCancel }: { family: PlanFamily; pla
   const previewPlan: FamilyCardPlan = {
     slug: plan?.slug ?? 'novo', name: d.name || 'Nome do plano', description: d.description || null, badge: d.badge || null, highlight: d.highlight,
     onRequest: d.saleStatus === 'on_request', base: baseOk ? base : null,
-    features: d.features.filter(f => f.text.trim()).map(f => ({ text: f.text, icon: (f.icon || null) as VpsIcon | null })),
+    features: d.features.filter(f => f.text.trim()).map(f => ({ text: f.text, icon: (f.icon || null) as VpsIcon | null, included: f.included })),
     periods: FAMILY_PERIODS.map((per, i) => { const r = result(i); return r ? { cycle: per.cycle, months: per.months, total: r.total, renewal: renewalOf(i) ?? r.total, discount: r.discount } : null }).filter(Boolean) as FamilyCardPlan['periods'],
   }
   const pi = FAMILY_PERIODS.findIndex(p => p.cycle === previewCycle)
@@ -69,19 +73,25 @@ function PlanForm({ family, plan, onSaved, onCancel }: { family: PlanFamily; pla
   const setPeriod = (i: number, p: Partial<PeriodDraft>) => set('periods', d.periods.map((x, k) => k === i ? { ...x, ...p } : x))
   const mvFeat = (i: number, dir: -1 | 1) => { const j = i + dir; if (j < 0 || j >= d.features.length) return; const f = [...d.features];[f[i], f[j]] = [f[j], f[i]]; set('features', f) }
 
+  const emptyRows = d.features.map((f, i) => (f.text.trim() ? -1 : i)).filter(i => i >= 0)
   async function save() {
-    setBusy(true); setMsg(null)
+    setMsg(null)
+    // Nenhuma linha é descartada em silêncio: sem texto não se grava
+    if (emptyRows.length) { setMsg({ ok: false, text: `Escreva o «Texto da característica» na linha ${emptyRows.map(i => i + 1).join(', ')} (o ícone sozinho não descreve o plano) ou apague a linha.`, field: 'features' }); return }
+    setBusy(true)
     try {
       const body = {
         id: d.id, name: d.name, description: d.description, saleStatus: d.saleStatus, position: d.position, badge: d.badge, highlight: d.highlight, baseMonthly: d.baseMonthly,
-        features: d.features.filter(f => f.text.trim()).map(f => ({ text: f.text, icon: f.icon || null })),
+        features: d.features.map(f => ({ text: f.text, icon: f.icon || null, included: f.included })),
         periods: d.periods.map(p => ({ cycle: p.cycle, discount: p.discount === null ? null : p.discount === '' ? (p.publish ? '' : null) : p.discount, publish: p.publish, renewal: p.renewal === '' ? null : p.renewal })),
       }
       const res = await fetch(`/api/admin/catalog/family-plans?family=${family}`, { method: d.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const j = await res.json()
       if (!res.ok) { setMsg({ ok: false, text: j.error ?? `HTTP ${res.status}`, field: j.field ?? undefined }); return }
+      // O formulário passa a mostrar o que ficou gravado (texto, ícone e ordem lidos do catálogo)
+      const stored = (j.plans as Plan[]).find(x => x.id === (d.id ?? j.id))
+      setD(d.id && stored ? toDraft(stored) : toDraft())
       setMsg({ ok: true, text: d.id ? 'Guardado' : 'Plano criado' })
-      if (!d.id) setD(toDraft())
       onSaved(j.plans)
     } catch (e) { setMsg({ ok: false, text: (e as Error).message }) } finally { setBusy(false) }
   }
@@ -101,20 +111,36 @@ function PlanForm({ family, plan, onSaved, onCancel }: { family: PlanFamily; pla
 
         <div>
           <p className="text-xs font-bold text-[#334155] mb-1">Características (pela ordem do cartão)</p>
-          <ul className="space-y-1.5">
-            {d.features.map((f, i) => (
-              <li key={i} className="flex gap-1.5 items-center" data-testid={tid('feature')}>
-                <select className={`${input} w-44`} value={f.icon} onChange={e => set('features', d.features.map((x, k) => k === i ? { ...x, icon: e.target.value } : x))} aria-label={`Ícone da característica ${i + 1}`} data-testid={tid('feature-icon')}>
-                  <option value="">(sem ícone)</option>{Object.entries(VPS_FEATURE_ICONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-                <input className={`${input} ${bad('features')}`} maxLength={120} value={f.text} onChange={e => set('features', d.features.map((x, k) => k === i ? { ...x, text: e.target.value } : x))} aria-label={`Característica ${i + 1}`} data-testid={tid('feature-text')} />
-                <button type="button" onClick={() => mvFeat(i, -1)} disabled={i === 0} className="p-1.5 rounded border border-[#E5E7EB] disabled:opacity-30" aria-label="Subir" data-testid={tid('feature-up')}><ArrowUp size={14} /></button>
-                <button type="button" onClick={() => mvFeat(i, 1)} disabled={i === d.features.length - 1} className="p-1.5 rounded border border-[#E5E7EB] disabled:opacity-30" aria-label="Descer" data-testid={tid('feature-down')}><ArrowDown size={14} /></button>
-                <button type="button" onClick={() => set('features', d.features.filter((_, k) => k !== i))} className="p-1.5 rounded border border-[#E5E7EB] text-red-600" aria-label="Remover"><Trash2 size={14} /></button>
-              </li>
-            ))}
-          </ul>
-          <button type="button" onClick={() => set('features', [...d.features, { text: '', icon: 'check' }])} className="mt-1.5 text-xs font-bold inline-flex items-center gap-1" data-testid={tid('add-feature')}><Plus size={12} /> Acrescentar característica</button>
+          <p className="text-[11px] text-[#64748B] mb-2">Escreva cada característica no campo «Texto da característica» (ex.: «20 GB de armazenamento», «10 contas cPanel», «Nameservers privados»). A lista «Ícone» só escolhe o símbolo mostrado ao lado.</p>
+          {d.features.length === 0 && <p className="text-[11px] text-[#94A3B8] mb-1" data-testid={tid('no-features')}>Sem características: o cartão não mostra lista.</p>}
+          <ol className="space-y-2">
+            {d.features.map((f, i) => {
+              const missing = !f.text.trim()
+              const setF = (patch: Partial<FeatureDraft>) => set('features', d.features.map((x, k) => k === i ? { ...x, ...patch } : x))
+              return (
+                <li key={i} className={`rounded-lg border p-2 ${missing && msg && !msg.ok && msg.field === 'features' ? 'border-red-300 bg-red-50' : 'border-[#E5E7EB]'}`} data-testid={tid('feature')} data-missing={missing ? '1' : '0'}>
+                  <div className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)] sm:grid-cols-[10rem_minmax(0,1fr)_auto] gap-2 items-end">
+                    <label className={lbl}>Ícone
+                      <select className={`${input} mt-0.5`} value={f.icon} onChange={e => setF({ icon: e.target.value })} data-testid={tid('feature-icon')}>
+                        <option value="">(sem ícone)</option>{Object.entries(VPS_FEATURE_ICONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                    </label>
+                    <label className={lbl}>Texto da característica
+                      <input className={`${input} mt-0.5`} maxLength={120} value={f.text} placeholder="ex.: 20 GB de armazenamento" onChange={e => setF({ text: e.target.value })} data-testid={tid('feature-text')} />
+                    </label>
+                    <div className="flex gap-1 col-span-2 sm:col-span-1 items-center">
+                      <label className="text-[11px] text-[#475569] flex items-center gap-1 mr-1" title="Desmarcado = mostrada riscada no cartão"><input type="checkbox" checked={f.included} onChange={e => setF({ included: e.target.checked })} data-testid={tid('feature-included')} /> Incluída</label>
+                      <button type="button" onClick={() => mvFeat(i, -1)} disabled={i === 0} className="p-1.5 rounded border border-[#E5E7EB] disabled:opacity-30" aria-label={`Subir a característica ${i + 1}`} data-testid={tid('feature-up')}><ArrowUp size={14} /></button>
+                      <button type="button" onClick={() => mvFeat(i, 1)} disabled={i === d.features.length - 1} className="p-1.5 rounded border border-[#E5E7EB] disabled:opacity-30" aria-label={`Descer a característica ${i + 1}`} data-testid={tid('feature-down')}><ArrowDown size={14} /></button>
+                      <button type="button" onClick={() => set('features', d.features.filter((_, k) => k !== i))} className="p-1.5 rounded border border-[#E5E7EB] text-red-600" aria-label={`Apagar a característica ${i + 1}`} data-testid={tid('feature-delete')}><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+                  {f.origEmpty && missing && <p className="text-[11px] text-amber-800 mt-1" data-testid={tid('feature-orig-empty')}>Esta linha está gravada só com ícone, sem texto. Escreva o texto ou apague a linha.</p>}
+                </li>
+              )
+            })}
+          </ol>
+          <button type="button" onClick={() => set('features', [...d.features, { ...NEW_FEATURE }])} className="mt-2 text-xs font-bold inline-flex items-center gap-1" data-testid={tid('add-feature')}><Plus size={12} /> Acrescentar característica</button>
         </div>
 
         <div>

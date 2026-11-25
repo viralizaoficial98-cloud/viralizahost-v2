@@ -45,6 +45,7 @@ else
   run "Domínios: hero do painel (independente), Registo de domínios, catálogo e fluxos (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/domains-page-e2e.cjs
   run "E-mail corporativo (hero do painel, atalhos), submenus com imagem e WhatsApp/chat em todas as páginas (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/site-chrome-e2e.cjs
   run "Planos de Revenda, Criador de Sites e Construtor WordPress; Nossas Marcas; heros de Sobre nós, Parceria e Suporte (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/family-plans-e2e.cjs
+  run "Características e descrições dos planos (editor, gravação, formatos antigos, cartões) (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/family-features-e2e.cjs
   run "Servidores Dedicados Linux e Windows: planos, páginas e compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/dedicated-plans-e2e.cjs
   run "Menu principal (5 grupos), páginas consolidadas e encaminhamentos (desktop + telemóvel)" node scripts/mariadb/rehearsal/menu-e2e.cjs
   run "Percursos de compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/purchase-flows-e2e.cjs
