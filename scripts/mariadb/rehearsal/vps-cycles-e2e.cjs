@@ -35,6 +35,10 @@ async function ctxFor(b, opts, cookie, initCart) {
 
 ;(async () => {
   const db = await mysql.createConnection({ host: process.env.DB_HOST, port: Number(process.env.DB_PORT), user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME, dateStrings: true })
+  // Cloud VPS (migração 24): compra directa = modo comercial «automático». Este ensaio cobre esse modo; o modo
+  // «solicitação mediante aprovação» é coberto por cloud-vps-e2e.cjs. Repõe o modo no fim.
+  const cvModeBefore = (await db.query("SELECT JSON_UNQUOTE(JSON_EXTRACT(options, '$.commercialMode')) m FROM vps_provider_settings WHERE id = 1"))[0][0]?.m ?? null
+  await db.query("UPDATE vps_provider_settings SET options = JSON_SET(COALESCE(options, '{}'), '$.commercialMode', 'automatic') WHERE id = 1")
   const all = async (sql, a = []) => (await db.query(sql, a))[0]
   const one = async (sql, a = []) => (await all(sql, a))[0]
   const val = v => (v != null && typeof v === 'object' && !(v instanceof Date) && !Buffer.isBuffer(v) ? JSON.stringify(v) : v)
@@ -213,6 +217,7 @@ async function ctxFor(b, opts, cookie, initCart) {
     console.log('\n7. Âmbito')
     ok((await history()) === historyBefore, 'encomendas, itens, facturas e serviços anteriores inalterados')
   } catch (e) { ok(false, 'execução', e.stack) } finally {
+    await db.query("UPDATE vps_provider_settings SET options = JSON_SET(COALESCE(options, '{}'), '$.commercialMode', ?) WHERE id = 1", [cvModeBefore ?? 'request_only']).catch(() => {})
     try {
       for (const id of fixtures) await db.query('DELETE FROM services WHERE id = ?', [id])
       await db.beginTransaction()

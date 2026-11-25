@@ -3,7 +3,7 @@
 #   APP_LOG=/caminho/next.log BASE_URL=http://localhost:3000 bash scripts/mariadb/rehearsal/run-all.sh
 # O processo Next de ensaio deve correr com RDAP_BOOTSTRAP_URL=http://127.0.0.1:12088/dns.json (mock-rdap.mjs),
 # NODE_EXTRA_CA_CERTS=<certificado do WHM simulado>, ORDER_RATE_LIMIT=500, QUOTE_RATE_LIMIT=200,
-# REGISTRAR_TEST_PROVISIONING=1, REGISTRAR_TIMEOUT_MS=2000, RESELLER_PROVISIONING_ENABLED=1, RESELLER_WHM_TIMEOUT_MS=4000, RESELLER_REQUEST_RATE_LIMIT=1000, RESELLER_REQUEST_EMAIL_LIMIT=1000, RESELLER_CLIENT_RATE_LIMIT=1000, VPS_PROVIDER_TIMEOUT_MS=2000, LOGIN_RATE_LIMIT=100 e SIGNUP_RATE_LIMIT=200 (nunca em produção); RESEND_API_URL=http://127.0.0.1:12090 com mock-resend.mjs e RESEND_API_KEY fictícia «re_…» (com mock-registrar.mjs --delay=4000 na porta 12089 e mock-hostinger.mjs --delay=4000 --vps-ready=3000 na porta 12091).
+# REGISTRAR_TEST_PROVISIONING=1, REGISTRAR_TIMEOUT_MS=2000, RESELLER_PROVISIONING_ENABLED=1, RESELLER_WHM_TIMEOUT_MS=4000, RESELLER_REQUEST_RATE_LIMIT=1000, RESELLER_REQUEST_EMAIL_LIMIT=1000, RESELLER_CLIENT_RATE_LIMIT=1000, VPS_PROVIDER_TIMEOUT_MS=2000, VPS_CLIENT_RATE_LIMIT=5000, VPS_REQUEST_RATE_LIMIT=1000, LOGIN_RATE_LIMIT=100 e SIGNUP_RATE_LIMIT=200 (nunca em produção); RESEND_API_URL=http://127.0.0.1:12090 com mock-resend.mjs e RESEND_API_KEY fictícia «re_…» (com mock-registrar.mjs --delay=4000 na porta 12089 e mock-hostinger.mjs --delay=4000 --vps-ready=3000 na porta 12091).
 set -u
 cd "$(dirname "$0")/../../.."
 case "$(node --env-file=.env.local -p 'process.env.DB_NAME')" in
@@ -38,6 +38,7 @@ else
   run "Hospedagem Premium: períodos, descontos e fichas de plano (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/hosting-plans-e2e.cjs
   run "E-mail Corporativo: períodos, descontos e fichas de plano (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/email-plans-e2e.cjs
   run "Servidor VPS: planos, compra, comprovativo e Hostinger VPS simulada (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/vps-purchase-e2e.cjs
+  run "Cloud VPS: modos, pedidos com aprovação, pagamento, autorização, compra simulada (202), reconciliação, limites, VM interna protegida, Área do Cliente (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/cloud-vps-e2e.cjs
   run "Configurações → Contas: confirmação de e-mail configurável (registo e checkout)" node --env-file=.env.local scripts/mariadb/rehearsal/account-settings-e2e.cjs
   run "Presença Global: bandeiras no mapa e na lista (desktop + telemóvel)" node scripts/mariadb/rehearsal/global-presence-e2e.cjs
   run "VPS: só 1 mês, 1 ano e 2 anos (3 meses, 6 meses e 3 anos retirados), carrinho antigo, renovações, KVM 2" node --env-file=.env.local scripts/mariadb/rehearsal/vps-cycles-e2e.cjs

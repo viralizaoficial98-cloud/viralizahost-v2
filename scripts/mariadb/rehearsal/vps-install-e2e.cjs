@@ -58,6 +58,10 @@ const hideChrome = p => p.addStyleTag({ content: 'header, [class*=sticky], [clas
 
 ;(async () => {
   const db = await mysql.createConnection({ host: process.env.DB_HOST, port: Number(process.env.DB_PORT), user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME, dateStrings: true })
+  // Cloud VPS (migração 24): compra directa = modo comercial «automático». Este ensaio cobre esse modo; o modo
+  // «solicitação mediante aprovação» é coberto por cloud-vps-e2e.cjs. Repõe o modo no fim.
+  const cvModeBefore = (await db.query("SELECT JSON_UNQUOTE(JSON_EXTRACT(options, '$.commercialMode')) m FROM vps_provider_settings WHERE id = 1"))[0][0]?.m ?? null
+  await db.query("UPDATE vps_provider_settings SET options = JSON_SET(COALESCE(options, '{}'), '$.commercialMode', 'automatic') WHERE id = 1")
   const all = async (sql, a = []) => (await db.query(sql, a))[0]
   const one = async (sql, a = []) => (await all(sql, a))[0]
   const val = v => (v != null && typeof v === 'object' && !(v instanceof Date) && !Buffer.isBuffer(v) ? JSON.stringify(v) : v)
@@ -202,8 +206,9 @@ const hideChrome = p => p.addStyleTag({ content: 'header, [class*=sticky], [clas
     let { ctx, p } = await ctxFor(b, DESKTOP, c2.cookie)
     await p.goto(BASE + '/servidor-vps', { waitUntil: 'domcontentloaded' })
     await p.getByTestId('vps-period-monthly').click().catch(() => {})
-    await p.locator(`[data-testid=vps-plan][data-slug="${p1.slug}"]`).getByTestId('vps-plan-cta').click()
-    await p.waitForURL(`**/comprar/${p1.slug}**`)
+    // O botão do plano abre agora o configurador Cloud VPS; o percurso /comprar (modo automático) é testado directamente
+    ok(/\/servidor-vps\/configurar\?plano=/.test(await p.locator(`[data-testid=vps-plan][data-slug="${p1.slug}"]`).getByTestId('vps-plan-cta').getAttribute('href')), 'botão do plano → configurador Cloud VPS')
+    await p.goto(`${BASE}/comprar/${p1.slug}?ciclo=monthly`, { waitUntil: 'domcontentloaded' })
     await p.getByTestId('install-picker').waitFor()
     const body = await p.locator('body').innerText()
     ok(/Escolha a duração/.test(body) && /Localização do servidor/.test(body) && /Escolha o que instalar/.test(body), 'mesma página: «Escolha a duração», «Localização do servidor» e «Escolha o que instalar»')
@@ -524,6 +529,7 @@ const hideChrome = p => p.addStyleTag({ content: 'header, [class*=sticky], [clas
   } catch (e) {
     ok(false, 'execução', e.stack)
   } finally {
+    await db.query("UPDATE vps_provider_settings SET options = JSON_SET(COALESCE(options, '{}'), '$.commercialMode', ?) WHERE id = 1", [cvModeBefore ?? 'request_only']).catch(() => {})
     try {
       await db.beginTransaction()
       if (created) {
