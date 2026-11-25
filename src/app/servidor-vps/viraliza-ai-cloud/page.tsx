@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { VpsPlansSection } from '@/components/service/VpsPlansSection'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Bot, Zap, MessageCircle, Globe, Shield, HardDrive, Lock, Headphones, Layers } from 'lucide-react'
@@ -29,7 +29,7 @@ const included = [
 
 export default async function ViralizaAICloudPage() {
   const banner = await getBannerPage('vps-viraliza-ai-cloud')
-  const fromPrice = await fromPriceText('vps', 'viraliza-ai-cloud')
+  const fromPrice = await fromPriceText('vps')
   return (
     <>
       <Header />
@@ -51,11 +51,8 @@ export default async function ViralizaAICloudPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["Agentes de IA","WhatsApp + Telegram","Gmail + Google Agenda","Integrações Empresariais"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <DynamicServicePricing
-          category="vps"
-          subcategory="viraliza-ai-cloud"
-          cols={3}
-          showBillingToggle
+        {/* Planos reais do catálogo Cloud VPS: o botão abre o configurador com «Viraliza AI Cloud» pré-seleccionado */}
+        <VpsPlansSection app="ai"
           title="Viraliza AI Cloud — Planos"
           subtitle="Agentes de IA integrados com as ferramentas do seu negócio." />
         <IncludedFeatures features={included} dark
@@ -64,7 +61,7 @@ export default async function ViralizaAICloudPage() {
           title="Active os seus agentes de IA hoje"
           subtitle="Assistentes inteligentes, integrações completas e suporte especializado."
           cta="Contratar AI Cloud"
-          ctaHref="/comprar/vps-ai-cloud-pro" />
+          ctaHref="/servidor-vps/configurar?app=ai" />
       </main>
       <Footer />
     </>

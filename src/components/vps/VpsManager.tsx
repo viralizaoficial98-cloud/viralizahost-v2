@@ -6,6 +6,7 @@ import type { MyVps } from '@/lib/vps/manage'
 import type { InstallOption } from '@/lib/vps/install-shared'
 import { InstallIcon } from '@/components/purchase/VpsInstallPicker'
 import { VPS_TONE } from './tone'
+import { VpsBackupsCard, VpsDetailsCard, VpsFirewallCard, VpsMetricsCard, VpsPlanActions } from './VpsExtras'
 
 // «Os meus VPS» → detalhe. As operações chamam /api/client/vps/:id (posse verificada no servidor).
 // A palavra-passe root só existe neste formulário até ser enviada; nunca é guardada nem mostrada depois.
@@ -54,7 +55,9 @@ export function VpsManager({ initial }: { initial: MyVps }) {
     if (!r.ok) { setLiveErr(j.error ?? 'Estado indisponível.'); return null }
     setLiveErr(''); setLive(j); return j
   }, [initial.id])
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- carregamento inicial
   useEffect(() => { load() }, [load])
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- carregamento inicial
   useEffect(() => { if (vps.manageable) loadLive() }, [vps.manageable, loadLive])
   useEffect(() => () => { if (poll.current) clearTimeout(poll.current) }, [])
 
@@ -102,6 +105,13 @@ export function VpsManager({ initial }: { initial: MyVps }) {
 
       {msg && <p role={msg.ok ? 'status' : 'alert'} data-testid="vps-msg" className={`p-3 rounded-xl text-sm ${msg.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{msg.text}</p>}
 
+      {vps.accessPending && vps.manageable && (
+        <div className="rounded-2xl border-2 border-[#F5B700] bg-[#FFF8E1] p-4 text-sm" role="status" data-testid="vps-access-pending">
+          <p className="font-black text-[#0B0B0D]">Defina o acesso ao seu VPS</p>
+          <p className="text-[#334155] mt-1">O VPS está criado. Por segurança a senha gerada pelo fornecedor não é conhecida por ninguém: defina a sua senha root ou adicione a sua chave SSH em «Acesso inicial seguro» para começar a usar o servidor.</p>
+        </div>
+      )}
+
       {vps.state !== 'ready' && (
         <div className={card} data-testid="vps-status-help">
           <p className="text-sm text-[#334155]">{vps.stateHelp}</p>
@@ -131,6 +141,8 @@ export function VpsManager({ initial }: { initial: MyVps }) {
           {vps.nextDue && <div><dt className="text-[#64748B]">Próximo vencimento</dt><dd className="font-semibold">{new Date(vps.nextDue).toLocaleDateString('pt-PT')}</dd></div>}
         </dl>
       </section>
+
+      {vps.manageable && <><VpsDetailsCard vps={vps} /><VpsMetricsCard id={vps.id} /></>}
 
       {vps.state === 'ready' && vps.ip && (
         <section className={card} aria-labelledby="access-title" data-testid="vps-access">
@@ -167,8 +179,13 @@ export function VpsManager({ initial }: { initial: MyVps }) {
 
           <Reinstall installs={installs} current={vps.install?.id ?? null} busy={busy === 'reinstall'} disabled={working}
             onReinstall={(img, confirmText) => run('reinstall', 'Reinstalação', { action: 'reinstall', image: img, acceptDataLoss: true, confirmText })} />
+
+          <VpsBackupsCard id={vps.id} />
+          <VpsFirewallCard id={vps.id} />
         </>
       )}
+
+      {vps.state === 'ready' && <VpsPlanActions vps={vps} />}
 
       <section className={card} data-testid="vps-support">
         <h2 className="font-black text-[#0B0B0D] mb-1 flex items-center gap-2"><LifeBuoy size={18} className="text-[#B45309]" /> Precisa de ajuda?</h2>

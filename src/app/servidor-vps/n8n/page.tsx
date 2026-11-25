@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { VpsPlansSection } from '@/components/service/VpsPlansSection'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Workflow, Zap, Shield, HardDrive, Globe, MessageCircle, Headphones, Lock, Server } from 'lucide-react'
@@ -29,7 +29,7 @@ const included = [
 
 export default async function VPSn8nPage() {
   const banner = await getBannerPage('vps-n8n')
-  const fromPrice = await fromPriceText('vps', 'n8n')
+  const fromPrice = await fromPriceText('vps')
   return (
     <>
       <Header />
@@ -51,11 +51,8 @@ export default async function VPSn8nPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["n8n Pré-instalado","Fluxos Ilimitados","WhatsApp Integrado","Root Access"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <DynamicServicePricing
-          category="vps"
-          subcategory="n8n"
-          cols={3}
-          showBillingToggle
+        {/* Planos reais do catálogo Cloud VPS: o botão abre o configurador com «n8n» pré-seleccionado */}
+        <VpsPlansSection app="n8n"
           title="VPS n8n — Automação sem limites"
           subtitle="Servidor pronto com n8n configurado. Active e comece a automatizar hoje." />
         <IncludedFeatures features={included} dark
@@ -64,7 +61,7 @@ export default async function VPSn8nPage() {
           title="Comece a automatizar hoje com n8n"
           subtitle="Servidor pré-configurado, fluxos ilimitados e suporte especializado."
           cta="Contratar VPS n8n"
-          ctaHref="/comprar/vps-n8n-pro" />
+          ctaHref="/servidor-vps/configurar?app=n8n" />
       </main>
       <Footer />
     </>
