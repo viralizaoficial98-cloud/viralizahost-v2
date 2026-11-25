@@ -160,7 +160,7 @@ export async function vpsRequestDetail(idOrRef: string) {
 const ALLOWED: Record<string, VpsRequestStatus[]> = {
   start_review: ['submitted'], note: Object.keys(VPS_REQ_LABEL) as VpsRequestStatus[], approve: ['under_review'], reject: ['submitted', 'under_review', 'approved'],
   cancel: ['submitted', 'under_review', 'approved', 'awaiting_payment'], send_to_payment: ['approved'], refresh_payment: ['awaiting_payment'],
-  simulate_payment: ['awaiting_payment'], authorize_purchase: ['paid', 'failed'],
+  simulate_payment: ['awaiting_payment'], authorize_purchase: ['paid', 'failed', 'purchase_authorized'],
 }
 export async function vpsRequestAction(adminId: string, id: string, action: string, payload: Record<string, unknown> = {}) {
   if (!(action in ALLOWED)) throw new CloudError('action_invalid', 'Acção inválida.')
@@ -241,8 +241,10 @@ export async function vpsRequestAction(adminId: string, id: string, action: stri
       if (String(payload.confirmText ?? '').trim().toUpperCase() !== 'AUTORIZO AQUISICAO') throw new CloudError('confirm_required', 'Escreva «AUTORIZO AQUISICAO» para autorizar a compra no fornecedor.', 400)
       const [o] = await rows(db, 'SELECT payment_status FROM orders WHERE id = ?', [r.order_id])
       if (o?.payment_status !== 'paid') throw new CloudError('not_paid', 'Pagamento do cliente não confirmado.', 409)
-      await move(db, 'purchase_authorized', { purchase_authorized_by: adminId, purchase_authorized_at: new Date() })
-      await log(`Pedido ${r.reference}: aquisição AUTORIZADA`, 'activate')
+      // Já autorizado mas bloqueado (orçamento, operações, configuração): repetir depois de corrigir a causa
+      if (r.status === 'purchase_authorized') await event(db, id, adminId, r.status, r.status, 'authorize_purchase_retry', note)
+      else await move(db, 'purchase_authorized', { purchase_authorized_by: adminId, purchase_authorized_at: new Date() })
+      await log(`Pedido ${r.reference}: aquisição AUTORIZADA${r.status === 'purchase_authorized' ? ' (nova tentativa)' : ''}`, 'activate')
       await db.query("UPDATE services SET provisioning_status = 'pending', provisioning_error = NULL WHERE id = ? AND provisioning_status IN ('manual_required','failed','pending')", [r.service_id])
       const { provisionService, refreshOrderActivation } = await import('@/lib/commerce/provisioning')
       const out = await provisionService(r.service_id)

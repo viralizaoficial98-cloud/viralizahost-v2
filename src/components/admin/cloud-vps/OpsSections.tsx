@@ -137,7 +137,7 @@ export function RequestsSection({ initialRef }: { initialRef?: string | null }) 
     <div className="space-y-3" data-testid="cv-requests">
       <div className="flex flex-wrap gap-2">
         <select className={input} value={status} onChange={e => { setStatus(e.target.value); setPage(1) }} data-testid="cv-req-filter"><option value="open">Em aberto</option><option value="">Todos</option>{Object.entries(REQ).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}</select>
-        <input className={`${input} w-full sm:w-64`} placeholder="Referência, e-mail, nome" value={q} onChange={e => { setQ(e.target.value); setPage(1) }} data-testid="cv-req-search" />
+        <input className={`${input} w-full sm:w-64`} placeholder="Referência, e-mail, nome" value={q} onChange={e => { setQ(e.target.value); setPage(1); if (e.target.value.trim() && status === 'open') setStatus('') }} data-testid="cv-req-search" />
       </div>
       {!d ? <Spinner /> : d.items.length === 0 ? <p className={`${card} p-6 text-sm text-[#64748B]`}>Sem pedidos neste filtro.</p> : (
         <ul className="space-y-2">{d.items.map((r: any) => (

@@ -131,7 +131,7 @@ export function VpsBackupsCard({ id }: { id: string }) {
 
 export function VpsFirewallCard({ id }: { id: string }) {
   const [d, setD] = useState<any>(null), [err, setErr] = useState(''), [busy, setBusy] = useState(''), [m, setM] = useState<{ ok: boolean; t: string } | null>(null)
-  const [rule, setRule] = useState({ action: 'accept', protocol: 'SSH', port: '22', sourceDetail: 'any' })
+  const [rule, setRule] = useState({ ruleAction: 'accept', protocol: 'SSH', port: '22', sourceDetail: 'any' })
   const load = useCallback(() => get(id, 'firewall').then(setD).catch(e => setErr(e.message)), [id])
   useEffect(() => { load() }, [load])
   const run = async (op: string, extra: any = {}, ok = 'Feito.') => {
@@ -148,7 +148,7 @@ export function VpsFirewallCard({ id }: { id: string }) {
         <div className="space-y-3 text-sm">
           <ul className="text-xs space-y-1" data-testid="vx-fw-rules">{d.firewall.rules.length === 0 ? <li className="text-[#64748B]">Sem regras.</li> : d.firewall.rules.map((r: any) => <li key={r.id} className="flex items-center gap-2" data-testid="vx-fw-rule"><span className={r.action === 'accept' ? 'text-green-700 font-bold' : 'text-red-700 font-bold'}>{r.action === 'accept' ? 'Permitir' : 'Bloquear'}</span> {r.protocol} · porta {r.port} · origem {r.sourceDetail}<button className="ml-auto underline" disabled={!!busy} onClick={() => run('delete-rule', { ruleId: r.id }, 'Regra removida.')}>Remover</button></li>)}</ul>
           <div className="flex flex-wrap gap-2 items-end text-xs">
-            <select className={field} value={rule.action} onChange={e => setRule({ ...rule, action: e.target.value })}><option value="accept">Permitir</option><option value="drop">Bloquear</option></select>
+            <select className={field} value={rule.ruleAction} onChange={e => setRule({ ...rule, ruleAction: e.target.value })} data-testid="vx-fw-action"><option value="accept">Permitir</option><option value="drop">Bloquear</option></select>
             <select className={field} value={rule.protocol} onChange={e => setRule({ ...rule, protocol: e.target.value })} data-testid="vx-fw-protocol">{d.protocols.map((p: string) => <option key={p}>{p}</option>)}</select>
             <input className={`${field} w-28`} value={rule.port} onChange={e => setRule({ ...rule, port: e.target.value })} placeholder="porta" data-testid="vx-fw-port" />
             <input className={`${field} w-40`} value={rule.sourceDetail} onChange={e => setRule({ ...rule, sourceDetail: e.target.value })} placeholder="any ou IP/CIDR" />

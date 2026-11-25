@@ -28,11 +28,12 @@ export interface MyVps {
 }
 
 const BASE_SQL = `SELECT s.id, s.status, s.provisioning_status, s.provisioning_error, s.next_due_date, s.profile_id, s.external_ref,
-    o.id order_id, o.order_number, o.payment_status, oi.options, oi.billing_cycle, p.name plan_name, p.slug plan_slug, p.plan_specs,
+    o.id order_id, COALESCE(o.order_number, 'importado') order_number, IF(s.activation_source = 'import' AND o.id IS NULL, 'paid', o.payment_status) payment_status, oi.options, oi.billing_cycle,
+    COALESCE(p.name, s.service_name) plan_name, p.slug plan_slug, p.plan_specs,
     v.id op_id, v.provider, v.provider_vm_id, v.provider_status, v.ipv4, v.request, v.status op_status, v.access_method, v.access_configured_at, v.client_hostname, v.firewall_id, s.provisioned_at
-  FROM services s JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id JOIN products p ON p.id = s.product_id
+  FROM services s LEFT JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id LEFT JOIN products p ON p.id = s.product_id
   LEFT JOIN vps_provider_orders v ON v.service_id = s.id
-  WHERE s.profile_id = ? AND p.category = 'vps' AND p.subcategory IS NULL AND s.status <> 'cancelled'`
+  WHERE s.profile_id = ? AND ((p.category = 'vps' AND p.subcategory IS NULL) OR (s.activation_source = 'import' AND s.service_type = 'vps')) AND s.status <> 'cancelled'`
 
 async function toMyVps(r: any): Promise<MyVps> {
   const o = json(r.options) ?? {}
@@ -294,11 +295,11 @@ export async function vpsFirewallOp(profileId: string, serviceId: string, input:
   if (!fw) throw new VpsManageError('Crie primeiro a firewall deste VPS.', 409)
   let res: any
   if (op === 'add-rule') {
-    const action = input.action === 'drop' ? 'drop' : 'accept'
+    const action = input.ruleAction === 'drop' ? 'drop' : 'accept'
     const protocol = String(input.protocol ?? '')
     if (!(FW_PROTOCOLS as readonly string[]).includes(protocol)) throw new VpsManageError('Protocolo inválido.', 422)
     const port = String(input.port ?? '').trim() || 'any'
-    if (port !== 'any' && !/^\d{1,5}(?::\d{1,5})?$/.test(port)) throw new VpsManageError('Porta inválida (ex.: 22, 80 ou 8000:8100).', 422)
+    if (port !== 'any' && (!/^\d{1,5}(?::\d{1,5})?$/.test(port) || port.split(':').some(x => Number(x) < 1 || Number(x) > 65535))) throw new VpsManageError('Porta inválida (ex.: 22, 80 ou 8000:8100).', 422)
     const src = String(input.sourceDetail ?? 'any').trim() || 'any'
     if (src !== 'any' && !/^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$|^[0-9a-f:]+(\/\d{1,3})?$/i.test(src)) throw new VpsManageError('Origem inválida (any, IP ou CIDR).', 422)
     res = await client.op('firewall-rule-add', { firewall: fw.id, body: { protocol, port, source: src === 'any' ? 'any' : 'custom', source_detail: src, action } })

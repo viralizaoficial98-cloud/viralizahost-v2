@@ -40,6 +40,11 @@ export async function providerReadAll(actor: string | null, kind = 'sync') {
     catch (e) { results[k] = { ok: false, ms: Date.now() - t0, error: e instanceof VpsApiError ? `${e.message}${e.status ? ` (HTTP ${e.status})` : ''}` : 'falha' } }
   }))
   const ok = ESSENTIAL.every(k => results[k]?.ok)
+  // Centros de dados e templates reais guardados (mantém o que o administrador configurou)
+  if (results.dataCenters?.ok && results.templates?.ok) {
+    const { mergeProviderOptions } = await import('./settings')
+    await mergeProviderOptions(data.dataCenters as never, data.templates as never).catch(e => { results.templates = { ...results.templates, ok: false, error: `não gravado: ${(e as Error).message}` } })
+  }
   const failed = Object.entries(results).filter(([, r]) => !r.ok).map(([k]) => k)
   const message = ok
     ? `Ligação OK: ${results.catalog.count} produto(s), ${results.virtualMachines.count} VM(s), ${results.dataCenters.count} centro(s), ${results.templates.count} template(s)${failed.length ? `; com falhas não essenciais: ${failed.join(', ')}` : ''}.`

@@ -184,6 +184,26 @@ export async function saveVpsSettings(input: { mode?: unknown; apiUrl?: unknown;
   return loadVpsSettings()
 }
 
+/**
+ * Actualiza as localizações e os templates guardados a partir do fornecedor, mantendo a configuração do
+ * administrador (publicação, categoria, licença, compatibilidade). Novos ficam por publicar. Usado pelo «Testar
+ * ligação» antigo e pela sincronização do Cloud VPS.
+ */
+export async function mergeProviderOptions(dcs: { id: number; name?: string | null; location?: string | null; city?: string | null }[], tpls: { id: number; name: string; description?: string | null }[]) {
+  const prev = await row(); const o = parse(prev?.options)
+  const old = (l: OptionRow[] | undefined, id: string) => (l ?? []).find(x => String(x.id) === id)?.enabled ?? false
+  o.locations = dcs.map(d => ({ id: String(d.id), label: [d.city, d.location].filter(Boolean).join(', ') || d.name || `Centro ${d.id}`, detail: d.name ?? null, enabled: old(o.locations, String(d.id)) }))
+  const prevImgs: InstallOptionRow[] = Array.isArray(o.images) ? o.images : []
+  o.images = [
+    ...tpls.map(t => {
+      const p = prevImgs.find(x => String(x.id) === String(t.id))
+      return p ? { ...p, label: t.name, detail: t.description ?? null, source: 'api' } : { id: String(t.id), label: t.name, detail: t.description ?? null, enabled: false, source: 'api', ...classifyTemplate(t.name) }
+    }),
+    ...prevImgs.filter(x => x.source === 'manual'),
+  ]
+  await getPool().query('UPDATE vps_provider_settings SET options = ? WHERE id = 1', [JSON.stringify(o)])
+}
+
 /** «Testar ligação»: só leituras (catálogo VPS, centros de dados, templates, métodos de pagamento, VMs). Actualiza as opções. */
 export async function testVpsConnection() {
   const c = await vpsClient('read')
@@ -192,20 +212,7 @@ export async function testVpsConnection() {
   else {
     try {
       const [catalog, dcs, tpls, pms, vms] = await Promise.all([c.client.catalog(), c.client.dataCenters(), c.client.templates(), c.client.paymentMethods(), c.client.virtualMachines()])
-      const prev = await row(); const o = parse(prev?.options)
-      const old = (l: OptionRow[] | undefined, id: string) => (l ?? []).find(x => String(x.id) === id)?.enabled ?? false
-      o.locations = dcs.map(d => ({ id: String(d.id), label: [d.city, d.location].filter(Boolean).join(', ') || d.name || `Centro ${d.id}`, detail: d.name ?? null, enabled: old(o.locations, String(d.id)) }))
-      // Templates: mantém a configuração do administrador (categoria, licença, compatibilidade); novos ficam desactivados
-      const prevImgs: InstallOptionRow[] = Array.isArray(o.images) ? o.images : []
-      o.images = [
-        ...tpls.map(t => {
-          const p = prevImgs.find(x => String(x.id) === String(t.id))
-          return p ? { ...p, label: t.name, detail: t.description ?? null, source: 'api' } : { id: String(t.id), label: t.name, detail: t.description ?? null, enabled: false, source: 'api', ...classifyTemplate(t.name) }
-        }),
-        ...prevImgs.filter(x => x.source === 'manual'),
-      ]
-
-      await getPool().query('UPDATE vps_provider_settings SET options = ? WHERE id = 1', [JSON.stringify(o)])
+      await mergeProviderOptions(dcs, tpls)
       result = { ok: true, message: `Ligação OK (${c.mode === 'live' ? 'produção' : 'ensaio'}): ${catalog.length} produto(s) VPS no catálogo, ${dcs.length} centro(s) de dados, ${tpls.length} sistema(s)/imagem(ns), ${vms.length} VPS na conta, ${pms.length} método(s) de pagamento.`,
         detail: { catalog: catalog.map(i => ({ id: i.id, name: i.name, metadata: i.metadata ?? null, prices: i.prices })), paymentMethods: pms.map(p => ({ id: p.id, label: `${p.name ?? 'Método'} ${p.identifier ?? ''}`.trim(), isDefault: !!p.is_default, unusable: !!(p.is_expired || p.is_suspended) })) } }
     } catch (e) { result = { ok: false, message: e instanceof VpsApiError ? e.message : 'Falha ao contactar a Hostinger.' } }

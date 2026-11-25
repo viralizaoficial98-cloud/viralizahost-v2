@@ -79,6 +79,8 @@ export function VpsConfigurator({ plans, addons, mode, isAdmin, loggedIn, initia
   const lineErr = quote?.line?.error?.message as string | undefined
   const ready = !!(quote?.line && !quote.line.error)
   const closed = mode === 'disabled' || (mode === 'test' && !isAdmin)
+  // Só os grupos de extras que existem (numeração dos passos sem saltos)
+  const addonGroups = ([['backup', 'Backups adicionais'], ['license', 'Licenças adicionais'], ['support', 'Serviços de suporte'], ['other', 'Outros extras']] as const).filter(([k]) => addons.some(a => a.kind === k))
 
   async function submit() {
     setErr(''); setBusy(true)
@@ -114,7 +116,7 @@ export function VpsConfigurator({ plans, addons, mode, isAdmin, loggedIn, initia
               <button key={x.slug} type="button" onClick={() => setPlan(x.slug)} data-testid="cfg-plan" data-slug={x.slug} aria-pressed={plan === x.slug}
                 className={`text-left rounded-xl border-2 p-4 transition-all ${plan === x.slug ? 'border-[#F5B700] bg-[#FFFBEA]' : 'border-[#EEE] hover:border-[#DDD]'}`}>
                 <p className="font-black">{x.name}</p>
-                <p className="text-xs text-[#555] mt-1 flex flex-wrap gap-x-3"><span className="inline-flex items-center gap-1"><Cpu size={12} />{x.specs.vcpu ?? '?'} vCPU</span><span className="inline-flex items-center gap-1"><MemoryStick size={12} />{x.specs.ramGb ?? '?'} GB</span><span className="inline-flex items-center gap-1"><HardDrive size={12} />{x.specs.diskGb ?? '?'} GB</span></p>
+                <p className="text-xs text-[#555] mt-1 flex flex-wrap gap-x-3">{x.specs.vcpu != null && <span className="inline-flex items-center gap-1"><Cpu size={12} />{x.specs.vcpu} vCPU</span>}{x.specs.ramGb != null && <span className="inline-flex items-center gap-1"><MemoryStick size={12} />{x.specs.ramGb} GB RAM</span>}{x.specs.diskGb != null && <span className="inline-flex items-center gap-1"><HardDrive size={12} />{x.specs.diskGb} GB</span>}</p>
                 {c && <p className="text-sm font-bold mt-2">{fmt(c.price / c.months)}<span className="text-xs font-normal text-[#777]">/mês</span></p>}
               </button>
             )
@@ -154,9 +156,8 @@ export function VpsConfigurator({ plans, addons, mode, isAdmin, loggedIn, initia
           <div className="flex flex-wrap gap-2 mt-4">{p?.cycles.map(c => <button key={c.cycle} type="button" onClick={() => setCycle(c.cycle)} data-testid={`cfg-cycle-${c.cycle}`} aria-pressed={cycle === c.cycle}
             className={`px-4 py-2.5 rounded-xl border-2 text-sm font-semibold ${cycle === c.cycle ? 'border-[#F5B700] bg-[#FFFBEA]' : 'border-[#EEE]'}`}>{CYCLE_LABEL[c.cycle] ?? c.cycle}<span className="block text-xs font-normal text-[#666]">{fmt(c.price)} · renova {fmt(c.renewal)}</span></button>)}</div>
         </section>
-        {addons.length > 0 && ([['backup', 'Backups adicionais'], ['license', 'Licenças adicionais'], ['support', 'Serviços de suporte'], ['other', 'Outros extras']] as const).map(([kind, title], i) => {
+        {addonGroups.map(([kind, title], i) => {
           const list = addons.filter(a => a.kind === kind)
-          if (!list.length) return null
           return (
             <section key={kind} className={box} data-testid={`cfg-addons-${kind}`}>{step(6 + i, title)}
               <div className="space-y-2 mt-4">{list.map(a => <label key={a.id} className="flex items-start gap-2 text-sm"><input type="checkbox" checked={chosen.includes(a.id)} onChange={e => setChosen(e.target.checked ? [...chosen, a.id] : chosen.filter(x => x !== a.id))} data-testid="cfg-addon" data-id={a.id} className="mt-1" />
@@ -164,7 +165,7 @@ export function VpsConfigurator({ plans, addons, mode, isAdmin, loggedIn, initia
             </section>
           )
         })}
-        <section className={box}>{step(addons.length ? 9 : 6, 'Chave pública SSH (opcional)')}
+        <section className={box}>{step(6 + addonGroups.length, 'Chave pública SSH (opcional)')}
           <p className="text-xs text-[#666] mt-2 flex items-start gap-1.5"><KeyRound size={14} className="shrink-0 mt-0.5" />Cole a chave <strong>pública</strong> (ex.: «ssh-ed25519 AAAA… nome»). Sem chave, define a senha root na Área do Cliente antes do primeiro acesso — nunca enviamos senhas por e-mail.</p>
           <textarea className="mt-3 w-full rounded-xl border border-[#E5E7EB] px-3.5 py-2.5 text-xs font-mono min-h-[70px]" value={sshKey} onChange={e => setSshKey(e.target.value)} data-testid="cfg-ssh" />
           {mode !== 'automatic' && <textarea className="mt-2 w-full rounded-xl border border-[#E5E7EB] px-3.5 py-2.5 text-sm min-h-[60px]" placeholder="Observações para a equipa (opcional)" value={notes} onChange={e => setNotes(e.target.value)} data-testid="cfg-notes" maxLength={2000} />}
