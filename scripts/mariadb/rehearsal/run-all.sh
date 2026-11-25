@@ -18,7 +18,7 @@ await c.query(\"DELETE FROM hosting_accounts WHERE cpanel_username='mariaacu'\")
 await c.query(\"DELETE FROM whm_accounts WHERE whm_username IN ('joaoconc','mariaacu','semdono','dupdom')\");await c.end()})()"
 fail=0
 run() { echo; echo "=== $1"; shift; "$@" || fail=$((fail+1)); }
-run "Regras: catálogo de domínios Hostinger e especificações VPS (unidades)" node --test scripts/registrar/hostinger-catalog.test.mjs scripts/vps/vps-specs.test.mjs
+run "Regras: catálogo de domínios Hostinger e especificações VPS (unidades)" node --test scripts/registrar/hostinger-catalog.test.mjs scripts/vps/vps-specs.test.mjs scripts/vps/vps-protected.test.mjs
 run "Compras, pagamentos e activação" node --env-file=.env.local scripts/mariadb/rehearsal/commerce-e2e.mjs
 run "Área do Cliente, renovações, catálogo" node --env-file=.env.local scripts/mariadb/rehearsal/client-area-e2e.mjs
 run "Importação WHM" node --env-file=.env.local scripts/mariadb/rehearsal/whm-import-e2e.mjs

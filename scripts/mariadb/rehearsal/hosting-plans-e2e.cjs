@@ -78,7 +78,7 @@ class S {
     }
     ok(snapPrices.length >= visible.length * 4 && snapPrices.some(r => r.cycle === '3months'), `ciclos existentes mantidos (${[...new Set(snapPrices.map(r => r.cycle))].join(', ')})`)
     ok(snapProducts.filter(p => visible.some(v => v.id === p.id)).every(p => p.plan_specs == null) && snapFeatures.filter(f => visible.some(v => v.id === f.product_id)).every(f => f.group_name == null), 'sem ficha nem grupos até o administrador os gravar (cartões como antes)')
-    const nonHostingBase = await one("SELECT COUNT(*) n FROM products WHERE category IN ('wordpress', 'website-builder', 'reseller') AND (base_monthly_price IS NOT NULL OR plan_specs IS NOT NULL)")
+    const nonHostingBase = await one("SELECT COUNT(*) n FROM products WHERE category IN ('wordpress', 'website-builder', 'reseller') AND slug NOT LIKE 'revenda-%' AND (base_monthly_price IS NOT NULL OR plan_specs IS NOT NULL)") // revenda-*: criados com preço base pela migração 23 (PR #57)
     ok(Number(nonHostingBase.n) === 0, 'WordPress, construtor e revenda não foram tocados pela migração')
 
     // ── 2. Autorização e validação ──

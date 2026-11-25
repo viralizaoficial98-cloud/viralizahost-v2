@@ -29,6 +29,11 @@ class S {
 const admin = async (s, body) => s.req('/api/admin/orders', { method: 'POST', body })
 
 const db = await mysql.createConnection({ host: process.env.DB_HOST, port: Number(process.env.DB_PORT), user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME })
+// Cloud VPS (migração 24): a compra directa de VPS pelo checkout só existe no modo comercial «automático»; o modo
+// inicial «solicitação» recusa-a (vps_request_only, coberto por cloud-vps-e2e). Este ensaio usa o modo automático e repõe-no.
+const cvModeBefore = (await db.query("SELECT JSON_UNQUOTE(JSON_EXTRACT(options, '$.commercialMode')) m FROM vps_provider_settings WHERE id = 1"))[0][0]?.m ?? null
+await db.query("UPDATE vps_provider_settings SET options = JSON_SET(COALESCE(options, '{}'), '$.commercialMode', 'automatic') WHERE id = 1")
+const restoreCvMode = () => db.query("UPDATE vps_provider_settings SET options = JSON_SET(COALESCE(options, '{}'), '$.commercialMode', ?) WHERE id = 1", [cvModeBefore ?? 'request_only']).catch(() => {})
 const one = async (sql, p = []) => (await db.query(sql, p))[0][0]
 const count = async (sql, p = []) => Number(Object.values((await db.query(sql, p))[0][0])[0])
 const rnd = () => randomBytes(4).toString('hex')
@@ -112,7 +117,8 @@ const oV = r.json.order
 r = await admin(adm, { action: 'approve', orderId: oV.id })
 ok(r.json?.provisioning?.[0]?.status === 'manual_required', 'VPS fica em activação manual (sem API do fornecedor)')
 r = await c2.req(`/orders/${oV.id}`)
-ok(/activar manualmente/.test(r.text), 'cliente vê «A equipa está a activar manualmente»')
+// Texto do estado alterado em 50ccc75 (Servidor VPS) para «Activação em tratamento pela equipa»
+ok(/Activação em tratamento pela equipa/.test(r.text), 'cliente vê «Activação em tratamento pela equipa»')
 const vs = await one('SELECT id FROM services WHERE order_id = ?', [oV.id])
 await admin(adm, { action: 'mark_active', serviceId: vs.id, externalRef: 'vps-ensaio-01' })
 ok((await one('SELECT provisioning_status, next_due_date FROM services WHERE id = ?', [vs.id])).provisioning_status === 'active', 'admin marca o VPS como activo')
@@ -177,6 +183,7 @@ ok(/Activação falhou/.test(r.text), 'cliente vê a falha de activação sem no
 console.log('\n9. Sem senhas no WHM')
 ok(true, 'createacct recusa pedidos com senha no simulador (verificado acima na activação bem-sucedida)')
 
+await restoreCvMode()
 await db.end()
 console.log(`\n${pass} OK, ${fail} falhadas`)
 process.exit(fail ? 1 : 0)

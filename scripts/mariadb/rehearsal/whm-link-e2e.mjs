@@ -106,10 +106,22 @@ try {
   ok(r.status === 409, 'nova tentativa para outro cliente → conflito para revisão, nada alterado')
 
   console.log('\n4. Contadores e filtros')
-  r = await adm.req('/api/admin/whm/accounts?linked=true')
+  // A lista é paginada (50 por página): a conta é procurada pela pesquisa, aplicada na base a TODAS as páginas
+  r = await adm.req(`/api/admin/whm/accounts?linked=true&search=${comerc.whm_username}`)
   ok(r.json?.data?.some(x => x.id === comerc.id), 'aparece em «Com cliente»')
-  r = await adm.req('/api/admin/whm/accounts?linked=false')
-  ok(!r.json?.data?.some(x => x.id === comerc.id) && r.json?.data?.some(x => x.id === tadm.id), 'sai de «Sem cliente» (a conta testeadm continua lá)')
+  r = await adm.req(`/api/admin/whm/accounts?linked=false&search=${comerc.whm_username}`)
+  const rT = await adm.req(`/api/admin/whm/accounts?linked=false&search=${tadm.whm_username}`)
+  ok(!r.json?.data?.some(x => x.id === comerc.id) && rT.json?.data?.some(x => x.id === tadm.id), 'sai de «Sem cliente» (a conta testeadm continua lá)')
+  // Pesquisa antes da paginação: com mais de 50 contas, uma conta fora da 1.ª página é encontrada e o total é o da pesquisa
+  const allLinked = await adm.req('/api/admin/whm/accounts?linked=true')
+  const lastPage = Math.max(1, Math.ceil((allLinked.json?.total ?? 0) / 50))
+  const far = (await adm.req(`/api/admin/whm/accounts?linked=true&page=${lastPage}`)).json?.data?.at(-1)
+  if (far) {
+    r = await adm.req(`/api/admin/whm/accounts?linked=true&search=${encodeURIComponent(far.primary_domain)}`)
+    ok(r.json?.data?.some(x => x.id === far.id) && (allLinked.json.total <= 50 || r.json.total < allLinked.json.total), `pesquisa encontra conta da página ${lastPage} (${far.primary_domain}; total ${r.json?.total})`)
+  }
+  r = await adm.req(`/api/admin/whm/accounts?search=${encodeURIComponent("x',(),*%")}`)
+  ok(r.status === 200, 'pesquisa com caracteres especiais não quebra a consulta')
   ok(typeof r.json?.counts?.unlinked === 'number' && r.json.counts.linked >= 1, `contadores: ${JSON.stringify(r.json?.counts)}`)
   r = await adm.req('/api/admin/whm/accounts?linked=pending')
   ok(r.json?.data?.some(x => x.id === maria.id) && r.json.data.every(x => !x.profile_id && x.link_status === 'pending_validation'), '«Candidatas» lista só contas com cliente sugerido por e-mail')

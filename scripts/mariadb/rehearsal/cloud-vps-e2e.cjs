@@ -321,8 +321,32 @@ const hide = p => p.addStyleTag({ content: '[data-floating]{display:none!importa
     ok(imp && imp.accessPending === true, 'cliente 2 vê o VPS importado, com acesso por definir', imp)
     r = await cv({ action: 'link_instance', id: old.id, profileId: c1id, confirmed: true }); ok(r.status === 409, 'VM já associada → recusado')
     r = await c1.req(`/api/client/vps/${imp.id}?view=details`); ok(r.status === 404, 'cliente 1 não acede ao VPS do cliente 2')
+    // Adulteração simulada: a base passa a apontar o VPS do cliente 1 para a VM de produção. Todas as rotas
+    // (cliente, painel, cron) têm de recusar e nada pode chegar à Hostinger (2.ª barreira no cliente da API).
+    const opRow = await one('SELECT id, provider_vm_id FROM vps_provider_orders WHERE service_id = ?', [sid])
+    await db.query("UPDATE vps_provider_orders SET provider_vm_id = '1564781' WHERE id = ?", [opRow.id])
+    try {
+      const refused = []
+      for (const body of [{ action: 'restart' }, { action: 'stop' }, { action: 'start' }, { action: 'root_password', password: `Ensaio-${RND}-Forte9#` }, { action: 'ssh_key', key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEnsaioEnsaioEnsaioEnsaioEnsaioEnsaio01 ensaio' },
+        { action: 'reinstall', image: '1130', acceptDataLoss: true, confirmText: 'REINSTALAR' }, { action: 'backup_op', op: 'snapshot-create' }, { action: 'backup_op', op: 'backup-restore', backupId: '1', confirmText: 'RESTAURAR' }, { action: 'firewall_op', op: 'activate' }]) {
+        r = await c1.req(`/api/client/vps/${sid}`, { method: 'POST', body }); if (r.status === 403) refused.push(body.action + (body.op ? `:${body.op}` : ''))
+      }
+      ok(refused.length === 9, `cliente: 9/9 operações recusadas (403) na VM 1564781 (${refused.join(', ')})`)
+      r = await c1.req(`/api/client/vps/${sid}?view=details`); ok(r.status === 403, 'cliente: ficha da VM protegida recusada')
+      r = await adm.req('/api/admin/orders', { method: 'POST', body: { action: 'vps_link', serviceId: sid, vmId: '1564781' } })
+      ok(r.status !== 200 || r.json?.ok !== true, `painel → Encomendas: associar a VM 1564781 recusado (${r.status} ${String(r.json?.error ?? '').slice(0, 80)})`)
+      r = await cv({ action: 'link_instance', id: (await one("SELECT id FROM vps_instances WHERE provider_vm_id = '1564781'")).id, profileId: c1id, confirmed: true })
+      ok(r.status === 403, 'painel → Cloud VPS: associar a VM 1564781 recusado (403)')
+      r = await cv({ action: 'set_internal', id: (await one("SELECT id FROM vps_instances WHERE provider_vm_id = '1564781'")).id, internal: false })
+      ok(r.status === 403, 'painel → Cloud VPS: retirar «interna» da VM 1564781 recusado (403)')
+      const cron = await fetch(`${BASE}/api/cron/vps-sync`, { method: 'POST', headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } })
+      ok(cron.status === 200, `tarefa cron de conciliação executada (${cron.status})`)
+      r = await fetch(`${BASE}/api/cron/vps-sync`, { method: 'POST' }); ok(r.status === 401, 'cron sem segredo → 401')
+    } finally {
+      await db.query('UPDATE vps_provider_orders SET provider_vm_id = ? WHERE id = ?', [opRow.provider_vm_id, opRow.id])
+    }
     const vmOps = (await stats()).vmOps ?? {}
-    ok(!vmOps['1564781'], 'VM 1564781 nunca recebeu operações de escrita do portal', vmOps)
+    ok(!vmOps['1564781'], 'VM 1564781 nunca recebeu operações de escrita (cliente, painel, cron)', vmOps)
 
     // ── 9. Modos ──
     console.log('\n9. Modos: desactivado, teste e automático')
@@ -337,19 +361,116 @@ const hide = p => p.addStyleTag({ content: '[data-floating]{display:none!importa
     ok(r.status === 201 && Number((await one('SELECT is_test FROM vps_requests WHERE reference = ?', [r.json.reference])).is_test) === 1, 'teste: administrador cria pedido de teste')
     r = await cv({ action: 'save_cloud', mode: 'automatic' }); ok(r.status === 409, 'automático sem autorização expressa → recusado')
     r = await cv({ action: 'save_cloud', mode: 'automatic', confirmText: 'AUTORIZO VENDA AUTOMATICA VPS' }); ok(r.status === 200 && r.json.cloud.mode === 'automatic', 'automático autorizado (API simulada)')
-    ;({ ctx, p } = await ctxFor(b, DESKTOP, c2.cookie))
-    await p.goto(`${BASE}/servidor-vps/configurar?plano=${kvm2.slug}`, { waitUntil: 'domcontentloaded' })
-    await p.locator('[data-testid=cfg-image][data-id="1210"]').click(); await p.getByTestId('cfg-total').waitFor({ timeout: 15000 })
-    ok(/Adicionar ao carrinho/.test(await p.getByTestId('cfg-submit').innerText()), 'automático: «Adicionar ao carrinho»')
-    await ctx.close()
+    // Percurso completo no navegador (modo automático, API simulada): configurador → carrinho → checkout → rever →
+    // encomenda → comprovativo validado no painel → compra → aprovisionamento → painel do VPS. Capturas de cada etapa.
+    await db.query("UPDATE shopping_carts c JOIN profiles p ON p.id = c.profile_id SET c.items = '[]' WHERE p.email = 'cliente2@ensaio.test'")
     const aq = (await c2.req('/api/checkout/quote', { method: 'POST', body: { lines: [{ type: 'product', slug: kvm2.slug, cycle: 'monthly', options: { location: '19', image: '1210' } }] } })).json.quote
     r = await c2.req('/api/checkout/orders', { method: 'POST', body: { idempotencyKey: `ensaio-${randomUUID()}`, lines: [{ type: 'product', slug: kvm2.slug, cycle: 'monthly', options: { location: '19', image: '1210' } }], acceptedTotal: 1, paymentMethod: 'bank_transfer', proofFile: null } })
     ok(r.status === 409 && r.json.code === 'price_changed', 'preço do navegador ignorado (recalculado no servidor)')
-    r = await c2.req('/api/checkout/orders', { method: 'POST', body: { idempotencyKey: `ensaio-${randomUUID()}`, lines: [{ type: 'product', slug: kvm2.slug, cycle: 'monthly', options: { location: '19', image: '1210' } }], acceptedTotal: aq.total, paymentMethod: 'bank_transfer', proofFile: null } })
-    const autoOrder = r.json?.order?.id
+    const proofPath = `ensaio/${Date.now()}_cloud-vps.pdf`
+    let autoOrder = null
+    for (const [name, opts] of [['desktop', DESKTOP], ['iphone', IPHONE]]) {
+      await db.query("UPDATE shopping_carts c JOIN profiles p ON p.id = c.profile_id SET c.items = '[]' WHERE p.email = 'cliente2@ensaio.test'")
+      ;({ ctx, p } = await ctxFor(b, opts, c2.cookie))
+      await p.goto(`${BASE}/servidor-vps/configurar?plano=${kvm2.slug}`, { waitUntil: 'domcontentloaded' })
+      await p.locator('[data-testid=cfg-image][data-id="1210"]').click(); await p.getByTestId('cfg-total').waitFor({ timeout: 15000 })
+      if (name === 'desktop') ok(/Adicionar ao carrinho/.test(await p.getByTestId('cfg-submit').innerText()), 'automático: «Adicionar ao carrinho»')
+      await p.getByTestId('cfg-submit').click(); await p.waitForURL('**/carrinho', { timeout: 20000 })
+      await p.getByTestId('finalize').waitFor({ timeout: 15000 }); await hide(p); await p.waitForTimeout(500)
+      ok(await overflow(p) <= 1, `${name}: carrinho sem deslocamento horizontal`)
+      await p.screenshot({ path: `${OUT}/${name === 'desktop' ? 20 : 30}-carrinho-${name}.png`, fullPage: true })
+      if (name === 'iphone') { await ctx.close(); break }
+      await p.getByTestId('finalize').click(); await p.waitForURL('**/checkout/pagamento', { timeout: 20000 })
+      await p.getByTestId('summary-total').waitFor(); await hide(p)
+      ok(/27|Kz/.test(await p.getByTestId('summary-total').innerText()) && await overflow(p) <= 1, `checkout: total do servidor (${await p.getByTestId('summary-total').innerText()})`)
+      await p.screenshot({ path: `${OUT}/21-checkout-pagamento-desktop.png`, fullPage: true })
+      await p.locator('input[type=file]').setInputFiles({ name: 'comprovativo.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 ensaio cloud vps') })
+      await p.getByText(/Comprovativo: comprovativo.pdf/).waitFor()
+      await p.locator('[data-testid=to-review]:not([disabled])').click()
+      await p.getByTestId('review-total').waitFor(); await hide(p)
+      await p.screenshot({ path: `${OUT}/22-checkout-rever-desktop.png`, fullPage: true })
+      await p.getByTestId('accept-terms').check(); await p.getByTestId('confirm-order').click()
+      await p.waitForURL('**/orders/**', { timeout: 20000 }); autoOrder = p.url().split('/orders/')[1].split('?')[0]
+      await p.getByTestId('order-proof-pending').waitFor({ timeout: 15000 }); await hide(p)
+      ok(true, `encomenda criada no checkout (${autoOrder.slice(0, 8)}) com comprovativo por validar`)
+      await p.screenshot({ path: `${OUT}/23-encomenda-comprovativo-desktop.png`, fullPage: true })
+      await ctx.close()
+    }
+    // Mobile: checkout (sem criar encomenda)
+    ;({ ctx, p } = await ctxFor(b, IPHONE, c2.cookie))
+    await p.goto(`${BASE}/servidor-vps/configurar?plano=${kvm2.slug}`, { waitUntil: 'domcontentloaded' })
+    await p.locator('[data-testid=cfg-image][data-id="1210"]').click(); await p.getByTestId('cfg-total').waitFor({ timeout: 15000 })
+    await p.getByTestId('cfg-submit').click(); await p.waitForURL('**/carrinho', { timeout: 20000 })
+    await p.getByTestId('finalize').click(); await p.waitForURL('**/checkout/pagamento', { timeout: 20000 }); await p.getByTestId('summary-total').waitFor(); await hide(p)
+    ok(await overflow(p) <= 1, 'iphone: checkout sem deslocamento horizontal')
+    await p.screenshot({ path: `${OUT}/31-checkout-iphone.png`, fullPage: true })
+    await ctx.close()
+    await db.query("UPDATE shopping_carts c JOIN profiles p ON p.id = c.profile_id SET c.items = '[]' WHERE p.email = 'cliente2@ensaio.test'")
+    // Painel: lista de comprovativos (paginada, pesquisa) → confirmar pagamento → compra automática
+    const autoNumber = (await one('SELECT order_number FROM orders WHERE id = ?', [autoOrder])).order_number
     const cAuto = (await stats()).vpsPurchaseCalls
-    await adm.req('/api/admin/orders', { method: 'POST', body: { action: 'approve', orderId: autoOrder } })
+    ;({ ctx, p } = await ctxFor(b, DESKTOP, adm.cookie))
+    await p.goto(`${BASE}/admin/orders?filtro=comprovativos`, { waitUntil: 'domcontentloaded' })
+    await p.getByTestId('proofs-total').waitFor({ timeout: 20000 }); await p.getByTestId('admin-order').first().waitFor()
+    ok((await p.getByTestId('admin-order').first().innerText()).includes(autoNumber), `comprovativos: o mais recente (${autoNumber}) aparece primeiro`)
+    await hide(p); await p.screenshot({ path: `${OUT}/24-admin-comprovativos-desktop.png`, fullPage: false })
+    await p.getByTestId('proofs-search').fill(autoNumber); await p.getByTestId('proofs-search-go').click()
+    await p.waitForURL(/q=/); await p.waitForFunction(n => { const e = document.querySelectorAll('[data-testid=admin-order]'); return e.length === 1 && e[0].textContent.includes(n) }, autoNumber, { timeout: 15000 })
+    ok(true, 'comprovativos: pesquisa pelo número da encomenda')
+    await p.getByTestId('approve-payment').first().click()
+    await p.locator('[role=status]').filter({ hasText: /Pagamento confirmado|confirmad/ }).waitFor({ timeout: 20000 })
     ok((await stats()).vpsPurchaseCalls === cAuto + 1, 'automático: pagamento confirmado → compra automática (uma)')
+    await hide(p); await p.screenshot({ path: `${OUT}/25-admin-pagamento-confirmado-desktop.png`, fullPage: false })
+    const autoSvc = (await one('SELECT id FROM services WHERE order_id = ?', [autoOrder])).id
+    await p.goto(`${BASE}/admin/cloud-vps/aprovisionamento`, { waitUntil: 'domcontentloaded' }); await p.getByTestId('cv-provisioning').waitFor({ timeout: 20000 }); await p.waitForTimeout(900)
+    await hide(p); await p.screenshot({ path: `${OUT}/26-admin-aprovisionamento-compra-desktop.png`, fullPage: true })
+    await ctx.close()
+    for (let i = 0; i < 12; i++) { await sleep(1500); await cv({ action: 'reconcile_all' }); if ((await one('SELECT provisioning_status s FROM services WHERE id = ?', [autoSvc])).s === 'active') break }
+    ok((await one('SELECT provisioning_status s FROM services WHERE id = ?', [autoSvc])).s === 'active', 'aprovisionamento concluído: VM «running» → serviço activo')
+    // Cliente: painel do VPS → definir acesso → backups, snapshot e firewall
+    r = await c2.req(`/api/client/vps/${autoSvc}`, { method: 'POST', body: { action: 'root_password', password: `Ensaio-${RND}-Forte9#` } }); ok(r.status === 200, 'cliente 2 define a senha root (acesso entregue)')
+    await c2.req(`/api/client/vps/${autoSvc}`, { method: 'POST', body: { action: 'firewall_op', op: 'create' } })
+    for (const [protocol, port] of [['SSH', '22'], ['HTTPS', '443']]) await c2.req(`/api/client/vps/${autoSvc}`, { method: 'POST', body: { action: 'firewall_op', op: 'add-rule', protocol, port, sourceDetail: 'any', ruleAction: 'accept' } })
+    r = await c2.req(`/api/client/vps/${autoSvc}`, { method: 'POST', body: { action: 'firewall_op', op: 'activate' } }); ok(r.status === 200, 'firewall criada, 2 regras e activada no VPS do cliente 2')
+    // Com uma acção ainda em curso no VPS (senha root acabada de definir) a operação é recusada (409): aguardar
+    for (let i = 0; i < 10; i++) { r = await c2.req(`/api/client/vps/${autoSvc}`, { method: 'POST', body: { action: 'backup_op', op: 'snapshot-create' } }); if (r.status !== 409) break; await sleep(1000) }
+    ok(r.status === 200, 'snapshot criado', r.json)
+    for (const [name, opts] of [['desktop', DESKTOP], ['iphone', IPHONE]]) {
+      ;({ ctx, p } = await ctxFor(b, opts, c2.cookie))
+      await p.goto(`${BASE}/vps/${autoSvc}`, { waitUntil: 'domcontentloaded' })
+      await p.getByTestId('vx-details').waitFor({ timeout: 20000 }); await p.getByTestId('vx-metric').first().waitFor({ timeout: 15000 })
+      await p.getByTestId('vx-backup').first().waitFor({ timeout: 15000 }).catch(() => {}); await p.getByTestId('vx-fw-rule').first().waitFor({ timeout: 15000 }).catch(() => {})
+      await hide(p); await p.waitForTimeout(600)
+      ok(await overflow(p) <= 1 && p.errors.length === 0, `${name}: painel do VPS sem deslocamento nem erros`)
+      await p.screenshot({ path: `${OUT}/${name === 'desktop' ? 27 : 32}-painel-vps-${name}.png`, fullPage: true })
+      if (name === 'desktop') {
+        for (const [tid, file] of [['vx-firewall', '28-firewall-desktop'], ['vx-backups', '29-backups-snapshot-desktop']]) {
+          const el = p.getByTestId(tid); await el.scrollIntoViewIfNeeded(); await el.screenshot({ path: `${OUT}/${file}.png` })
+        }
+      }
+      await ctx.close()
+    }
+
+    // Compras reais: o modo de ensaio nunca aponta para a API real, e o modo produção sem VPS_LIVE_PURCHASES=1 não compra
+    ok(process.env.VPS_LIVE_PURCHASES !== '1', 'ensaio corre sem VPS_LIVE_PURCHASES')
+    r = await cv({ action: 'provider_save', mode: 'test', apiUrl: 'https://developers.hostinger.com' })
+    ok(r.status === 400 && /simulada/.test(r.json?.error ?? ''), `modo de ensaio com a API real → recusado (${r.json?.error})`)
+    const prevMode = (await one('SELECT mode FROM vps_provider_settings WHERE id = 1')).mode
+    await db.query("UPDATE vps_provider_settings SET mode = 'live' WHERE id = 1") // simula produção (sem chamadas: a compra é recusada antes)
+    try {
+      const lq = (await c2.req('/api/checkout/quote', { method: 'POST', body: { lines: [{ type: 'product', slug: kvm2.slug, cycle: 'monthly', options: { location: '19', image: '1210' } }] } })).json.quote
+      r = await c2.req('/api/checkout/orders', { method: 'POST', body: { idempotencyKey: `ensaio-${randomUUID()}`, lines: [{ type: 'product', slug: kvm2.slug, cycle: 'monthly', options: { location: '19', image: '1210' } }], acceptedTotal: lq.total, paymentMethod: 'bank_transfer', proofFile: null } })
+      const liveOrder = r.json?.order?.id
+      const cLive = (await stats()).vpsPurchaseCalls
+      await adm.req('/api/admin/orders', { method: 'POST', body: { action: 'approve', orderId: liveOrder } })
+      const ls = await one('SELECT provisioning_status, provisioning_error FROM services WHERE order_id = ?', [liveOrder])
+      ok((await stats()).vpsPurchaseCalls === cLive && ls?.provisioning_status === 'manual_required' && /VPS_LIVE_PURCHASES/.test(ls.provisioning_error ?? ''), `produção sem VPS_LIVE_PURCHASES: pago mas NADA comprado → tratamento manual («${String(ls?.provisioning_error ?? '').slice(0, 70)}…»)`)
+      await cv({ action: 'save_cloud', mode: 'request_only' })
+      r = await cv({ action: 'save_cloud', mode: 'automatic', confirmText: 'AUTORIZO VENDA AUTOMATICA VPS' })
+      ok(r.status !== 200, `produção sem VPS_LIVE_PURCHASES: modo automático recusado mesmo com autorização (${r.status})`)
+    } finally {
+      await db.query('UPDATE vps_provider_settings SET mode = ? WHERE id = 1', [prevMode])
+    }
     await cv({ action: 'save_cloud', mode: 'request_only' })
 
     // ── 10. Painel: capturas e responsividade ──
