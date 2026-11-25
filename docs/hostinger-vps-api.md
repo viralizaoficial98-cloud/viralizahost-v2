@@ -103,3 +103,8 @@
 - **Resposta 202:** a conciliação encontra a VM pela subscrição e, no estado `initial`, chama `/setup` uma única vez.
 - **Conclusão:** activo quando `state = running`. Guarda a referência (VM, encomenda, subscrição, IPv4) e compara CPU, RAM, disco e tráfego da VM com o anunciado.
 - **Compras reais:** exigem modo `live`, a opção explícita activada **e** a variável `VPS_LIVE_PURCHASES=1` no servidor. Sem isso, a compra fica em tratamento manual.
+
+## Cloud VPS (módulo completo)
+A partir da migração 24, a venda passa pelos modos comerciais, pedidos com aprovação, autorização de aquisição e limite mensal de
+gasto, e são usadas também as leituras de subscrições, métricas, backups, snapshot e firewall. Ver [cloud-vps.md](cloud-vps.md).
+A VM de produção **1564781** está protegida contra qualquer operação através do módulo.
