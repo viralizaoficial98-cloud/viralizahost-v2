@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
+import { BannerHero } from '@/components/service/BannerHero'
 import { TeamSection } from '@/components/landing/TeamSection'
 import { GlobalPresenceSection } from '@/components/landing/GlobalPresenceSection'
 import { Headphones, Mail, MapPin, Phone, Server, ShieldCheck, Wallet } from 'lucide-react'
@@ -25,21 +26,19 @@ const contacts = [
   { icon: MapPin, label: 'Escritórios', value: 'Luanda, Angola · São Paulo, Brasil', href: null },
 ]
 
+export const dynamic = 'force-dynamic'
+
 export default function SobrePage() {
   return (
     <>
       <Header />
       <main className="min-h-screen bg-white" data-testid="page-sobre">
-        <section className="relative overflow-hidden pt-32 pb-20" style={{ background: 'linear-gradient(160deg,#090909 0%,#111 60%,#0d0d0d 100%)' }}>
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(245,183,0,0.18) 0%, transparent 70%)' }} />
-          <div className="container mx-auto px-4 lg:px-8 relative z-10 text-center max-w-4xl">
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: 'rgba(245,183,0,0.12)', border: '1px solid rgba(245,183,0,0.30)', color: '#F5B700' }}>EMPRESA</span>
-            <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">Sobre a <span style={{ color: '#F5B700' }}>ViralizaHost</span></h1>
-            <p className="text-lg lg:text-xl leading-relaxed max-w-2xl mx-auto" style={{ color: 'rgba(255,255,255,0.65)' }}>
-              Alojamento de sites, domínios, e-mail corporativo e servidores para empresas e profissionais — com preços em kwanzas e suporte em português.
-            </p>
-          </div>
-        </section>
+        {/* Hero: Painel → Site → Banners de páginas, entrada «sobre» (único H1) */}
+        <BannerHero slug="sobre" testId="sobre-hero" defaults={{
+          breadcrumb: 'Sobre nós', tag: 'Empresa', title: 'Sobre a ViralizaHost',
+          subtitle: 'Alojamento de sites, domínios, e-mail corporativo e servidores para empresas e profissionais — com preços em kwanzas e suporte em português.',
+          cta: '', ctaHref: '', bgColor: '#090909', highlights: [], guarantee: false,
+        }} />
 
         <section className="py-16 bg-white">
           <div className="container mx-auto px-4 max-w-6xl grid sm:grid-cols-2 lg:grid-cols-4 gap-4">

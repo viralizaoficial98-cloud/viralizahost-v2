@@ -130,6 +130,17 @@ INSERT INTO banner_pages
      'Distribua o conteúdo do seu site por servidores em todo o mundo para reduzir a latência e melhorar a experiência do utilizador.',
      'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=80&auto=format&fit=crop','#04060f',
      JSON_ARRAY('CDN Global','Latência Mínima','Cache Inteligente','Suporte 24/7'),
-     'Activar CDN','/hospedagem-de-sites','Saber Mais','/suporte/faq',NULL,true,true)
+     'Activar CDN','/hospedagem-de-sites','Saber Mais','/suporte/faq',NULL,true,true),
+
+    -- Empresa (migração 22): Sobre nós, Parceria e Suporte; botão principal vazio = sem botão
+    (UUID(), 'sobre','Sobre nós','Sobre nós',NULL,NULL,'Empresa','Sobre a ViralizaHost',
+     'Alojamento de sites, domínios, e-mail corporativo e servidores para empresas e profissionais — com preços em kwanzas e suporte em português.',
+     NULL,'#090909',JSON_ARRAY(),'','',NULL,NULL,NULL,false,true),
+    (UUID(), 'parcerias','Parceria','Parceria',NULL,NULL,'Parcerias','Torne-se nosso Parceiro',
+     'Ganhe comissões recorrentes ao indicar a ViralizaHost para os seus clientes.',
+     NULL,'#090909',JSON_ARRAY(),'Tornar-me Parceiro','/register?ref=parceiro','Falar com Suporte','/suporte/tickets',NULL,false,true),
+    (UUID(), 'suporte','Suporte','Suporte',NULL,NULL,'Suporte 24/7','Central de Suporte',
+     'Estamos disponíveis 24 horas por dia, 7 dias por semana para ajudar o seu negócio.',
+     NULL,'#090909',JSON_ARRAY(),'Abrir Ticket','/suporte/tickets','Base de Conhecimento','/suporte/base-conhecimento',NULL,false,true)
 
   ON DUPLICATE KEY UPDATE page_slug = page_slug;

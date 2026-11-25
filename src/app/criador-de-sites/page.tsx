@@ -4,7 +4,8 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { FamilyPlansSection } from '@/components/service/FamilyPlansSection'
+import { publicFamilyPlans } from '@/lib/commerce/family-plans'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Bot, Zap, Globe, Shield, BarChart, Headphones, Lock, Code, Layers } from 'lucide-react'
@@ -27,8 +28,12 @@ const included = [
   { icon: Headphones, title: 'Suporte 24/7', desc: 'Equipa especializada sempre disponível para ajudar.' },
 ]
 
+export const dynamic = 'force-dynamic'
+
 export default async function CriadorDeSitesPage() {
   const banner = await getBannerPage('criador-de-sites')
+  // Planos do catálogo (Catálogo e Preços → Planos); só 1 mês, 1, 2 e 3 anos para novas contratações
+  const plans = await publicFamilyPlans('website-builder').catch(() => [])
   const fromPrice = await fromPriceText('website-builder')
   return (
     <>
@@ -49,7 +54,7 @@ export default async function CriadorDeSitesPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["Site pronto em minutos","Sem código","Hospedagem incluída","SEO automático"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <DynamicServicePricing category="website-builder" cols={3} showBillingToggle
+        <FamilyPlansSection plans={plans} testId="family-plans-website-builder"
           title="Criador de Sites com IA — Planos"
           subtitle="Crie sites profissionais sem nenhum conhecimento técnico." />
         <IncludedFeatures features={included}

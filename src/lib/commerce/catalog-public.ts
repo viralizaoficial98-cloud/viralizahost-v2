@@ -3,6 +3,7 @@ import { isVpsCycleForSale } from './vps-shared'
 import { getPool } from '@/lib/db/pool'
 import type { Cycle } from './quote'
 import { EMAIL_PERIODS } from './period-pricing'
+import { familyOf, isFamilyCycleForSale } from './plan-families'
 
 // Plano para o percurso de compra (/comprar/<slug>). Mesma fonte do carrinho e do checkout.
 
@@ -47,7 +48,9 @@ export async function getPurchasePlan(slug: string): Promise<PurchasePlan | null
     features: (feats as any[]).map(f => String(f.feature)),
     // E-mail Corporativo: oferta em 4 períodos (1 mês, 1, 2 e 3 anos)
     // Servidor VPS: só os ciclos à venda (3 meses retirado)
-    prices: (prices as any[]).filter(r => (p.category !== 'email' || EMAIL_PERIODS.some(x => x.cycle === r.cycle)) && (p.category !== 'vps' || p.subcategory || isVpsCycleForSale(r.cycle)))
+    // Revenda, Criador de Sites e Construtor WordPress: só 1 mês, 1, 2 e 3 anos para novas contratações
+    prices: (prices as any[]).filter(r => (p.category !== 'email' || EMAIL_PERIODS.some(x => x.cycle === r.cycle)) && (p.category !== 'vps' || p.subcategory || isVpsCycleForSale(r.cycle))
+        && (!familyOf(p.category, p.subcategory) || isFamilyCycleForSale(r.cycle)))
       .map(r => ({ cycle: r.cycle, months: Number(r.months), price: Number(r.price), renewal: Number(r.renewal_price), discount: Number(r.discount_pct ?? 0), renewalDiscount: Number(r.renewal_discount_pct ?? 0) })),
     baseMonthly: p.base_monthly_price == null ? null : Number(p.base_monthly_price),
     storageGb: p.storage_gb == null ? null : Number(p.storage_gb), sendLimitHour: p.send_limit_hour == null ? null : Number(p.send_limit_hour), badge: p.badge ?? null,

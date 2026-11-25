@@ -56,7 +56,7 @@ function PanelItem({ item, compact, onClick }: { item: NavItem; compact: boolean
 const ASIDE_GRID: Record<NavAside, (cols: number) => string> = {
   hospedagem: () => '1fr 1fr 1.4fr 260px',
   servicos: cols => `repeat(${cols}, minmax(0, 1fr)) 260px`,
-  empresa: () => 'minmax(0, 1fr) 260px',
+  empresa: cols => (cols > 1 ? `minmax(0, 1.6fr) repeat(${cols - 1}, minmax(0, 1fr)) 260px` : 'minmax(0, 1fr) 260px'),
 }
 function NavAsideCard({ kind, onClick, testId, sizes }: { kind: NavAside; onClick: () => void; testId: string; sizes: string }) {
   return (
@@ -162,9 +162,14 @@ export function Header() {
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-3 flex items-center gap-2.5" style={{ color: '#F5B700' }}>
                         <span className="w-3 h-px inline-block" style={{ background: '#F5B700' }} />{col.title}
                       </p>
-                      <div className={`space-y-0.5 ${openGroup.id === 'empresa' ? 'grid grid-cols-2 gap-2 space-y-0' : ''}`}>
+                      <div className={`space-y-0.5 ${openGroup.id === 'empresa' && col.items.length ? 'grid grid-cols-2 gap-2 space-y-0' : ''}`}>
                         {col.items.map(item => <PanelItem key={item.href} item={item} compact={compact} onClick={close} />)}
                       </div>
+                      {col.texts?.length ? (
+                        <ul className="space-y-0.5" data-testid="nav-texts">
+                          {col.texts.map(t => <li key={t} className="px-3 py-2.5 text-[13px] font-semibold text-white/80 cursor-default select-text" data-testid="nav-text">{t}</li>)}
+                        </ul>
+                      ) : null}
                     </div>
                   ))}
                   {openGroup.aside && (
@@ -199,6 +204,7 @@ export function Header() {
                   {g.columns!.map(col => (
                     <div key={col.title}>
                       {g.columns!.length > 1 && <p className="text-[10px] font-black text-[#AAA] uppercase tracking-wider px-3 pt-2 pb-1" data-testid="mnav-column-title">{col.title}</p>}
+                      {col.texts?.map(t => <p key={t} className="px-3 py-2.5 text-sm text-[#555] cursor-default" data-testid="mnav-text">{t}</p>)}
                       {col.items.map(item => (
                         <Link key={item.href} href={item.href} onClick={close} data-testid="mnav-item"
                           className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm text-[#555] hover:text-[#0A0A0A] hover:bg-[#F5F5F5]">
