@@ -4,8 +4,16 @@ import { PUBLIC_PAGES, type PageIcon } from './pages'
 
 export interface NavItem { label: string; desc: string; href: string; icon: PageIcon; badge?: string }
 export interface NavColumn { title: string; items: NavItem[] }
-/** Painel visual com imagem à direita do submenu (o cartão «Infraestrutura de Classe Mundial» anterior ao PR #48). */
-export type NavAside = 'hospedagem' | 'servicos'
+/** Cartão de imagem dos submenus (um só modelo): imagem + link «Fale com um especialista». */
+export type NavAside = 'hospedagem' | 'servicos' | 'empresa'
+/** Destino da acção «Fale com um especialista» (o mesmo usado no resto do site). */
+export const SPECIALIST_HREF = '/suporte/contactar'
+/** Imagem de cada submenu (public/nav/*.webp, 640×480, recorte 4:3 do cartão). */
+export const NAV_ASIDE_IMAGE: Record<NavAside, string> = {
+  hospedagem: '/nav/hospedagem.webp',  // servidor com janela de navegador
+  servicos: '/nav/servicos.webp',      // nuvem, envelope e servidor
+  empresa: '/nav/empresa.webp',        // imagem ilustrativa de uma equipa a colaborar
+}
 export interface NavGroup { id: 'hospedagem' | 'dominios' | 'email' | 'servicos' | 'empresa'; label: string; href?: string; columns?: NavColumn[]; aside?: NavAside }
 
 const page = (path: string, over: Partial<NavItem> = {}): NavItem => {
@@ -36,5 +44,5 @@ export const MAIN_NAV: NavGroup[] = [
       { title: 'E-mail', items: [page('/email-corporativo', { label: 'E-mail corporativo' }), page('/email/microsoft-365-outlook', { label: 'Microsoft 365 Outlook' })] },
     ],
   },
-  { id: 'empresa', label: 'Empresa', columns: [{ title: 'Empresa', items: [page('/sobre'), page('/suporte'), page('/parcerias'), page('/blog')] }] },
+  { id: 'empresa', label: 'Empresa', aside: 'empresa', columns: [{ title: 'Empresa', items: [page('/sobre'), page('/suporte'), page('/parcerias'), page('/blog')] }] },
 ]

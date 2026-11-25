@@ -297,6 +297,32 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
 
   const showQuickQuestions = messages.length <= 1 && !isLoading
 
+  // Os botões fixos nunca ficam por cima de um controlo da página (botão, link, campo): enquanto houver um por baixo,
+  // o botão afasta-se (transparente e sem cliques) e volta quando o controlo sai de baixo. O chat aberto fica sempre.
+  const waRef = useRef<HTMLAnchorElement>(null)
+  const fabRef = useRef<HTMLButtonElement>(null)
+  const [covering, setCovering] = useState({ wa: false, chat: false })
+  useEffect(() => {
+    const CONTROL = 'a,button,input,select,textarea,summary,label,[role=button],[role=radio],[role=tab]'
+    const over = (el: HTMLElement | null) => {
+      if (!el) return false
+      const r = el.getBoundingClientRect()
+      const pts = [[r.left + 4, r.top + 4], [r.right - 4, r.top + 4], [r.left + 4, r.bottom - 4], [r.right - 4, r.bottom - 4], [r.left + r.width / 2, r.top + r.height / 2]]
+      return pts.some(([x, y]) => document.elementsFromPoint(x, y).some(n => !n.closest('[data-floating]') && !!n.closest(CONTROL)))
+    }
+    let frame = 0
+    const check = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => setCovering(c => { const n = { wa: over(waRef.current), chat: over(fabRef.current) }; return n.wa === c.wa && n.chat === c.chat ? c : n })) }
+    check()
+    // Fase de captura: apanha o deslocamento da página e de qualquer contentor (os eventos de scroll não sobem)
+    document.addEventListener('scroll', check, { passive: true, capture: true }); window.addEventListener('resize', check)
+    // Conteúdo que muda a altura da página sem deslocamento (imagens, planos carregados depois) também conta
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(check) : null
+    ro?.observe(document.body)
+    const t = setInterval(check, 1000)
+    return () => { cancelAnimationFrame(frame); clearInterval(t); ro?.disconnect(); document.removeEventListener('scroll', check, { capture: true }); window.removeEventListener('resize', check) }
+  }, [])
+  const away = 'opacity-0 pointer-events-none' // sem mover: a posição não pode depender do próprio estado
+
   return (
     <>
     {/* WhatsApp — fixed bottom-left */}
@@ -306,14 +332,18 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
       rel="noopener noreferrer"
       aria-label="Contactar pelo WhatsApp"
       data-floating=""
-      className="fixed z-50 transition-all active:scale-95 hover:scale-105"
-      style={{ bottom: 24, left: 24 }}
+      data-testid="floating-whatsapp"
+      data-covering={covering.wa ? '1' : '0'}
+      ref={waRef}
+      aria-hidden={covering.wa || undefined}
+      tabIndex={covering.wa ? -1 : undefined}
+      className={`fixed z-50 bottom-4 left-4 sm:bottom-6 sm:left-6 transition-all duration-200 active:scale-95 hover:scale-105 ${covering.wa ? away : ''}`}
     >
       <div
-        className="relative w-14 h-14 rounded-full flex items-center justify-center shadow-[0_8px_32px_rgba(37,211,102,0.40)]"
+        className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-[0_8px_32px_rgba(37,211,102,0.40)]"
         style={{ background: '#25D366' }}
       >
-        <svg viewBox="0 0 24 24" width="30" height="30" fill="white">
+        <svg viewBox="0 0 24 24" className="w-[26px] h-[26px] sm:w-[30px] sm:h-[30px]" fill="white" aria-hidden="true">
           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
           <path d="M12 0C5.373 0 0 5.373 0 12c0 2.136.561 4.14 1.535 5.876L.057 23.63a.5.5 0 00.614.612l5.857-1.53A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.9a9.886 9.886 0 01-5.031-1.374l-.36-.214-3.742.979.999-3.645-.235-.374A9.865 9.865 0 012.1 12C2.1 6.533 6.533 2.1 12 2.1c5.466 0 9.9 4.433 9.9 9.9 0 5.466-4.434 9.9-9.9 9.9z"/>
         </svg>
@@ -322,10 +352,11 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
     </a>
 
     {/* AI Chat (Cizesa) — fixed bottom-right */}
-    <div data-floating="" className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <div data-floating="" data-testid="floating-chat" className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end gap-3">
       {open && (
         <div
-          className="w-[360px] bg-white rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.25)] border border-[#E8E8E8] overflow-hidden flex flex-col"
+          data-testid="chat-panel"
+          className="w-[calc(100vw-32px)] sm:w-[360px] bg-white rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.25)] border border-[#E8E8E8] overflow-hidden flex flex-col"
           style={{ maxHeight: 'calc(100dvh - 100px)', animation: 'slideUp 0.2s ease' }}
         >
           {/* Header */}
@@ -475,10 +506,11 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
       )}
 
       {/* FAB trigger */}
-      <div className="flex items-center gap-3">
+      <div data-testid="chat-fab" data-covering={covering.chat && !open ? '1' : '0'} aria-hidden={(covering.chat && !open) || undefined}
+        className={`flex items-center gap-3 transition-all duration-200 ${covering.chat && !open ? away : ''}`}>
         {!open && (
           <div
-            className="bg-white border border-[#E8E8E8] rounded-2xl px-3.5 py-2 shadow-lg text-[11px] font-semibold text-[#0A0A0A] cursor-pointer hover:border-[#2F80ED] hover:shadow-[0_4px_20px_rgba(47,128,237,0.18)] transition-all"
+            className="hidden sm:block bg-white border border-[#E8E8E8] rounded-2xl px-3.5 py-2 shadow-lg text-[11px] font-semibold text-[#0A0A0A] cursor-pointer hover:border-[#2F80ED] hover:shadow-[0_4px_20px_rgba(47,128,237,0.18)] transition-all"
             onClick={handleOpen}
             style={{ animation: badge ? 'fabLabelPulse 2.5s ease-in-out infinite' : 'none' }}
           >
@@ -490,13 +522,16 @@ export function FloatingChat({ pageContext }: { pageContext?: string } = {}) {
           className="relative transition-all active:scale-95"
           style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
           aria-label={open ? 'Fechar assistente' : 'Abrir assistente virtual'}
+          aria-expanded={open}
+          data-testid="chat-toggle"
+          ref={fabRef}
         >
           {open ? (
-            <div className="w-14 h-14 bg-[#0A0A0A] hover:bg-[#1A1A1A] rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center transition-colors">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[#0A0A0A] hover:bg-[#1A1A1A] rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center transition-colors">
               <X size={22} className="text-white" />
             </div>
           ) : (
-            <AvatarIA size={72} showBadge={badge} showOnline={true} />
+            <span className="block origin-bottom-right scale-[0.72] -m-[10px] sm:scale-100 sm:m-0"><AvatarIA size={72} showBadge={badge} showOnline={true} /></span>
           )}
         </button>
       </div>

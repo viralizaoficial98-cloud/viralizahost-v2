@@ -449,3 +449,5 @@ html { overflow-x: hidden; }
 
 /* Menu principal aberto no telemóvel: os botões flutuantes (chat/WhatsApp) não tapam as opções */
 html.vh-menu-open [data-floating] { visibility: hidden; }
+/* Telemóvel: espaço no fim da página para o WhatsApp e o chat fixos não taparem o último conteúdo (links, botões) */
+@media (max-width: 639px) { body:has([data-floating]) { padding-bottom: 76px; } }

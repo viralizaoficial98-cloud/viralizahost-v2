@@ -1,6 +1,5 @@
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { FloatingChat } from '@/components/layout/FloatingChat'
 import { HeroSection } from '@/components/landing/HeroSection'
 import { DomainSearchBar } from '@/components/landing/DomainSearchBar'
 import { EmailCorpSection } from '@/components/landing/EmailCorpSection'
@@ -36,7 +35,6 @@ export default function HomePage() {
         <CTASection />
       </main>
       <Footer />
-      <FloatingChat />
     </>
   )
 }

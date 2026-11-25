@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { SESSION_COOKIE, getProfileRole, userFromSessionToken } from '@/lib/auth/server'
+import { isAdminArea, isClientArea } from '@/lib/site/areas'
 
 // Protecção de rotas (runtime Node.js). Mesmas regras de antes; a sessão passa a
 // ser o cookie vh_session validado em MariaDB (antes: cookies sb-* do Supabase).
@@ -8,13 +9,10 @@ export default async function proxy(request: NextRequest) {
   // Match whole path segments only ('/email' must not catch '/email-corporativo').
   const under = (p: string) => path === p || path.startsWith(`${p}/`)
 
-  const protectedPaths = ['/dashboard', '/domains', '/hosting', '/tickets', '/billing', '/settings', '/orders', '/services', '/vps']
-  // '/email' is the client area page; '/email/*' are public marketing pages.
-  const protectedExact = ['/email']
-  const adminPaths = ['/admin']
+  // Área do Cliente e painel (lista única em lib/site/areas.ts; '/email' exacto é da Área do Cliente)
   const authRoutes = ['/login', '/register', '/forgot-password']
 
-  const isProtected = protectedPaths.some(under) || protectedExact.includes(path) || adminPaths.some(under)
+  const isProtected = isClientArea(path) || isAdminArea(path)
   const isAuthRoute = authRoutes.some(under)
   // Páginas públicas não precisam de consultar a base de dados.
   if (!isProtected && !isAuthRoute) return NextResponse.next({ request })
@@ -33,7 +31,7 @@ export default async function proxy(request: NextRequest) {
     return res
   }
   // /admin exige o papel admin (antes bastava sessão: um cliente via o painel sem dados)
-  if (user && adminPaths.some(under)) {
+  if (user && isAdminArea(path)) {
     let role: string | null = null
     try { role = await getProfileRole(user.id) } catch {}
     if (role !== 'admin') return NextResponse.redirect(new URL('/dashboard', request.url))

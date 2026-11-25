@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 import { CurrencySelector } from '@/components/shared/CurrencySelector'
-import { MAIN_NAV, type NavAside, type NavGroup, type NavItem } from '@/lib/site/navigation'
+import { MAIN_NAV, NAV_ASIDE_IMAGE, SPECIALIST_HREF, type NavAside, type NavGroup, type NavItem } from '@/lib/site/navigation'
 import type { PageIcon } from '@/lib/site/pages'
 
 // Menu principal — a MESMA configuração (src/lib/site/navigation.ts) no desktop e no telemóvel:
@@ -49,47 +49,26 @@ function PanelItem({ item, compact, onClick }: { item: NavItem; compact: boolean
 }
 
 /*
- * Painel com imagem à direita do submenu — recuperado da versão anterior ao PR #48 (mesma imagem, textos, cores e
- * proporções): «hospedagem» = coluna de 260 px com imagem de 148 px; «servicos» = coluna larga com imagem de 170 px;
- * ambos com o cartão «Precisa de ajuda?» por baixo. No telemóvel usa-se a variante compacta (MobileAside).
+ * Cartão de imagem dos submenus — UM só modelo para «Hospedagem e site», «Serviços» e «Empresa»: a imagem do grupo e o
+ * link «Fale com um especialista» numa única peça (um único link acessível). Desktop: coluna direita do painel;
+ * telemóvel: por baixo dos links do grupo.
  */
 const ASIDE_GRID: Record<NavAside, (cols: number) => string> = {
   hospedagem: () => '1fr 1fr 1.4fr 260px',
-  servicos: cols => `repeat(${cols}, minmax(0, 1fr)) minmax(240px, 1.15fr)`,
+  servicos: cols => `repeat(${cols}, minmax(0, 1fr)) 260px`,
+  empresa: () => 'minmax(0, 1fr) 260px',
 }
-function NavAsidePanel({ kind, onClick }: { kind: NavAside; onClick: () => void }) {
-  const big = kind === 'servicos'
+function NavAsideCard({ kind, onClick, testId, sizes }: { kind: NavAside; onClick: () => void; testId: string; sizes: string }) {
   return (
-    <div className="flex flex-col gap-3" style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: '1.5rem' }} data-testid="nav-aside" data-kind={kind}>
-      <div className="flex-1 rounded-2xl overflow-hidden flex flex-col"
-        style={{ background: 'linear-gradient(160deg, #111111 0%, #0d0d0d 100%)', border: '1px solid rgba(245,183,0,0.32)', boxShadow: '0 0 32px rgba(245,183,0,0.08), inset 0 1px 0 rgba(245,183,0,0.14)' }}>
-        <div className="relative w-full flex items-center justify-center" style={{ height: big ? 170 : 148, background: '#080808', borderBottom: '1px solid rgba(245,183,0,0.14)' }}>
-          <Image src="/infrastructure-world-class.png" alt="" aria-hidden width={big ? 260 : 230} height={big ? 155 : 132}
-            style={{ objectFit: 'contain', maxHeight: big ? 155 : 132, width: '100%', borderRadius: big ? 10 : 0 }} data-testid="nav-aside-image" />
-          <div className="absolute bottom-0 left-0 right-0 h-8" style={{ background: 'linear-gradient(to top, #0d0d0d, transparent)' }} />
-        </div>
-        <div className="p-4 flex flex-col flex-1">
-          <p className="text-[9px] font-black uppercase tracking-[0.22em] mb-1.5" style={{ color: 'rgba(245,183,0,0.65)' }}>Infraestrutura Premium</p>
-          <p className="text-white font-black text-[13px] leading-tight mb-2">Infraestrutura de <span style={{ color: '#F5B700' }}>Classe Mundial</span></p>
-          <p className="text-[11px] leading-relaxed mb-4 flex-1" style={{ color: 'rgba(255,255,255,0.42)' }}>Servidores de última geração com desempenho máximo e 99.9% de uptime garantido.</p>
-          <Link href="/servidor-dedicado" onClick={onClick} className="block text-center text-xs font-black py-2.5 rounded-xl w-full hover:bg-[#FFD54F]" style={{ background: '#F5B700', color: '#090909' }}>Ver Infraestrutura →</Link>
-        </div>
-      </div>
-      <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <p className="flex items-center gap-2 mb-1.5"><span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0" /><span className="text-white text-xs font-bold">Precisa de ajuda?</span></p>
-        <p className="text-[11px] mb-3 leading-relaxed" style={{ color: 'rgba(255,255,255,0.38)' }}>A nossa equipa está online 24/7 para si.</p>
-        <Link href="/suporte/tickets" onClick={onClick} className="block text-center text-[11px] font-bold py-2 rounded-xl w-full hover:text-[#F5B700]" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.78)', border: '1px solid rgba(255,255,255,0.12)' }}>Falar com Suporte →</Link>
-      </div>
-    </div>
-  )
-}
-/** Telemóvel: o mesmo painel, compacto e por baixo dos links (nenhum link fica escondido, sem rolagem horizontal). */
-function MobileAside({ onClick }: { onClick: () => void }) {
-  return (
-    <Link href="/servidor-dedicado" onClick={onClick} data-testid="mnav-aside" className="mt-2 mx-1 flex items-center gap-3 rounded-2xl overflow-hidden bg-[#0B0B0B] border border-[#F5B700]/30 max-w-full">
-      <span className="relative w-28 h-20 shrink-0 bg-[#080808]"><Image src="/infrastructure-world-class.png" alt="" aria-hidden fill sizes="112px" style={{ objectFit: 'contain' }} /></span>
-      <span className="min-w-0 py-2 pr-3"><span className="block text-white font-black text-[13px] leading-tight">Infraestrutura de <span className="text-[#F5B700]">Classe Mundial</span></span>
-        <span className="block text-[11px] text-white/50 mt-0.5">Ver infraestrutura →</span></span>
+    <Link href={SPECIALIST_HREF} onClick={onClick} data-testid={testId} data-kind={kind}
+      className="group block w-full rounded-2xl overflow-hidden bg-[#0B0B0B] outline-none focus-visible:ring-2 focus-visible:ring-[#F5B700]"
+      style={{ border: '1px solid rgba(245,183,0,0.32)', boxShadow: '0 0 32px rgba(245,183,0,0.08)' }}>
+      <span className="relative block w-full aspect-[4/3] bg-[#080808]">
+        <Image src={NAV_ASIDE_IMAGE[kind]} alt="" aria-hidden fill sizes={sizes} className="object-cover transition-transform duration-300 group-hover:scale-[1.03]" data-testid={`${testId}-image`} />
+      </span>
+      <span className="flex items-center justify-between gap-2 px-4 py-3 text-[13px] font-black text-[#F5B700] group-hover:text-[#FFD54F]" style={{ borderTop: '1px solid rgba(245,183,0,0.18)' }}>
+        Fale com um especialista <ChevronRight size={15} aria-hidden />
+      </span>
     </Link>
   )
 }
@@ -183,17 +162,18 @@ export function Header() {
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-3 flex items-center gap-2.5" style={{ color: '#F5B700' }}>
                         <span className="w-3 h-px inline-block" style={{ background: '#F5B700' }} />{col.title}
                       </p>
-                      <div className={`space-y-0.5 ${openGroup.id === 'empresa' ? 'grid grid-cols-4 gap-2 space-y-0' : ''}`}>
+                      <div className={`space-y-0.5 ${openGroup.id === 'empresa' ? 'grid grid-cols-2 gap-2 space-y-0' : ''}`}>
                         {col.items.map(item => <PanelItem key={item.href} item={item} compact={compact} onClick={close} />)}
                       </div>
                     </div>
                   ))}
-                  {openGroup.aside && <NavAsidePanel kind={openGroup.aside} onClick={close} />}
+                  {openGroup.aside && (
+                    <div className="self-start" style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: '1.5rem' }}>
+                      <NavAsideCard kind={openGroup.aside} onClick={close} testId="nav-aside" sizes="260px" />
+                    </div>
+                  )}
                 </div>
-                <div className="mt-6 pt-4 flex items-center justify-between text-[11px]" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.35)' }}>Suporte 24/7 · Preços em Kz</span>
-                  <Link href="/suporte/contactar" onClick={close} className="font-semibold hover:underline" style={{ color: '#F5B700' }}>Fale com um especialista</Link>
-                </div>
+                <div className="mt-6 pt-4 text-[11px]" style={{ borderTop: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.35)' }}>Suporte 24/7 · Preços em Kz</div>
               </div>
             )
           })()}
@@ -228,7 +208,7 @@ export function Header() {
                       ))}
                     </div>
                   ))}
-                  {g.aside && <MobileAside onClick={close} />}
+                  {g.aside && <div className="pt-2 pr-1 max-w-sm"><NavAsideCard kind={g.aside} onClick={close} testId="mnav-aside" sizes="(max-width: 420px) 90vw, 384px" /></div>}
                 </div>
               )}
             </div>

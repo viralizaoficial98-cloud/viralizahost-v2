@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import { useReanchorAfterLoad } from '@/hooks/useReanchorAfterLoad'
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Loader2, Mail, HardDrive, Send } from 'lucide-react'
 import { useLocale } from '@/hooks/useLocale'
@@ -32,6 +33,8 @@ export function EmailPlansSection({ id = 'planos', tag = 'Planos e Preços', tit
   const [state, setState] = useState<'loading' | 'ok' | 'empty' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
 
+  // A âncora do endereço (ex.: #seguranca) volta ao sítio certo depois de os planos carregarem
+  useReanchorAfterLoad(state === 'ok', id)
   useEffect(() => {
     fetch('/api/products?category=email', { cache: 'no-store' })
       .then(async r => { const j = await r.json(); if (!r.ok || !j.success) throw new Error(j.message ?? `HTTP ${r.status}`); return j })

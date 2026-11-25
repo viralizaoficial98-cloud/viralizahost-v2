@@ -43,6 +43,7 @@ else
   run "VPS: duração + localização + instalação, licenças, escolher mais tarde, Os meus VPS (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/vps-install-e2e.cjs
   run "Hospedagem de sites: ordem das secções, H1, âncoras, SSL do catálogo e percurso de compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/hosting-page-e2e.cjs
   run "Domínios: hero do painel (independente), Registo de domínios, catálogo e fluxos (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/domains-page-e2e.cjs
+  run "E-mail corporativo (hero do painel, atalhos), submenus com imagem e WhatsApp/chat em todas as páginas (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/site-chrome-e2e.cjs
   run "Servidores Dedicados Linux e Windows: planos, páginas e compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/dedicated-plans-e2e.cjs
   run "Menu principal (5 grupos), páginas consolidadas e encaminhamentos (desktop + telemóvel)" node scripts/mariadb/rehearsal/menu-e2e.cjs
   run "Percursos de compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/purchase-flows-e2e.cjs

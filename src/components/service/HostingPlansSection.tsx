@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Check, X, Loader2, Globe, HardDrive, Activity, Mail, Send, Cpu, Files, Server } from 'lucide-react'
 import { useLocale } from '@/hooks/useLocale'
+import { useReanchorAfterLoad } from '@/hooks/useReanchorAfterLoad'
 import { convertFromAOA } from '@/lib/currency'
 import { PLAN_PERIODS, impliedDiscount, selectorBadge, type EmailCycle } from '@/lib/commerce/period-pricing'
 
@@ -171,15 +172,7 @@ export function HostingPlansSection({ id = 'planos', tag = 'Hospedagem Premium',
       .catch(err => { console.error('[HostingPlansSection]', err); setState('error') })
   }, [attempt])
 
-  // Os cartões chegam depois do carregamento e empurram o resto da página: se o endereço tiver uma âncora mais abaixo
-  // (ex.: /hospedagem-de-sites#wordpress), volta a posicioná-la uma vez, quando os planos ficam visíveis.
-  useEffect(() => {
-    if (state !== 'ok' || typeof window === 'undefined') return
-    const hash = decodeURIComponent(window.location.hash.slice(1))
-    if (!hash || hash === id) return
-    const target = document.getElementById(hash), self = document.getElementById(id)
-    if (target && self && (self.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING)) requestAnimationFrame(() => target.scrollIntoView())
-  }, [state, id])
+  useReanchorAfterLoad(state === 'ok', id)
 
   // Períodos publicados em pelo menos um plano; etiqueta do selector a partir dos planos disponíveis nesse período
   const periods = useMemo(() => PLAN_PERIODS.map(per => {
