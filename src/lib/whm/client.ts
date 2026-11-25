@@ -23,13 +23,16 @@ export interface WHMTestResult {
  * Normalise a WHM URL: ensure https, port 2087, no trailing slash.
  * Accepts: https://host:2087, http://host, host:2087, host
  */
+const CPANEL_PORTS = new Set(['2082', '2083', '2086', '2095', '2096'])
 export function normalizeWhmUrl(raw: string): string {
   let u = raw.trim().replace(/\/+$/, '')
   if (!u.startsWith('http')) u = `https://${u}`
   try {
     const parsed = new URL(u)
     parsed.protocol = 'https:'
-    if (!parsed.port || parsed.port !== '2087') parsed.port = '2087'
+    // Sem porta, ou com uma porta do cPanel/Webmail (2082/2083/2086/2095/2096) → WHM em 2087. Uma porta explícita
+    // diferente (ex.: proxy) é mantida, para o «Testar ligação» usar o MESMO endereço que as operações (whmCall).
+    if (!parsed.port || CPANEL_PORTS.has(parsed.port)) parsed.port = '2087'
     return parsed.origin // drops path, trailing slash
   } catch {
     return u
