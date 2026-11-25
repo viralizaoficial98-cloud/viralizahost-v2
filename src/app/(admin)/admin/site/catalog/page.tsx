@@ -4,6 +4,7 @@ import { DomainExtensionsEditor, type DomainExtension } from '@/components/admin
 import { EmailPlansEditor } from '@/components/admin/EmailPlansEditor'
 import { HostingPlansEditor } from '@/components/admin/HostingPlansEditor'
 import { FamilyPlansEditor } from '@/components/admin/FamilyPlansEditor'
+import { ResellerProfilesEditor } from '@/components/admin/reseller/ResellerProfilesEditor'
 import { PLAN_FAMILIES, PLAN_FAMILY_KEYS, familyOf, familyPeriods, familyPeriodsText } from '@/lib/commerce/plan-families'
 import { VpsPlansEditor } from '@/components/admin/VpsPlansEditor'
 import { DedicatedPlansEditor } from '@/components/admin/DedicatedPlansEditor'
@@ -186,6 +187,10 @@ function Catalog() {
             <section key={f} data-testid={`family-plans-admin-${f}`}>
               <h2 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">Planos — {PLAN_FAMILIES[f].label} ({PLAN_FAMILIES[f].page}) — características, preço base e descontos por período</h2>
               <FamilyPlansEditor family={f} onSaved={load} />
+              {f === 'reseller' && <div className="mt-4" data-testid="reseller-profiles-admin">
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#64748B] mb-2">Revenda — perfil técnico (limites WHM, ACL, pacotes e servidores)</h3>
+                <ResellerProfilesEditor />
+              </div>}
             </section>
           ))}
           {(cat === 'all' || cat === 'email') && <section data-testid="email-plans-admin">
