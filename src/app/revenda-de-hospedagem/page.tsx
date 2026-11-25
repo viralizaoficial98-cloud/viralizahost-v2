@@ -4,7 +4,8 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { FamilyPlansSection } from '@/components/service/FamilyPlansSection'
+import { publicFamilyPlans } from '@/lib/commerce/family-plans'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Users, Server, Globe, Shield, Mail, RotateCcw, Headphones, Lock, Layers } from 'lucide-react'
@@ -27,8 +28,12 @@ const included = [
   { icon: Headphones, title: 'Suporte ao Revendedor', desc: 'Linha de suporte dedicada para revendedores disponível 24/7.' },
 ]
 
+export const dynamic = 'force-dynamic'
+
 export default async function RevendaDeHospedagemPage() {
   const banner = await getBannerPage('revenda-de-hospedagem')
+  // Planos do catálogo (Catálogo e Preços → Planos); só 1 mês, 1, 2 e 3 anos para novas contratações
+  const plans = await publicFamilyPlans('reseller').catch(() => [])
   const fromPrice = await fromPriceText('reseller')
   return (
     <>
@@ -49,7 +54,7 @@ export default async function RevendaDeHospedagemPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["WHM/cPanel Incluído","DNS Whitelabel","SSL por Conta","Suporte Revendedor"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <DynamicServicePricing category="reseller" cols={4} showBillingToggle
+        <FamilyPlansSection plans={plans} testId="family-plans-reseller"
           title="Revenda de Hospedagem — Escolha o plano"
           subtitle="Comece a vender hospedagem hoje com a infraestrutura da ViralizaHost." />
         <IncludedFeatures features={included}

@@ -4,7 +4,8 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { FamilyPlansSection } from '@/components/service/FamilyPlansSection'
+import { publicFamilyPlans } from '@/lib/commerce/family-plans'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Code, Globe, Shield, Zap, RotateCcw, Lock, Headphones, BarChart, Layers } from 'lucide-react'
@@ -27,8 +28,12 @@ const included = [
   { icon: Headphones, title: 'Suporte Especializado', desc: 'Equipa com expertise em WordPress disponível 24/7.' },
 ]
 
+export const dynamic = 'force-dynamic'
+
 export default async function ConstrutorWordPressPage() {
   const banner = await getBannerPage('construtor-wordpress')
+  // Planos do catálogo (Catálogo e Preços → Planos); só 1 mês, 1, 2 e 3 anos para novas contratações
+  const plans = await publicFamilyPlans('wp-builder').catch(() => [])
   const fromPrice = await fromPriceText('wordpress', 'builder')
   return (
     <>
@@ -49,7 +54,7 @@ export default async function ConstrutorWordPressPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["Builder Visual","Plugins Premium","WordPress Pré-instalado","CDN Global"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <DynamicServicePricing category="wordpress" subcategory="builder" cols={3} showBillingToggle
+        <FamilyPlansSection plans={plans} testId="family-plans-wp-builder"
           title="Construtor WordPress — Planos"
           subtitle="Escolha o plano, depois o domínio e a duração." />
         <IncludedFeatures features={included}

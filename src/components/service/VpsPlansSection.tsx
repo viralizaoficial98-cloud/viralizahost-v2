@@ -11,7 +11,7 @@ import { VPS_CYCLES, isVpsIcon, vpsSpecLines, type VpsFeature, type VpsIcon, typ
 // «Comprar agora» à direita (desktop); em coluna no telemóvel, sem rolagem horizontal. Fonte: catálogo
 // (/api/products?category=vps, sem subcategoria); só planos publicados. Total = valor guardado em product_prices.
 
-const ICONS: Record<VpsIcon, ComponentType<{ size?: number; className?: string }>> = {
+export const FEATURE_ICONS: Record<VpsIcon, ComponentType<{ size?: number; className?: string }>> = {
   check: Check, shield: Shield, backup: DatabaseBackup, globe: Globe, lock: Lock, terminal: Terminal, zap: Zap, headphones: Headphones,
   panel: LayoutDashboard, cloud: Cloud, refresh: RefreshCw, bot: Bot, database: Database, mail: Mail,
 }
@@ -62,7 +62,7 @@ export function VpsPlanBand({ plan, fmt, href, preview = false, tid = 'vps' }: {
           )}
           {plan.features.length > 0 && (
             <ul className="mt-4 grid sm:grid-cols-2 gap-x-6 gap-y-1.5" data-testid={`${tid}-plan-features`}>
-              {plan.features.map((f, i) => { const I = f.icon && isVpsIcon(f.icon) ? ICONS[f.icon] : Check; return (
+              {plan.features.map((f, i) => { const I = f.icon && isVpsIcon(f.icon) ? FEATURE_ICONS[f.icon] : Check; return (
                 <li key={`${f.text}-${i}`} className="flex items-start gap-2 text-sm text-[#444]" data-testid={`${tid}-plan-feature`} data-icon={f.icon ?? 'check'}>
                   <I size={15} className="mt-0.5 shrink-0 text-green-600" aria-hidden /><span>{f.text}</span>
                 </li>) })}

@@ -3,7 +3,11 @@
 import { PUBLIC_PAGES, type PageIcon } from './pages'
 
 export interface NavItem { label: string; desc: string; href: string; icon: PageIcon; badge?: string }
-export interface NavColumn { title: string; items: NavItem[] }
+export interface NavColumn {
+  title: string; items: NavItem[]
+  /** Entradas só de texto (sem link nem acção), ex.: «Nossas Marcas» enquanto não têm página própria. */
+  texts?: string[]
+}
 /** Cartão de imagem dos submenus (um só modelo): imagem + link «Fale com um especialista». */
 export type NavAside = 'hospedagem' | 'servicos' | 'empresa'
 /** Destino da acção «Fale com um especialista» (o mesmo usado no resto do site). */
@@ -44,5 +48,11 @@ export const MAIN_NAV: NavGroup[] = [
       { title: 'E-mail', items: [page('/email-corporativo', { label: 'E-mail corporativo' }), page('/email/microsoft-365-outlook', { label: 'Microsoft 365 Outlook' })] },
     ],
   },
-  { id: 'empresa', label: 'Empresa', aside: 'empresa', columns: [{ title: 'Empresa', items: [page('/sobre'), page('/suporte'), page('/parcerias'), page('/blog')] }] },
+  {
+    id: 'empresa', label: 'Empresa', aside: 'empresa', columns: [
+      { title: 'Empresa', items: [page('/sobre'), page('/suporte'), page('/parcerias'), page('/blog')] },
+      // Por agora só texto: sem links, botões nem href="#"
+      { title: 'Nossas Marcas', items: [], texts: ['Viralizastudio', 'Automação com IA'] },
+    ],
+  },
 ]

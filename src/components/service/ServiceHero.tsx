@@ -118,10 +118,13 @@ export function ServiceHero({
           )}
 
           <div className="flex flex-wrap gap-3 items-center">
-            <Link href={ctaHref}
-              className="btn-shimmer btn-primary px-7 py-3.5 text-sm font-bold rounded-xl shadow-[0_4px_20px_rgba(245,183,0,0.30)]">
-              {cta}
-            </Link>
+            {/* Botões opcionais: texto vazio no painel = sem botão (ex.: Sobre nós) */}
+            {cta && ctaHref && (
+              <Link href={ctaHref}
+                className="btn-shimmer btn-primary px-7 py-3.5 text-sm font-bold rounded-xl shadow-[0_4px_20px_rgba(245,183,0,0.30)]">
+                {cta}
+              </Link>
+            )}
             {ctaSecondary && ctaSecondaryHref && (
               <Link href={ctaSecondaryHref}
                 className="px-6 py-3.5 text-sm font-semibold text-white border border-white/20 rounded-xl hover:border-[#F5B700]/40 hover:text-[#F5B700] transition-all">

@@ -7,22 +7,25 @@ import { getBannerPage } from '@/lib/banner-pages'
 
 export interface BannerHeroDefaults {
   breadcrumb: string; tag: string; title: string; subtitle: string
-  cta: string; ctaHref: string; ctaSecondary?: string; ctaSecondaryHref?: string
+  /** Botões opcionais (texto vazio = sem botão) */
+  cta?: string; ctaHref?: string; ctaSecondary?: string; ctaSecondaryHref?: string
   bgImage?: string; bgColor?: string; highlights?: string[]; guarantee?: boolean
 }
 
-export async function BannerHero({ slug, defaults, price, testId }: { slug: string; defaults: BannerHeroDefaults; price?: string | null; testId?: string }) {
+export async function BannerHero({ slug, defaults, price, testId, breadcrumbParent }: { slug: string; defaults: BannerHeroDefaults; price?: string | null; testId?: string; breadcrumbParent?: { label: string; href: string } }) {
   const banner = await getBannerPage(slug)
   return (
     <div data-section="hero" data-testid={testId} data-banner-slug={slug} data-banner-source={banner ? 'admin' : 'default'}>
       <ServiceHero
         breadcrumb={banner?.breadcrumb ?? defaults.breadcrumb}
+        breadcrumbParent={banner?.breadcrumb_parent ?? breadcrumbParent?.label}
+        breadcrumbParentHref={banner?.breadcrumb_parent_href ?? breadcrumbParent?.href}
         tag={banner?.tag ?? defaults.tag}
         title={banner?.title ?? defaults.title}
         subtitle={banner?.subtitle ?? defaults.subtitle}
         price={price ?? undefined}
-        cta={banner?.button_primary_text ?? defaults.cta}
-        ctaHref={banner?.button_primary_link ?? defaults.ctaHref}
+        cta={banner ? banner.button_primary_text : defaults.cta ?? ''}
+        ctaHref={banner ? banner.button_primary_link : defaults.ctaHref ?? ''}
         ctaSecondary={banner?.button_secondary_text ?? defaults.ctaSecondary}
         ctaSecondaryHref={banner?.button_secondary_link ?? defaults.ctaSecondaryHref}
         bgImage={banner?.bg_image ?? defaults.bgImage}
