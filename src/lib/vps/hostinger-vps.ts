@@ -13,11 +13,22 @@ export interface DataCenter { id: number; name?: string | null; location?: strin
 export interface Template { id: number; name: string; description?: string | null }
 export interface VirtualMachine {
   id: number; subscription_id?: string | null; data_center_id?: number | null; plan?: string | null; hostname?: string; state?: string
-  cpus?: number; memory?: number; disk?: number; bandwidth?: number; ipv4?: { id?: number; address: string }[] | null; created_at?: string
+  cpus?: number; memory?: number; disk?: number; bandwidth?: number; ipv4?: { id?: number; address: string }[] | null
+  ipv6?: { id?: number; address: string }[] | null; template?: { id?: number; name?: string } | null; created_at?: string
+}
+/** Especificação 3.9.2: métricas por série { unit, usage: { <unix>: valor } }. */
+export interface VpsMetrics { [serie: string]: { unit?: string; usage?: Record<string, number> } }
+export interface VpsBackup { id: number; size?: number; restore_time?: number; location?: string; created_at?: string }
+export interface VpsSnapshot { id: number; restore_time?: number; created_at?: string; expires_at?: string }
+export interface FirewallRule { id: number; action: 'accept' | 'drop'; protocol: string; port: string; source: string; source_detail: string }
+export interface Firewall { id: number; name: string; is_synced?: boolean; rules?: FirewallRule[]; created_at?: string }
+export interface Subscription {
+  id: string; name?: string; status?: string; billing_period?: number; billing_period_unit?: string; currency_code?: string
+  total_price?: number; renewal_price?: number; is_auto_renewed?: boolean; created_at?: string; expires_at?: string | null; next_billing_at?: string | null
 }
 export interface PurchaseRequest {
   item_id: string; payment_method_id?: number
-  setup: { template_id: number; data_center_id: number; hostname?: string; ssh_keys?: string[] }
+  setup: { template_id: number; data_center_id: number; hostname?: string; ssh_keys?: string[]; enable_backups?: boolean }
 }
 export type PurchaseOutcome =
   | { kind: 'ok'; orderId: string | null; subscriptionId: string | null; orderStatus: string | null; vm: VirtualMachine | null; total: number | null; currency: string | null }
@@ -111,6 +122,46 @@ export function hostingerVpsClient({ token, baseUrl = HOSTINGER_API, timeoutMs =
     async sshKeys(id: number | string): Promise<string[]> {
       const j = await read(`/api/vps/v1/virtual-machines/${encodeURIComponent(String(id))}/ssh-keys`)
       return list<any>(j).map(k => (typeof k === 'string' ? k : k?.key ?? k?.public_key ?? '')).filter(Boolean)
+    },
+    /** Subscrições da conta (custos, renovação automática, próxima cobrança) — leitura. */
+    async subscriptions(): Promise<Subscription[]> { return list<Subscription>(await read('/api/billing/v1/subscriptions')) },
+    /** Métricas (CPU %, RAM/disco/tráfego em bytes, uptime em ms) entre duas datas (YYYY-MM-DD). */
+    async metrics(id: number | string, from: string, to: string): Promise<VpsMetrics> {
+      const j = await read(`/api/vps/v1/virtual-machines/${encodeURIComponent(String(id))}/metrics?date_from=${encodeURIComponent(from)}&date_to=${encodeURIComponent(to)}`)
+      return (j?.data ?? j ?? {}) as VpsMetrics
+    },
+    async backups(id: number | string): Promise<VpsBackup[]> { return list<VpsBackup>(await read(`/api/vps/v1/virtual-machines/${encodeURIComponent(String(id))}/backups`)) },
+    /** Snapshot actual (null se não existir: 404). */
+    async snapshot(id: number | string): Promise<VpsSnapshot | null> {
+      let r
+      try { r = await call('GET', `/api/vps/v1/virtual-machines/${encodeURIComponent(String(id))}/snapshot`) } catch { throw new VpsApiError('Ligação à API da Hostinger falhou.', 0) }
+      if (r.status === 404) return null
+      if (r.status < 200 || r.status >= 300) throw new VpsApiError(safe(r.json?.error ?? r.json?.message ?? `HTTP ${r.status}`), r.status)
+      const sn = r.json?.data ?? r.json
+      return sn && sn.id != null ? sn as VpsSnapshot : null
+    },
+    async firewalls(): Promise<Firewall[]> { return list<Firewall>(await read('/api/vps/v1/firewall')) },
+    async firewall(fid: number | string): Promise<Firewall | null> { try { const j = await read(`/api/vps/v1/firewall/${encodeURIComponent(String(fid))}`); return (j?.data ?? j) as Firewall } catch (e) { if (e instanceof VpsApiError && e.status === 404) return null; throw e } },
+    /**
+     * Operações sem custo para o cliente (as destrutivas exigem confirmação no módulo que as chama):
+     * backups (restaurar), snapshot (criar/restaurar/apagar), firewall (criar/regra/activar/desactivar/sincronizar), hostname.
+     */
+    async op(kind: 'backup-restore' | 'snapshot-create' | 'snapshot-restore' | 'snapshot-delete' | 'hostname-set' | 'firewall-create' | 'firewall-rule-add' | 'firewall-rule-delete' | 'firewall-activate' | 'firewall-deactivate' | 'firewall-sync',
+      a: { vm?: number | string; backup?: number | string; firewall?: number | string; rule?: number | string; body?: Record<string, unknown> }): Promise<{ ok: true; data: any } | { ok: false; status: number; message: string }> {
+      const vm = `/api/vps/v1/virtual-machines/${encodeURIComponent(String(a.vm ?? ''))}`, fw = `/api/vps/v1/firewall/${encodeURIComponent(String(a.firewall ?? ''))}`
+      const map: Record<string, [string, string]> = {
+        'backup-restore': ['POST', `${vm}/backups/${encodeURIComponent(String(a.backup ?? ''))}/restore`],
+        'snapshot-create': ['POST', `${vm}/snapshot`], 'snapshot-restore': ['POST', `${vm}/snapshot/restore`], 'snapshot-delete': ['DELETE', `${vm}/snapshot`],
+        'hostname-set': ['PUT', `${vm}/hostname`],
+        'firewall-create': ['POST', '/api/vps/v1/firewall'], 'firewall-rule-add': ['POST', `${fw}/rules`], 'firewall-rule-delete': ['DELETE', `${fw}/rules/${encodeURIComponent(String(a.rule ?? ''))}`],
+        'firewall-activate': ['POST', `${fw}/activate/${encodeURIComponent(String(a.vm ?? ''))}`], 'firewall-deactivate': ['POST', `${fw}/deactivate/${encodeURIComponent(String(a.vm ?? ''))}`],
+        'firewall-sync': ['POST', `${fw}/sync/${encodeURIComponent(String(a.vm ?? ''))}`],
+      }
+      const [method, path] = map[kind]
+      let r
+      try { r = await call(method, path, a.body) } catch (e) { return { ok: false, status: 0, message: (e as Error).name === 'TimeoutError' ? 'A Hostinger não respondeu dentro do tempo limite.' : 'Ligação à Hostinger falhou.' } }
+      if (r.status >= 200 && r.status < 300) return { ok: true, data: r.json?.data ?? r.json }
+      return { ok: false, status: r.status, message: safe(r.json?.error ?? r.json?.message ?? `HTTP ${r.status}`) }
     },
     /** Conclui a configuração de uma VM já paga no estado «initial» (sem nova compra). */
     async setup(id: number | string, setup: PurchaseRequest['setup']): Promise<{ ok: boolean; status: number; message: string | null }> {

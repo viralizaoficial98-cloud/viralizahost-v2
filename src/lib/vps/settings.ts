@@ -3,7 +3,7 @@ import { getPool } from '@/lib/db/pool'
 import { decryptSecret, encryptSecret } from '@/lib/crypto'
 import { HOSTINGER_API, hostingerVpsClient, VpsApiError, type HostingerVpsClient } from './hostinger-vps'
 import type { VpsOption } from '@/lib/commerce/vps-shared'
-import { classifyTemplate, fitsPlan, normalizeRow, sellable, type InstallOptionRow, type PublicVpsOptions } from './install-shared'
+import { classifyTemplate, fitsPlan, isInstallGroup, normalizeRow, sellable, type InstallOptionRow, type PublicVpsOptions } from './install-shared'
 
 // Integrações → Hostinger VPS (linha única vps_provider_settings.id = 1).
 // Credencial cifrada com WHM_ENCRYPTION_KEY (como o Registrador); nunca sai do servidor. Sem token próprio, usa o
@@ -57,7 +57,7 @@ export async function publicVpsOptions(plan?: { slug: string; ramGb?: number | n
     .map(r => ({ r, locs: r.locations.filter(l => locIds.includes(l)) }))
     .filter(({ r, locs }) => !r.locations.length || !locIds.length || locs.length > 0)
     .map(({ r, locs }) => ({
-      id: r.id, label: r.label, category: r.category, name: r.name, version: r.version, icon: r.icon ?? "generic", includedOs: r.includedOs,
+      id: r.id, label: r.label, category: r.category, group: r.group ?? "other", name: r.name, version: r.version, icon: r.icon ?? "generic", includedOs: r.includedOs,
       license: { type: r.license.type, monthlyKz: r.license.type === 'paid' ? Number(r.license.monthlyKz ?? 0) : 0 },
       locations: r.locations.length ? locs : [], description: r.detail,
     }))
@@ -111,6 +111,7 @@ function imageConfig(raw: any, prev: ImageRow | undefined): InstallOptionRow {
     includedOs: cat === 'os' ? null : raw?.includedOs === undefined ? prev?.includedOs ?? null : str(raw.includedOs),
     license: { type: licType, monthlyKz: licType === 'paid' ? monthly : null, note: raw?.license?.note === undefined ? prev?.license.note ?? null : str(raw.license.note, 160) },
     locations: list(raw?.locations, prev?.locations), minRamGb: minRam || null, plans: list(raw?.plans, prev?.plans), accessUrl: url, sshUser: user,
+    group: raw?.group === undefined ? prev?.group ?? null : isInstallGroup(raw.group) ? raw.group : prev?.group ?? null,
   }
 }
 

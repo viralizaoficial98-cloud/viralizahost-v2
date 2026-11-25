@@ -15,7 +15,7 @@ export const CYCLE_LABEL: Record<Cycle, string> = { monthly: 'Mensal', '3months'
 
 export type DomainMode = 'register' | 'transfer' | 'existing'
 export type CartLineInput =
-  | { type: 'product'; slug: string; cycle: Cycle; quantity?: number; domain?: string; domainMode?: DomainMode; options?: { location?: string; image?: string; later?: boolean } }
+  | { type: 'product'; slug: string; cycle: Cycle; quantity?: number; domain?: string; domainMode?: DomainMode; options?: { location?: string; image?: string; later?: boolean; hostname?: string; sshKey?: string; addons?: string[] } }
   | { type: 'domain'; domain: string; operation: 'register' | 'transfer' | 'renew'; years?: number; eppCode?: string; nameservers?: { useDefault?: boolean; ns?: string[] } }
   | { type: 'renewal'; serviceId: string }
 
@@ -62,6 +62,10 @@ export interface VpsLineOptions {
   image?: { id: string; label: string; category?: string; name?: string; version?: string | null; includedOs?: string | null; license?: { type: 'included' | 'paid'; monthlyKz: number; total: number } } | null
   /** «Escolher mais tarde»: a instalação é escolhida em «Os meus VPS» depois do pagamento. */
   later?: boolean
+  /** Cloud VPS: hostname pedido pelo cliente, chave pública SSH (acesso inicial) e extras da ViralizaHost. */
+  hostname?: string | null
+  sshKey?: string | null
+  addons?: { id: string; label: string; monthlyKz: number; total: number }[]
 }
 
 export interface Quote {
@@ -136,6 +140,10 @@ export interface QuoteOptions {
   checkAvailability?: boolean
   /** Encomenda criada pelo painel a partir de um pedido de Revenda tecnicamente aprovado */
   resellerRequestId?: string | null
+  /** Cloud VPS: encomenda criada pelo painel a partir de um pedido aprovado (vps_requests) */
+  vpsRequestId?: string | null
+  /** Cloud VPS: só calcular o preço de um pedido (nunca usado para criar encomendas) */
+  vpsValidateOnly?: boolean
 }
 
 export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {}): Promise<Quote> {
@@ -211,8 +219,8 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
     const base: QuoteLine = { index, type: 'product', slug, name: prod?.name ?? slug, serviceType: prod?.service_type ?? 'other', provisioning: prod?.provisioning, quantity: 1, unitPrice: 0, lineTotal: 0, renewalPrice: 0, cycle, quantityUnit: prod?.quantity_unit ?? null, maxQuantity: Number(prod?.max_quantity ?? 1) }
     if (!prod || !prod.active) { lines.push({ ...base, error: err('product_not_found') }); continue }
     base.productId = prod.id
-    base.cycles = (await rows(db, 'SELECT cycle, months, price, renewal_price, discount_pct, renewal_discount_pct FROM product_prices WHERE product_id = ? AND active = 1 ORDER BY months', [prod.id]))
-      .map(c => ({ cycle: c.cycle, months: Number(c.months), price: Number(c.price), renewal: Number(c.renewal_price), discount: Number(c.discount_pct ?? 0), renewalDiscount: Number(c.renewal_discount_pct ?? 0) }))
+    const priceRows = await rows(db, 'SELECT cycle, months, price, renewal_price, discount_pct, renewal_discount_pct, provider_renewal_minor, provider_currency FROM product_prices WHERE product_id = ? AND active = 1 ORDER BY months', [prod.id])
+    base.cycles = priceRows.map(c => ({ cycle: c.cycle, months: Number(c.months), price: Number(c.price), renewal: Number(c.renewal_price), discount: Number(c.discount_pct ?? 0), renewalDiscount: Number(c.renewal_discount_pct ?? 0) }))
     // VPS (Servidor VPS): só os ciclos à venda; um carrinho antigo com um ciclo retirado pede outro período
     const serverVps = prod.category === 'vps' && !prod.subcategory
     if (serverVps) base.cycles = base.cycles.filter(x => isVpsCycleForSale(x.cycle))
@@ -224,6 +232,18 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
     if (family && !isFamilyCycleForSale(cycle, family)) { lines.push({ ...base, error: { code: 'cycle_retired_plan', message: familyCycleRetiredMsg(family) } }); continue }
     const c = base.cycles.find(x => x.cycle === cycle)
     if (!c) { lines.push({ ...base, error: err('cycle_unavailable') }); continue }
+    // Cloud VPS (todas as páginas VPS): modo comercial e pedido aprovado verificados no servidor (lib/vps/cloud.ts)
+    if (prod.category === 'vps') {
+      const { vpsGate, VPS_GATE_MSG } = await import('@/lib/vps/cloud')
+      const code = await vpsGate(db, { productId: prod.id, cycle, userId: opts.userId, requestId: opts.vpsRequestId, validateOnly: opts.vpsValidateOnly, options: (raw as { options?: unknown }).options })
+      if (code) { lines.push({ ...base, error: { code, message: VPS_GATE_MSG[code] ?? code } }); continue }
+      // Nunca vender um ciclo cuja renovação não cobre o custo de renovação do fornecedor (câmbio + comissões)
+      const pr = priceRows.find(x => x.cycle === cycle)
+      if (pr?.provider_renewal_minor != null) {
+        const { loadCloudSettings, cycleSustainable } = await import('@/lib/vps/cloud')
+        if (cycleSustainable((await loadCloudSettings(db)).finance, Number(pr.renewal_price), Number(pr.provider_renewal_minor), pr.provider_currency) === false) { lines.push({ ...base, error: { code: 'vps_cycle_unsustainable', message: VPS_GATE_MSG.vps_cycle_unsustainable } }); continue }
+      }
+    }
     // Revenda: modo comercial, autorização e capacidade verificados no servidor (lib/reseller/gate.ts)
     if (family === 'reseller') {
       const { resellerGate, GATE_MSG } = await import('@/lib/reseller/gate')
@@ -241,7 +261,7 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
       let specs: { ramGb?: number | null } = {}
       try { specs = (typeof prod.plan_specs === 'string' ? JSON.parse(prod.plan_specs) : prod.plan_specs) ?? {} } catch { /* sem especificações */ }
       const avail = await vpsOptions({ slug: prod.slug, ramGb: specs.ramGb ?? null })
-      const want = ((raw as { options?: { location?: string; image?: string; later?: boolean } }).options ?? {})
+      const want = ((raw as { options?: { location?: string; image?: string; later?: boolean; hostname?: string; sshKey?: string; addons?: string[] } }).options ?? {})
       const loc = avail.locations.length ? (want.location ? avail.locations.find(o => o.id === String(want.location)) ?? undefined : null) : null
       if (loc === undefined) { lines.push({ ...base, error: err('options_invalid') }); continue }
       if (avail.locations.length && !loc) { lines.push({ ...base, error: err('options_required') }); continue }
@@ -257,12 +277,27 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
           if (loc && img.locations.length && !img.locations.includes(loc.id)) { lines.push({ ...base, error: err('image_incompatible') }); continue }
         }
       }
+      // Cloud VPS: hostname, chave pública SSH (acesso inicial sem senha) e extras — validados aqui (nunca senhas)
+      const hostname = want.hostname == null || want.hostname === '' ? null : String(want.hostname).trim().toLowerCase()
+      if (hostname && (hostname.length > 191 || !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/.test(hostname))) { lines.push({ ...base, error: { code: 'hostname_invalid', message: 'Hostname inválido (ex.: servidor.aminhaempresa.ao).' } }); continue }
+      const sshKey = want.sshKey == null || want.sshKey === '' ? null : String(want.sshKey).trim().replace(/\s+/g, ' ')
+      if (sshKey && (sshKey.length > 8000 || !/^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(?:256|384|521)|sk-ssh-ed25519@openssh\.com) [A-Za-z0-9+/]{40,}={0,3}(?: [^\r\n]{0,200})?$/.test(sshKey))) { lines.push({ ...base, error: { code: 'ssh_key_invalid', message: 'Chave pública SSH inválida (cole a chave PÚBLICA completa, ex.: «ssh-ed25519 AAAA… nome»).' } }); continue }
+      let addons: { id: string; label: string; monthlyKz: number; total: number }[] = []
+      if (Array.isArray(want.addons) && want.addons.length) {
+        const { loadCloudSettings } = await import('@/lib/vps/cloud')
+        const enabled = (await loadCloudSettings(db)).addons.filter(a => a.enabled)
+        const ids = [...new Set(want.addons.map(String))]
+        if (ids.some(id => !enabled.some(a => a.id === id))) { lines.push({ ...base, error: { code: 'addon_invalid', message: 'Extra indisponível: escolha de novo.' } }); continue }
+        addons = enabled.filter(a => ids.includes(a.id)).map(a => ({ id: a.id, label: a.label, monthlyKz: a.monthlyKz, total: round2(a.monthlyKz * c.months) }))
+      }
+      const extra = addons.reduce((t, a) => t + a.total, 0)
       const lic = img && img.license.type === 'paid' ? Math.round(img.license.monthlyKz * c.months * 100) / 100 : 0
-      if (lic > 0) Object.assign(base, { unitPrice: round2(c.price + lic), lineTotal: round2((c.price + lic) * qty), renewalPrice: round2((c.renewal + lic) * qty), listTotal: base.listTotal != null ? round2(base.listTotal + lic * qty) : null })
-      if (loc || img || (want.later && avail.images.length)) base.options = {
+      if (lic + extra > 0) Object.assign(base, { unitPrice: round2(c.price + lic + extra), lineTotal: round2((c.price + lic + extra) * qty), renewalPrice: round2((c.renewal + lic + extra) * qty), listTotal: base.listTotal != null ? round2(base.listTotal + (lic + extra) * qty) : null })
+      if (loc || img || (want.later && avail.images.length) || hostname || sshKey || addons.length) base.options = {
         location: loc,
         image: img ? { id: img.id, label: img.label, category: img.category, name: img.name, version: img.version, includedOs: img.includedOs, license: { type: img.license.type, monthlyKz: img.license.monthlyKz, total: lic } } : null,
         ...(want.later && !img && avail.images.length ? { later: true } : {}),
+        ...(hostname ? { hostname } : {}), ...(sshKey ? { sshKey } : {}), ...(addons.length ? { addons } : {}),
       }
     }
     if (base.serviceType === 'hosting' || base.serviceType === 'email' || family === 'reseller') {

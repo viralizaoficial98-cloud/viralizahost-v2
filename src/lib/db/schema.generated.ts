@@ -2864,6 +2864,11 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "json",
         "hasDefault": true,
         "nullable": true
+      },
+      "provider_finance": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": [
@@ -3052,6 +3057,11 @@ export const SCHEMA_META: SchemaMeta = {
         "nullable": true
       },
       "provider_cost_limit_minor": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "provider_renewal_minor": {
         "kind": "int",
         "hasDefault": true,
         "nullable": true
@@ -5834,6 +5844,200 @@ export const SCHEMA_META: SchemaMeta = {
       }
     ]
   },
+  "vps_instances": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "provider",
+        "provider_vm_id"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "provider": {
+        "kind": "text",
+        "hasDefault": true
+      },
+      "provider_vm_id": {
+        "kind": "text"
+      },
+      "subscription_id": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "plan": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "hostname": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "state": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "cpus": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "memory_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "disk_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "bandwidth_mb": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "ipv4": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "ipv6": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "data_center_id": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "template_name": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "provider_created_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "is_internal": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "is_protected": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "protection_reason": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "link_status": {
+        "kind": "enum",
+        "values": [
+          "unlinked",
+          "linked"
+        ],
+        "hasDefault": true
+      },
+      "service_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "linked_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "linked_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "sub_status": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "sub_currency": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "sub_total_minor": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "sub_renewal_minor": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "sub_billing_period": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "sub_billing_unit": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "sub_auto_renew": {
+        "kind": "bool",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "sub_next_billing_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "sub_expires_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "missing_since": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "last_sync_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
   "vps_provider_events": {
     "pk": [
       "id"
@@ -5974,6 +6178,26 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "timestamp",
         "hasDefault": true,
         "autoUpdate": true
+      },
+      "access_method": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "access_configured_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "client_hostname": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "firewall_id": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
       }
     },
     "relations": []
@@ -6043,6 +6267,262 @@ export const SCHEMA_META: SchemaMeta = {
         "kind": "timestamp",
         "hasDefault": true,
         "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
+  "vps_requests": {
+    "pk": [
+      "id"
+    ],
+    "unique": [
+      [
+        "reference"
+      ]
+    ],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "reference": {
+        "kind": "text"
+      },
+      "kind": {
+        "kind": "enum",
+        "values": [
+          "new",
+          "upgrade"
+        ],
+        "hasDefault": true
+      },
+      "upgrade_service_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "profile_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "full_name": {
+        "kind": "text"
+      },
+      "email": {
+        "kind": "text"
+      },
+      "phone": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "company": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "product_id": {
+        "kind": "uuid"
+      },
+      "cycle": {
+        "kind": "enum",
+        "values": [
+          "monthly",
+          "3months",
+          "6months",
+          "1year",
+          "2years",
+          "3years"
+        ]
+      },
+      "options": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "notes": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "status": {
+        "kind": "enum",
+        "values": [
+          "submitted",
+          "under_review",
+          "approved",
+          "awaiting_payment",
+          "paid",
+          "purchase_authorized",
+          "provisioning",
+          "active",
+          "rejected",
+          "cancelled",
+          "failed"
+        ],
+        "hasDefault": true
+      },
+      "quoted_total": {
+        "kind": "number",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "provider_cost_minor": {
+        "kind": "int",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "provider_currency": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "order_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "service_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "internal_notes": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "decision_reason": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "reviewed_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "approved_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "approved_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "purchase_authorized_by": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "purchase_authorized_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "is_test": {
+        "kind": "bool",
+        "hasDefault": true
+      },
+      "ip_hash": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "dedupe_key": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      },
+      "updated_at": {
+        "kind": "timestamp",
+        "hasDefault": true,
+        "autoUpdate": true
+      }
+    },
+    "relations": []
+  },
+  "vps_request_events": {
+    "pk": [
+      "id"
+    ],
+    "unique": [],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "request_id": {
+        "kind": "uuid"
+      },
+      "actor_id": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "from_status": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "to_status": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "action": {
+        "kind": "text"
+      },
+      "note": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
+      }
+    },
+    "relations": []
+  },
+  "vps_sync_runs": {
+    "pk": [
+      "id"
+    ],
+    "unique": [],
+    "columns": {
+      "id": {
+        "kind": "uuid"
+      },
+      "kind": {
+        "kind": "text"
+      },
+      "ok": {
+        "kind": "bool"
+      },
+      "results": {
+        "kind": "json",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "message": {
+        "kind": "text",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "actor": {
+        "kind": "uuid",
+        "hasDefault": true,
+        "nullable": true
+      },
+      "created_at": {
+        "kind": "timestamp",
+        "hasDefault": true
       }
     },
     "relations": []
