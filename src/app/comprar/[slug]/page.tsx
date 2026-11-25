@@ -32,12 +32,27 @@ export default async function ComprarPage({ params, searchParams }: { params: Pr
     const code = await resellerGate(getPool(), { productId: prod.id, cycle: ciclo ?? 'monthly', userId: user?.id ?? null })
     if (code) resellerBlock = GATE_MSG[code] ?? code
   }
+  // Cloud VPS: fora do modo automático a contratação passa pelo configurador (pedido com aprovação)
+  let vpsBlock: string | null = null
+  if (plan.category === 'vps' && plan.saleStatus === 'active') {
+    const { vpsGate, VPS_GATE_MSG } = await import('@/lib/vps/cloud')
+    const { data: { user } } = await (await createAuthClient()).auth.getUser()
+    const [[prod]] = await getPool().query('SELECT id FROM products WHERE slug = ?', [slug]) as never as [{ id: string }[]]
+    const code = await vpsGate(getPool(), { productId: prod.id, cycle: ciclo ?? 'monthly', userId: user?.id ?? null })
+    if (code) vpsBlock = VPS_GATE_MSG[code] ?? code
+  }
   return (
     <>
       <Header />
       <main className="bg-[#F7F7F7] min-h-screen pt-24 pb-16">
         <div className="max-w-6xl mx-auto px-4">
-          {resellerBlock ? (
+          {vpsBlock ? (
+            <div className="max-w-2xl bg-white border border-[#E8E8E8] rounded-2xl p-8" data-testid="vps-buy-blocked">
+              <h1 className="text-xl font-black text-[#0A0A0A]">{plan.name}</h1>
+              <p className="text-sm text-[#555] mt-2">{vpsBlock}</p>
+              <Link href={`/servidor-vps/configurar?plano=${plan.slug}${ciclo ? `&ciclo=${ciclo}` : ''}`} className="inline-block mt-5 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#F5B700] text-black">Abrir o configurador</Link>
+            </div>
+          ) : resellerBlock ? (
             <div className="max-w-2xl bg-white border border-[#E8E8E8] rounded-2xl p-8" data-testid="reseller-buy-blocked">
               <h1 className="text-xl font-black text-[#0A0A0A]">{plan.name}</h1>
               <p className="text-sm text-[#555] mt-2">{resellerBlock}</p>

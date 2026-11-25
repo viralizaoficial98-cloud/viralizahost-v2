@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { VpsPlansSection } from '@/components/service/VpsPlansSection'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Shield, Bot, Zap, HardDrive, Globe, Lock, Headphones, Server, Layers } from 'lucide-react'
@@ -29,7 +29,7 @@ const included = [
 
 export default async function VPSOpenClawPage() {
   const banner = await getBannerPage('vps-openclaw')
-  const fromPrice = await fromPriceText('vps', 'openclaw')
+  const fromPrice = await fromPriceText('vps')
   return (
     <>
       <Header />
@@ -51,11 +51,8 @@ export default async function VPSOpenClawPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["Agentes Autónomos","Automação Sem Código","Cofre Seguro","Integrações Ilimitadas"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <DynamicServicePricing
-          category="vps"
-          subcategory="openclaw"
-          cols={3}
-          showBillingToggle
+        {/* Planos reais do catálogo Cloud VPS: o botão abre o configurador com «OpenClaw» pré-seleccionado */}
+        <VpsPlansSection app="openclaw"
           title="VPS OpenClaw — Agentes de IA para o seu negócio"
           subtitle="Servidor pré-configurado com OpenClaw. Active e comece a automatizar com IA hoje." />
         <IncludedFeatures features={included} dark
@@ -64,7 +61,7 @@ export default async function VPSOpenClawPage() {
           title="Active os seus agentes de IA hoje"
           subtitle="Servidor pré-configurado, automação sem código e suporte especializado."
           cta="Contratar OpenClaw"
-          ctaHref="/comprar/vps-openclaw-pro" />
+          ctaHref="/servidor-vps/configurar?app=openclaw" />
       </main>
       <Footer />
     </>

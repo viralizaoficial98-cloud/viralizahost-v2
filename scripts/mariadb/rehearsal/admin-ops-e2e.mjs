@@ -32,6 +32,11 @@ class S {
   order(lines, total, extra = {}) { return this.req('/api/checkout/orders', { method: 'POST', body: { idempotencyKey: randomUUID(), lines, acceptedTotal: total, paymentMethod: 'bank_transfer', billingDetails: { name: 'Teste' }, ...extra } }) }
 }
 const db = await mysql.createConnection({ host: process.env.DB_HOST, port: Number(process.env.DB_PORT), user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME, dateStrings: true })
+// Cloud VPS (migração 24): a compra directa de VPS pelo checkout só existe no modo comercial «automático»; o modo
+// inicial «solicitação» recusa-a (vps_request_only, coberto por cloud-vps-e2e). Este ensaio usa o modo automático e repõe-no.
+const cvModeBefore = (await db.query("SELECT JSON_UNQUOTE(JSON_EXTRACT(options, '$.commercialMode')) m FROM vps_provider_settings WHERE id = 1"))[0][0]?.m ?? null
+await db.query("UPDATE vps_provider_settings SET options = JSON_SET(COALESCE(options, '{}'), '$.commercialMode', 'automatic') WHERE id = 1")
+const restoreCvMode = () => db.query("UPDATE vps_provider_settings SET options = JSON_SET(COALESCE(options, '{}'), '$.commercialMode', ?) WHERE id = 1", [cvModeBefore ?? 'request_only']).catch(() => {})
 const one = async (sql, p = []) => (await db.query(sql, p))[0][0]
 const rnd = () => randomBytes(3).toString('hex')
 const digits = s => Number(String(s ?? '').replace(/[^\d]/g, '') || 0)
@@ -90,6 +95,17 @@ try {
   const proofPath = `ensaio/${Date.now()}_painel.pdf`
   const fd = new FormData(); fd.append('bucket', 'payment-proofs'); fd.append('path', proofPath); fd.append('file', new Blob([Buffer.from('%PDF-1.4 ensaio')], { type: 'application/pdf' }), 'c.pdf')
   await fetch(BASE + '/api/storage/upload', { method: 'POST', body: fd, headers: { cookie: c2.cookie } })
+  // Pelo menos 5 comprovativos MAIS ANTIGOS por validar (o resumo mostra 5): o novo tem de aparecer mesmo assim
+  const olderPending = async () => (await pending()).cats.proofs?.count ?? 0
+  for (let i = 0; i < 6 && (await olderPending()) < 6; i++) {
+    const d = `comprov-antigo-${rnd()}.com`, qx = await c2.quote([{ type: 'product', slug: 'hosting-start', cycle: 'monthly', domain: d, domainMode: 'existing' }])
+    const oldProof = `ensaio/${Date.now()}_${rnd()}_antigo.pdf` // cada comprovativo só pode ser usado numa encomenda
+    const fdx = new FormData(); fdx.append('bucket', 'payment-proofs'); fdx.append('path', oldProof); fdx.append('file', new Blob([Buffer.from('%PDF-1.4 ensaio')], { type: 'application/pdf' }), 'c.pdf')
+    await fetch(BASE + '/api/storage/upload', { method: 'POST', body: fdx, headers: { cookie: c2.cookie } })
+    const ox = await c2.order([{ type: 'product', slug: 'hosting-start', cycle: 'monthly', domain: d, domainMode: 'existing' }], qx.json.quote.total, { proofFile: oldProof, transferRef: 'TRF-ANTIGO' })
+    if (!ox.json?.order) { ok(false, 'comprovativo antigo criado', JSON.stringify(ox.json).slice(0, 200)); break }
+  }
+  await new Promise(r => setTimeout(r, 1100)) // o comprovativo novo fica com data posterior
   const domB = `comprov-${rnd()}.com`
   const qB = await c2.quote([{ type: 'product', slug: 'hosting-start', cycle: 'monthly', domain: domB, domainMode: 'existing' }])
   const B = (await c2.order([{ type: 'product', slug: 'hosting-start', cycle: 'monthly', domain: domB, domainMode: 'existing' }], qB.json.quote.total, { proofFile: proofPath, transferRef: 'TRF-PAINEL' })).json?.order
@@ -97,6 +113,24 @@ try {
   ok(p.status === 200 && Object.keys(p.cats).length === 6, 'acções pendentes: 6 categorias (inclui pedidos de Revenda)')
   const proofItem = p.cats.proofs?.items.find(i => i.ref === B?.order_number)
   ok(!!proofItem && /filtro=comprovativos/.test(proofItem.href) && proofItem.href.includes(B.order_number) && proofItem.since, `comprovativo ${B?.order_number} listado com referência, antiguidade e ligação ao registo`)
+  ok(p.cats.proofs.count >= 6 && p.cats.proofs.items[0]?.ref === B?.order_number, `resumo: o comprovativo mais recente aparece primeiro, com ${p.cats.proofs.count} por validar`)
+  // Lista completa: paginada, pesquisável e ordenável no servidor
+  const plist = async qs => (await adm.req(`/api/admin/orders?lista=comprovativos&${qs}`)).json
+  let L = await plist('')
+  ok(L?.proofs?.estado === 'pendentes' && L.proofs.perPage === 20 && L.proofs.total === p.cats.proofs.count && L.orders[0]?.order_number === B?.order_number && L.orders.length <= 20, `lista: por validar, mais recentes primeiro, 20 por página (${L?.proofs?.total} no total, ${L?.proofs?.pages} pág.)`)
+  L = await plist(`q=${encodeURIComponent(B?.order_number ?? '')}`)
+  ok(L?.proofs?.total === 1 && L.orders[0]?.order_number === B?.order_number, 'pesquisa pelo n.º da encomenda')
+  L = await plist('q=TRF-PAINEL')
+  ok(L?.orders?.some(o => o.order_number === B?.order_number), 'pesquisa pela referência da transferência')
+  L = await plist(`q=${encodeURIComponent('cliente2@ensaio.test')}&estado=todos`)
+  ok(L?.proofs?.total >= 1 && L.orders.every(o => o.profiles?.email === 'cliente2@ensaio.test'), 'pesquisa pelo e-mail do cliente')
+  const antigos = await plist('ordem=antigos')
+  ok(antigos?.orders?.length && String(antigos.orders[0].proof_at) <= String(antigos.orders.at(-1).proof_at) && antigos.orders[0].order_number !== B?.order_number, 'ordenação «mais antigos primeiro»: os registos antigos continuam acessíveis')
+  const todos = await plist('estado=todos'), validados = await plist('estado=validados'), recusados = await plist('estado=rejeitados')
+  ok(todos?.proofs?.total >= L.proofs.total && todos.proofs.total >= validados.proofs.total + 0 && validados.orders.every(o => o.payment_status === 'paid'), `estados: todos ${todos?.proofs?.total}, validados ${validados?.proofs?.total}, recusados ${recusados?.proofs?.total}`)
+  const last = await plist(`estado=todos&pagina=${todos.proofs.pages}`), beyond = await plist(`estado=todos&pagina=${todos.proofs.pages + 1}`)
+  ok(last?.orders?.length >= 1 && beyond?.orders?.length === 0 && beyond.proofs.page === todos.proofs.pages + 1, `paginação até à última página (${todos.proofs.pages})`)
+  ok((await plist(`q=${encodeURIComponent("%' OR 1=1 -- _")}`))?.proofs?.total === 0, 'pesquisa com caracteres especiais tratada como texto')
   const proofsBefore = p.cats.proofs.count
   r = await act({ action: 'approve', orderId: B.id })
   ok(r.status === 200 && r.json?.payment === 'paid', 'admin valida o comprovativo')
@@ -294,6 +328,7 @@ try {
   if (regBefore) await db.query('UPDATE registrar_settings SET provider = ?, mode = ?, enabled = ?, api_url = ?, username = ?, secret_enc = ?, extensions = ? WHERE id = 1', [regBefore.provider, regBefore.mode, regBefore.enabled, regBefore.api_url, regBefore.username, regBefore.secret_enc, typeof regBefore.extensions === 'string' ? regBefore.extensions : JSON.stringify(regBefore.extensions ?? [])])
   else await db.query('DELETE FROM registrar_settings WHERE id = 1')
   for (const pr of prodBefore) await db.query('UPDATE products SET provisioning = ?, whm_package = ?, whm_server_id = ? WHERE id = ?', [pr.provisioning, pr.whm_package, pr.whm_server_id, pr.id])
+  await restoreCvMode()
   await db.end()
 }
 console.log(`\n${pass} passaram, ${fail} falharam`)

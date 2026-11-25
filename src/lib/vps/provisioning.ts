@@ -5,6 +5,7 @@ import { imageRow, loadVpsSettings, vpsClient } from './settings'
 import { ACTION_PENDING, specsFromVm, type VirtualMachine } from './hostinger-vps'
 import { AWAITING_CHOICE_MSG, describeVpsOptions } from './install-shared'
 import { VPS_CYCLES, specMismatches, type VpsSpecs } from '@/lib/commerce/vps-shared'
+import { assertVmNotProtected, isProtectedVm, loadCloudSettings, monthSpendMinor } from './cloud'
 
 // Aprovisionamento de VPS depois do pagamento validado (chamado por provisionService).
 //   Automático (opção activa + plano em modo automático + item e limite de custo por ciclo + localização/sistema):
@@ -15,6 +16,8 @@ import { VPS_CYCLES, specMismatches, type VpsSpecs } from '@/lib/commerce/vps-sh
 //     4. resposta inconclusiva → NÃO repete: concilia pela lista de VMs (hostname único / subscrição); se não confirmar,
 //        fica em revisão manual. 202 → espera a VM «initial» e chama /setup uma vez. «running» → serviço activo.
 //   Manual (sem automatização, por escolha ou por salvaguarda): tarefa no painel para a equipa adquirir e associar.
+// Cloud VPS: nenhuma compra sem autorização (pedido com «Autorizar aquisição», ou modo automático sem pedido);
+// operações de compra activáveis no painel; limite mensal de despesas; VMs protegidas nunca são associadas.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type VpsOutcome = { serviceId: string; status: 'active' | 'manual_required' | 'failed' | 'skipped' | 'in_progress'; message: string }
@@ -27,6 +30,9 @@ async function setService(serviceId: string, status: string, message: string | n
   if (status === 'active') sets.push("status = 'active'", 'provisioned_at = CURRENT_TIMESTAMP(6)', 'started_at = COALESCE(started_at, CURRENT_TIMESTAMP(6))')
   for (const [k, v] of Object.entries(extra)) { sets.push(`\`${k}\` = ?`); params.push(v) }
   await getPool().query(`UPDATE services SET ${sets.join(', ')} WHERE id = ?`, [...params, serviceId])
+  // O pedido Cloud VPS (se existir) acompanha o estado do aprovisionamento
+  const { syncRequestFromService } = await import('./requests')
+  await syncRequestFromService(serviceId, status).catch(() => {})
 }
 async function event(opId: string, ev: string, detail: string | null, actor: string | null = null) {
   await getPool().query('INSERT INTO vps_provider_events (id, provider_order_id, event, detail, actor) VALUES (?, ?, ?, ?, ?)', [randomUUID(), opId, ev, detail?.slice(0, 500) ?? null, actor]).catch(() => {})
@@ -60,6 +66,12 @@ export async function provisionVps(serviceId: string): Promise<VpsOutcome> {
   }
   if (c.payment_status !== 'paid') return done('skipped', 'Pagamento ainda não validado.')
   const [op] = await rows(getPool(), 'SELECT * FROM vps_provider_orders WHERE service_id = ?', [serviceId])
+  // Autorização de aquisição (pedido autorizado, ou modo automático sem pedido) — antes de qualquer compra
+  if (!op || op.status === 'pending' || (op.status === 'failed' && !op.provider_order_id)) {
+    const { purchaseAuthorization } = await import('./requests')
+    const auth = await purchaseAuthorization(serviceId)
+    if (!auth.ok) return done('manual_required', auth.message)
+  }
   // Já houve tentativa: nunca comprar de novo aqui — conciliar (excepto recusa explícita sem encomenda)
   if (op && !(op.status === 'failed' && !op.provider_order_id) && op.status !== 'pending') return reconcileVps(serviceId)
 
@@ -82,11 +94,19 @@ export async function provisionVps(serviceId: string): Promise<VpsOutcome> {
   const cost = price.first_period_price ?? price.price
   if (price.currency !== c.provider_currency) return done('manual_required', manualTask(c, `Moeda do fornecedor mudou (${price.currency} ≠ ${c.provider_currency}); nada foi comprado.`))
   if (cost > Number(c.provider_cost_limit_minor)) return done('manual_required', manualTask(c, `Custo actual ${(cost / 100).toFixed(2)} ${price.currency} acima do limite ${(Number(c.provider_cost_limit_minor) / 100).toFixed(2)} ${price.currency}; nada foi comprado.`))
+  // Orçamento: limite mensal de despesas no fornecedor (Cloud VPS → Fornecedores)
+  const cloud = await loadCloudSettings()
+  if (cloud.spendLimitMonthlyMinor != null) {
+    const spent = await monthSpendMinor()
+    if (spent + cost > cloud.spendLimitMonthlyMinor) return done('manual_required', manualTask(c, `Limite mensal de despesas atingido (${((spent + cost) / 100).toFixed(2)} > ${(cloud.spendLimitMonthlyMinor / 100).toFixed(2)} ${price.currency}); nada foi comprado.`))
+  }
 
   // Operação única por serviço
   const ref = `vh${serviceId.replace(/-/g, '').slice(0, 14)}`
   const hostname = `${ref}.${settings.hostnameSuffix}`
-  const request = { item_id: c.provider_item_id, payment_method_id: settings.paymentMethodId ?? undefined, setup: { template_id: Number(o.image.id), data_center_id: Number(o.location.id), hostname } }
+  // Chave pública SSH indicada no configurador: o cliente tem acesso desde o início (nunca se envia senha)
+  const sshKeys = typeof o.sshKey === 'string' && o.sshKey ? [o.sshKey] : undefined
+  const request = { item_id: c.provider_item_id, payment_method_id: settings.paymentMethodId ?? undefined, setup: { template_id: Number(o.image.id), data_center_id: Number(o.location.id), hostname, ...(sshKeys ? { ssh_keys: sshKeys } : {}) } }
   const opId = op?.id ?? randomUUID()
   if (!op) {
     await getPool().query(`INSERT IGNORE INTO vps_provider_orders (id, service_id, order_item_id, mode, client_ref, item_id, expected_cost_minor, cost_limit_minor, currency, status, request)
@@ -156,6 +176,11 @@ export async function reconcileVps(serviceId: string, actor: string | null = nul
       if (!all) return done(op.status === 'unknown' ? 'manual_required' : 'in_progress', 'Não foi possível listar as VMs na Hostinger agora: nova consulta mais tarde. Não é feita nova compra.')
       vm = all.find(v => (req.hostname && v.hostname === req.hostname) || (op.provider_subscription_id && v.subscription_id === op.provider_subscription_id)) ?? null
     }
+    // Infraestrutura protegida nunca é associada a um serviço comercial
+    if (vm && await isProtectedVm(vm.id)) {
+      await event(op.id, 'protected_vm_ignored', `VM ${vm.id} é protegida: não associada`, actor)
+      return done('manual_required', `A conciliação encontrou a VM protegida ${vm.id}: nada foi associado. Verificar no hPanel.`)
+    }
     if (!vm) {
       if (op.status === 'payment_processing') return done('in_progress', 'Pagamento ao fornecedor em processamento: a VM ainda não existe.')
       await db.query("UPDATE vps_provider_orders SET status = 'unknown', message = ? WHERE id = ?", ['Sem VM encontrada na conta para esta compra.', op.id])
@@ -194,6 +219,17 @@ export async function reconcileVps(serviceId: string, actor: string | null = nul
       const warn = specMismatches((json(c?.plan_specs) ?? {}) as VpsSpecs, specsFromVm(vm))
       await event(op.id, 'vm_running', `VM ${vm.id} activa (${ip ?? 'sem IP'})${warn.length ? `; ATENÇÃO: ${warn.join('; ')}` : ''}`, actor)
       const months = Number(c?.months ?? VPS_CYCLES.find(x => x.cycle === c?.billing_cycle)?.months ?? 1)
+      // Acesso do cliente: chave SSH enviada na compra → acesso configurado; senão o cliente define senha/chave no portal
+      const keys = Array.isArray(req.setup?.ssh_keys) && req.setup.ssh_keys.length
+      await db.query("UPDATE vps_provider_orders SET access_method = COALESCE(access_method, ?), access_configured_at = IF(? = 1, COALESCE(access_configured_at, CURRENT_TIMESTAMP(6)), access_configured_at) WHERE id = ?", [keys ? 'ssh_key' : null, keys ? 1 : 0, op.id])
+      // Hostname pedido pelo cliente (a compra usa um hostname único para a conciliação): aplicado uma vez
+      const wanted = (json(c?.options) ?? {}).hostname
+      if (wanted && !req.client_hostname_applied) {
+        req.client_hostname_applied = true
+        await db.query('UPDATE vps_provider_orders SET request = ?, client_hostname = ? WHERE id = ?', [JSON.stringify(req), wanted, op.id])
+        const h = await cl.client.op('hostname-set', { vm: vm.id, body: { hostname: wanted } })
+        await event(op.id, h.ok ? 'hostname_set' : 'hostname_failed', h.ok ? `hostname «${wanted}» aplicado` : `hostname «${wanted}» não aplicado: ${h.message}`, actor)
+      }
       const res = await done('active', 'VPS activo.', { external_ref: `VM ${vm.id}${ip ? ` · ${ip}` : ''}`, next_due_date: addMonths(months), activation_source: 'provider' })
       if (warn.length) await db.query('UPDATE vps_provider_orders SET message = ? WHERE id = ?', [`Características da VM diferem do anunciado: ${warn.join('; ')}`, op.id])
       return res
@@ -214,6 +250,7 @@ export async function reconcileVps(serviceId: string, actor: string | null = nul
 export async function linkVps(serviceId: string, vmId: string, adminId: string): Promise<VpsOutcome> {
   const id = String(vmId ?? '').trim()
   if (!/^\d{1,12}$/.test(id)) throw new Error('Indique o número da VM na Hostinger (só dígitos).')
+  await assertVmNotProtected(id).catch(e => { throw new Error(e.message) })
   const db = getPool()
   const [other] = await rows(db, 'SELECT service_id FROM vps_provider_orders WHERE provider_vm_id = ? AND service_id <> ?', [id, serviceId])
   if (other) throw new Error('Essa VM já está associada a outro serviço.')
@@ -259,9 +296,9 @@ export async function deliverManualVps(serviceId: string, input: { ip?: unknown;
   const [op] = await rows(db, 'SELECT id, status FROM vps_provider_orders WHERE service_id = ?', [serviceId])
   if (op && ['submitting', 'submitted', 'payment_processing', 'unknown'].includes(op.status)) throw new Error('Há uma compra automática em curso ou por confirmar: concilie primeiro.')
   const opId = op?.id ?? randomUUID()
-  if (!op) await db.query(`INSERT INTO vps_provider_orders (id, service_id, order_item_id, provider, mode, client_ref, item_id, status, provider_status, ipv4, request)
-    VALUES (?, ?, ?, 'manual', 'manual', ?, 'manual', 'active', 'delivered', ?, NULL)`, [opId, serviceId, c.order_item_id, `man${serviceId.replace(/-/g, '').slice(0, 14)}`, ip])
-  else await db.query("UPDATE vps_provider_orders SET status = 'active', provider = 'manual', provider_status = 'delivered', ipv4 = ? WHERE id = ?", [ip, opId])
+  if (!op) await db.query(`INSERT INTO vps_provider_orders (id, service_id, order_item_id, provider, mode, client_ref, item_id, status, provider_status, ipv4, request, access_method, access_configured_at)
+    VALUES (?, ?, ?, 'manual', 'manual', ?, 'manual', 'active', 'delivered', ?, NULL, 'manual', CURRENT_TIMESTAMP(6))`, [opId, serviceId, c.order_item_id, `man${serviceId.replace(/-/g, '').slice(0, 14)}`, ip])
+  else await db.query("UPDATE vps_provider_orders SET status = 'active', provider = 'manual', provider_status = 'delivered', ipv4 = ?, access_method = 'manual', access_configured_at = CURRENT_TIMESTAMP(6) WHERE id = ?", [ip, opId])
   await event(opId, 'manual_delivery', `entrega confirmada pela equipa (${ip})${note ? `: ${note}` : ''}`, adminId)
   const months = Number(c.months ?? VPS_CYCLES.find(x => x.cycle === c.billing_cycle)?.months ?? 1)
   await setService(serviceId, 'active', null, { external_ref: `Manual · ${ip}`, next_due_date: addMonths(months), activation_source: 'manual' })

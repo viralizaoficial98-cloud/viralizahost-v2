@@ -36,6 +36,12 @@
  *   GET|POST|DELETE …/{id}/ssh-keys. Cada instalação cria a acção «vps_install» (painéis/aplicações terminam
  *   --vps-ready ms depois da VM «running»; o template 1299 termina em «error»). Stats: vpsPowerCalls, vpsRecreates,
  *   vpsRootPasswords (só a contagem), vpsSshKeys.
+ * Cloud VPS (especificação 3.9.2): catálogo BRL real (hostingercombr-vps-kvm1/2/4/8, cêntimos de BRL) e itens Game Panel;
+ *   VM 1564781 (infraestrutura de produção, KVM 4, AlmaLinux 9 + cPanel) e VM 1570001 (existente, por importar);
+ *   GET /api/billing/v1/subscriptions; GET …/{id}/metrics; GET …/{id}/backups e POST …/backups/{b}/restore;
+ *   GET|POST|DELETE …/{id}/snapshot e POST …/snapshot/restore; PUT …/{id}/hostname; firewall (GET|POST /firewall,
+ *   GET /firewall/{f}, POST|DELETE regras, activate/deactivate/sync). Stats: vmOps[vmId] (todas as operações de
+ *   escrita por VM — a VM protegida tem de ficar a 0), firewallCreated, snapshotOps, backupRestores, hostnames.
  */
 import http from 'node:http'
 
@@ -66,9 +72,15 @@ const vpsCatalog = () => [
 ]
 // Tráfego como a Hostinger o devolve: GB anunciados × 1024 (KVM 1 «4 TB» = 4 000 GB = 4 096 000 MB).
 // Também: o mesmo KVM 1 na loja brasileira (hostingercombr-…) e um produto cuja chave de tráfego não tem unidade.
+// Preços REAIS da auditoria (loja brasileira, cêntimos de BRL): [meses, renovação, inicial]
+const BR = { kvm1: [1, 4096, 51200, 4096000, [[1, 8799, 5299], [12, 81588, 39588], [24, 143976, 71976]]], kvm2: [2, 8192, 102400, 8192000, [[1, 10899, 7099], [12, 106788, 59988], [24, 187176, 103176]]],
+  kvm4: [4, 16384, 204800, 16384000, [[1, 19699, 12999], [12, 191988, 83988], [24, 359976, 143976]]], kvm8: [8, 32768, 409600, 32768000, [[1, 35999, 25999], [12, 335988, 167988], [24, 623976, 287976]]] }
+const brPrices = (k, name) => BR[k][4].map(([m, price, first]) => ({ id: `hostingercombr-vps-${k}-brl-${m}m`, name: `${name} BR (${m})`, currency: 'BRL', price, first_period_price: first, period: m, period_unit: 'month' }))
 const vpsCatalogExtra = () => [
   { id: 'hostingercombr-vps-kvm1', name: 'KVM 1 (BR)', category: 'VPS', metadata: { cpus: 1, memory: 4096, disk_space: 51200, bandwidth: 4096000 },
-    prices: [[1, 1199, 499], [12, 7188, 5988]].map(([m, price, first]) => ({ id: `hostingercombr-vps-kvm1-usd-${m}m`, name: `KVM 1 BR (${m})`, currency: 'USD', price, first_period_price: first, period: m, period_unit: 'month' })) },
+    prices: [...[[1, 1199, 499], [12, 7188, 5988]].map(([m, price, first]) => ({ id: `hostingercombr-vps-kvm1-usd-${m}m`, name: `KVM 1 BR (${m})`, currency: 'USD', price, first_period_price: first, period: m, period_unit: 'month' })), ...brPrices('kvm1', 'KVM 1')] },
+  ...['kvm2', 'kvm4', 'kvm8'].map(k => ({ id: `hostingercombr-vps-${k}`, name: `${k.toUpperCase().replace('KVM', 'KVM ')} (BR)`, category: 'VPS', metadata: { cpus: BR[k][0], memory: BR[k][1], disk_space: BR[k][2], bandwidth: BR[k][3] }, prices: brPrices(k, k.toUpperCase()) })),
+  ...[1, 2, 3, 4].map(n => ({ id: `hostingercombr-vps-game-panel-${n}`, name: `Game Panel ${n}`, category: 'VPS', metadata: { cpus: n * 2, memory: 4096 * n, disk_space: 51200 * n }, prices: [{ id: `hostingercombr-vps-game-panel-${n}-brl-1m`, name: `Game Panel ${n}`, currency: 'BRL', price: 9999 * n, first_period_price: 5999 * n, period: 1, period_unit: 'month' }] })),
   { id: 'hostingercom-vps-semunidade', name: 'KVM 1 (tráfego sem unidade)', category: 'VPS', metadata: { cpus: 1, memory: 4096, disk_space: 51200, traffic: 4 },
     prices: [{ id: 'hostingercom-vps-semunidade-usd-1m', name: 'sem unidade 1m', currency: 'USD', price: 1199, first_period_price: 499, period: 1, period_unit: 'month' }] },
 ]
@@ -81,7 +93,10 @@ const TEMPLATES = [
   { id: 1200, name: 'AlmaLinux 9 with cPanel', description: 'cPanel & WHM (licença paga)' }, { id: 1201, name: 'Ubuntu 24.04 with CyberPanel', description: 'CyberPanel + OpenLiteSpeed' },
   { id: 1204, name: 'Ubuntu 24.04 with Plesk', description: 'Plesk Obsidian (licença paga)' }, { id: 1202, name: 'Ubuntu 24.04 with n8n', description: 'n8n (automação)' },
   { id: 1299, name: 'Debian 12 with Ensaio Erro', description: 'Instalação que falha (ensaio)' },
+  { id: 1210, name: 'Ubuntu 24.04 with Ollama', description: 'Ollama (modelos de IA locais)' }, { id: 1211, name: 'Ubuntu 24.04 with MySQL', description: 'MySQL 8' },
+  { id: 1212, name: 'Ubuntu 24.04 with Odoo', description: 'Odoo (ERP)' }, { id: 1213, name: 'Ubuntu 24.04 with Node.js', description: 'Node.js LTS' },
 ]
+const fwView = f => ({ id: f.id, name: f.name, is_synced: f.synced, rules: f.rules, created_at: now(), updated_at: now() })
 const isPanelOrApp = id => / with /.test(TEMPLATES.find(t => t.id === Number(id))?.name ?? '')
 // Estado derivado do tempo: criação/instalação, ligar/desligar/reiniciar e reinstalação terminam sozinhos
 function vmState(vm) {
@@ -105,16 +120,35 @@ function createVm(it, setup, subscription, state = 'creating', count = true) {
   const id = ++seq
   const vm = { id, subscription_id: subscription, data_center_id: setup?.data_center_id ?? null, plan: it.name, hostname: setup?.hostname || `srv${id}.hstgr.cloud`, state,
     actions_lock: 'unlocked', cpus: it.metadata.cpus, memory: it.metadata.memory, disk: it.metadata.disk_space, bandwidth: it.metadata.bandwidth,
-    ipv4: [{ id: id + 1, address: `198.51.100.${id % 250}`, ptr: null }], ipv6: [], template: setup?.template_id ? { id: setup.template_id, name: `Template ${setup.template_id}` } : null,
+    ipv4: [{ id: id + 1, address: `198.51.100.${id % 250}`, ptr: null }], ipv6: [{ id: id + 2, address: `2001:db8::${(id % 65535).toString(16)}` }], template: setup?.template_id ? { id: setup.template_id, name: `Template ${setup.template_id}` } : null,
     created_at: now(), _readyAt: Date.now() + VPS_READY, _actions: [], _transition: null, _keys: [...(setup?.ssh_keys ?? [])] }
   if (state === 'creating' && setup?.template_id) installAction(vm, setup.template_id, vm._readyAt)
   vms.set(id, vm)
+  if (subscription && !subs.has(subscription)) {
+    const pr = it.prices?.find?.(x => x.id === setup?._item) ?? it.prices?.[0]
+    subs.set(subscription, { id: subscription, name: it.name, status: 'active', billing_period: pr?.period ?? 1, billing_period_unit: 'month', currency_code: pr?.currency ?? 'USD', total_price: pr?.first_period_price ?? pr?.price ?? 0, renewal_price: pr?.price ?? 0, is_auto_renewed: true, created_at: now(), expires_at: null, next_billing_at: new Date(Date.now() + 30 * 86400000).toISOString() })
+  }
   if (count) vpsPurchases.set(vm.hostname, (vpsPurchases.get(vm.hostname) ?? 0) + 1)
   return vm
 }
 const whois = []
+// Contas existentes (antes de qualquer compra do portal): infraestrutura interna e uma VM por importar
+const seedVm = (id, it, tpl, sub, extra = {}) => vms.set(id, { id, subscription_id: sub, data_center_id: 19, plan: it.name, hostname: extra.hostname, state: 'running', actions_lock: 'unlocked',
+  cpus: it.metadata.cpus, memory: it.metadata.memory, disk: it.metadata.disk_space, bandwidth: it.metadata.bandwidth, ipv4: [{ id: id + 1, address: extra.ip, ptr: null }], ipv6: [{ id: id + 2, address: `2a02:4780::${id % 9999}` }],
+  template: { id: tpl.id, name: tpl.name }, created_at: '2025-03-01T10:00:00Z', _readyAt: 0, _actions: [], _transition: null, _keys: [] })
+const subs = new Map() // subscription_id → dados (custos/renovação)
+const fws = new Map()  // firewall id → { id, name, rules, vms:Set }
+const snaps = new Map() // vmId → snapshot
+const vmOp = id => { stats.vmOps = stats.vmOps ?? {}; stats.vmOps[id] = (stats.vmOps[id] ?? 0) + 1 }
 // Números distintos em cada arranque (VMs de execuções anteriores continuam associadas na base de ensaio)
 let seq = 5000 + (Math.floor(Date.now() / 1000) % 100000) * 100
+{
+  const kvm4 = { name: 'KVM 4', metadata: { cpus: 4, memory: 16384, disk_space: 204800, bandwidth: 16384000 } }, kvm2 = { name: 'KVM 2', metadata: { cpus: 2, memory: 8192, disk_space: 102400, bandwidth: 8192000 } }
+  seedVm(1564781, kvm4, { id: 1200, name: 'AlmaLinux 9 with cPanel' }, 'AzProd1564781', { hostname: 'server.viralizahost.com', ip: '203.0.113.10' })
+  subs.set('AzProd1564781', { id: 'AzProd1564781', name: 'KVM 4', status: 'active', billing_period: 12, billing_period_unit: 'month', currency_code: 'BRL', total_price: 83988, renewal_price: 191988, is_auto_renewed: true, created_at: '2025-03-01T10:00:00Z', expires_at: null, next_billing_at: new Date(Date.now() + 20 * 86400000).toISOString() })
+  seedVm(1570001, kvm2, { id: 1130, name: 'Ubuntu 24.04' }, 'AzOld1570001', { hostname: 'cliente-antigo.example.com', ip: '203.0.113.20' })
+  subs.set('AzOld1570001', { id: 'AzOld1570001', name: 'KVM 2', status: 'active', billing_period: 1, billing_period_unit: 'month', currency_code: 'BRL', total_price: 7099, renewal_price: 10899, is_auto_renewed: true, created_at: '2025-06-01T10:00:00Z', expires_at: null, next_billing_at: new Date(Date.now() + 10 * 86400000).toISOString() })
+}
 const label = d => d.split('.')[0]
 const send = (res, status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)) }
 const body = req => new Promise(r => { let b = ''; req.on('data', c => (b += c)); req.on('end', () => { try { r(JSON.parse(b || '{}')) } catch { r({}) } }) })
@@ -202,6 +236,57 @@ http.createServer(async (req, res) => {
     installAction(vm, b.template_id, vm._readyAt)
     return send(res, 200, vmView(vm))
   }
+  // ── Cloud VPS (3.9.2): subscrições, métricas, backups, snapshot, hostname, firewall ──
+  if (req.method === 'GET' && p === '/api/billing/v1/subscriptions') { stats.reads++; return send(res, 200, [...subs.values()]) }
+  vmm = p.match(/^\/api\/vps\/v1\/virtual-machines\/(\d+)\/(metrics|backups|snapshot|hostname)(?:\/(\d+|restore))?(?:\/(restore))?$/)
+  if (vmm) {
+    const id = Number(vmm[1]), vm = vms.get(id), what = vmm[2]
+    if (!vm) return send(res, 404, { error: 'Virtual machine not found' })
+    if (what === 'metrics' && req.method === 'GET') {
+      stats.reads++
+      if (!url.searchParams.get('date_from') || !url.searchParams.get('date_to')) return send(res, 422, { error: 'date_from and date_to are required.' })
+      const t0 = Math.floor(Date.now() / 1000) - 86400, serie = f => Object.fromEntries(Array.from({ length: 12 }, (_, i) => [t0 + i * 7200, f(i)]))
+      return send(res, 200, { cpu_usage: { unit: '%', usage: serie(i => 5 + (i * 7) % 40) }, ram_usage: { unit: 'bytes', usage: serie(i => (1.2 + i * 0.05) * 1024 ** 3) }, disk_space: { unit: 'bytes', usage: serie(i => (10 + i * 0.1) * 1024 ** 3) },
+        outgoing_traffic: { unit: 'bytes', usage: serie(i => i * 50 * 1024 ** 2) }, incoming_traffic: { unit: 'bytes', usage: serie(i => i * 30 * 1024 ** 2) }, uptime: { unit: 'milliseconds', usage: serie(i => i * 7200000) } })
+    }
+    if (what === 'backups' && req.method === 'GET' && !vmm[3]) { stats.reads++; return send(res, 200, { data: [{ id: id * 10 + 1, size: 2048000, restore_time: 600, location: 'nl', created_at: new Date(Date.now() - 7 * 86400000).toISOString() }, { id: id * 10 + 2, size: 2100000, restore_time: 620, location: 'nl', created_at: new Date(Date.now() - 86400000).toISOString() }], meta: { current_page: 1, per_page: 50, total: 2 } }) }
+    if (what === 'backups' && req.method === 'POST' && vmm[4] === 'restore') {
+      if (![id * 10 + 1, id * 10 + 2].includes(Number(vmm[3]))) return send(res, 404, { error: 'Backup not found' })
+      vmOp(id); stats.backupRestores = (stats.backupRestores ?? 0) + 1; vm.state = 'restoring'; vm._transition = { to: 'running', at: Date.now() + 1500 }
+      return send(res, 200, actView(addAction(vm, 'backup_restore', Date.now() + 1500)))
+    }
+    if (what === 'snapshot') {
+      if (req.method === 'GET' && !vmm[3]) { stats.reads++; const sn = snaps.get(id); return sn ? send(res, 200, sn) : send(res, 404, { error: 'Snapshot not found' }) }
+      vmOp(id); stats.snapshotOps = (stats.snapshotOps ?? 0) + 1
+      if (req.method === 'POST' && !vmm[3]) { snaps.set(id, { id: ++seq, restore_time: 120, created_at: now(), expires_at: new Date(Date.now() + 20 * 86400000).toISOString() }); return send(res, 200, actView(addAction(vm, 'snapshot_create', Date.now() + 800))) }
+      if (req.method === 'POST' && vmm[3] === 'restore') { if (!snaps.has(id)) return send(res, 422, { error: 'No snapshot.' }); return send(res, 200, actView(addAction(vm, 'snapshot_restore', Date.now() + 800))) }
+      if (req.method === 'DELETE') { snaps.delete(id); return send(res, 200, actView(addAction(vm, 'snapshot_delete', Date.now() + 300))) }
+    }
+    if (what === 'hostname' && req.method === 'PUT') {
+      const b = await body(req)
+      if (!/^[a-z0-9.-]{3,191}$/.test(String(b.hostname ?? ''))) return send(res, 422, { error: 'Invalid hostname.' })
+      vmOp(id); vm.hostname = b.hostname; stats.hostnames = (stats.hostnames ?? 0) + 1
+      return send(res, 200, actView(addAction(vm, 'hostname_set', Date.now() + 200)))
+    }
+  }
+  if (p === '/api/vps/v1/firewall') {
+    if (req.method === 'GET') { stats.reads++; return send(res, 200, { data: [...fws.values()].map(fwView), meta: { current_page: 1, per_page: 50, total: fws.size } }) }
+    if (req.method === 'POST') { const b = await body(req); if (!b.name) return send(res, 422, { error: 'name required' }); const f = { id: ++seq, name: String(b.name), rules: [], vms: new Set(), synced: true }; fws.set(f.id, f); stats.firewallCreated = (stats.firewallCreated ?? 0) + 1; return send(res, 200, fwView(f)) }
+  }
+  let fm = p.match(/^\/api\/vps\/v1\/firewall\/(\d+)(?:\/(rules|activate|deactivate|sync))?(?:\/(\d+))?$/)
+  if (fm) {
+    const f = fws.get(Number(fm[1]))
+    if (!f) return send(res, 404, { error: 'Firewall not found' })
+    if (!fm[2] && req.method === 'GET') { stats.reads++; return send(res, 200, fwView(f)) }
+    if (fm[2] === 'rules' && req.method === 'POST') { const b = await body(req); if (!['accept', 'drop'].includes(b.action) || !b.protocol) return send(res, 422, { error: 'invalid rule' }); f.rules.push({ id: ++seq, action: b.action, protocol: b.protocol, port: String(b.port ?? 'any'), source: b.source ?? 'any', source_detail: b.source_detail ?? 'any' }); f.synced = false; return send(res, 200, fwView(f)) }
+    if (fm[2] === 'rules' && req.method === 'DELETE' && fm[3]) { f.rules = f.rules.filter(r => r.id !== Number(fm[3])); f.synced = false; return send(res, 200, fwView(f)) }
+    if (['activate', 'deactivate', 'sync'].includes(fm[2]) && req.method === 'POST' && fm[3]) {
+      const vm = vms.get(Number(fm[3])); if (!vm) return send(res, 404, { error: 'Virtual machine not found' })
+      vmOp(Number(fm[3]))
+      if (fm[2] === 'activate') f.vms.add(Number(fm[3])); if (fm[2] === 'deactivate') f.vms.delete(Number(fm[3])); f.synced = true
+      return send(res, 200, actView(addAction(vm, `firewall_${fm[2]}`, Date.now() + 300)))
+    }
+  }
   // Gestão (sem custo): acções, energia, reinstalação, palavra-passe root, chaves SSH
   vmm = p.match(/^\/api\/vps\/v1\/virtual-machines\/(\d+)\/(actions|start|stop|restart|recreate|root-password|ssh-keys)(?:\/(\d+))?$/)
   if (vmm) {
@@ -218,6 +303,7 @@ http.createServer(async (req, res) => {
       const b = await body(req)
       if (!Array.isArray(b.keys) || !b.keys.length || b.keys.some(k => !/^(ssh-|ecdsa-|sk-)/.test(String(k)))) return send(res, 422, { error: 'The given data was invalid.' })
       stats.vpsSshKeys = (stats.vpsSshKeys ?? 0) + 1
+      vmOp(vm.id)
       if (req.method === 'POST') vm._keys.push(...b.keys.filter(k => !vm._keys.includes(k)))
       if (req.method === 'DELETE') vm._keys = vm._keys.filter(k => !b.keys.includes(k))
       return send(res, 200, actView(addAction(vm, 'ssh_keys_update', Date.now())))
@@ -227,9 +313,11 @@ http.createServer(async (req, res) => {
       if (!ROOT_PW.test(String(b.password ?? ''))) return send(res, 422, { error: 'Password does not meet requirements.' })
       if (LEAKED.includes(b.password)) return send(res, 422, { error: 'Password has been found in a data leak.' })
       stats.vpsRootPasswords = (stats.vpsRootPasswords ?? 0) + 1   // o valor nunca é guardado
+      vmOp(vm.id)
       return send(res, 200, actView(addAction(vm, 'set_root_password', Date.now() + 500)))
     }
     if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed' })
+    vmOp(vm.id)
     if (busy) return send(res, 422, { error: 'Another action is in progress.' })
     stats.vpsPowerCalls = (stats.vpsPowerCalls ?? 0) + 1
     if (op === 'start') { if (st !== 'stopped') return send(res, 422, { error: 'Virtual machine is not stopped.' }); vm.state = 'starting'; vm._transition = { to: 'running', at: Date.now() + 1500 }; return send(res, 200, actView(addAction(vm, 'vps_start', Date.now() + 1500))) }
@@ -258,7 +346,7 @@ http.createServer(async (req, res) => {
     if (sc === 'recusa') return send(res, 422, { error: 'Payment method declined.' })
     if (sc === 'perdido') { await sleep(DELAY); return send(res, 504, { error: 'Gateway timeout' }) }
     if (sc === 'pagamento') { vpsPending.set(sub, { it: found.it, setup: b.setup }); vpsPurchases.set(b.setup.hostname, (vpsPurchases.get(b.setup.hostname) ?? 0) + 1); return send(res, 202, { id: order.id, subscription_id: sub, status: 'payment_initiated', message: 'Payment is being processed.' }) }
-    const vm = createVm(found.it, b.setup, sub)
+    const vm = createVm(found.it, { ...b.setup, _item: found.pr.id }, sub)
     if (sc === 'lento') { await sleep(DELAY); return send(res, 200, { order, virtual_machine: vmView(vm) }) }
     return send(res, 200, { order, virtual_machine: vmView(vm) })
   }

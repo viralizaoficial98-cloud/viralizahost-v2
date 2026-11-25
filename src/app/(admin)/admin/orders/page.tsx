@@ -14,7 +14,7 @@ type Service = { id: string; order_item_id: string; service_name: string; servic
   vps_op?: { mode: string; status: string; item_id: string; expected_cost_minor: number | null; cost_limit_minor: number | null; currency: string | null; provider_vm_id: string | null; provider_order_id: string | null; provider_subscription_id: string | null; provider_status: string | null; ipv4: string | null; attempts: number; message: string | null; events: { event: string; detail: string | null; at: string }[] } | null }
 type Order = {
   id: string; order_number: string | null; created_at: string; paid_at: string | null; status: string; payment_status: string; activation_status: string; hold_reason?: string | null
-  review_flag: 'test' | 'real' | null; review_note: string | null
+  review_flag: 'test' | 'real' | null; review_note: string | null; proof_at?: string | null
   amount: number; currency: string | null; payment_method: string | null; transfer_ref: string | null; proof_url: string | null
   profiles: { full_name: string; email: string; role: string } | null
   order_items: { id: string; service_name: string; quantity: number; line_total: number | null; unit_price: number | null; renewal_price: number | null; billing_cycle: string | null; options?: unknown; domain_case?: string | null; domain_case_note?: string | null; proposed_domain?: string | null; domain_name: string | null; domain_operation: string | null; availability?: string | null; years?: number | null; nameservers?: unknown }[]
@@ -34,6 +34,7 @@ const FILTERS = {
   todas: { label: 'Todas', test: () => true },
 } as const
 type Filter = keyof typeof FILTERS
+type ProofMeta = { estado: string; ordem: string; q: string; page: number; perPage: number; total: number; pages: number }
 
 const EVENT_LABEL: Record<string, string> = {
   confirmed_available: 'Disponibilidade confirmada', unavailable_cancelled: 'Indisponível — encomenda cancelada (sem pagamento)',
@@ -64,15 +65,28 @@ function OrdersInner() {
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
   const [hostinger, setHostinger] = useState<string | null>(null)
   const scrolled = useRef<string | null>(null)
+  // Comprovativos: lista paginada no servidor (pesquisa, estado, ordenação e página na URL)
+  const isProofs = filter === 'comprovativos'
+  const pq = { estado: params.get('estado') ?? 'pendentes', q: params.get('q') ?? '', ordem: params.get('ordem') ?? 'recentes', pagina: params.get('pagina') ?? '1' }
+  const proofQuery = new URLSearchParams({ lista: 'comprovativos', ...pq }).toString()
+  const [proofs, setProofs] = useState<{ orders: Order[]; meta: ProofMeta | null; error: string }>({ orders: [], meta: null, error: '' })
+  const [proofSearch, setProofSearch] = useState(pq.q)
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
-      const res = await fetch('/api/admin/orders', { cache: 'no-store' }); const j = await res.json()
+      const [res, pres] = await Promise.all([fetch('/api/admin/orders', { cache: 'no-store' }), isProofs ? fetch(`/api/admin/orders?${proofQuery}`, { cache: 'no-store' }) : null])
+      const j = await res.json()
       if (!res.ok || j.error) setError(j.error ?? `HTTP ${res.status}`)
       setOrders(j.orders ?? [])
+      if (pres) { const pj = await pres.json(); setProofs({ orders: pj.orders ?? [], meta: pj.proofs ?? null, error: !pres.ok || pj.error ? (pj.error ?? `HTTP ${pres.status}`) : '' }) }
     } catch { setError('Falha de rede.') } finally { setLoading(false) }
-  }, [])
+  }, [isProofs, proofQuery])
+  const setProofParams = (next: Partial<typeof pq>) => {
+    const u = new URLSearchParams({ filtro: 'comprovativos', ...pq, pagina: '1', ...next })
+    for (const [k, v] of [...u.entries()]) if (!v || (k === 'estado' && v === 'pendentes') || (k === 'ordem' && v === 'recentes') || (k === 'pagina' && v === '1')) u.delete(k)
+    router.push(`/admin/orders?${u.toString()}`, { scroll: false })
+  }
   // eslint-disable-next-line react-hooks/set-state-in-effect -- carregamento inicial dos dados
   useEffect(() => { load() }, [load])
 
@@ -118,7 +132,7 @@ function OrdersInner() {
   // Mensagem gravada numa tentativa anterior (antes de a Hostinger estar activa) já não se aplica
   const staleManual = (s: Service) => !!s.hostinger?.eligible && s.provisioning_status === 'manual_required' && /sem integração automática activa/.test(s.provisioning_error ?? '')
   const counts = useMemo(() => Object.fromEntries(Object.entries(FILTERS).map(([k, f]) => [k, orders.filter(f.test).length])), [orders])
-  const filtered = orders.filter(FILTERS[filter].test)
+  const filtered = isProofs ? proofs.orders : orders.filter(FILTERS[filter].test)
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl">
@@ -137,6 +151,28 @@ function OrdersInner() {
           </button>
         ))}
       </div>
+      {isProofs && (
+        <div className="mb-4 bg-white border border-[#E8E8E8] rounded-2xl p-4 space-y-3" data-testid="proofs-toolbar">
+          <form className="flex flex-wrap gap-2" onSubmit={e => { e.preventDefault(); setProofParams({ q: proofSearch.trim() }) }}>
+            <input value={proofSearch} onChange={e => setProofSearch(e.target.value)} placeholder="Pesquisar: n.º da encomenda, cliente, e-mail ou referência da transferência" maxLength={80}
+              className="flex-1 min-w-[220px] px-3 py-2 rounded-xl border border-[#E8E8E8] text-sm" data-testid="proofs-search" aria-label="Pesquisar comprovativos" />
+            <button className="px-4 py-2 rounded-xl bg-[#0A0A0A] text-white text-sm font-bold" data-testid="proofs-search-go">Pesquisar</button>
+            {pq.q && <button type="button" onClick={() => { setProofSearch(''); setProofParams({ q: '' }) }} className="px-3 py-2 rounded-xl border border-[#E8E8E8] text-sm">Limpar</button>}
+          </form>
+          <div className="flex flex-wrap gap-2 items-center text-sm">
+            <label className="flex items-center gap-2">Estado
+              <select value={pq.estado} onChange={e => setProofParams({ estado: e.target.value })} className="px-2 py-1.5 rounded-lg border border-[#E8E8E8]" data-testid="proofs-state">
+                <option value="pendentes">Por validar</option><option value="validados">Validados</option><option value="rejeitados">Recusados / cancelados</option><option value="todos">Todos (inclui antigos)</option>
+              </select></label>
+            <label className="flex items-center gap-2">Ordenar
+              <select value={pq.ordem} onChange={e => setProofParams({ ordem: e.target.value })} className="px-2 py-1.5 rounded-lg border border-[#E8E8E8]" data-testid="proofs-sort">
+                <option value="recentes">Mais recentes primeiro</option><option value="antigos">Mais antigos primeiro</option><option value="valor">Maior valor</option>
+              </select></label>
+            {proofs.meta && <span className="text-[#555]" data-testid="proofs-total">{proofs.meta.total} comprovativo(s) · página {proofs.meta.page} de {proofs.meta.pages}</span>}
+          </div>
+          {proofs.error && <p className="text-sm text-red-700" role="alert">Falha ao carregar os comprovativos: {proofs.error}</p>}
+        </div>
+      )}
       {hostinger && <HostingerRegisterDialog serviceId={hostinger} onClose={changed => { setHostinger(null); if (changed) void load() }} />}
       {notice && <div role="status" className={`mb-4 p-3 rounded-xl text-sm ${notice.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{notice.text}</div>}
       {error && <div className="mb-4 p-3 rounded-xl text-sm bg-red-50 text-red-700" role="alert">Falha ao carregar: {error}</div>}
@@ -161,6 +197,7 @@ function OrdersInner() {
                       </p>
                       {approved && <p className="text-xs text-[#555] mt-1" data-testid="payment-confirmed">Pagamento validado em {new Date(String(approved.paid_at ?? approved.created_at).replace(' ', 'T').slice(0, 23) + 'Z').toLocaleString('pt-PT')} · {approved.currency === 'AKZ' ? kz(approved.amount) : `${approved.currency} ${approved.amount}`}</p>}
                       {o.transfer_ref && <p className="text-xs text-[#555] mt-1">Ref. transferência: {o.transfer_ref}</p>}
+                      {isProofs && o.proof_at && <p className="text-xs text-[#555] mt-1" data-testid="proof-at">Comprovativo enviado em {new Date(String(o.proof_at).replace(' ', 'T').slice(0, 23) + 'Z').toLocaleString('pt-PT')}</p>}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <span className={`text-xs font-bold px-2 py-1 rounded-full ${TONE_CLASS[p.tone]}`} data-testid="order-payment-state">Pagamento: {p.label}</span>
@@ -312,6 +349,13 @@ function OrdersInner() {
             })}
           </ul>
         )}
+      {isProofs && proofs.meta && proofs.meta.pages > 1 && (
+        <nav className="flex flex-wrap items-center justify-center gap-2 mt-6" aria-label="Páginas de comprovativos" data-testid="proofs-pager">
+          <button disabled={proofs.meta.page <= 1} onClick={() => setProofParams({ pagina: String(proofs.meta!.page - 1) })} className="px-3 py-2 rounded-xl border border-[#E8E8E8] text-sm disabled:opacity-40" data-testid="proofs-prev">← Anterior</button>
+          <span className="text-sm text-[#555]">Página {proofs.meta.page} de {proofs.meta.pages}</span>
+          <button disabled={proofs.meta.page >= proofs.meta.pages} onClick={() => setProofParams({ pagina: String(proofs.meta!.page + 1) })} className="px-3 py-2 rounded-xl border border-[#E8E8E8] text-sm disabled:opacity-40" data-testid="proofs-next">Seguinte →</button>
+        </nav>
+      )}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { DynamicServicePricing } from '@/components/service/DynamicServicePricing'
+import { VpsPlansSection } from '@/components/service/VpsPlansSection'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { MessageCircle, Zap, Shield, HardDrive, Globe, Lock, Headphones, Server, Workflow } from 'lucide-react'
@@ -29,7 +29,7 @@ const included = [
 
 export default async function VPSEvolutionAPIPage() {
   const banner = await getBannerPage('vps-evolution-api')
-  const fromPrice = await fromPriceText('vps', 'evolution-api')
+  const fromPrice = await fromPriceText('vps')
   return (
     <>
       <Header />
@@ -51,11 +51,8 @@ export default async function VPSEvolutionAPIPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["Evolution API Instalada","Múltiplos Números","Webhooks Avançados","Integrações CRM"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <DynamicServicePricing
-          category="vps"
-          subcategory="evolution-api"
-          cols={3}
-          showBillingToggle
+        {/* Planos reais do catálogo Cloud VPS: o botão abre o configurador com «Evolution API» pré-seleccionado */}
+        <VpsPlansSection app="evolution"
           title="VPS Evolution API — Planos"
           subtitle="Servidor pré-configurado com Evolution API. Comece a automatizar o WhatsApp hoje." />
         <IncludedFeatures features={included} dark
@@ -64,7 +61,7 @@ export default async function VPSEvolutionAPIPage() {
           title="Comece a automatizar o WhatsApp hoje"
           subtitle="Servidor pré-configurado, múltiplos números e integrações completas."
           cta="Contratar Evolution API"
-          ctaHref="/comprar/vps-evolution-pro" />
+          ctaHref="/servidor-vps/configurar?app=evolution" />
       </main>
       <Footer />
     </>

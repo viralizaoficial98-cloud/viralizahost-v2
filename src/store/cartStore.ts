@@ -10,7 +10,7 @@ export interface NameserverChoice { useDefault: boolean; ns: string[] }
 export type Cycle = 'monthly' | '3months' | '6months' | '1year' | '2years' | '3years'
 export type DomainMode = 'register' | 'transfer' | 'existing'
 /** Opções de um VPS (ids das opções activadas no painel): localização e sistema operativo/imagem. */
-export interface ProductOptions { location?: string; image?: string; later?: boolean }
+export interface ProductOptions { location?: string; image?: string; later?: boolean; hostname?: string; sshKey?: string; addons?: string[] }
 
 export type CartLine =
   | { key: string; type: 'product'; slug: string; cycle: Cycle; quantity: number; domain?: string; domainMode?: DomainMode; flowId?: string; options?: ProductOptions }

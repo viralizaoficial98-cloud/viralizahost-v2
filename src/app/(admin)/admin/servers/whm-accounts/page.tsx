@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Server, Users, RefreshCw, ExternalLink, Search, AlertTriangle, Database } from 'lucide-react'
 import Link from 'next/link'
 import WhmAccountsTable from '@/components/admin/WhmAccountsTable'
+import { whmSearchOr } from '@/lib/whm/account-search'
 import WhmMigrateButton from '@/components/admin/WhmMigrateButton'
 import WhmImportPanel from '@/components/admin/WhmImportPanel'
 
@@ -166,6 +167,10 @@ ALTER TABLE viralizahost.services
   if (linked === 'false')   q = q.is('profile_id', null)
   if (linked === 'pending') q = q.is('profile_id', null).eq('link_status', 'pending_validation')
 
+  // Pesquisa na base, antes da paginação (abrange todas as páginas)
+  const searchOr = await whmSearchOr(search)
+  if (searchOr) q = q.or(searchOr)
+
   const { data: rawData, count } = await q
   const rowsRaw = (rawData ?? []) as Record<string, unknown>[]
   // Candidatas sugeridas pela importação (e-mail coincidente, por validar)
@@ -176,14 +181,7 @@ ALTER TABLE viralizahost.services
   const serverLabel = (id: unknown) => { const sv = (servers ?? []).find((x: { id: string }) => x.id === id) as { name: string; hostname: string } | undefined; return sv ? (sv.name === '__whm_config__' ? sv.hostname : sv.name) : '—' }
   const rows = rowsRaw.map(r => ({ ...r, candidate: (cands ?? []).find((c: { id: string }) => c.id === r.link_candidate_profile_id) ?? null })) as Record<string, any>[] // eslint-disable-line @typescript-eslint/no-explicit-any
 
-  const filtered = search
-    ? rows.filter(r =>
-        String(r.primary_domain ?? '').toLowerCase().includes(search) ||
-        String(r.whm_username   ?? '').toLowerCase().includes(search) ||
-        String(r.contact_email  ?? '').toLowerCase().includes(search) ||
-        String((r.profiles as Record<string, unknown> | null)?.full_name ?? '').toLowerCase().includes(search)
-      )
-    : rows
+  const filtered = rows
 
   const total = count ?? 0
   const totalPages = Math.ceil(total / limit)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRole } from '@/lib/api/require-admin'
 import { createAdminWriteClient } from '@/lib/supabase/server'
 import { getPool } from '@/lib/db/pool'
+import { whmSearchOr } from '@/lib/whm/account-search'
 
 export async function GET(req: NextRequest) {
   try {
@@ -36,6 +37,10 @@ export async function GET(req: NextRequest) {
     // «pending» = sem cliente e com candidata por e-mail a validar
     if (linked === 'pending') q = q.is('profile_id', null).eq('link_status', 'pending_validation')
 
+    // Pesquisa na base, antes da paginação (abrange todas as páginas)
+    const searchOr = await whmSearchOr(search)
+    if (searchOr) q = q.or(searchOr)
+
     const { data, count, error } = await q
 
     if (error) {
@@ -43,16 +48,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Client-side search filter (PostgREST doesn't support case-insensitive OR easily)
-    const rows = data ?? []
-    const filtered = search
-      ? rows.filter((r: Record<string, unknown>) =>
-          String(r.primary_domain ?? '').toLowerCase().includes(search) ||
-          String(r.whm_username   ?? '').toLowerCase().includes(search) ||
-          String(r.contact_email  ?? '').toLowerCase().includes(search) ||
-          String((r.profiles as Record<string, unknown> | null)?.full_name ?? '').toLowerCase().includes(search)
-        )
-      : rows
+    const filtered = data ?? []
 
     // Contadores globais (independentes do filtro): com cliente, sem cliente, candidatas por validar
     const [[c]] = await getPool().query(`SELECT COUNT(*) total, SUM(profile_id IS NOT NULL) linked, SUM(profile_id IS NULL) unlinked,

@@ -59,6 +59,11 @@ export default function HostingerVpsPage() {
     <div className="p-4 sm:p-6 max-w-4xl space-y-5" data-testid="hostinger-vps-integration">
       <Link href="/admin/settings/integrations" className="text-sm text-[#555] inline-flex items-center gap-1"><ArrowLeft size={14} /> Integrações</Link>
       <h1 className="text-2xl font-black">Hostinger VPS</h1>
+      <div className="rounded-xl border border-[#F5B700] bg-[#FFF8E1] p-3 text-sm" data-testid="cloud-vps-moved">
+        Esta integração foi reorganizada na área <Link href="/admin/cloud-vps" className="font-bold underline">Cloud VPS</Link>:{' '}
+        <Link href="/admin/cloud-vps/fornecedores" className="underline">Fornecedores</Link> · <Link href="/admin/cloud-vps/sistemas" className="underline">SO e aplicações</Link> ·{' '}
+        <Link href="/admin/cloud-vps/datacenters" className="underline">Datacenters</Link> · <Link href="/admin/cloud-vps/configuracoes" className="underline">Modo de contratação</Link>. Esta página continua disponível como configuração avançada.
+      </div>
       <p className="text-sm text-[#555]">A API da Hostinger permite <strong>comprar um VPS novo</strong> (POST /api/vps/v1/virtual-machines, sem idempotência) e configurar um VPS já pago. Ver <code>docs/hostinger-vps-api.md</code>.
         Sem aprovisionamento automático, cada VPS pago fica como tarefa da equipa em Encomendas (adquirir no hPanel e «Associar VPS…»).</p>
       {notice && <p role="status" data-testid="vps-int-notice" className={`p-3 rounded-xl text-sm ${notice.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{notice.text}</p>}

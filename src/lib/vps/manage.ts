@@ -5,6 +5,7 @@ import { imageRow, publicVpsOptions, vpsClient } from './settings'
 import { ACTION_PENDING, type VpsAction } from './hostinger-vps'
 import { VPS_CLIENT_STATE, accessUrlFor, fitsLocation, vpsClientState, type VpsClientState } from './install-shared'
 import { VPS_CYCLES } from '@/lib/commerce/vps-shared'
+import { assertVmNotProtected, loadCloudSettings } from './cloud'
 
 // «Os meus VPS» (Área do Cliente). Cada função recebe o id do cliente autenticado e só actua sobre serviços dele
 // (services.profile_id). Nenhuma palavra-passe é guardada, registada ou enviada por e-mail: a palavra-passe root
@@ -22,14 +23,17 @@ export interface MyVps {
   awaitingChoice: boolean; sshUser: string; accessUrl: string | null
   /** Gestão pela API disponível (VM da Hostinger associada). Em entrega manual: só suporte. */
   manageable: boolean; vmId: string | null; nextDue: string | null; reference: string
+  /** Entrega: o cliente ainda não definiu senha root nem chave SSH (a senha gerada pela Hostinger não é devolvida). */
+  accessPending: boolean; accessMethod: string | null; hostname: string | null; activatedAt: string | null
 }
 
 const BASE_SQL = `SELECT s.id, s.status, s.provisioning_status, s.provisioning_error, s.next_due_date, s.profile_id, s.external_ref,
-    o.id order_id, o.order_number, o.payment_status, oi.options, oi.billing_cycle, p.name plan_name, p.slug plan_slug, p.plan_specs,
-    v.id op_id, v.provider, v.provider_vm_id, v.provider_status, v.ipv4, v.request, v.status op_status
-  FROM services s JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id JOIN products p ON p.id = s.product_id
+    o.id order_id, COALESCE(o.order_number, 'importado') order_number, IF(s.activation_source = 'import' AND o.id IS NULL, 'paid', o.payment_status) payment_status, oi.options, oi.billing_cycle,
+    COALESCE(p.name, s.service_name) plan_name, p.slug plan_slug, p.plan_specs,
+    v.id op_id, v.provider, v.provider_vm_id, v.provider_status, v.ipv4, v.request, v.status op_status, v.access_method, v.access_configured_at, v.client_hostname, v.firewall_id, s.provisioned_at
+  FROM services s LEFT JOIN orders o ON o.id = s.order_id LEFT JOIN order_items oi ON oi.id = s.order_item_id LEFT JOIN products p ON p.id = s.product_id
   LEFT JOIN vps_provider_orders v ON v.service_id = s.id
-  WHERE s.profile_id = ? AND p.category = 'vps' AND p.subcategory IS NULL AND s.status <> 'cancelled'`
+  WHERE s.profile_id = ? AND ((p.category = 'vps' AND p.subcategory IS NULL) OR (s.activation_source = 'import' AND s.service_type = 'vps')) AND s.status <> 'cancelled'`
 
 async function toMyVps(r: any): Promise<MyVps> {
   const o = json(r.options) ?? {}
@@ -52,6 +56,9 @@ async function toMyVps(r: any): Promise<MyVps> {
     manageable: ready && r.provider !== 'manual' && !!r.provider_vm_id, vmId: ready ? r.provider_vm_id ?? null : null,
     nextDue: r.next_due_date ? String(r.next_due_date instanceof Date ? r.next_due_date.toISOString() : r.next_due_date).slice(0, 10) : null,
     reference: `${r.order_number}${r.provider_vm_id ? ` · VM ${r.provider_vm_id}` : ''}`,
+    accessPending: ready && !r.access_configured_at, accessMethod: r.access_method ?? null,
+    hostname: ready ? (r.client_hostname ?? req.hostname ?? null) : null,
+    activatedAt: r.provisioned_at ? String(r.provisioned_at instanceof Date ? r.provisioned_at.toISOString() : r.provisioned_at).slice(0, 10) : null,
   }
 }
 
@@ -77,6 +84,9 @@ async function managed(profileId: string, serviceId: string) {
   const r = await own(profileId, serviceId)
   const v = await toMyVps(r)
   if (!v.manageable || !r.provider_vm_id) throw new VpsManageError('A gestão deste VPS não está disponível no portal: peça suporte com a referência indicada.', 409)
+  // Infraestrutura protegida: nenhuma operação (mesmo que, por erro, estivesse associada a um cliente)
+  await assertVmNotProtected(r.provider_vm_id).catch(e => { throw new VpsManageError(e.message, 403) })
+  if (!(await loadCloudSettings()).operations.clientManagement) throw new VpsManageError('A gestão pelo portal está temporariamente desactivada. Peça suporte.', 503)
   const cl = await vpsClient('read')
   if ('error' in cl) throw new VpsManageError('Gestão temporariamente indisponível. Tente mais tarde ou peça suporte.', 503)
   return { r, v, client: cl.client, vmId: String(r.provider_vm_id) }
@@ -125,6 +135,7 @@ export async function setRootPassword(profileId: string, serviceId: string, pass
   const res = await client.manage(vmId, 'root-password', { password: pw })
   if (!res.ok) throw new VpsManageError(res.status === 422 ? 'A Hostinger recusou esta palavra-passe (pode constar de listas de palavras-passe comprometidas). Escolha outra.' : `Não foi possível alterar a palavra-passe (${res.message}).`, res.status === 422 ? 422 : 502)
   await audit(r, 'client_root_password', 'palavra-passe root definida pelo cliente (valor não guardado)', profileId)
+  await getPool().query("UPDATE vps_provider_orders SET access_method = 'password', access_configured_at = COALESCE(access_configured_at, CURRENT_TIMESTAMP(6)) WHERE id = ?", [r.op_id])
   return { action: res.action }
 }
 
@@ -136,6 +147,7 @@ export async function addSshKey(profileId: string, serviceId: string, key: unkno
   const res = await client.manage(vmId, 'ssh-keys-add', { keys: [k] })
   if (!res.ok) throw new VpsManageError(`Não foi possível adicionar a chave (${res.message}).`, 502)
   await audit(r, 'client_ssh_key', `chave SSH ${k.split(' ')[0]} adicionada (${k.slice(-24)})`, profileId)
+  await getPool().query("UPDATE vps_provider_orders SET access_method = COALESCE(access_method, 'ssh_key'), access_configured_at = COALESCE(access_configured_at, CURRENT_TIMESTAMP(6)) WHERE id = ?", [r.op_id])
   return { action: res.action }
 }
 export async function listSshKeys(profileId: string, serviceId: string) {
@@ -195,4 +207,110 @@ export async function chooseInstall(profileId: string, serviceId: string, imageI
   const out = await provisionService(serviceId)
   await refreshOrderActivation(r.order_id).catch(() => {})
   return out
+}
+
+// ── Detalhes, histórico e métricas reais ──
+const iso = (v: unknown) => (v ? new Date(String(v)).toISOString() : null)
+/** Ficha técnica actual (da Hostinger) + histórico de operações (sem dados internos de custos). */
+export async function vpsDetails(profileId: string, serviceId: string) {
+  const { r, client, vmId } = await managed(profileId, serviceId)
+  const vm = await client.virtualMachine(vmId).catch(() => null)
+  if (!vm) throw new VpsManageError('Não foi possível consultar o VPS agora.', 503)
+  const [hist] = await getPool().query(`SELECT event, detail, created_at FROM vps_provider_events WHERE provider_order_id = ? AND event IN
+    ('vm_running','manual_link','import_link','manual_delivery','hostname_set','client_start','client_stop','client_restart','client_root_password','client_ssh_key','client_reinstall',
+     'client_backup_restore','client_snapshot_create','client_snapshot_restore','client_snapshot_delete','client_firewall','client_choose_install') ORDER BY created_at DESC LIMIT 30`, [r.op_id]) as any
+  const o = json(r.options) ?? {}
+  return {
+    cpus: vm.cpus ?? null, memoryMb: vm.memory ?? null, diskMb: vm.disk ?? null, bandwidthMb: vm.bandwidth ?? null,
+    ipv4: vm.ipv4?.map(x => x.address) ?? [], ipv6: vm.ipv6?.map(x => x.address) ?? [], hostname: vm.hostname ?? null, state: vm.state ?? null,
+    template: vm.template?.name ?? null, location: o.location?.label ?? null, plan: vm.plan ?? r.plan_name,
+    history: (hist as any[]).map(h => ({ event: h.event, detail: String(h.event).startsWith('client_') || ['vm_running', 'hostname_set'].includes(h.event) ? h.detail : null, at: iso(h.created_at) })),
+  }
+}
+/** Métricas da Hostinger (CPU %, RAM/disco/tráfego em bytes, uptime) — últimas 24 h ou 7 dias. */
+export async function vpsMetrics(profileId: string, serviceId: string, range: '24h' | '7d' = '24h') {
+  const { client, vmId } = await managed(profileId, serviceId)
+  const to = new Date(), from = new Date(to.getTime() - (range === '7d' ? 7 : 1) * 86400_000)
+  const d = (x: Date) => x.toISOString().slice(0, 10)
+  const m = await client.metrics(vmId, d(from), d(to)).catch(() => null)
+  if (!m) throw new VpsManageError('Métricas indisponíveis neste momento.', 503)
+  const serie = (k: string) => Object.entries(m[k]?.usage ?? {}).map(([t, v]) => ({ t: Number(t), v: Number(v) })).sort((a, b) => a.t - b.t)
+  return { range, unit: Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v?.unit ?? null])), cpu: serie('cpu_usage'), ram: serie('ram_usage'), disk: serie('disk_space'), out: serie('outgoing_traffic'), in: serie('incoming_traffic'), uptime: serie('uptime') }
+}
+
+// ── Backups e snapshots (restaurar/apagar: confirmação explícita) ──
+const confirm = (v: unknown, word: string) => { if (String(v ?? '').trim().toUpperCase() !== word) throw new VpsManageError(`Confirme escrevendo ${word}.`, 422) }
+export async function vpsBackups(profileId: string, serviceId: string) {
+  const { client, vmId } = await managed(profileId, serviceId)
+  const [backups, snapshot] = await Promise.all([client.backups(vmId).catch(() => null), client.snapshot(vmId).catch(() => undefined)])
+  if (!backups) throw new VpsManageError('Cópias de segurança indisponíveis neste momento.', 503)
+  return { backups: backups.map(b => ({ id: b.id, sizeKb: b.size ?? null, restoreSeconds: b.restore_time ?? null, location: b.location ?? null, at: b.created_at ?? null })), snapshot: snapshot === undefined ? null : snapshot, snapshotAvailable: snapshot !== undefined }
+}
+async function busyGuard(client: any, vmId: string) {
+  const acts = await client.actions(vmId).catch(() => null)
+  if (acts?.some((a: VpsAction) => ACTION_PENDING.includes(String(a.state)))) throw new VpsManageError('Há uma operação em curso neste VPS. Aguarde que termine.', 409)
+}
+export async function vpsBackupOp(profileId: string, serviceId: string, input: { op?: unknown; backupId?: unknown; confirmText?: unknown }) {
+  const op = String(input.op ?? '')
+  if (!['backup-restore', 'snapshot-create', 'snapshot-restore', 'snapshot-delete'].includes(op)) throw new VpsManageError('Operação inválida.')
+  if (op !== 'snapshot-create') confirm(input.confirmText, op === 'snapshot-delete' ? 'APAGAR' : 'RESTAURAR')
+  const { r, client, vmId } = await managed(profileId, serviceId)
+  await busyGuard(client, vmId)
+  let backup: string | undefined
+  if (op === 'backup-restore') {
+    const list = await client.backups(vmId).catch(() => [])
+    const b = list.find(x => String(x.id) === String(input.backupId ?? ''))
+    if (!b) throw new VpsManageError('Cópia de segurança inexistente neste VPS.', 404) // só backups DESTA VM
+    backup = String(b.id)
+  }
+  const res = await client.op(op as 'backup-restore', { vm: vmId, backup })
+  if (!res.ok) throw new VpsManageError(`A Hostinger não aceitou a operação (${res.message}). Nada foi alterado.`, 502)
+  await audit(r, `client_${op.replace('-', '_')}`, `${op}${backup ? ` (backup ${backup})` : ''} pedido pelo cliente`, profileId)
+  return { action: res.data }
+}
+
+// ── Firewall dedicada a ESTE VPS (nunca as regras de outras VMs da conta) ──
+const FW_PROTOCOLS = ['TCP', 'UDP', 'ICMP', 'SSH', 'HTTP', 'HTTPS', 'MySQL', 'PostgreSQL', 'any'] as const
+async function ownFirewall(r: any, client: any, vmId: string, create: boolean) {
+  if (r.firewall_id) { const fw = await client.firewall(r.firewall_id).catch(() => null); if (fw) return fw }
+  const name = `vh-${vmId}`
+  const found = (await client.firewalls().catch(() => [])).find((f: any) => f.name === name)
+  if (found) { await getPool().query('UPDATE vps_provider_orders SET firewall_id = ? WHERE id = ?', [String(found.id), r.op_id]); return found }
+  if (!create) return null
+  const c = await client.op('firewall-create', { body: { name } })
+  if (!c.ok || !c.data?.id) throw new VpsManageError(`Não foi possível criar a firewall (${c.ok ? 'sem id' : c.message}).`, 502)
+  await getPool().query('UPDATE vps_provider_orders SET firewall_id = ? WHERE id = ?', [String(c.data.id), r.op_id])
+  return c.data
+}
+export async function vpsFirewall(profileId: string, serviceId: string) {
+  const { r, client, vmId } = await managed(profileId, serviceId)
+  const fw = await ownFirewall(r, client, vmId, false)
+  return { firewall: fw ? { id: fw.id, name: fw.name, synced: fw.is_synced ?? null, rules: (fw.rules ?? []).map((x: any) => ({ id: x.id, action: x.action, protocol: x.protocol, port: x.port, source: x.source, sourceDetail: x.source_detail })) } : null, protocols: FW_PROTOCOLS }
+}
+export async function vpsFirewallOp(profileId: string, serviceId: string, input: Record<string, unknown>) {
+  const op = String(input.op ?? '')
+  const { r, client, vmId } = await managed(profileId, serviceId)
+  if (op === 'create') { await ownFirewall(r, client, vmId, true); await audit(r, 'client_firewall', 'firewall criada', profileId); return vpsFirewall(profileId, serviceId) }
+  const fw = await ownFirewall(r, client, vmId, false)
+  if (!fw) throw new VpsManageError('Crie primeiro a firewall deste VPS.', 409)
+  let res: any
+  if (op === 'add-rule') {
+    const action = input.ruleAction === 'drop' ? 'drop' : 'accept'
+    const protocol = String(input.protocol ?? '')
+    if (!(FW_PROTOCOLS as readonly string[]).includes(protocol)) throw new VpsManageError('Protocolo inválido.', 422)
+    const port = String(input.port ?? '').trim() || 'any'
+    if (port !== 'any' && (!/^\d{1,5}(?::\d{1,5})?$/.test(port) || port.split(':').some(x => Number(x) < 1 || Number(x) > 65535))) throw new VpsManageError('Porta inválida (ex.: 22, 80 ou 8000:8100).', 422)
+    const src = String(input.sourceDetail ?? 'any').trim() || 'any'
+    if (src !== 'any' && !/^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$|^[0-9a-f:]+(\/\d{1,3})?$/i.test(src)) throw new VpsManageError('Origem inválida (any, IP ou CIDR).', 422)
+    res = await client.op('firewall-rule-add', { firewall: fw.id, body: { protocol, port, source: src === 'any' ? 'any' : 'custom', source_detail: src, action } })
+  } else if (op === 'delete-rule') {
+    const ruleId = String(input.ruleId ?? '')
+    if (!(fw.rules ?? []).some((x: any) => String(x.id) === ruleId)) throw new VpsManageError('Regra inexistente nesta firewall.', 404)
+    res = await client.op('firewall-rule-delete', { firewall: fw.id, rule: ruleId })
+  } else if (op === 'activate' || op === 'deactivate' || op === 'sync') {
+    res = await client.op(op === 'sync' ? 'firewall-sync' : op === 'activate' ? 'firewall-activate' : 'firewall-deactivate', { firewall: fw.id, vm: vmId })
+  } else throw new VpsManageError('Operação inválida.')
+  if (!res.ok) throw new VpsManageError(`A Hostinger não aceitou a operação (${res.message}).`, 502)
+  await audit(r, 'client_firewall', `firewall: ${op}`, profileId)
+  return vpsFirewall(profileId, serviceId)
 }

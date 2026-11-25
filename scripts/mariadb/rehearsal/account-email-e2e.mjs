@@ -138,7 +138,8 @@ try {
   console.log('\n7. Clientes: estado do e-mail e reenvio pelo administrador')
   r = await adm.req('/api/admin/clients?filter=unverified')
   ok(r.json?.clients?.some(c => c.email === em3 && c.email_verified === false) && !r.json.clients.some(c => c.email === em), 'filtro «E-mail por verificar»')
-  r = await adm.req('/api/admin/clients')
+  // Lista paginada (50, mais recentes primeiro): a conta administrativa antiga é procurada pelo filtro «admins»
+  r = await adm.req('/api/admin/clients?filter=admins')
   const admRow = r.json?.clients?.find(c => c.email === 'admin@ensaio.test')
   ok(admRow?.role === 'admin', 'conta administrativa listada com papel «admin» (assinalada, fora dos contadores de clientes)')
   const before = r.json?.stats

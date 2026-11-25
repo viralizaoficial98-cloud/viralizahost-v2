@@ -53,7 +53,7 @@ export default async function ServidorVPSPage() {
         />
         <VpsPlansSection
           title="Servidor VPS — Escolha o seu plano"
-          subtitle="Escolha o plano e o período; depois a localização e o sistema operativo, reveja e pague." />
+          subtitle="Escolha o plano e configure sistema operativo ou aplicação, centro de dados, hostname, período e extras." />
         <PageLinksSection id="aplicacoes" tag="Aplicações pré-configuradas" title="VPS com aplicações prontas a usar"
           subtitle="Automação, WhatsApp Business e agentes de IA num VPS já configurado — cada solução tem a sua página com planos e detalhes."
           items={pagesInSection('vps-apps').map(p => ({ href: p.path, title: p.title, desc: p.desc, icon: p.icon, cta: 'Ver solução' }))} />
@@ -63,7 +63,7 @@ export default async function ServidorVPSPage() {
           title="Active o seu VPS em minutos"
           subtitle="Acesso root e suporte especializado. Activação pela equipa depois do pagamento confirmado."
           cta="Contratar VPS"
-          ctaHref="/comprar/vps-nvme4" />
+          ctaHref="/servidor-vps/configurar" />
       </main>
       <Footer />
     </>

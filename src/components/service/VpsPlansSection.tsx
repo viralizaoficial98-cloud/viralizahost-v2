@@ -31,7 +31,8 @@ export type VpsBandPlan = {
 }
 
 /** Faixa de plano (VPS e servidores dedicados). tid = prefixo dos identificadores de teste. */
-export function VpsPlanBand({ plan, fmt, href, preview = false, tid = 'vps' }: { plan: VpsBandPlan; fmt: (v: number) => string; href?: string; preview?: boolean; tid?: string }) {
+export function VpsPlanBand({ plan, fmt, href, preview = false, tid = 'vps', ctaLabel = 'Comprar agora' }: {
+  /** Texto do botão (VPS: «Configurar VPS»; Dedicados mantêm «Comprar agora») */ ctaLabel?: string; plan: VpsBandPlan; fmt: (v: number) => string; href?: string; preview?: boolean; tid?: string }) {
   const pr = plan.period
   const perMonth = pr ? pr.total / pr.months : null
   const specs = plan.specLines ?? vpsSpecLines(plan.specs)
@@ -87,7 +88,7 @@ export function VpsPlanBand({ plan, fmt, href, preview = false, tid = 'vps' }: {
               <p className="mt-1"><span className="text-3xl font-black text-[#0A0A0A]" data-testid={`${tid}-plan-monthly`}>{fmt(perMonth)}</span><span className="text-sm text-[#888]">/mês</span></p>
               <p className="text-xs text-[#444] mt-1" data-testid={`${tid}-plan-period`}>{pr.months > 1 ? <>Total <strong data-testid={`${tid}-plan-total`}>{fmt(pr.total)}</strong> por {pr.label}, pago antecipadamente</> : <>Total <strong data-testid={`${tid}-plan-total`}>{fmt(pr.total)}</strong> por mês</>}</p>
               {pr.renewal != null && pr.renewal > 0 && <p className="text-[11px] text-[#999] mt-0.5" data-testid={`${tid}-plan-renewal`}>Renova por {fmt(pr.renewal)}{pr.months > 1 ? ` a cada ${pr.label}` : '/mês'}</p>}
-              {href ? <Link href={href} className="mt-4 inline-flex justify-center items-center w-full py-3 rounded-xl text-sm font-black bg-[#F5B700] text-[#0A0A0A] hover:bg-[#E5A800]" data-testid={`${tid}-plan-cta`}>Comprar agora</Link>
+              {href ? <Link href={href} className="mt-4 inline-flex justify-center items-center w-full py-3 rounded-xl text-sm font-black bg-[#F5B700] text-[#0A0A0A] hover:bg-[#E5A800]" data-testid={`${tid}-plan-cta`}>{ctaLabel}</Link>
                 : <span className="mt-4 inline-flex justify-center w-full py-3 rounded-xl text-sm font-black bg-[#F5B700] text-[#0A0A0A]">Comprar agora</span>}
             </>
           ) : <p className="text-sm text-[#888]">Indisponível neste período</p>}
@@ -120,7 +121,7 @@ export function toVpsBand(p: ApiPlan, cycle: string): VpsBandPlan {
   }
 }
 
-export function VpsPlansSection({ id = 'planos', title, subtitle }: { id?: string; title: ReactNode; subtitle?: string }) {
+export function VpsPlansSection({ id = 'planos', title, subtitle, app }: { id?: string; title: ReactNode; subtitle?: string; /** Aplicação pré-seleccionada no configurador (páginas especializadas) */ app?: string }) {
   const { formatCurrency, currency } = useLocale()
   const fmt = (v: number) => formatCurrency(convertFromAOA(v, currency))
   const [plans, setPlans] = useState<ApiPlan[]>([])
@@ -178,7 +179,7 @@ export function VpsPlansSection({ id = 'planos', title, subtitle }: { id?: strin
         )}
         {state === 'ok' && (
           <div className="space-y-5 max-w-6xl mx-auto">
-            {plans.map(p => { const b = toVpsBand(p, active); return <VpsPlanBand key={p.id} plan={b} fmt={fmt} href={b.period ? `/comprar/${p.slug}?ciclo=${active}` : undefined} /> })}
+            {plans.map(p => { const b = toVpsBand(p, active); return <VpsPlanBand key={p.id} plan={b} fmt={fmt} ctaLabel="Configurar VPS" href={b.period ? `/servidor-vps/configurar?plano=${p.slug}&ciclo=${active}${app ? `&app=${encodeURIComponent(app)}` : ''}` : undefined} /> })}
           </div>
         )}
         <p className="text-center text-gray-400 text-xs sm:text-sm mt-8">Escolha o plano e o período; depois a localização e o sistema operativo. Activação depois do pagamento confirmado.</p>

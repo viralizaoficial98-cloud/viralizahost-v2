@@ -3,7 +3,7 @@ import { getPool } from '@/lib/db/pool'
 import { decryptSecret, encryptSecret } from '@/lib/crypto'
 import { HOSTINGER_API, hostingerVpsClient, VpsApiError, type HostingerVpsClient } from './hostinger-vps'
 import type { VpsOption } from '@/lib/commerce/vps-shared'
-import { classifyTemplate, fitsPlan, normalizeRow, sellable, type InstallOptionRow, type PublicVpsOptions } from './install-shared'
+import { classifyTemplate, fitsPlan, isInstallGroup, normalizeRow, sellable, type InstallOptionRow, type PublicVpsOptions } from './install-shared'
 
 // Integrações → Hostinger VPS (linha única vps_provider_settings.id = 1).
 // Credencial cifrada com WHM_ENCRYPTION_KEY (como o Registrador); nunca sai do servidor. Sem token próprio, usa o
@@ -57,7 +57,7 @@ export async function publicVpsOptions(plan?: { slug: string; ramGb?: number | n
     .map(r => ({ r, locs: r.locations.filter(l => locIds.includes(l)) }))
     .filter(({ r, locs }) => !r.locations.length || !locIds.length || locs.length > 0)
     .map(({ r, locs }) => ({
-      id: r.id, label: r.label, category: r.category, name: r.name, version: r.version, icon: r.icon ?? "generic", includedOs: r.includedOs,
+      id: r.id, label: r.label, category: r.category, group: r.group ?? "other", name: r.name, version: r.version, icon: r.icon ?? "generic", includedOs: r.includedOs,
       license: { type: r.license.type, monthlyKz: r.license.type === 'paid' ? Number(r.license.monthlyKz ?? 0) : 0 },
       locations: r.locations.length ? locs : [], description: r.detail,
     }))
@@ -70,6 +70,11 @@ export async function imageRow(id: string | null | undefined): Promise<ImageRow 
 }
 
 /** Cliente da API (ou o motivo por que não há). purchase=true aplica as salvaguardas das compras. */
+/** Endereço da API real da Hostinger (qualquer subdomínio de hostinger.com). */
+export function isRealHostingerApi(url: string): boolean {
+  try { return /(^|\.)hostinger\.[a-z.]+$/i.test(new URL(url).hostname) } catch { return false }
+}
+
 export async function vpsClient(purpose: 'read' | 'purchase' = 'read'): Promise<{ client: HostingerVpsClient; mode: 'test' | 'live' } | { error: string }> {
   const r = await row().catch(() => null)
   if (!r) return { error: 'Integração Hostinger VPS por configurar (Integrações → Hostinger VPS).' }
@@ -82,6 +87,8 @@ export async function vpsClient(purpose: 'read' | 'purchase' = 'read'): Promise<
     if (!r.auto_provision) return { error: 'Aprovisionamento automático desactivado (Integrações → Hostinger VPS).' }
     if (r.last_test_ok !== 1) return { error: 'Teste a ligação com sucesso antes de usar o aprovisionamento automático.' }
     if (mode === 'test' && process.env.REGISTRAR_TEST_PROVISIONING !== '1') return { error: 'Hostinger VPS em modo de ensaio: só o servidor de ensaio executa compras simuladas.' }
+    // O modo de ensaio nunca compra na API real (contornaria VPS_LIVE_PURCHASES)
+    if (mode === 'test' && isRealHostingerApi(baseUrl)) return { error: 'Modo de ensaio a apontar para a API real da Hostinger: compra recusada (use o modo «produção» com VPS_LIVE_PURCHASES=1).' }
     if (mode === 'live' && process.env.VPS_LIVE_PURCHASES !== '1') return { error: 'Compras reais de VPS por aprovar: falta VPS_LIVE_PURCHASES=1 no servidor.' }
   }
   const t = Number(process.env.VPS_PROVIDER_TIMEOUT_MS) || 0
@@ -111,6 +118,7 @@ function imageConfig(raw: any, prev: ImageRow | undefined): InstallOptionRow {
     includedOs: cat === 'os' ? null : raw?.includedOs === undefined ? prev?.includedOs ?? null : str(raw.includedOs),
     license: { type: licType, monthlyKz: licType === 'paid' ? monthly : null, note: raw?.license?.note === undefined ? prev?.license.note ?? null : str(raw.license.note, 160) },
     locations: list(raw?.locations, prev?.locations), minRamGb: minRam || null, plans: list(raw?.plans, prev?.plans), accessUrl: url, sshUser: user,
+    group: raw?.group === undefined ? prev?.group ?? null : isInstallGroup(raw.group) ? raw.group : prev?.group ?? null,
   }
 }
 
@@ -121,6 +129,7 @@ export async function saveVpsSettings(input: { mode?: unknown; apiUrl?: unknown;
   if (apiUrlRaw && !/^https?:\/\/[^\s]+$/.test(apiUrlRaw)) throw new VpsConfigError('Endereço da API inválido.')
   if (mode === 'live' && apiUrlRaw && apiUrlRaw.replace(/\/+$/, '') !== HOSTINGER_API) throw new VpsConfigError(`Em produção a Hostinger usa sempre ${HOSTINGER_API}.`)
   if (mode === 'test' && !apiUrlRaw) throw new VpsConfigError('Em modo de ensaio indique o endereço da API simulada.')
+  if (mode === 'test' && apiUrlRaw && isRealHostingerApi(apiUrlRaw)) throw new VpsConfigError('Em modo de ensaio o endereço tem de ser o da API simulada, nunca o da Hostinger.')
   const apiUrl = mode === 'live' ? null : apiUrlRaw
   let secretEnc: string | null | undefined
   if (typeof input.secret === 'string' && input.secret.trim()) {
@@ -183,6 +192,26 @@ export async function saveVpsSettings(input: { mode?: unknown; apiUrl?: unknown;
   return loadVpsSettings()
 }
 
+/**
+ * Actualiza as localizações e os templates guardados a partir do fornecedor, mantendo a configuração do
+ * administrador (publicação, categoria, licença, compatibilidade). Novos ficam por publicar. Usado pelo «Testar
+ * ligação» antigo e pela sincronização do Cloud VPS.
+ */
+export async function mergeProviderOptions(dcs: { id: number; name?: string | null; location?: string | null; city?: string | null }[], tpls: { id: number; name: string; description?: string | null }[]) {
+  const prev = await row(); const o = parse(prev?.options)
+  const old = (l: OptionRow[] | undefined, id: string) => (l ?? []).find(x => String(x.id) === id)?.enabled ?? false
+  o.locations = dcs.map(d => ({ id: String(d.id), label: [d.city, d.location].filter(Boolean).join(', ') || d.name || `Centro ${d.id}`, detail: d.name ?? null, enabled: old(o.locations, String(d.id)) }))
+  const prevImgs: InstallOptionRow[] = Array.isArray(o.images) ? o.images : []
+  o.images = [
+    ...tpls.map(t => {
+      const p = prevImgs.find(x => String(x.id) === String(t.id))
+      return p ? { ...p, label: t.name, detail: t.description ?? null, source: 'api' } : { id: String(t.id), label: t.name, detail: t.description ?? null, enabled: false, source: 'api', ...classifyTemplate(t.name) }
+    }),
+    ...prevImgs.filter(x => x.source === 'manual'),
+  ]
+  await getPool().query('UPDATE vps_provider_settings SET options = ? WHERE id = 1', [JSON.stringify(o)])
+}
+
 /** «Testar ligação»: só leituras (catálogo VPS, centros de dados, templates, métodos de pagamento, VMs). Actualiza as opções. */
 export async function testVpsConnection() {
   const c = await vpsClient('read')
@@ -191,20 +220,7 @@ export async function testVpsConnection() {
   else {
     try {
       const [catalog, dcs, tpls, pms, vms] = await Promise.all([c.client.catalog(), c.client.dataCenters(), c.client.templates(), c.client.paymentMethods(), c.client.virtualMachines()])
-      const prev = await row(); const o = parse(prev?.options)
-      const old = (l: OptionRow[] | undefined, id: string) => (l ?? []).find(x => String(x.id) === id)?.enabled ?? false
-      o.locations = dcs.map(d => ({ id: String(d.id), label: [d.city, d.location].filter(Boolean).join(', ') || d.name || `Centro ${d.id}`, detail: d.name ?? null, enabled: old(o.locations, String(d.id)) }))
-      // Templates: mantém a configuração do administrador (categoria, licença, compatibilidade); novos ficam desactivados
-      const prevImgs: InstallOptionRow[] = Array.isArray(o.images) ? o.images : []
-      o.images = [
-        ...tpls.map(t => {
-          const p = prevImgs.find(x => String(x.id) === String(t.id))
-          return p ? { ...p, label: t.name, detail: t.description ?? null, source: 'api' } : { id: String(t.id), label: t.name, detail: t.description ?? null, enabled: false, source: 'api', ...classifyTemplate(t.name) }
-        }),
-        ...prevImgs.filter(x => x.source === 'manual'),
-      ]
-
-      await getPool().query('UPDATE vps_provider_settings SET options = ? WHERE id = 1', [JSON.stringify(o)])
+      await mergeProviderOptions(dcs, tpls)
       result = { ok: true, message: `Ligação OK (${c.mode === 'live' ? 'produção' : 'ensaio'}): ${catalog.length} produto(s) VPS no catálogo, ${dcs.length} centro(s) de dados, ${tpls.length} sistema(s)/imagem(ns), ${vms.length} VPS na conta, ${pms.length} método(s) de pagamento.`,
         detail: { catalog: catalog.map(i => ({ id: i.id, name: i.name, metadata: i.metadata ?? null, prices: i.prices })), paymentMethods: pms.map(p => ({ id: p.id, label: `${p.name ?? 'Método'} ${p.identifier ?? ''}`.trim(), isDefault: !!p.is_default, unusable: !!(p.is_expired || p.is_suspended) })) } }
     } catch (e) { result = { ok: false, message: e instanceof VpsApiError ? e.message : 'Falha ao contactar a Hostinger.' } }

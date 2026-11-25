@@ -12,6 +12,31 @@ export type InstallCategory = 'os' | 'panel' | 'app'
 export const INSTALL_CATEGORIES: { id: InstallCategory; label: string }[] = [
   { id: 'os', label: 'Sistema operativo' }, { id: 'panel', label: 'Painel de controlo' }, { id: 'app', label: 'Aplicações' },
 ]
+/** Grupos do catálogo (organização no painel e no configurador). Deduzidos do nome; o administrador pode corrigir. */
+export const INSTALL_GROUPS = [
+  { id: 'linux', label: 'Sistemas operativos Linux' }, { id: 'panels', label: 'Painéis de gestão' }, { id: 'automation', label: 'Aplicações de automação' },
+  { id: 'ai', label: 'Inteligência artificial' }, { id: 'business', label: 'Aplicações empresariais' }, { id: 'databases', label: 'Bases de dados' },
+  { id: 'dev', label: 'Desenvolvimento' }, { id: 'containers', label: 'Containers' }, { id: 'other', label: 'Outros' },
+] as const
+export type InstallGroup = (typeof INSTALL_GROUPS)[number]['id']
+export const isInstallGroup = (v: unknown): v is InstallGroup => INSTALL_GROUPS.some(g => g.id === v)
+const GROUP_WORDS: [InstallGroup, string[]][] = [
+  ['ai', ['ollama', 'openwebui', 'llama', 'deepseek', 'anythingllm', 'flowise', 'langflow', 'dify', 'comfyui', 'stablediffusion', 'openclaw', 'agent', 'gpt', ' ai']],
+  ['automation', ['n8n', 'nodered', 'activepieces', 'windmill', 'huginn', 'evolution', 'typebot', 'chatwoot', 'botpress']],
+  ['containers', ['docker', 'portainer', 'kubernetes', 'k3s', 'podman', 'coolify', 'dokploy', 'easypanel', 'caprover']],
+  ['databases', ['mysql', 'mariadb', 'postgres', 'mongodb', 'redis', 'clickhouse', 'supabase']],
+  ['business', ['odoo', 'erpnext', 'nextcloud', 'mautic', 'wordpress', 'woocommerce', 'prestashop', 'magento', 'moodle', 'suitecrm', 'dolibarr', 'mattermost', 'rocketchat']],
+  ['dev', ['nodejs', 'node.js', 'python', 'django', 'laravel', 'gitlab', 'gitea', 'jenkins', 'lamp', 'lemp', 'openlitespeed', 'ruby', 'golang', 'java']],
+]
+export function templateGroup(label: string, category?: InstallCategory): InstallGroup {
+  const k = ` ${String(label ?? '').toLowerCase()}`
+  const extra = (k.match(/\s(?:with|com|\+)\s(.+)$/) ?? [])[1] ?? (category === 'os' ? '' : k)
+  for (const [g, words] of GROUP_WORDS) if (words.some(w => extra.replace(/[^a-z0-9. ]/g, '').includes(w.trim()) || (w.startsWith(' ') && extra.includes(w.trim())))) return g
+  if (category === 'panel' || PANELS.some(p => extra.replace(/[^a-z0-9]/g, '').startsWith(p))) return 'panels'
+  if (/windows|freebsd/.test(k)) return 'other'
+  if ((category ?? 'os') === 'os' && OS.some(o => k.replace(/[^a-z0-9]/g, '').startsWith(o))) return 'linux'
+  return 'other'
+}
 export interface InstallLicense { type: 'included' | 'paid'; monthlyKz?: number | null; note?: string | null }
 
 /** Opção como o administrador a guarda (vps_provider_settings.options.images). */
@@ -30,10 +55,12 @@ export interface InstallOptionRow {
   accessUrl?: string | null
   /** Utilizador SSH (por omissão root). */
   sshUser?: string | null
+  /** Grupo do catálogo (Cloud VPS → Sistemas operativos e aplicações). */
+  group?: InstallGroup | null
 }
 /** Opção publicada para o cliente. */
 export interface InstallOption {
-  id: string; label: string; category: InstallCategory; name: string; version: string | null; icon: string
+  id: string; label: string; category: InstallCategory; group?: InstallGroup; name: string; version: string | null; icon: string
   includedOs: string | null; license: { type: 'included' | 'paid'; monthlyKz: number }
   locations: string[]; description: string | null
 }
@@ -82,6 +109,7 @@ export function normalizeRow(r: InstallOptionRow): Required<Omit<InstallOptionRo
     license: { type: lic.type === 'paid' ? 'paid' : 'included', monthlyKz: lic.type === 'paid' && lic.monthlyKz != null ? Number(lic.monthlyKz) : null, note: lic.note ?? null },
     locations: Array.isArray(r.locations) ? r.locations.map(String) : [], minRamGb: r.minRamGb != null && Number(r.minRamGb) > 0 ? Number(r.minRamGb) : null,
     plans: Array.isArray(r.plans) ? r.plans.map(String) : [], accessUrl: r.accessUrl ?? null, sshUser: r.sshUser || 'root',
+    group: isInstallGroup(r.group) ? r.group : templateGroup(r.label, r.category ?? guess.category ?? 'os'),
   }
 }
 /** Uma licença paga sem preço definido não pode ser vendida. */
