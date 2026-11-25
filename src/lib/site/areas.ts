@@ -1,6 +1,6 @@
 // Áreas da aplicação (sem dependências de servidor; usado no proxy e no navegador).
 // Área do Cliente e painel de administração: tudo o resto é público.
-export const CLIENT_AREA_PATHS = ['/dashboard', '/domains', '/hosting', '/tickets', '/billing', '/settings', '/orders', '/services', '/vps']
+export const CLIENT_AREA_PATHS = ['/dashboard', '/domains', '/hosting', '/tickets', '/billing', '/settings', '/orders', '/services', '/vps', '/revendedor']
 // '/email' é a página da Área do Cliente; '/email/*' são páginas públicas.
 export const CLIENT_AREA_EXACT = ['/email']
 export const ADMIN_PATHS = ['/admin']

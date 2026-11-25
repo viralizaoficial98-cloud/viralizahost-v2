@@ -10,7 +10,8 @@ const load = unstable_cache(async (category: string, subcategory: string | null)
       `SELECT MIN(pp.price / pp.months) AS m, SUM(p.sale_status = 'on_request') AS onreq, SUM(p.sale_status = 'active') AS act
          FROM products p LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.active = 1 AND p.sale_status = 'active'
            AND (p.category NOT IN ('reseller', 'website-builder') AND NOT (p.category = 'wordpress' AND p.subcategory = 'builder')
-                OR pp.cycle IN ('monthly', '1year', '2years', '3years')) -- famílias de planos: só os 4 períodos à venda
+                OR (p.category = 'reseller' AND pp.cycle IN ('monthly', '3months', '6months', '1year'))
+                OR (p.category <> 'reseller' AND pp.cycle IN ('monthly', '1year', '2years', '3years'))) -- famílias de planos: só os períodos à venda
         WHERE p.active = 1 AND p.category = ? AND ${subcategory ? 'p.subcategory = ?' : 'p.subcategory IS NULL'}`,
       subcategory ? [category, subcategory] : [category],
     ) as unknown as [{ m: number | null; onreq: number | null; act: number | null }[]]

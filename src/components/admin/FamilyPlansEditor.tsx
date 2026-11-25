@@ -2,13 +2,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Loader2, Plus, Save, Trash2 } from 'lucide-react'
 import { MAX_DISCOUNT, exactPeriodTotal, impliedDiscount, selectorBadge } from '@/lib/commerce/period-pricing'
-import { FAMILY_PERIODS, PLAN_FAMILIES, type PlanFamily } from '@/lib/commerce/plan-families'
+import { PLAN_FAMILIES, familyPeriods, familyPeriodsText, type PlanFamily } from '@/lib/commerce/plan-families'
 import { VPS_FEATURE_ICONS, type VpsIcon } from '@/lib/commerce/vps-shared'
 import { FamilyPlanCard, type FamilyCardPlan } from '@/components/service/FamilyPlansSection'
 
 // Catálogo e Preços → planos de Revenda de Hospedagem, Criador de Sites e Construtor WordPress.
 // Nome, descrição, características (ordenáveis, com ícone da lista controlada), etiqueta, destaque, ordem, estado,
-// preço mensal base e desconto por período (1 mês, 1, 2 e 3 anos), publicação e renovação por período.
+// preço mensal base e desconto por período (os períodos de cada família: plan-families.ts), publicação e renovação por período.
 // Pré-visualização com a mesma regra do servidor; o servidor volta a validar e a calcular ao guardar.
 
 type Period = { cycle: string; months: number; exists: boolean; active: boolean; price: number | null; renewal: number | null; discount: number; matchesRule: boolean }
@@ -29,7 +29,8 @@ const RETIRED: Record<string, string> = { '3months': '3 meses', '6months': '6 me
 const kz = (v: number) => `Kz ${Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\s/g, ' ')}`
 const fmtCard = (v: number) => `${Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\s/g, ' ')} Kz`
 
-function toDraft(p?: Plan): Draft {
+function toDraft(family: PlanFamily, p?: Plan): Draft {
+  const FAMILY_PERIODS = familyPeriods(family)
   return {
     id: p?.id, name: p?.name ?? '', description: p?.description ?? '', saleStatus: p?.saleStatus ?? 'draft', position: String(p?.position ?? 0),
     badge: p?.badge ?? '', highlight: p?.highlight ?? false, baseMonthly: p?.baseMonthly?.toString() ?? '',
@@ -44,7 +45,8 @@ function toDraft(p?: Plan): Draft {
 }
 
 function PlanForm({ family, plan, onSaved, onCancel }: { family: PlanFamily; plan?: Plan; onSaved: (plans: Plan[]) => void; onCancel?: () => void }) {
-  const [d, setD] = useState<Draft>(() => toDraft(plan))
+  const FAMILY_PERIODS = familyPeriods(family)
+  const [d, setD] = useState<Draft>(() => toDraft(family, plan))
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string; field?: string } | null>(null)
   const [previewCycle, setPreviewCycle] = useState('1year')
@@ -90,7 +92,7 @@ function PlanForm({ family, plan, onSaved, onCancel }: { family: PlanFamily; pla
       if (!res.ok) { setMsg({ ok: false, text: j.error ?? `HTTP ${res.status}`, field: j.field ?? undefined }); return }
       // O formulário passa a mostrar o que ficou gravado (texto, ícone e ordem lidos do catálogo)
       const stored = (j.plans as Plan[]).find(x => x.id === (d.id ?? j.id))
-      setD(d.id && stored ? toDraft(stored) : toDraft())
+      setD(d.id && stored ? toDraft(family, stored) : toDraft(family))
       setMsg({ ok: true, text: d.id ? 'Guardado' : 'Plano criado' })
       onSaved(j.plans)
     } catch (e) { setMsg({ ok: false, text: (e as Error).message }) } finally { setBusy(false) }
@@ -146,7 +148,7 @@ function PlanForm({ family, plan, onSaved, onCancel }: { family: PlanFamily; pla
         <div>
           <div className="flex flex-wrap items-end gap-3 mb-2">
             <label className={`${lbl} w-56`}>Preço mensal base (Kz){d.saleStatus === 'on_request' ? ' — opcional' : ''}<input type="number" min={1} step="0.01" className={`${input} ${bad('baseMonthly')}`} value={d.baseMonthly} onChange={e => set('baseMonthly', e.target.value)} data-testid={tid('base')} /></label>
-            <p className="text-[11px] text-[#64748B] flex-1 min-w-[220px]">Total = base × meses × (1 − desconto/100), arredondado ao cêntimo; equivalente mensal = total ÷ meses. Novas contratações só em 1 mês, 1 ano, 2 anos e 3 anos; só os períodos «Publicado» aparecem no site.
+            <p className="text-[11px] text-[#64748B] flex-1 min-w-[220px]">Total = base × meses × (1 − desconto/100), arredondado ao cêntimo; equivalente mensal = total ÷ meses. Novas contratações só em {familyPeriodsText(family)}; só os períodos «Publicado» aparecem no site.
               {plan?.baseDerived && <strong className="block text-[#334155]" data-testid={tid('base-derived')}>Preço base ainda não guardado: proposto a partir do preço de 1 mês ({kz(plan.baseMonthly ?? 0)}). Fica guardado ao gravar.</strong>}</p>
           </div>
           <div className="overflow-x-auto">
@@ -209,11 +211,11 @@ export function FamilyPlansEditor({ family, onSaved }: { family: PlanFamily; onS
   }, [family])
   useEffect(load, [load])
   const saved = (list: Plan[]) => { setPlans(list); setCreating(false); onSaved?.() }
-  const summary = useMemo(() => FAMILY_PERIODS.map(per => {
+  const summary = useMemo(() => familyPeriods(family).map(per => {
     const ds = (plans ?? []).filter(p => p.saleStatus === 'active').map(p => ({ p, x: p.periods.find(y => y.cycle === per.cycle) })).filter(({ x }) => x?.active && x.price != null)
       .map(({ p, x }) => impliedDiscount(x!.price!, p.baseMonthly, per.months))
     return `${per.label}${ds.length ? (selectorBadge(ds) ? ` (${selectorBadge(ds)})` : '') : ' (não publicado)'}`
-  }), [plans])
+  }), [plans, family])
 
   if (error) return <p className="text-red-600 text-sm" role="alert">{error}</p>
   if (!plans) return <div className="flex justify-center py-6"><Loader2 className="animate-spin text-[#F5B700]" /></div>

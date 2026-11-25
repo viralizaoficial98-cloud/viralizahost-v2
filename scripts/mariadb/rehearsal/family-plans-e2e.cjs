@@ -1,5 +1,5 @@
 // Planos editáveis de Revenda, Criador de Sites e Construtor WordPress (Catálogo e Preços): criação no painel,
-// página pública (descrição, características pela ordem, etiqueta, desconto), só 1 mês/1/2/3 anos (painel, página,
+// página pública (descrição, características pela ordem, etiqueta, desconto), períodos por família — revenda mensal/trimestral/semestral/anual, restantes 1 mês/1/2/3 anos (painel, página,
 // compra, carrinho, servidor), preços iguais até ao checkout, carrinho antigo com ciclo retirado, renovação de um
 // contrato antigo; «Nossas Marcas» (só texto) no submenu Empresa; hero do painel em Sobre nós, Parceria e Suporte.
 // Desktop + iPhone. Repõe catálogo, banners e carrinhos no fim. Sem encomendas.
@@ -19,7 +19,12 @@ const DESKTOP = { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 }
 const IPHONE = devices['iPhone 13']
 const RND = Math.random().toString(36).slice(2, 6)
 const FOR_SALE = ['monthly', '1year', '2years', '3years']
-const MONTHS = { monthly: 1, '1year': 12, '2years': 24, '3years': 36 }
+const MONTHS = { monthly: 1, '3months': 3, '6months': 6, '1year': 12, '2years': 24, '3years': 36 }
+// Revenda: mensal, trimestral, semestral e anual (migração 23); Criador de Sites e Construtor WordPress: 1 mês, 1, 2 e 3 anos
+const RESELLER_FOR_SALE = ['monthly', '3months', '6months', '1year']
+const forSale = k => (k === 'reseller' ? RESELLER_FOR_SALE : FOR_SALE)
+/** Ciclo com 10% e ciclo com 20% de desconto em cada família (pré-visualização e página pública). */
+const c10 = k => (k === 'reseller' ? '3months' : '1year'), c20 = k => (k === 'reseller' ? '6months' : '2years')
 const total = (base, m, d) => Math.round(Math.round(base * 100) * m * (100 - d) / 100) / 100
 const FAMILIES = [
   { key: 'reseller', page: '/revenda-de-hospedagem', where: "category = 'reseller' AND subcategory IS NULL", needsDomain: false },
@@ -112,12 +117,14 @@ async function ctxFor(b, opts, cookie, initCart) {
       await form.getByTestId('fp-feature-up').nth(2).click()
       const base = 10000 + i * 1000
       await form.getByTestId('fp-base').fill(String(base))
-      const disc = { monthly: 0, '1year': 10, '2years': 20, '3years': 30 }
-      for (const c of FOR_SALE) { await form.getByTestId(`fp-discount-${c}`).fill(String(disc[c])); await form.getByTestId(`fp-publish-${c}`).check() }
-      ok(await form.locator('[data-testid^=fp-period-]').count() === 4 && await form.getByTestId('fp-period-3months').count() === 0 && await form.getByTestId('fp-period-6months').count() === 0, `${f.key}: editor só com 1 mês, 1 ano, 2 anos e 3 anos`)
-      await form.getByTestId('fp-preview-1year').click()
+      const disc = f.key === 'reseller' ? { monthly: 0, '3months': 10, '6months': 20, '1year': 30 } : { monthly: 0, '1year': 10, '2years': 20, '3years': 30 }
+      for (const c of forSale(f.key)) { await form.getByTestId(`fp-discount-${c}`).fill(String(disc[c])); await form.getByTestId(`fp-publish-${c}`).check() }
+      const absent = f.key === 'reseller' ? ['2years', '3years'] : ['3months', '6months']
+      ok(await form.locator('[data-testid^=fp-period-]').count() === 4 && await form.getByTestId(`fp-period-${absent[0]}`).count() === 0 && await form.getByTestId(`fp-period-${absent[1]}`).count() === 0, `${f.key}: editor só com ${forSale(f.key).join(', ')}`)
+      await form.getByTestId(`fp-preview-${c10(f.key)}`).click()
       const prev = form.getByTestId('fp-preview')
-      ok(num((await prev.getByTestId('fam-plan-total').innerText())) === total(base, 12, 10) && /Poupe 10%/.test(await prev.innerText()) && await prev.getByTestId('fam-plan-list').count() === 1, `${f.key}: pré-visualização 1 ano = ${total(base, 12, 10)} Kz, preço riscado e «Poupe 10%»`)
+      const m10 = MONTHS[c10(f.key)]
+      ok(num((await prev.getByTestId('fam-plan-total').innerText())) === total(base, m10, 10) && /Poupe 10%/.test(await prev.innerText()) && await prev.getByTestId('fam-plan-list').count() === 1, `${f.key}: pré-visualização ${c10(f.key)} = ${total(base, m10, 10)} Kz, preço riscado e «Poupe 10%»`)
       ok(/equivalente mensal/.test(await form.getByTestId('fp-preview-summary').innerText()), 'pré-visualização: total do período e equivalente mensal')
       await form.getByTestId('fp-preview-monthly').click()
       ok(await prev.getByTestId('fam-plan-discount').count() === 0 && await prev.getByTestId('fam-plan-list').count() === 0, `${f.key}: 1 mês (0%) sem preço riscado nem «Poupe»`)
@@ -128,7 +135,7 @@ async function ctxFor(b, opts, cookie, initCart) {
       ok(!!row && Number(row.base_monthly_price) === base && row.badge === 'Mais popular' && Number(row.popular) === 1, `${f.key}: plano «${name}» criado (${row?.slug}; activação ${row?.service_type}/${row?.provisioning}, como os existentes)`)
       if (row) created.push({ ...f, id: row.id, slug: row.slug, name, base, disc })
       const pr = row ? await all('SELECT cycle, price, renewal_price, discount_pct, active FROM product_prices WHERE product_id = ? ORDER BY months', [row.id]) : []
-      ok(pr.length === 4 && pr.every(x => FOR_SALE.includes(x.cycle) && Number(x.price) === total(base, MONTHS[x.cycle], disc[x.cycle]) && Number(x.renewal_price) === total(base, MONTHS[x.cycle], 0)), `${f.key}: preços calculados no servidor (renovação ao preço base)`)
+      ok(pr.length === 4 && pr.every(x => forSale(f.key).includes(x.cycle) && Number(x.price) === total(base, MONTHS[x.cycle], disc[x.cycle]) && Number(x.renewal_price) === total(base, MONTHS[x.cycle], 0)), `${f.key}: preços calculados no servidor (renovação ao preço base)`)
     }
     await ctx.close()
 
@@ -140,14 +147,16 @@ async function ctxFor(b, opts, cookie, initCart) {
         await p.goto(BASE + c.page, { waitUntil: 'domcontentloaded' })
         const card = p.locator(`[data-testid=fam-plan-card][data-slug="${c.slug}"]`); await card.waitFor()
         const periods = await p.locator('[data-testid^=fam-period-]').evaluateAll(x => x.map(y => y.dataset.testid.replace('fam-period-', '')))
-        ok(JSON.stringify(periods) === JSON.stringify(FOR_SALE), `${c.page}: períodos ${periods.join(', ')}`)
+        ok(JSON.stringify(periods) === JSON.stringify(forSale(c.key)), `${c.page}: períodos ${periods.join(', ')}`)
         ok((await card.getByTestId('fam-plan-description').innerText()) === `Descrição de ensaio para ${c.key}` && (await card.getByTestId('fam-plan-badge').innerText()).toLowerCase() === 'mais popular', `${c.page}: descrição e etiqueta`)
         const fts = await card.getByTestId('fam-plan-feature').allInnerTexts()
         ok(JSON.stringify(fts) === JSON.stringify(['Primeira característica', 'Terceira característica', 'Segunda característica']), `${c.page}: características pela ordem do painel (${fts.join(' · ')})`)
         ok(await card.getByTestId('fam-plan-discount').count() === 0, `${c.page}: 1 mês sem «Poupe»`)
-        await p.getByTestId('fam-period-2years').click()
-        ok(/Poupe 20%/.test(await card.getByTestId('fam-plan-discount').innerText()) && num(await card.getByTestId('fam-plan-total').innerText()) === total(c.base, 24, 20)
-          && /Renova por/.test(await card.getByTestId('fam-plan-renewal').innerText()) && num((await card.getByTestId('fam-plan-renewal').innerText()).split('a cada')[0]) === total(c.base, 24, 0), `${c.page}: 2 anos — «Poupe 20%», a pagar agora ${total(c.base, 24, 20)} Kz, renova por ${total(c.base, 24, 0)} Kz`)
+        const m20 = MONTHS[c20(c.key)]
+        await p.getByTestId(`fam-period-${c20(c.key)}`).click()
+        ok(/Poupe 20%/.test(await card.getByTestId('fam-plan-discount').innerText()) && num(await card.getByTestId('fam-plan-total').innerText()) === total(c.base, m20, 20)
+          && /Renova por/.test(await card.getByTestId('fam-plan-renewal').innerText()) && num((await card.getByTestId('fam-plan-renewal').innerText()).split('a cada')[0]) === total(c.base, m20, 0), `${c.page}: ${c20(c.key)} — «Poupe 20%», a pagar agora ${total(c.base, m20, 20)} Kz, renova por ${total(c.base, m20, 0)} Kz`)
+        if (c.key === 'reseller') ok(/Solicitar contratação/.test(await card.getByTestId('fam-plan-cta').innerText()), `${c.page}: modo «só pedidos» → «Solicitar contratação» (compra directa: reseller-e2e)`)
         ok(await overflow(p) <= 1, `${c.page}: sem deslocamento horizontal`)
         await p.addStyleTag({ content: 'header { position: absolute !important } [data-floating] { display: none !important }' })
         await p.locator('[data-testid^=family-plans-]').first().screenshot({ path: `${OUT}/${label}-02-planos-${c.key}.png` })
@@ -157,18 +166,23 @@ async function ctxFor(b, opts, cookie, initCart) {
       const ia = p.locator('[data-testid=fam-plan-card][data-slug="ia-pro"]'); await ia.waitFor()
       const iaPrice = await one("SELECT price FROM product_prices pp JOIN products x ON x.id = pp.product_id WHERE x.slug = 'ia-pro' AND pp.cycle = 'monthly'")
       ok(num(await ia.getByTestId('fam-plan-monthly').innerText()) === Number(iaPrice.price) && await ia.getByTestId('fam-plan-discount').count() === 0, `plano existente «ia-pro»: ${iaPrice.price} Kz/mês, sem desconto (igual ao catálogo)`)
+      // Plano de revenda «sob consulta» (se existir): «Pedir proposta» mantido. Os 4 antigos sem preço passaram a
+      // rascunho na migração 23 (substituídos por Starter/Business/Pro); aqui usa-se um temporariamente.
+      await db.query("UPDATE products SET sale_status = 'on_request' WHERE slug = 'reseller-start'")
       await p.goto(BASE + '/revenda-de-hospedagem', { waitUntil: 'domcontentloaded' })
       const rs = p.locator('[data-testid=fam-plan-card][data-slug="reseller-start"]'); await rs.waitFor()
       ok(await rs.getByTestId('fam-plan-onrequest').count() === 1 && await rs.getByTestId('fam-plan-cta').getAttribute('href') === '/comprar/reseller-start' && /Pedir proposta/.test(await rs.getByTestId('fam-plan-cta').innerText()), 'revenda sob consulta: «Pedir proposta» mantido')
       await rs.getByTestId('fam-plan-cta').click(); await p.waitForURL('**/comprar/reseller-start')
       ok(await p.getByRole('button', { name: /Pedir proposta/ }).count() === 1, 'formulário de proposta aberto')
+      await db.query("UPDATE products SET sale_status = 'draft' WHERE slug = 'reseller-start'")
       ok(!p.errors.length, 'sem erros', p.errors.join(' | '))
       await ctx.close()
     }
 
     // ── 3. Compra: preços iguais até ao checkout ──
     console.log('\n3. Configuração da compra, carrinho e checkout (cliente)')
-    for (const c of created) {
+    // Revenda: compra directa bloqueada no modo «só pedidos» (testada em reseller-e2e.cjs)
+    for (const c of created.filter(x => x.key !== 'reseller')) {
       await db.query("UPDATE shopping_carts c JOIN profiles x ON x.id = c.profile_id SET c.items = '[]' WHERE x.email = 'cliente1@ensaio.test'")
       ;({ ctx, p } = await ctxFor(b, DESKTOP, c1.cookie))
       await p.goto(BASE + c.page, { waitUntil: 'domcontentloaded' })

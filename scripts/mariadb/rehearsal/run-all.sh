@@ -3,7 +3,7 @@
 #   APP_LOG=/caminho/next.log BASE_URL=http://localhost:3000 bash scripts/mariadb/rehearsal/run-all.sh
 # O processo Next de ensaio deve correr com RDAP_BOOTSTRAP_URL=http://127.0.0.1:12088/dns.json (mock-rdap.mjs),
 # NODE_EXTRA_CA_CERTS=<certificado do WHM simulado>, ORDER_RATE_LIMIT=500, QUOTE_RATE_LIMIT=200,
-# REGISTRAR_TEST_PROVISIONING=1, REGISTRAR_TIMEOUT_MS=2000, VPS_PROVIDER_TIMEOUT_MS=2000, LOGIN_RATE_LIMIT=100 e SIGNUP_RATE_LIMIT=200 (nunca em produção); RESEND_API_URL=http://127.0.0.1:12090 com mock-resend.mjs e RESEND_API_KEY fictícia «re_…» (com mock-registrar.mjs --delay=4000 na porta 12089 e mock-hostinger.mjs --delay=4000 --vps-ready=3000 na porta 12091).
+# REGISTRAR_TEST_PROVISIONING=1, REGISTRAR_TIMEOUT_MS=2000, RESELLER_PROVISIONING_ENABLED=1, RESELLER_WHM_TIMEOUT_MS=4000, RESELLER_REQUEST_RATE_LIMIT=1000, RESELLER_REQUEST_EMAIL_LIMIT=1000, RESELLER_CLIENT_RATE_LIMIT=1000, VPS_PROVIDER_TIMEOUT_MS=2000, LOGIN_RATE_LIMIT=100 e SIGNUP_RATE_LIMIT=200 (nunca em produção); RESEND_API_URL=http://127.0.0.1:12090 com mock-resend.mjs e RESEND_API_KEY fictícia «re_…» (com mock-registrar.mjs --delay=4000 na porta 12089 e mock-hostinger.mjs --delay=4000 --vps-ready=3000 na porta 12091).
 set -u
 cd "$(dirname "$0")/../../.."
 case "$(node --env-file=.env.local -p 'process.env.DB_NAME')" in
@@ -46,6 +46,7 @@ else
   run "E-mail corporativo (hero do painel, atalhos), submenus com imagem e WhatsApp/chat em todas as páginas (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/site-chrome-e2e.cjs
   run "Planos de Revenda, Criador de Sites e Construtor WordPress; Nossas Marcas; heros de Sobre nós, Parceria e Suporte (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/family-plans-e2e.cjs
   run "Características e descrições dos planos (editor, gravação, formatos antigos, cartões) (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/family-features-e2e.cjs
+  run "Revenda de Hospedagem: pedidos, modos, capacidade, motor WHM simulado, área do revendedor (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/reseller-e2e.cjs
   run "Servidores Dedicados Linux e Windows: planos, páginas e compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/dedicated-plans-e2e.cjs
   run "Menu principal (5 grupos), páginas consolidadas e encaminhamentos (desktop + telemóvel)" node scripts/mariadb/rehearsal/menu-e2e.cjs
   run "Percursos de compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/purchase-flows-e2e.cjs

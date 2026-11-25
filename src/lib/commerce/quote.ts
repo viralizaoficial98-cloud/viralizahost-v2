@@ -4,7 +4,7 @@ import { checkAvailability, normalizeDomain, splitDomain, type Availability } fr
 import { validateNameservers } from './nameservers'
 import { getDefaultNameservers } from './nameserver-settings'
 import { VPS_RETIRED_CYCLES, isVpsCycleForSale } from './vps-shared'
-import { FAMILY_CYCLE_RETIRED_MSG, familyOf, isFamilyCycleForSale } from './plan-families'
+import { FAMILY_CYCLE_RETIRED_MSG, familyCycleRetiredMsg, familyOf, isFamilyCycleForSale } from './plan-families'
 
 // Cotação calculada SEMPRE no servidor a partir da base (product_prices / domain_prices).
 // O cliente só envia escolhas (produto, ciclo, quantidade, domínio, operação).
@@ -134,6 +134,8 @@ export interface QuoteOptions {
   db?: Queryable
   userId?: string | null
   checkAvailability?: boolean
+  /** Encomenda criada pelo painel a partir de um pedido de Revenda tecnicamente aprovado */
+  resellerRequestId?: string | null
 }
 
 export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {}): Promise<Quote> {
@@ -214,14 +216,20 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
     // VPS (Servidor VPS): só os ciclos à venda; um carrinho antigo com um ciclo retirado pede outro período
     const serverVps = prod.category === 'vps' && !prod.subcategory
     if (serverVps) base.cycles = base.cycles.filter(x => isVpsCycleForSale(x.cycle))
-    // Revenda, Criador de Sites e Construtor WordPress: novas contratações só em 1 mês, 1, 2 e 3 anos
+    // Revenda, Criador de Sites e Construtor WordPress: só os períodos à venda de cada família (plan-families.ts)
     const family = familyOf(prod.category, prod.subcategory)
-    if (family) base.cycles = base.cycles.filter(x => isFamilyCycleForSale(x.cycle))
+    if (family) base.cycles = base.cycles.filter(x => isFamilyCycleForSale(x.cycle, family))
     if (prod.sale_status !== 'active') { lines.push({ ...base, error: err(prod.sale_status === 'on_request' ? 'on_request' : 'draft') }); continue }
     if (serverVps && !isVpsCycleForSale(cycle)) { lines.push({ ...base, error: err(VPS_RETIRED_CYCLES.includes(cycle) ? 'cycle_retired' : 'cycle_unavailable') }); continue }
-    if (family && !isFamilyCycleForSale(cycle)) { lines.push({ ...base, error: err('cycle_retired_plan') }); continue }
+    if (family && !isFamilyCycleForSale(cycle, family)) { lines.push({ ...base, error: { code: 'cycle_retired_plan', message: familyCycleRetiredMsg(family) } }); continue }
     const c = base.cycles.find(x => x.cycle === cycle)
     if (!c) { lines.push({ ...base, error: err('cycle_unavailable') }); continue }
+    // Revenda: modo comercial, autorização e capacidade verificados no servidor (lib/reseller/gate.ts)
+    if (family === 'reseller') {
+      const { resellerGate, GATE_MSG } = await import('@/lib/reseller/gate')
+      const code = await resellerGate(db, { productId: prod.id, cycle, userId: opts.userId, requestId: opts.resellerRequestId })
+      if (code) { lines.push({ ...base, error: { code, message: GATE_MSG[code] ?? code } }); continue }
+    }
     const qty = Number((raw as { quantity?: number }).quantity ?? 1)
     if (!Number.isInteger(qty) || qty < 1 || qty > base.maxQuantity!) { lines.push({ ...base, error: err('quantity_invalid') }); continue }
     Object.assign(base, { months: c.months, quantity: qty, unitPrice: c.price, lineTotal: round2(c.price * qty), renewalPrice: round2(c.renewal * qty),
@@ -257,7 +265,7 @@ export async function quoteCart(input: CartLineInput[], opts: QuoteOptions = {})
         ...(want.later && !img && avail.images.length ? { later: true } : {}),
       }
     }
-    if (base.serviceType === 'hosting' || base.serviceType === 'email') {
+    if (base.serviceType === 'hosting' || base.serviceType === 'email' || family === 'reseller') {
       const d = normalizeDomain((raw as { domain?: string }).domain)
       const mode = (raw as { domainMode?: DomainMode }).domainMode ?? 'existing'
       if (!d) { lines.push({ ...base, error: err('domain_required') }); continue }

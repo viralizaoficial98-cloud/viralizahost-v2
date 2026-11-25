@@ -94,7 +94,7 @@ try {
   const qB = await c2.quote([{ type: 'product', slug: 'hosting-start', cycle: 'monthly', domain: domB, domainMode: 'existing' }])
   const B = (await c2.order([{ type: 'product', slug: 'hosting-start', cycle: 'monthly', domain: domB, domainMode: 'existing' }], qB.json.quote.total, { proofFile: proofPath, transferRef: 'TRF-PAINEL' })).json?.order
   let p = await pending()
-  ok(p.status === 200 && Object.keys(p.cats).length === 5, 'acções pendentes: 5 categorias')
+  ok(p.status === 200 && Object.keys(p.cats).length === 6, 'acções pendentes: 6 categorias (inclui pedidos de Revenda)')
   const proofItem = p.cats.proofs?.items.find(i => i.ref === B?.order_number)
   ok(!!proofItem && /filtro=comprovativos/.test(proofItem.href) && proofItem.href.includes(B.order_number) && proofItem.since, `comprovativo ${B?.order_number} listado com referência, antiguidade e ligação ao registo`)
   const proofsBefore = p.cats.proofs.count

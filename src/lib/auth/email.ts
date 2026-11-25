@@ -9,6 +9,7 @@ import { getPool } from '@/lib/db/pool'
 // «Aceite» (o Resend devolveu um id) ≠ «entregue» (evento do Resend, consultado depois).
 
 export type Kind = 'recovery' | 'signup' | 'test'
+type LogKind = Kind | 'notice'
 
 const TEMPLATES: Record<Kind, { subject: string; title: string; text: string; cta: string }> = {
   recovery: {
@@ -35,7 +36,7 @@ export const resendApi = () => (process.env.RESEND_API_URL || 'https://api.resen
 export const emailFrom = () => ({ email: process.env.RESEND_FROM_EMAIL || 'comercial@viralizahost.com', name: process.env.RESEND_FROM_NAME || 'ViralizaHost' })
 const clean = (s: unknown) => String(s ?? '').replace(/re_[A-Za-z0-9_]{8,}/g, '[chave]').replace(/https?:\/\/\S+/g, '[url]').slice(0, 300)
 
-async function record(kind: Kind, to: string, userId: string | null, status: 'accepted' | 'failed' | 'not_configured', providerId: string | null, error: string | null) {
+async function record(kind: LogKind, to: string, userId: string | null, status: 'accepted' | 'failed' | 'not_configured', providerId: string | null, error: string | null) {
   await getPool().query('INSERT INTO auth_email_log (id, user_id, kind, recipient, provider_id, status, error) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [randomUUID(), userId, kind, to.toLowerCase(), providerId, status, error]).catch(e => console.error('[auth/email] registo falhou:', (e as Error).message))
 }
@@ -95,4 +96,37 @@ export async function fetchDeliveryEvent(providerId: string): Promise<{ ok: bool
     if (j.last_event) await getPool().query('UPDATE auth_email_log SET last_event = ?, last_event_at = CURRENT_TIMESTAMP(6) WHERE provider_id = ?', [j.last_event, providerId])
     return { ok: true, lastEvent: j.last_event }
   } catch (e) { return { ok: false, error: clean((e as Error).message) } }
+}
+
+const escHtml = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
+
+/**
+ * Aviso transaccional (ex.: estado de um pedido de Revenda). Mesmo fornecedor e registo (auth_email_log, kind
+ * «notice») dos e-mails de autenticação. Texto simples escapado; nunca leva senhas, tokens nem sessões temporárias.
+ */
+export async function sendNoticeEmail(to: string, subject: string, title: string, text: string, cta?: { label: string; link: string } | null, userId: string | null = null): Promise<{ ok: boolean; error?: string }> {
+  const key = process.env.RESEND_API_KEY
+  if (!key) { await record('notice', to, userId, 'not_configured', null, 'RESEND_API_KEY em falta no processo'); return { ok: false, error: 'Serviço de e-mail não configurado.' } }
+  const from = emailFrom()
+  const html = `<!doctype html><html><body style="margin:0;background:#0D0D0D;font-family:Arial,sans-serif;color:#fff">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 16px">
+<table width="100%" style="max-width:520px;background:#141414;border:1px solid rgba(245,183,0,.25);border-radius:16px">
+<tr><td style="padding:32px">
+<h1 style="margin:0 0 16px;font-size:22px;color:#F5B700">${escHtml(title)}</h1>
+<p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#ccc;white-space:pre-line">${escHtml(text)}</p>
+${cta ? `<a href="${escHtml(cta.link)}" style="display:inline-block;background:#F5B700;color:#000;font-weight:bold;text-decoration:none;padding:12px 24px;border-radius:10px">${escHtml(cta.label)}</a>` : ''}
+</td></tr></table></td></tr></table></body></html>`
+  try {
+    const res = await fetch(`${resendApi()}/emails`, {
+      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: `${from.name} <${from.email}>`, to: [to], subject, html, text: `${title}\n\n${text}\n${cta ? `\n${cta.label}: ${cta.link}\n` : ''}` }),
+      signal: AbortSignal.timeout(15_000), cache: 'no-store',
+    })
+    const j = await res.json().catch(() => ({})) as { id?: string; message?: string }
+    if (!res.ok || !j.id) { const err = clean(`HTTP ${res.status}: ${j.message ?? 'sem detalhe'}`); await record('notice', to, userId, 'failed', null, err); return { ok: false, error: err } }
+    await record('notice', to, userId, 'accepted', j.id, null)
+    return { ok: true }
+  } catch (e) {
+    const err = clean((e as Error).message); await record('notice', to, userId, 'failed', null, err); return { ok: false, error: err }
+  }
 }

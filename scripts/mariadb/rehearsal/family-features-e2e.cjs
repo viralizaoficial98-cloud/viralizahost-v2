@@ -39,6 +39,8 @@ async function ctxFor(b, opts, cookie) {
   const snapProd = await all(`SELECT id, description, base_monthly_price, sale_status FROM products WHERE id IN ${inI}`, idList)
   const snapFeat = await all(`SELECT * FROM product_features WHERE product_id IN ${inI}`, idList)
   const snapPrice = await all(`SELECT * FROM product_prices WHERE product_id IN ${inI}`, idList)
+  // Revenda: os planos antigos sem preço passaram a rascunho (migração 23); este ensaio usa um «sob consulta» (reposto no fim)
+  await db.query("UPDATE products SET sale_status = 'on_request' WHERE slug = 'reseller-business' AND sale_status = 'draft'")
   const priceKey = async () => JSON.stringify(await all(`SELECT product_id, cycle, price, renewal_price, discount_pct, active FROM product_prices WHERE product_id IN ${inI} ORDER BY product_id, cycle`, idList))
   const ordersBefore = Number((await one('SELECT COUNT(*) n FROM orders')).n)
   const feats = id => all('SELECT feature, icon, included, position FROM product_features WHERE product_id = ? ORDER BY position', [id])

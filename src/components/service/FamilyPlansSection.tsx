@@ -5,7 +5,7 @@ import { Check, Layers, X } from 'lucide-react'
 import { useLocale } from '@/hooks/useLocale'
 import { convertFromAOA } from '@/lib/currency'
 import { selectorBadge } from '@/lib/commerce/period-pricing'
-import { FAMILY_PERIODS } from '@/lib/commerce/plan-families'
+import { familyPeriods, type PlanFamily } from '@/lib/commerce/plan-families'
 import { isVpsIcon, type VpsIcon } from '@/lib/commerce/vps-shared'
 import { FEATURE_ICONS } from './VpsPlansSection'
 
@@ -21,7 +21,7 @@ export interface FamilyCardPlan {
 const monthsLabel = (m: number) => (m === 1 ? '1 mês' : m % 12 === 0 ? `${m / 12} ${m === 12 ? 'ano' : 'anos'}` : `${m} meses`)
 
 /** Cartão de plano (página pública e pré-visualização do painel). */
-export function FamilyPlanCard({ plan, cycle, fmt, preview = false }: { plan: FamilyCardPlan; cycle: string; fmt: (v: number) => string; preview?: boolean }) {
+export function FamilyPlanCard({ plan, cycle, fmt, preview = false, cta }: { plan: FamilyCardPlan; cycle: string; fmt: (v: number) => string; preview?: boolean; cta?: React.ReactNode }) {
   const dark = plan.highlight
   const muted = dark ? 'text-gray-400' : 'text-[#777]'
   const pr = plan.periods.find(p => p.cycle === cycle) ?? null
@@ -79,7 +79,7 @@ export function FamilyPlanCard({ plan, cycle, fmt, preview = false }: { plan: Fa
         )}
 
         <div className="mt-auto pt-2">
-          {href && !preview ? (
+          {cta !== undefined && !preview ? cta : href && !preview ? (
             <Link href={href} data-testid="fam-plan-cta"
               className={`block w-full text-center py-3 rounded-xl font-bold text-sm transition-all ${dark ? 'bg-[#F5B700] text-[#0A0A0A] hover:bg-[#E5A800]' : 'bg-[#0A0A0A] text-white hover:bg-[#222]'}`}>
               {plan.onRequest ? 'Pedir proposta' : 'Comprar agora'}
@@ -91,14 +91,20 @@ export function FamilyPlanCard({ plan, cycle, fmt, preview = false }: { plan: Fa
   )
 }
 
-export function FamilyPlansSection({ plans, title, subtitle, tag = 'Planos e preços', id = 'planos', testId }: { plans: FamilyCardPlan[]; title: string; subtitle?: string; tag?: string; id?: string; testId?: string }) {
+export function FamilyPlansSection({ plans, title, subtitle, tag = 'Planos e preços', id = 'planos', testId, family = null, footnote, ctaFor }: {
+  plans: FamilyCardPlan[]; title: string; subtitle?: string; tag?: string; id?: string; testId?: string; family?: PlanFamily | null
+  /** Texto por baixo dos planos (omissão: períodos da família) */
+  footnote?: string
+  /** Botão de cada plano decidido pela página (ex.: Revenda conforme o modo comercial) */
+  ctaFor?: (plan: FamilyCardPlan, cycle: string) => React.ReactNode
+}) {
   const { formatCurrency, currency } = useLocale()
   const fmt = (v: number) => formatCurrency(convertFromAOA(v, currency))
   // Só os 4 períodos de novas contratações que algum plano publica; etiqueta do selector a partir dos descontos
-  const periods = useMemo(() => FAMILY_PERIODS.map(per => {
+  const periods = useMemo(() => familyPeriods(family).map(per => {
     const ds = plans.flatMap(p => p.periods.filter(x => x.cycle === per.cycle).map(x => x.discount))
     return { ...per, available: ds.length > 0, badge: selectorBadge(ds) }
-  }).filter(p => p.available), [plans])
+  }).filter(p => p.available), [plans, family])
   const [cycle, setCycle] = useState<string>(() => periods.find(p => p.cycle === 'monthly')?.cycle ?? periods[0]?.cycle ?? 'monthly')
   const cols = plans.length >= 4 ? 'lg:grid-cols-4' : plans.length === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-2'
 
@@ -130,10 +136,10 @@ export function FamilyPlansSection({ plans, title, subtitle, tag = 'Planos e pre
           </div>
         ) : (
           <div className={`grid grid-cols-1 sm:grid-cols-2 ${cols} gap-6 max-w-6xl mx-auto pt-4`}>
-            {plans.map(p => <FamilyPlanCard key={p.slug} plan={p} cycle={cycle} fmt={fmt} />)}
+            {plans.map(p => <FamilyPlanCard key={p.slug} plan={p} cycle={cycle} fmt={fmt} cta={ctaFor?.(p, cycle)} />)}
           </div>
         )}
-        <p className="text-center text-xs text-[#888] mt-8">Períodos de 1 mês, 1, 2 e 3 anos, pagos antecipadamente · a renovação é indicada em cada plano</p>
+        <p className="text-center text-xs text-[#888] mt-8" data-testid="fam-plans-footnote">{footnote ?? `Períodos de ${familyPeriods(family).map(p => p.label.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' e $1')}, pagos antecipadamente · a renovação é indicada em cada plano`}</p>
       </div>
     </section>
   )

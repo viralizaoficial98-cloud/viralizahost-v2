@@ -4,8 +4,13 @@ import { Footer } from '@/components/layout/Footer'
 import { ServiceHero } from '@/components/service/ServiceHero'
 import { getBannerPage } from '@/lib/banner-pages'
 import { fromPriceText } from '@/lib/commerce/from-price'
-import { FamilyPlansSection } from '@/components/service/FamilyPlansSection'
 import { publicFamilyPlans } from '@/lib/commerce/family-plans'
+import { ResellerOffer, type OfferMode } from '@/components/service/reseller/ResellerOffer'
+import { ResellerComparison, ResellerFaq, ResellerHowItWorks, ResellerWhmInfo } from '@/components/service/reseller/ResellerInfo'
+import { getResellerSettings } from '@/lib/reseller/settings'
+import { listProfiles } from '@/lib/reseller/profiles'
+import { createAuthClient } from '@/lib/supabase/server'
+import { getPool } from '@/lib/db/pool'
 import { IncludedFeatures } from '@/components/service/IncludedFeatures'
 import { FinalCTA } from '@/components/service/FinalCTA'
 import { Users, Server, Globe, Shield, Mail, RotateCcw, Headphones, Lock, Layers } from 'lucide-react'
@@ -32,9 +37,23 @@ export const dynamic = 'force-dynamic'
 
 export default async function RevendaDeHospedagemPage() {
   const banner = await getBannerPage('revenda-de-hospedagem')
-  // Planos do catálogo (Catálogo e Preços → Planos); só 1 mês, 1, 2 e 3 anos para novas contratações
+  // Planos do catálogo (Catálogo e Preços → Revenda): mensal, trimestral, semestral e anual
   const plans = await publicFamilyPlans('reseller').catch(() => [])
   const fromPrice = await fromPriceText('reseller')
+  // Modo comercial (painel → Revenda de Hospedagem); o servidor volta a validar cada pedido e cada compra
+  const settings = await getResellerSettings().catch(() => null)
+  const { data: { user } } = await (await createAuthClient()).auth.getUser()
+  const [[me]] = user ? await getPool().query('SELECT full_name, email, phone, role FROM profiles WHERE id = ?', [user.id]).catch(() => [[null]]) as never : [[null]]
+  const m = settings?.mode ?? 'disabled'
+  const mode: OfferMode = m === 'disabled' ? 'closed' : m === 'test' ? ((me as { role?: string } | null)?.role === 'admin' ? 'test' : 'closed') : m === 'automatic' && settings?.automaticReady ? 'automatic' : 'request'
+  const prefill = { fullName: String((me as { full_name?: string } | null)?.full_name ?? ''), email: String((me as { email?: string } | null)?.email ?? ''), phone: String((me as { phone?: string } | null)?.phone ?? ''), loggedIn: !!me }
+  // Comparação: limites públicos do perfil técnico (espaço, contas, tráfego) — sem dados internos (ACL, pacotes, servidores)
+  const profiles = await listProfiles().catch(() => [])
+  const compare = plans.filter(p => !p.onRequest).map(p => {
+    const pr = profiles.find(x => x.slug === p.slug)
+    const monthly = p.periods.find(x => x.cycle === 'monthly')
+    return { slug: p.slug, name: p.name, highlight: p.highlight, monthly: monthly ? monthly.total : p.base, storageMb: pr?.storageMb ?? null, bandwidthMb: pr?.bandwidthMb ?? null, accounts: pr?.maxAccounts ?? null }
+  })
   return (
     <>
       <Header />
@@ -54,16 +73,18 @@ export default async function RevendaDeHospedagemPage() {
           highlights={banner?.highlights?.length ? banner.highlights : ["WHM/cPanel Incluído","DNS Whitelabel","SSL por Conta","Suporte Revendedor"]}
           guarantee={banner?.show_guarantee ?? true}
         />
-        <FamilyPlansSection plans={plans} testId="family-plans-reseller"
-          title="Revenda de Hospedagem — Escolha o plano"
-          subtitle="Comece a vender hospedagem hoje com a infraestrutura da ViralizaHost." />
+        <ResellerOffer plans={plans} mode={mode} prefill={prefill} notice={settings?.requestNotice ?? null} />
+        <ResellerComparison plans={compare} />
+        <ResellerHowItWorks />
+        <ResellerWhmInfo />
         <IncludedFeatures features={included}
           title="Tudo o que precisa para revender hospedagem" />
+        <ResellerFaq />
         <FinalCTA
           title="Inicie o seu negócio de hospedagem hoje"
           subtitle="Infraestrutura premium, marca própria e suporte dedicado ao revendedor."
-          cta="Começar a Revender"
-          ctaHref="#planos" />
+          cta={mode === 'closed' ? 'Ver planos' : mode === 'automatic' ? 'Começar a Revender' : 'Solicitar contratação'}
+          ctaHref={mode === 'closed' || mode === 'automatic' ? '#planos' : '#pedido'} />
       </main>
       <Footer />
     </>

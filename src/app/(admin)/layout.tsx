@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Users, CreditCard, MessageSquare, Settings,
-  Server, Globe, Activity, LogOut, ChevronRight, Monitor, ShoppingBag, Menu, X, Bot, Package, Plug, Receipt, FileQuestion,
+  Server, Globe, Activity, LogOut, ChevronRight, Monitor, ShoppingBag, Menu, X, Bot, Package, Plug, Receipt, FileQuestion, Layers,
 } from 'lucide-react'
 import { createAuthClient } from '@/lib/supabase/client'
 
@@ -17,7 +17,8 @@ const adminNav = [
   { href: '/admin/clients',   icon: Users,           label: 'Clientes',       match: ['/admin/clients'] },
   { href: '/admin/financial', icon: CreditCard,      label: 'Financeiro',     match: ['/admin/financial'] },
   { href: '/admin/tickets',   icon: MessageSquare,   label: 'Tickets',        match: ['/admin/tickets'] },
-  { href: '/admin/servers',   icon: Server,          label: 'Servidores',     match: ['/admin/servers'] },
+  { href: '/admin/servers',   icon: Server,          label: 'Infraestrutura', match: ['/admin/servers'] },
+  { href: '/admin/reseller',  icon: Layers,          label: 'Revenda de Hospedagem', match: ['/admin/reseller'] },
   { href: '/admin/domains',   icon: Globe,           label: 'Domínios',       match: ['/admin/domains'] },
   { href: '/admin/activity',  icon: Activity,        label: 'Atividade',      match: ['/admin/activity', '/admin/email-logs'] },
   { href: '/admin/orders',    icon: ShoppingBag,     label: 'Pedidos',        match: ['/admin/orders'] },

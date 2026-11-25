@@ -53,6 +53,16 @@ async function quotes() {
   return { count: Number(c.n), items: rows.map(r => ({ id: r.id, ref: r.reference, detail: [r.product_name, r.name].filter(Boolean).join(' · '), status: 'Por responder', since: r.created_at, href: `/admin/quotes?estado=new&ref=${enc(r.reference)}` })) }
 }
 
+const RV: Record<string, string> = { submitted: 'Pedido recebido', under_review: 'Em análise', paid: 'Pago: autorizar activação', awaiting_confirmation: 'Confirmar ACL', failed: 'Falha na activação' }
+async function resellerRequests() {
+  const where = `status IN ('submitted','under_review','paid','awaiting_confirmation','failed')`
+  const [[c], rows] = await Promise.all([
+    q(`SELECT COUNT(*) n FROM reseller_requests WHERE ${where}`),
+    q(`SELECT id, reference, full_name, domain, status, created_at FROM reseller_requests WHERE ${where} ORDER BY created_at LIMIT ${LIMIT}`),
+  ])
+  return { count: Number(c.n), items: rows.map(r => ({ id: r.id, ref: r.reference, detail: [r.full_name, r.domain].filter(Boolean).join(' · '), status: RV[r.status] ?? r.status, since: r.created_at, href: `/admin/reseller?pedido=${enc(r.reference)}` })) }
+}
+
 async function tickets() {
   // Por responder: aberto/em curso e sem resposta da equipa depois da última mensagem do cliente
   const base = `FROM tickets t
@@ -71,6 +81,7 @@ const CATEGORIES: { key: string; label: string; action: string; listHref: string
   { key: 'domains', label: 'Domínios à espera de confirmação', action: 'Confirmar domínio', listHref: '/admin/orders?filtro=dominios', fn: domains },
   { key: 'activations', label: 'Encomendas pagas por activar', action: 'Abrir activação', listHref: '/admin/orders?filtro=activacao', fn: activations },
   { key: 'quotes', label: 'Pedidos de cotação por responder', action: 'Responder cotação', listHref: '/admin/quotes?estado=new', fn: quotes },
+  { key: 'reseller', label: 'Pedidos de Revenda por tratar', action: 'Abrir pedido', listHref: '/admin/reseller', fn: resellerRequests },
   { key: 'tickets', label: 'Tickets por responder', action: 'Responder ticket', listHref: '/admin/tickets', fn: tickets },
 ]
 
