@@ -11,12 +11,50 @@ import { ActivationError, markServiceActive, provisionOrder, provisionService, r
 export const dynamic = 'force-dynamic'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export async function GET() {
+// Lista de comprovativos (?lista=comprovativos): paginada, pesquisável e ordenável no servidor, para que a
+// acumulação de registos antigos nunca esconda os novos — e os antigos continuem acessíveis (estado «todos»).
+const PROOF_STATES = ['pendentes', 'validados', 'rejeitados', 'todos'] as const
+const PROOF_SORT: Record<string, string> = { recentes: 'proof_at DESC, o.id', antigos: 'proof_at ASC, o.id', valor: 'o.amount DESC, proof_at DESC, o.id' }
+const PROOF_PAGE = 20
+async function proofList(sp: URLSearchParams) {
+  const estado = (PROOF_STATES as readonly string[]).includes(sp.get('estado') ?? '') ? sp.get('estado')! : 'pendentes'
+  const ordem = sp.get('ordem') && PROOF_SORT[sp.get('ordem')!] ? sp.get('ordem')! : 'recentes'
+  const text = (sp.get('q') ?? '').trim().slice(0, 80)
+  const page = Math.max(1, Math.min(10000, parseInt(sp.get('pagina') ?? '1') || 1))
+  // Comprovativo: no pagamento (ligado à encomenda ou à sua factura) ou na própria encomenda
+  const pays = `FROM payments p LEFT JOIN invoices iv ON iv.id = p.invoice_id WHERE (p.order_id = o.id OR iv.order_id = o.id) AND p.proof_url IS NOT NULL`
+  const where = [`(o.proof_file IS NOT NULL OR EXISTS (SELECT 1 ${pays}))`], args: unknown[] = []
+  if (estado === 'pendentes') where.push(`o.payment_status = 'proof_submitted' AND o.status NOT IN ('rejected','cancelled')`)
+  if (estado === 'validados') where.push(`o.payment_status = 'paid'`)
+  if (estado === 'rejeitados') where.push(`(o.payment_status = 'failed' OR o.status IN ('rejected','cancelled') OR EXISTS (SELECT 1 ${pays} AND p.status = 'rejected'))`)
+  if (text) {
+    const like = `%${text.replace(/[\\%_]/g, m => '\\' + m)}%`
+    where.push(`(o.order_number LIKE ? OR o.transfer_ref LIKE ? OR pr.full_name LIKE ? OR pr.email LIKE ? OR EXISTS (SELECT 1 ${pays} AND p.transfer_ref LIKE ?))`)
+    args.push(like, like, like, like, like)
+  }
+  const from = `FROM orders o LEFT JOIN profiles pr ON pr.id = o.user_id WHERE ${where.join(' AND ')}`
+  const pool = getPool()
+  const [[c]] = await pool.query(`SELECT COUNT(*) n ${from}`, args) as any
+  const [rows] = await pool.query(`SELECT o.id, COALESCE((SELECT MAX(p.created_at) ${pays}), o.created_at) proof_at ${from} ORDER BY ${PROOF_SORT[ordem]} LIMIT ${PROOF_PAGE} OFFSET ${(page - 1) * PROOF_PAGE}`, args) as any
+  const total = Number(c.n)
+  return { ids: (rows as any[]).map(r => r.id as string), proofAt: Object.fromEntries((rows as any[]).map(r => [r.id, r.proof_at])), meta: { estado, ordem, q: text, page, perPage: PROOF_PAGE, total, pages: Math.max(1, Math.ceil(total / PROOF_PAGE)) } }
+}
+
+export async function GET(req: NextRequest) {
   try { await requireAdminRole() } catch { return NextResponse.json({ orders: [], error: 'Unauthorized' }, { status: 401 }) }
   const db = createAdminWriteClient()
+  const sp = new URL(req.url).searchParams
+  const proofMode = sp.get('lista') === 'comprovativos'
   const COLS = `id, order_number, user_id, status, payment_status, activation_status, hold_reason, review_flag, review_note, review_at, amount, currency, subtotal, tax_amount, billing_cycle, payment_method,
       domain_name, proof_file, transfer_ref, notes, created_at, updated_at, paid_at,
       order_items(id, service_name, service_type, quantity, unit_price, line_total, renewal_price, billing_cycle, domain_name, domain_operation, availability, years, nameservers, domain_case, domain_case_note, proposed_domain, options)`
+  let proofs: Awaited<ReturnType<typeof proofList>> | null = null
+  let orders: any[]
+  if (proofMode) {
+    try { proofs = await proofList(sp) } catch (e) { console.error('[admin/orders proofs]', (e as Error).message); return NextResponse.json({ orders: [], error: 'Falha ao carregar os comprovativos.' }, { status: 500 }) }
+    const got = proofs.ids.length ? (await db.from('orders').select(COLS).in('id', proofs.ids)).data ?? [] : []
+    orders = proofs.ids.map(id => got.find((o: any) => o.id === id)).filter(Boolean).map((o: any) => ({ ...o, proof_at: proofs!.proofAt[o.id] ?? null }))
+  } else {
   const { data: recent, error } = await db.from('orders').select(COLS).order('created_at', { ascending: false }).limit(300)
   if (error) return NextResponse.json({ orders: [], error: error.message })
   // Encomendas mais antigas com acções pendentes (activação por fazer, comprovativo, domínio por confirmar)
@@ -29,7 +67,8 @@ export async function GET() {
   const have = new Set((recent ?? []).map((o: any) => o.id))
   const missing = (pendingRows as any[]).map(r => r.id).filter(id => !have.has(id))
   const older = missing.length ? (await db.from('orders').select(COLS).in('id', missing)).data ?? [] : []
-  const orders = [...(recent ?? []), ...older].sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))
+  orders = [...(recent ?? []), ...older].sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))
+  }
   const ids = (orders ?? []).map((o: any) => o.id)
   const userIds = [...new Set((orders ?? []).map((o: any) => o.user_id).filter(Boolean))]
   const [{ data: services }, { data: profiles }, { data: invoices }, { data: payments }] = await Promise.all([
@@ -76,7 +115,7 @@ export async function GET() {
       proof_url: signed,
     }
   }))
-  return NextResponse.json({ orders: out, registrar })
+  return NextResponse.json({ orders: out, registrar, ...(proofs ? { proofs: proofs.meta } : {}) })
 }
 
 // Acções do administrador. Nenhuma acção de activação cobra o cliente.

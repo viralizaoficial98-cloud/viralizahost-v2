@@ -15,12 +15,16 @@ const LIMIT = 5
 const enc = encodeURIComponent
 
 async function proofs(): Promise<{ count: number; items: PendingItem[] }> {
-  const where = `p.status IN ('under_review','proof_uploaded') AND o.status NOT IN ('rejected','cancelled') AND o.payment_status <> 'paid'`
+  // Comprovativo ligado à encomenda ou só à factura (pagamentos iniciados na Área do Cliente). Os mais RECENTES
+  // primeiro: registos antigos acumulados nunca escondem um pagamento novo (a lista completa é paginada em
+  // /admin/orders?filtro=comprovativos, com ordenação «mais antigos» e acesso aos antigos).
+  const from = `FROM payments p LEFT JOIN invoices iv ON iv.id = p.invoice_id JOIN orders o ON o.id = COALESCE(p.order_id, iv.order_id)
+    WHERE p.status IN ('under_review','proof_uploaded') AND o.status NOT IN ('rejected','cancelled') AND o.payment_status <> 'paid'`
   const [[c], rows] = await Promise.all([
-    q(`SELECT COUNT(*) n FROM payments p JOIN orders o ON o.id = p.order_id WHERE ${where}`),
-    q(`SELECT p.id, o.order_number, o.id AS order_id, p.amount, p.created_at FROM payments p JOIN orders o ON o.id = p.order_id WHERE ${where} ORDER BY p.created_at LIMIT ${LIMIT}`),
+    q(`SELECT COUNT(*) n ${from}`),
+    q(`SELECT p.id, o.order_number, o.id AS order_id, p.amount, p.created_at ${from} ORDER BY p.created_at DESC, p.id LIMIT ${LIMIT}`),
   ])
-  return { count: Number(c.n), items: rows.map(r => ({ id: r.id, ref: r.order_number ?? r.order_id.slice(0, 8), detail: `Kz ${Number(r.amount).toLocaleString('pt-PT').replace(/\s/g, ' ')}`, status: 'Comprovativo em análise', since: r.created_at, href: `/admin/orders?filtro=comprovativos&encomenda=${enc(r.order_number ?? r.order_id)}` })) }
+  return { count: Number(c.n), items: rows.map(r => ({ id: r.id, ref: r.order_number ?? r.order_id.slice(0, 8), detail: `Kz ${Number(r.amount).toLocaleString('pt-PT').replace(/\s/g, ' ')}`, status: 'Comprovativo em análise', since: r.created_at, href: `/admin/orders?filtro=comprovativos&q=${enc(r.order_number ?? r.order_id)}&encomenda=${enc(r.order_number ?? r.order_id)}` })) }
 }
 
 async function domains() {
