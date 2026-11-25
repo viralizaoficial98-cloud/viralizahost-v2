@@ -73,7 +73,8 @@ const hide = p => p.addStyleTag({ content: '[data-floating]{display:none!importa
   try {
     // ── 0. Preparação ──
     console.log('\n0. Fornecedor simulado, opções e planos de ensaio')
-    let r = await cv({ action: 'provider_save', mode: 'test', apiUrl: MOCK, paymentMethodId: 7001, hostnameSuffix: 'srv.ensaio.test' })
+    // Token de ensaio próprio (a base pode não ter nenhum): só serve o simulador; nunca é devolvido ao navegador
+    let r = await cv({ action: 'provider_save', mode: 'test', apiUrl: MOCK, secret: 'hostinger-de-ensaio', paymentMethodId: 7001, hostnameSuffix: 'srv.ensaio.test' })
     ok(r.status === 200, 'fornecedor em ensaio (API simulada)', r.json)
     r = await cv({ action: 'test' })
     ok(r.status === 200 && r.json.ok && ['catalog', 'virtualMachines', 'dataCenters', 'templates', 'paymentMethods', 'subscriptions', 'firewalls'].every(k => r.json.results[k]?.ok), 'Testar ligação: resultado OK por consulta (7 consultas)', r.json)
@@ -536,7 +537,7 @@ const hide = p => p.addStyleTag({ content: '[data-floating]{display:none!importa
     await db.query("UPDATE vps_instances SET link_status = 'unlinked', service_id = NULL, profile_id = NULL WHERE provider_vm_id <> '1564781'")
     await db.query('DELETE FROM vps_sync_runs WHERE created_at >= ?', [started])
     const s = snapSettings
-    await db.query('UPDATE vps_provider_settings SET mode = ?, api_url = ?, auto_provision = ?, payment_method_id = ?, options = ?, last_test_ok = ?, last_test_at = ?, last_test_message = ? WHERE id = 1', [s.mode, s.api_url, s.auto_provision, s.payment_method_id, s.options, s.last_test_ok, s.last_test_at, s.last_test_message])
+    await db.query('UPDATE vps_provider_settings SET mode = ?, api_url = ?, secret_enc = ?, auto_provision = ?, payment_method_id = ?, options = ?, last_test_ok = ?, last_test_at = ?, last_test_message = ? WHERE id = 1', [s.mode, s.api_url, s.secret_enc, s.auto_provision, s.payment_method_id, s.options, s.last_test_ok, s.last_test_at, s.last_test_message])
     await b.close(); await db.end()
     console.log(`\n${pass} passaram, ${fail} falharam`)
     process.exitCode = fail ? 1 : 0
