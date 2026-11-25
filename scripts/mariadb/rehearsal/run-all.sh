@@ -23,6 +23,7 @@ run "Compras, pagamentos e activação" node --env-file=.env.local scripts/maria
 run "Área do Cliente, renovações, catálogo" node --env-file=.env.local scripts/mariadb/rehearsal/client-area-e2e.mjs
 run "Importação WHM" node --env-file=.env.local scripts/mariadb/rehearsal/whm-import-e2e.mjs
 run "Associação manual de contas WHM a clientes" node --env-file=.env.local scripts/mariadb/rehearsal/whm-link-e2e.mjs
+run "Associação manual vs. opção de confirmação de e-mail (activada/desactivada, alteração entre pesquisa e gravação)" node --env-file=.env.local scripts/mariadb/rehearsal/whm-link-confirmation-e2e.cjs
 run "Contas: verificação de e-mail e eliminação" node --env-file=.env.local scripts/mariadb/rehearsal/account-email-e2e.mjs
 run "Painel: receita, acções pendentes, registrador e WHM" node --env-file=.env.local scripts/mariadb/rehearsal/admin-ops-e2e.mjs
 run "Registrador Hostinger (API simulada): compra autorizada, 202, timeout, recuperação" node --env-file=.env.local scripts/mariadb/rehearsal/hostinger-e2e.mjs

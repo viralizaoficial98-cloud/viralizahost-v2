@@ -15,7 +15,7 @@ export interface WhmAccountForLink {
   server_label?: string | null
   candidate?: { id: string; full_name?: string; email?: string } | null
 }
-type Client = { id: string; full_name: string; email: string; eligible: boolean; reason: string | null }
+type Client = { id: string; full_name: string; email: string; eligible: boolean; reason: string | null; email_confirmed?: boolean }
 type Conflict = { currentClient?: { full_name?: string; email?: string } | null; serviceId?: string | null }
 
 interface Props {
@@ -67,6 +67,12 @@ function Dialog({ account, onClose, onLinked }: { account: WhmAccountForLink } &
       const j = await r.json().catch(() => ({}))
       if (r.ok) { onLinked(); return }
       setError(j.error ?? 'Não foi possível associar.')
+      // Elegibilidade decidida pelo servidor (ex.: a confirmação de e-mail foi activada depois da pesquisa):
+      // o cliente deixa de estar seleccionado e a lista mostra-o como não elegível, sem gravar nada
+      if (j.code === 'email_not_confirmed' || j.code === 'client_not_eligible') {
+        setSelected(null); setConfirmed(false)
+        setResults(rs => rs.map(c => c.id === selected.id ? { ...c, eligible: false, reason: j.code === 'email_not_confirmed' ? 'E-mail ainda não confirmado no portal' : (j.error ?? 'Não elegível') } : c))
+      }
       if (r.status === 409) setConflict(j.conflict ?? {})
     } catch { setError('Falha de rede.') } finally { setSaving(false) }
   }
@@ -101,11 +107,12 @@ function Dialog({ account, onClose, onLinked }: { account: WhmAccountForLink } &
             {results.map(c => (
               <li key={c.id}>
                 <button type="button" disabled={!c.eligible} onClick={() => { setSelected(c); setConfirmed(false); setConflict(null); setError(null) }}
-                  className="w-full text-left px-3 py-2 text-xs disabled:opacity-60" data-testid="client-option"
+                  className="w-full text-left px-3 py-2 text-xs disabled:opacity-60" data-testid="client-option" data-eligible={c.eligible ? '1' : '0'}
                   style={{ background: selected?.id === c.id ? '#FFF8E1' : '#FFF', borderBottom: '1px solid #F1F5F9', cursor: c.eligible ? 'pointer' : 'not-allowed' }}>
                   <span className="font-bold block" style={{ color: '#0B0B0D' }}>{c.full_name || 'Sem nome'}</span>
                   <span style={{ color: '#64748B' }}>{c.email}</span>
-                  {c.reason && <span className="block" style={{ color: '#B45309' }}>Não elegível: {c.reason}</span>}
+                  {c.reason && <span className="block" style={{ color: '#B45309' }} data-testid="client-ineligible">Não elegível: {c.reason}</span>}
+                  {c.eligible && c.email_confirmed === false && <span className="block" style={{ color: '#64748B' }} data-testid="client-unconfirmed-note">E-mail por confirmar (confirmação desactivada em Configurações → Contas)</span>}
                 </button>
               </li>
             ))}

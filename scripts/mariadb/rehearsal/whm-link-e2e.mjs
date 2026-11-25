@@ -39,6 +39,10 @@ ok((await c1.login('cliente1@ensaio.test', 'Cliente#Um2026')).status === 200, 'l
 ok((await c2.login('cliente2@ensaio.test', 'Cliente#Dois2026')).status === 200, 'login cliente 2')
 const id = async email => (await one('SELECT id FROM profiles WHERE email = ?', [email])).id
 const p1 = await id('cliente1@ensaio.test'), p2 = await id('cliente2@ensaio.test'), pAdm = await id('admin@ensaio.test')
+// Este conjunto testa a regra com a confirmação de e-mail ACTIVA (Configurações → Contas); a regra com a opção
+// desactivada está em whm-link-confirmation-e2e.cjs. A opção é reposta no fim.
+const snapAccountSettings = await one('SELECT * FROM account_settings WHERE id = 1')
+await adm.req('/api/admin/settings/accounts', { method: 'PUT', body: { emailConfirmationRequired: true } })
 // Cliente registado mas com e-mail por confirmar (não elegível)
 const pNC = randomUUID(), ncEmail = `porconfirmar-${pNC.slice(0, 6)}@ensaio.test`
 await db.query('INSERT INTO auth_users (id, email, encrypted_password, email_confirmed_at) VALUES (?, ?, NULL, NULL)', [pNC, ncEmail])
@@ -142,6 +146,8 @@ try {
   r = await adm.req(`/api/admin/whm/accounts/${tadm.id}/candidate`, { method: 'POST' })
   ok(r.status === 200 && !(await w('testeadm')).profile_id, 'recusar sugestão mantém «Sem cliente»')
 } finally {
+  if (snapAccountSettings) await db.query('UPDATE account_settings SET email_confirmation_required = ?, updated_by = ? WHERE id = 1', [snapAccountSettings.email_confirmation_required, snapAccountSettings.updated_by])
+  else await db.query('DELETE FROM account_settings WHERE id = 1')
   await db.query('DELETE FROM profiles WHERE id = ?', [pNC])
   await db.query('DELETE FROM auth_users WHERE id = ?', [pNC])
   await db.end()
