@@ -29,7 +29,6 @@ const LOCK_MINUTES = 5
 const BACKOFF_MIN = [1, 5, 15, 60]
 
 type Step = 'validate' | 'availability' | 'reserve' | 'create_account' | 'package' | 'setup_reseller' | 'acl' | 'limits' | 'packages' | 'verify' | 'sync'
-const ORDER: Step[] = ['validate', 'availability', 'reserve', 'create_account', 'package', 'setup_reseller', 'acl', 'limits', 'packages', 'verify', 'sync']
 export const STEP_LABEL: Record<string, string> = {
   validate: 'Validações (pedido, modo, autorização, pagamento, servidor)', availability: 'Domínio e utilizador livres', reserve: 'Reserva de capacidade',
   create_account: 'Conta principal (createacct)', package: 'Pacote da conta principal', setup_reseller: 'Estatuto de revendedor (setupreseller)', acl: 'ACL (setacls)',
@@ -90,7 +89,7 @@ export async function runProvisioning(serviceId: string, actorId: string | null)
   if (!claim.affectedRows) return { status: 'busy', message: 'Aprovisionamento já em curso noutro processo.' }
   const op = (await rows(db, 'SELECT * FROM reseller_provision_ops WHERE service_id = ?', [serviceId]))[0]
   let state: OpState = { done: [] }
-  try { state = { done: [], ...(op.state ? JSON.parse(op.state) : {}) } } catch { /* estado ilegível → recomeça as validações (os passos WHM são idempotentes) */ }
+  try { state = { done: [], ...(typeof op.state === 'string' ? JSON.parse(op.state) : op.state ?? {}) } } catch { /* estado ilegível → recomeça as validações (os passos WHM são idempotentes) */ }
   const save = async (step: string, extra: Record<string, unknown> = {}) => {
     const cols = Object.keys(extra)
     await db.query(`UPDATE reseller_provision_ops SET step = ?, state = ?${cols.map(c => `, \`${c}\` = ?`).join('')} WHERE id = ? AND lock_token = ?`, [step, JSON.stringify(state), ...cols.map(c => extra[c]), op.id, token])
@@ -163,8 +162,9 @@ export async function runProvisioning(serviceId: string, actorId: string | null)
       if (onServer && !(state.username && onServer.user === state.username)) throw new StepError(`O domínio ${domain} já existe no servidor (conta ${onServer.user}). Resolva manualmente: nenhuma conta é apagada ou reutilizada.`, false, true)
       if (!state.username) {
         let chosen: string | null = null
-        for (let i = 0; i < 8 && !chosen; i++) {
-          const cand = cpanelUsername(domain, i ? String(i + 1) : '')
+        // Candidatos: o derivado do domínio, com sufixos 2–8, e depois sufixos aleatórios (domínios parecidos)
+        for (let i = 0; i < 12 && !chosen; i++) {
+          const cand = cpanelUsername(domain, i === 0 ? '' : i < 8 ? String(i + 1) : randomUUID().replace(/[^a-z]/g, '').slice(0, 3) || 'x')
           if (protectedAccounts.has(cand) || /lab$/.test(cand)) continue
           const [local] = await rows(db, `SELECT 1 FROM reseller_services WHERE server_id = ? AND whm_username = ? UNION SELECT 1 FROM hosting_accounts WHERE cpanel_username = ?
             UNION SELECT 1 FROM whm_accounts WHERE server_id = ? AND whm_username = ? LIMIT 1`, [server.id, cand, cand, server.id, cand])

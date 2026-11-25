@@ -145,8 +145,9 @@ export async function provisionService(serviceId: string): Promise<ProvisionOutc
        UNION SELECT 1 FROM whm_accounts WHERE whm_username = ? AND server_id = ? AND (service_id IS NULL OR service_id <> ?) LIMIT 1`,
       [u, serviceId, u, cfg.serverId, serviceId])).length > 0
     let username: string | null = null
-    for (let i = 0; i < 8; i++) {
-      const candidate = cpanelUsername(s.domain, i ? String(i + 1) : '')
+    // Derivado do domínio, com sufixos 2–8 e depois aleatórios (domínios com o mesmo início esgotavam os 8 nomes)
+    for (let i = 0; i < 12; i++) {
+      const candidate = cpanelUsername(s.domain, i === 0 ? '' : i < 8 ? String(i + 1) : randomUUID().replace(/[^a-z]/g, '').slice(0, 3) || 'x')
       if (await takenLocally(candidate)) continue
       const acct = await getAccount(cfg.config, candidate)
       if (!acct) { username = candidate; break }

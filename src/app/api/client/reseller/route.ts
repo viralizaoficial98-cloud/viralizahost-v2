@@ -5,6 +5,7 @@ import { clientIp, rateLimit } from '@/lib/auth/rate-limit'
 import { currentUserId, fail, noStore } from '@/lib/reseller/http'
 
 export const dynamic = 'force-dynamic'
+const LIMIT = Math.min(1000, Math.max(1, Number(process.env.RESELLER_CLIENT_RATE_LIMIT) || 30))
 
 // Área do revendedor: só os pedidos e serviços do utilizador autenticado (propriedade verificada em cada acção).
 export async function GET() {
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => null) as Record<string, unknown> | null
   const serviceId = String(b?.serviceId ?? '')
   if (!serviceId) return NextResponse.json({ error: 'Pedido inválido.' }, { status: 400 })
-  if (!rateLimit(`reseller-client:${uid}:${clientIp(req)}`, 30, 10 * 60_000)) return NextResponse.json({ error: 'Demasiados pedidos. Aguarde alguns minutos.' }, { status: 429 })
+  if (!rateLimit(`reseller-client:${uid}:${clientIp(req)}`, LIMIT, 10 * 60_000)) return NextResponse.json({ error: 'Demasiados pedidos. Aguarde alguns minutos.' }, { status: 429 })
   try {
     switch (b?.action) {
       case 'whm': case 'cpanel': return NextResponse.json({ url: await resellerSession(serviceId, uid, b.action) }, { headers: noStore })

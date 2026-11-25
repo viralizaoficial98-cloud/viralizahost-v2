@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic'
 // servidor. Anti-spam: campo isco («website»), tempo mínimo de preenchimento, limite por IP e por e-mail.
 // Nunca pede senhas WHM nem dados de pagamento.
 const LIMIT = Math.min(1000, Math.max(1, Number(process.env.RESELLER_REQUEST_RATE_LIMIT) || 5))
+const MAIL_LIMIT = Math.min(1000, Math.max(1, Number(process.env.RESELLER_REQUEST_EMAIL_LIMIT) || 3))
 const MIN_FILL_MS = 3000
 
 export async function POST(req: NextRequest) {
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
   if (String(b.website ?? '').trim() || !Number.isFinite(started) || Date.now() - started < MIN_FILL_MS) {
     return NextResponse.json({ error: 'Não foi possível validar o formulário. Reveja os dados e tente novamente.' }, { status: 400, headers: noStore })
   }
-  if (!rateLimit(`reseller-req-mail:${String(b.email ?? '').toLowerCase()}`, 3, 60 * 60_000)) return NextResponse.json({ error: 'Demasiados pedidos para este e-mail. Aguarde a resposta da equipa.' }, { status: 429, headers: noStore })
+  if (!rateLimit(`reseller-req-mail:${String(b.email ?? '').toLowerCase()}`, MAIL_LIMIT, 60 * 60_000)) return NextResponse.json({ error: 'Demasiados pedidos para este e-mail. Aguarde a resposta da equipa.' }, { status: 429, headers: noStore })
   try {
     const r = await createRequest(b as never, { userId: await currentUserId(), ip })
     return NextResponse.json({ ok: true, ...r }, { status: r.duplicate ? 200 : 201, headers: noStore })

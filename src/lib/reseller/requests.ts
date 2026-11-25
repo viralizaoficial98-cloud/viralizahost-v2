@@ -53,13 +53,14 @@ export async function createRequest(input: RequestInput, ctx: { userId: string |
   // Perfil autenticado: o e-mail é o da conta (nunca outro); restantes dados pré-preenchidos se em falta
   const fullName = clean(input.fullName, 160) || clean(me?.full_name, 160)
   const email = (me?.email ? String(me.email) : clean(input.email, 191)).toLowerCase()
-  const phone = clean(input.phone, 40) || clean(me?.phone, 40)
+  const isUpgrade = !!input.upgradeServiceId && !!me
+  const phone = clean(input.phone, 40) || clean(me?.phone, 40) || (isUpgrade ? 'n/d' : '')
   const company = clean(input.company, 160) || null
   const notes = String(input.notes ?? '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').trim().slice(0, 2000) || null
   const businessType = clean(input.businessType, 60) || null
   if (fullName.length < 3) throw new ResellerError('name', 'Indique o nome completo.')
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ResellerError('email', 'Indique um e-mail válido.')
-  if (!/^\+?[0-9 ()-]{9,20}$/.test(phone)) throw new ResellerError('phone', 'Indique um telefone/WhatsApp válido (9 a 20 dígitos).')
+  if (!(isUpgrade && phone === 'n/d') && !/^\+?[0-9 ()-]{9,20}$/.test(phone)) throw new ResellerError('phone', 'Indique um telefone/WhatsApp válido (9 a 20 dígitos).')
   const domain = normalizeDomain(input.domain)
   if (!domain || !/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(domain) || domain.length > 191) throw new ResellerError('domain', 'Indique um domínio válido (ex.: aminhaempresa.ao).')
   if (businessType && !(BUSINESS_TYPES as readonly string[]).includes(businessType)) throw new ResellerError('businessType', 'Tipo de negócio inválido.')
@@ -146,11 +147,11 @@ export async function provisioningView(db: Queryable, serviceId: string) {
   const [op] = await rows(db, 'SELECT id, status, step, attempts, max_attempts, last_error, state, next_attempt_at, updated_at FROM reseller_provision_ops WHERE service_id = ?', [serviceId])
   const [svc] = await rows(db, 'SELECT * FROM reseller_services WHERE service_id = ?', [serviceId])
   let state: any = null
-  try { state = op?.state ? JSON.parse(op.state) : null } catch { /* */ }
+  try { state = typeof op?.state === 'string' ? JSON.parse(op.state) : op?.state ?? null } catch { /* */ }
   return {
     op: op ? { ...op, state: state ? { username: state.username ?? null, done: state.done ?? [] } : null } : null,
     events: op ? await rows(db, 'SELECT step, outcome, whm_function, message, duration_ms, created_at FROM reseller_provision_events WHERE op_id = ? ORDER BY created_at', [op.id]) : [],
-    reseller: svc ? { ...svc, verification: svc.verification ? JSON.parse(svc.verification) : null } : null,
+    reseller: svc ? { ...svc, verification: typeof svc.verification === 'string' ? JSON.parse(svc.verification) : svc.verification ?? null } : null,
   }
 }
 

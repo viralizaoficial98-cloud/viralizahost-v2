@@ -10,6 +10,8 @@ import * as W from './whm'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const rows = async <T = any>(db: Queryable, sql: string, p: unknown[] = []) => (await db.query(sql, p))[0] as T[]
+/** JSON da base: pode chegar como texto ou já como objecto (conforme o tipo devolvido pelo MariaDB). */
+const asObj = (v: unknown) => { if (v == null) return null; if (typeof v !== 'string') return v; try { return JSON.parse(v) } catch { return null } }
 
 export async function listResellerServices(filter: { status?: string } = {}) {
   const args: unknown[] = []
@@ -19,7 +21,7 @@ export async function listResellerServices(filter: { status?: string } = {}) {
       p.name plan_name, pr.full_name client_name, pr.email client_email, sv.name server_name, sv.hostname server_host, sv.environment, s.next_due_date, s.billing_cycle, r.reference,
       (SELECT JSON_OBJECT('disk', u.disk_used_mb, 'accounts', u.accounts_used, 'bw', u.bandwidth_used_mb, 'at', u.created_at) FROM reseller_usage_snapshots u WHERE u.reseller_service_id = rs.id ORDER BY u.created_at DESC LIMIT 1) last_usage
     FROM reseller_services rs JOIN products p ON p.id = rs.product_id JOIN profiles pr ON pr.id = rs.profile_id JOIN servers sv ON sv.id = rs.server_id
-    JOIN services s ON s.id = rs.service_id LEFT JOIN reseller_requests r ON r.id = rs.request_id ${where} ORDER BY rs.created_at DESC LIMIT 200`, args)
+    JOIN services s ON s.id = rs.service_id LEFT JOIN reseller_requests r ON r.id = rs.request_id ${where} ORDER BY rs.created_at DESC LIMIT 200`, args).then(l => l.map(r => ({ ...r, last_usage: asObj(r.last_usage) })))
 }
 
 async function loadOwned(serviceId: string, profileId: string | null) {
@@ -64,7 +66,7 @@ export async function clientResellers(profileId: string) {
     FROM reseller_services rs JOIN products p ON p.id = rs.product_id JOIN servers sv ON sv.id = rs.server_id JOIN services s ON s.id = rs.service_id
     WHERE rs.profile_id = ? AND rs.status IN ('awaiting_confirmation','active','suspended') ORDER BY rs.created_at DESC`, [profileId])
   const ns = s.defaultNameservers.length ? s.defaultNameservers : ['ns1.viralizahost.com', 'ns2.viralizahost.com']
-  return list.map(r => ({ ...r, last_usage: r.last_usage ? JSON.parse(r.last_usage) : null, nameservers: ns, server_ip: r.status === 'active' ? r.server_ip : null }))
+  return list.map(r => ({ ...r, last_usage: asObj(r.last_usage), nameservers: ns, server_ip: r.status === 'active' ? r.server_ip : null }))
 }
 
 /** Sessão temporária no WHM do revendedor ou no cPanel da conta principal (create_user_session). */
@@ -104,7 +106,7 @@ export async function setSuspended(adminId: string, serviceId: string, suspend: 
   const sv = await getServer(rs.server_id)
   const g = sv ? writeGuard(sv) : 'Servidor inexistente.'
   if (g) throw new ResellerError('write_disabled', g, 409)
-  try { suspend ? await W.suspendReseller(lc.config, rs.whm_username, reason) : await W.unsuspendReseller(lc.config, rs.whm_username) } catch (e) { throw whmErr(e) }
+  try { if (suspend) await W.suspendReseller(lc.config, rs.whm_username, reason); else await W.unsuspendReseller(lc.config, rs.whm_username) } catch (e) { throw whmErr(e) }
   const db = getPool()
   await db.query(`UPDATE reseller_services SET status = ?, suspended_reason = ? WHERE id = ?`, [suspend ? 'suspended' : 'active', suspend ? reason.trim().slice(0, 300) : null, rs.id])
   await db.query(`UPDATE services SET status = ? WHERE id = ?`, [suspend ? 'suspended' : 'active', serviceId])
