@@ -18,7 +18,7 @@ await c.query(\"DELETE FROM hosting_accounts WHERE cpanel_username='mariaacu'\")
 await c.query(\"DELETE FROM whm_accounts WHERE whm_username IN ('joaoconc','mariaacu','semdono','dupdom')\");await c.end()})()"
 fail=0
 run() { echo; echo "=== $1"; shift; "$@" || fail=$((fail+1)); }
-run "Regras: catálogo de domínios Hostinger e especificações VPS (unidades)" node --test scripts/registrar/hostinger-catalog.test.mjs scripts/vps/vps-specs.test.mjs scripts/vps/vps-protected.test.mjs
+run "Regras: catálogo de domínios Hostinger e especificações VPS (unidades)" node --test scripts/registrar/hostinger-catalog.test.mjs scripts/vps/vps-specs.test.mjs scripts/vps/vps-protected.test.mjs scripts/vps/vps-country.test.mjs
 run "Compras, pagamentos e activação" node --env-file=.env.local scripts/mariadb/rehearsal/commerce-e2e.mjs
 run "Área do Cliente, renovações, catálogo" node --env-file=.env.local scripts/mariadb/rehearsal/client-area-e2e.mjs
 run "Importação WHM" node --env-file=.env.local scripts/mariadb/rehearsal/whm-import-e2e.mjs
@@ -39,6 +39,7 @@ else
   run "E-mail Corporativo: períodos, descontos e fichas de plano (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/email-plans-e2e.cjs
   run "Servidor VPS: planos, compra, comprovativo e Hostinger VPS simulada (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/vps-purchase-e2e.cjs
   run "Cloud VPS: modos, pedidos com aprovação, pagamento, autorização, compra simulada (202), reconciliação, limites, VM interna protegida, Área do Cliente (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/cloud-vps-e2e.cjs
+  run "Centros de dados: bandeira por país no seletor da compra, na configuração de VPS e no painel Cloud VPS; sem país/bandeira em falha → ícone neutro (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/dc-flags-e2e.cjs
   run "Configurações → Contas: confirmação de e-mail configurável (registo e checkout)" node --env-file=.env.local scripts/mariadb/rehearsal/account-settings-e2e.cjs
   run "Presença Global: globo 3D (vista inicial, rotação, 23 países, bandeiras, pulsos, rotas), alternativa em mapa plano (desktop + telemóvel)" node scripts/mariadb/rehearsal/global-presence-e2e.cjs
   run "VPS: só 1 mês, 1 ano e 2 anos (3 meses, 6 meses e 3 anos retirados), carrinho antigo, renovações, KVM 2" node --env-file=.env.local scripts/mariadb/rehearsal/vps-cycles-e2e.cjs
