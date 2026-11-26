@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { AlertCircle, Check, Clock, Info, LayoutDashboard, Loader2, MapPin, Monitor, Package, RefreshCw, Search, X } from 'lucide-react'
 import { kz as kzFmt } from '@/lib/commerce/status'
 import { INSTALL_CATEGORIES, fitsLocation, type InstallCategory, type InstallOption, type PublicVpsOptions } from '@/lib/vps/install-shared'
+import { CountryFlag } from '@/components/ui/CountryFlag'
 
 // Secção «Localização do servidor» + «Escolha o que instalar» da página «Escolha a duração» (Servidor VPS).
 // Só mostra opções compatíveis com o plano (filtradas no servidor) e com a localização escolhida.
@@ -63,12 +64,12 @@ export function VpsInstallPicker({ data, state, reload, location, image, later, 
           <div role="radiogroup" aria-label="Localização do servidor" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {data.locations.map(l => (
               <button key={l.id} type="button" role="radio" aria-checked={location === l.id} onClick={() => onLocation(l.id)} data-testid={`opt-location-${l.id}`}
-                className={`text-left p-3 rounded-xl border-2 text-sm font-semibold transition-colors ${location === l.id ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#EEE] hover:border-[#F5B700]/50'}`}>{l.label}</button>
+                className={`text-left p-3 rounded-xl border-2 text-sm font-semibold transition-colors ${location === l.id ? 'border-[#F5B700] bg-[#FFFBEB]' : 'border-[#EEE] hover:border-[#F5B700]/50'}`}><span className="inline-flex items-center gap-2"><CountryFlag code={l.country} />{l.label}</span></button>
             ))}
           </div>
         </fieldset>
       )}
-      {data.locations.length === 1 && <p className="text-sm text-[#555] flex items-center gap-1.5"><MapPin size={15} className="text-[#D9A300]" /> Localização do servidor: <strong className="text-[#0A0A0A]">{data.locations[0].label}</strong></p>}
+      {data.locations.length === 1 && <p className="text-sm text-[#555] flex items-center gap-1.5"><CountryFlag code={data.locations[0].country} iconSize={15} /> Localização do servidor: <strong className="text-[#0A0A0A]">{data.locations[0].label}</strong></p>}
 
       {data.images.length > 0 && (
         <section aria-labelledby="install-title" data-testid="install-picker">

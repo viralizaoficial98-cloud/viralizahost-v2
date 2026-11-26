@@ -5,6 +5,7 @@ import { CloudError, loadCloudSettings, saveCloudSettings, VPS_MODE_LABEL } from
 import { listVpsRequests, vpsRequestAction, vpsRequestDetail } from '@/lib/vps/requests'
 import { linkInstance, listInstances, providerReadAll, setInternal, syncHistory, syncInventory, unlinkInstance } from '@/lib/vps/inventory'
 import { applySuggested, cloudOverview, planFinance, savePlanExtras, serviceFinance, syncPlanCosts } from '@/lib/vps/finance'
+import { countryOf } from '@/lib/vps/country'
 import { loadVpsSettings, saveVpsSettings, VpsConfigError, vpsClient } from '@/lib/vps/settings'
 import { reconcileOpenVps } from '@/lib/vps/provisioning'
 import { INSTALL_GROUPS } from '@/lib/vps/install-shared'
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest) {
         const [plans] = await getPool().query("SELECT slug, name FROM products WHERE category = 'vps' AND subcategory IS NULL AND active = 1 ORDER BY position") as any
         return NextResponse.json({ images: s.images, locations: s.locations, groups: INSTALL_GROUPS, plans }, ns)
       }
-      case 'datacenters': { const s = await loadVpsSettings(); return NextResponse.json({ locations: s.locations }, ns) }
+      case 'datacenters': { const s = await loadVpsSettings(); return NextResponse.json({ locations: s.locations.map(l => ({ ...l, country: countryOf(l) })) }, ns) }
       case 'provisioning': {
         const [ops] = await getPool().query(`SELECT v.id, v.service_id, v.status, v.mode, v.item_id, v.expected_cost_minor, v.cost_limit_minor, v.currency, v.provider_vm_id, v.provider_status, v.ipv4,
             v.message, v.attempts, v.access_method, v.access_configured_at, v.updated_at, s.service_name, s.provisioning_status, s.provisioning_error, o.order_number, pr.email, r.reference request_ref
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, settings: { mode: s.mode, hasSecret: s.hasSecret, autoProvision: s.autoProvision, paymentMethodId: s.paymentMethodId, hostnameSuffix: s.hostnameSuffix } }, ns)
       }
       case 'templates_save': { const s = await saveVpsSettings({ enabledImages: b.enabledImages, images: b.images, allowChooseLater: b.allowChooseLater }, g); return NextResponse.json({ images: s.images }, ns) }
-      case 'datacenters_save': { const s = await saveVpsSettings({ enabledLocations: b.enabledLocations }, g); return NextResponse.json({ locations: s.locations }, ns) }
+      case 'datacenters_save': { const s = await saveVpsSettings({ enabledLocations: b.enabledLocations }, g); return NextResponse.json({ locations: s.locations.map(l => ({ ...l, country: countryOf(l) })) }, ns) }
       case 'sync_costs': return NextResponse.json(await syncPlanCosts(g), ns)
       case 'apply_suggested': return NextResponse.json(await applySuggested(g, String(b.productId), String(b.cycle)), ns)
       case 'plan_extras': return NextResponse.json(await savePlanExtras(g, String(b.productId), b), ns)

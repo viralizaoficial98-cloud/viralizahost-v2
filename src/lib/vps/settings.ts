@@ -3,6 +3,7 @@ import { getPool } from '@/lib/db/pool'
 import { decryptSecret, encryptSecret } from '@/lib/crypto'
 import { HOSTINGER_API, hostingerVpsClient, VpsApiError, type HostingerVpsClient } from './hostinger-vps'
 import type { VpsOption } from '@/lib/commerce/vps-shared'
+import { countryOf, normalizeCountry } from './country'
 import { classifyTemplate, fitsPlan, isInstallGroup, normalizeRow, sellable, type InstallOptionRow, type PublicVpsOptions } from './install-shared'
 
 // Integrações → Hostinger VPS (linha única vps_provider_settings.id = 1).
@@ -13,7 +14,7 @@ import { classifyTemplate, fitsPlan, isInstallGroup, normalizeRow, sellable, typ
 // VPS_LIVE_PURCHASES=1 no servidor (activação das compras reais sujeita a aprovação).
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export interface OptionRow extends VpsOption { enabled: boolean; detail?: string | null }
+export interface OptionRow extends VpsOption { enabled: boolean; detail?: string | null; /** ISO 3166-1 alfa-2 do centro (campo `location` da API) */ country?: string | null }
 export type ImageRow = ReturnType<typeof normalizeRow>
 export interface VpsSettings {
   mode: 'test' | 'live'; apiUrl: string | null; hasSecret: boolean; usesRegistrarToken: boolean; autoProvision: boolean
@@ -51,7 +52,7 @@ export async function loadVpsSettings(): Promise<VpsSettings> {
  */
 export async function publicVpsOptions(plan?: { slug: string; ramGb?: number | null } | null): Promise<PublicVpsOptions> {
   const s = await loadVpsSettings()
-  const locations = s.locations.filter(x => x.enabled).map(x => ({ id: String(x.id), label: x.label }))
+  const locations = s.locations.filter(x => x.enabled).map(x => ({ id: String(x.id), label: x.label, country: countryOf(x) }))
   const locIds = locations.map(l => l.id)
   const images = s.images.filter(r => sellable(r) && (!plan || fitsPlan(r, plan)))
     .map(r => ({ r, locs: r.locations.filter(l => locIds.includes(l)) }))
@@ -200,7 +201,7 @@ export async function saveVpsSettings(input: { mode?: unknown; apiUrl?: unknown;
 export async function mergeProviderOptions(dcs: { id: number; name?: string | null; location?: string | null; city?: string | null }[], tpls: { id: number; name: string; description?: string | null }[]) {
   const prev = await row(); const o = parse(prev?.options)
   const old = (l: OptionRow[] | undefined, id: string) => (l ?? []).find(x => String(x.id) === id)?.enabled ?? false
-  o.locations = dcs.map(d => ({ id: String(d.id), label: [d.city, d.location].filter(Boolean).join(', ') || d.name || `Centro ${d.id}`, detail: d.name ?? null, enabled: old(o.locations, String(d.id)) }))
+  o.locations = dcs.map(d => ({ id: String(d.id), label: [d.city, d.location].filter(Boolean).join(', ') || d.name || `Centro ${d.id}`, detail: d.name ?? null, country: normalizeCountry(d.location), enabled: old(o.locations, String(d.id)) }))
   const prevImgs: InstallOptionRow[] = Array.isArray(o.images) ? o.images : []
   o.images = [
     ...tpls.map(t => {
