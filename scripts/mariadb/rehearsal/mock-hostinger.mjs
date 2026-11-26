@@ -138,6 +138,14 @@ const seedVm = (id, it, tpl, sub, extra = {}) => vms.set(id, { id, subscription_
   template: { id: tpl.id, name: tpl.name }, created_at: '2025-03-01T10:00:00Z', _readyAt: 0, _actions: [], _transition: null, _keys: [] })
 const subs = new Map() // subscription_id → dados (custos/renovação)
 const fws = new Map()  // firewall id → { id, name, rules, vms:Set }
+let dcSet = 'default'
+const TEN_DCS = [
+  { id: 301, name: 'bnk', location: 'LT', city: 'Vilnius', continent: 'Europe' }, { id: 302, name: 'sin1', location: 'sg', city: 'Singapore', continent: 'Asia' },
+  { id: 303, name: 'fast', location: 'Gb', city: 'Manchester', continent: 'Europe' }, { id: 304, name: 'mum2', location: 'IN', city: 'Mumbai 2', continent: 'Asia' },
+  { id: 305, name: 'jkt1', location: 'id', city: 'Jakarta', continent: 'Asia' }, { id: 306, name: 'de', location: 'MY', city: 'Kuala Lumpur', continent: 'Asia' },
+  { id: 307, name: 'cpq', location: 'br', city: 'Campinas', continent: 'South America' }, { id: 308, name: 'bos2', location: 'US', city: 'Boston 2', continent: 'North America' },
+  { id: 309, name: 'us', location: 'de', city: 'Düsseldorf', continent: 'Europe' }, { id: 310, name: 'par', location: 'FR', city: 'Paris', continent: 'Europe' },
+]
 const snaps = new Map() // vmId → snapshot
 const vmOp = id => { stats.vmOps = stats.vmOps ?? {}; stats.vmOps[id] = (stats.vmOps[id] ?? 0) + 1 }
 // Números distintos em cada arranque (VMs de execuções anteriores continuam associadas na base de ensaio)
@@ -186,6 +194,7 @@ function register(d, extra = {}) {
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`)
   const p = url.pathname
+  if (p === '/_dcs' && req.method === 'POST') { dcSet = new URL(req.url, 'http://x').searchParams.get('set') === 'ten' ? 'ten' : 'default'; return send(res, 200, { dcSet }) }
   if (p === '/_stats') return send(res, 200, { ...stats, purchases: Object.fromEntries(purchases), whois: whois.length, vpsPurchases: Object.fromEntries(vpsPurchases) })
   if (p === '/_vps_pay' && req.method === 'POST') {
     const sub = url.searchParams.get('subscription'); const x = vpsPending.get(sub)
@@ -221,6 +230,9 @@ http.createServer(async (req, res) => {
   }
   if (req.method === 'GET' && p === '/api/billing/v1/catalog') { stats.reads++; return send(res, 200, url.searchParams.get('category') === 'VPS' ? vpsCatalog() : catalog(url.searchParams.get('name'))) }
   // ── VPS ──
+  // POST /_dcs?set=ten|default: os dez centros de dados das capturas (país em maiúsculas/minúsculas mistas; o nome técnico
+  // do centro — bnk, fast, mum2… — nunca é o país; «de» e «us» são nomes técnicos de centros que NÃO são alemão/americano)
+  if (req.method === 'GET' && p === '/api/vps/v1/data-centers' && dcSet === 'ten') { stats.reads++; return send(res, 200, TEN_DCS) }
   if (req.method === 'GET' && p === '/api/vps/v1/data-centers') { stats.reads++; return send(res, 200, [{ id: 19, name: 'fra', location: 'de', city: 'Frankfurt', continent: 'Europe' }, { id: 21, name: 'lis', location: 'pt', city: 'Lisboa', continent: 'Europe' }, { id: 17, name: 'bos', location: 'us', city: 'Boston', continent: 'North America' }]) }
   if (req.method === 'GET' && p === '/api/vps/v1/templates') { stats.reads++; return send(res, 200, TEMPLATES) }
   if (req.method === 'GET' && p === '/api/vps/v1/virtual-machines') { stats.reads++; return send(res, 200, [...vms.values()].map(vmView)) }

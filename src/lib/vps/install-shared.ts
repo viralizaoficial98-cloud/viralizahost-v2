@@ -65,7 +65,7 @@ export interface InstallOption {
   locations: string[]; description: string | null
 }
 export interface PublicVpsOptions {
-  locations: { id: string; label: string }[]
+  locations: { id: string; label: string; /** ISO alfa-2 minúsculo do país do centro, ou null */ country?: string | null }[]
   images: InstallOption[]
   /** «Escolher mais tarde» permitido (activação suporta escolher depois do pagamento). */
   allowChooseLater: boolean

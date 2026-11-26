@@ -2,10 +2,11 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Boxes, Bot, Briefcase, Check, Code2, Cpu, Database, HardDrive, KeyRound, LayoutPanelLeft, Loader2, MapPin, MemoryStick, Package, Search, Server, ShieldCheck, Workflow } from 'lucide-react'
+import { Boxes, Bot, Briefcase, Check, Code2, Cpu, Database, HardDrive, KeyRound, LayoutPanelLeft, Loader2, MemoryStick, Package, Search, Server, ShieldCheck, Workflow } from 'lucide-react'
 import { useLocale } from '@/hooks/useLocale'
 import { convertFromAOA } from '@/lib/currency'
 import { useCart } from '@/store/cartStore'
+import { CountryFlag } from '@/components/ui/CountryFlag'
 
 // Configurador Cloud VPS (/servidor-vps/configurar): plano → instalação → centro de dados → hostname → período
 // → extras (backups, licenças, suporte) → chave SSH → resumo. Dados reais (MariaDB + opções publicadas no painel);
@@ -28,7 +29,7 @@ export function VpsConfigurator({ plans, addons, mode, isAdmin, loggedIn, initia
   const [plan, setPlan] = useState(() => plans.find(p => p.slug === initial.plan)?.slug ?? plans[0]?.slug ?? '')
   const p = plans.find(x => x.slug === plan)
   const [cycle, setCycle] = useState(() => p?.cycles.some(c => c.cycle === initial.cycle) ? initial.cycle! : p?.cycles[0]?.cycle ?? 'monthly')
-  const [opts, setOpts] = useState<{ locations: { id: string; label: string }[]; images: any[] } | null>(null)
+  const [opts, setOpts] = useState<{ locations: { id: string; label: string; country?: string | null }[]; images: any[] } | null>(null)
   const [image, setImage] = useState(''), [location, setLocation] = useState(''), [hostname, setHostname] = useState(''), [sshKey, setSshKey] = useState(''), [chosen, setChosen] = useState<string[]>([])
   const [q, setQ] = useState(''), [group, setGroup] = useState(''), [notes, setNotes] = useState('')
   const [quote, setQuote] = useState<any>(null), [busy, setBusy] = useState(false), [err, setErr] = useState(''), [done, setDone] = useState<{ reference: string } | null>(null)
@@ -146,7 +147,7 @@ export function VpsConfigurator({ plans, addons, mode, isAdmin, loggedIn, initia
         </section>
         <section className={box}>{step(3, 'Centro de dados')}
           <div className="flex flex-wrap gap-2 mt-4">{locs.map(l => <button key={l.id} type="button" onClick={() => setLocation(l.id)} data-testid="cfg-location" data-id={l.id} aria-pressed={location === l.id}
-            className={`px-4 py-2.5 rounded-xl border-2 text-sm font-semibold inline-flex items-center gap-1.5 ${location === l.id ? 'border-[#F5B700] bg-[#FFFBEA]' : 'border-[#EEE]'}`}><MapPin size={14} />{l.label}</button>)}
+            className={`px-4 py-2.5 rounded-xl border-2 text-sm font-semibold inline-flex items-center gap-1.5 ${location === l.id ? 'border-[#F5B700] bg-[#FFFBEA]' : 'border-[#EEE]'}`}><CountryFlag code={l.country} />{l.label}</button>)}
             {opts && !locs.length && <p className="text-sm text-[#666]">Sem centros de dados disponíveis para esta instalação.</p>}</div>
         </section>
         <section className={box}>{step(4, 'Hostname (opcional)')}

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Boxes, Bot, Briefcase, Code2, Database, LayoutPanelLeft, Package, Server, Workflow } from 'lucide-react'
 import { Badge, btn, card, cvApi, cvPost, ErrorBox, input, kz, money, Msg, Pager, Spinner } from './ui'
+import { CountryFlag } from '@/components/ui/CountryFlag'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const CYCLE: Record<string, string> = { monthly: '1 mês', '1year': '1 ano', '2years': '2 anos' }
@@ -162,7 +163,7 @@ export function DatacentersSection() {
         <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">{d.locations.map((l: any) => (
           <li key={l.id} className={`${card} p-3 text-sm flex items-center gap-2`} data-testid="cv-dc">
             <input type="checkbox" checked={sel.includes(String(l.id))} onChange={e => setSel(e.target.checked ? [...sel, String(l.id)] : sel.filter(x => x !== String(l.id)))} data-testid="cv-dc-check" />
-            <div><p className="font-bold">{l.label}</p><p className="text-xs text-[#64748B]">id {l.id}{l.detail ? ` · ${l.detail}` : ''}</p></div>
+            <div><p className="font-bold flex items-center gap-1.5"><CountryFlag code={l.country} />{l.label}</p><p className="text-xs text-[#64748B]">id {l.id}{l.detail ? ` · ${l.detail}` : ''}</p></div>
             <span className="ml-auto"><Badge tone={l.enabled ? 'green' : 'gray'}>{l.enabled ? 'Oferecido' : 'Não oferecido'}</Badge></span>
           </li>))}</ul>
       )}
