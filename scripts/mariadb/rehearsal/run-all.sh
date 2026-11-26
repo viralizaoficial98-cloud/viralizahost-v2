@@ -40,7 +40,7 @@ else
   run "Servidor VPS: planos, compra, comprovativo e Hostinger VPS simulada (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/vps-purchase-e2e.cjs
   run "Cloud VPS: modos, pedidos com aprovação, pagamento, autorização, compra simulada (202), reconciliação, limites, VM interna protegida, Área do Cliente (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/cloud-vps-e2e.cjs
   run "Configurações → Contas: confirmação de e-mail configurável (registo e checkout)" node --env-file=.env.local scripts/mariadb/rehearsal/account-settings-e2e.cjs
-  run "Presença Global: bandeiras no mapa e na lista (desktop + telemóvel)" node scripts/mariadb/rehearsal/global-presence-e2e.cjs
+  run "Presença Global: globo 3D (vista inicial, rotação, 23 países, bandeiras, pulsos, rotas), alternativa em mapa plano (desktop + telemóvel)" node scripts/mariadb/rehearsal/global-presence-e2e.cjs
   run "VPS: só 1 mês, 1 ano e 2 anos (3 meses, 6 meses e 3 anos retirados), carrinho antigo, renovações, KVM 2" node --env-file=.env.local scripts/mariadb/rehearsal/vps-cycles-e2e.cjs
   run "VPS: duração + localização + instalação, licenças, escolher mais tarde, Os meus VPS (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/vps-install-e2e.cjs
   run "Hospedagem de sites: ordem das secções, H1, âncoras, SSL do catálogo e percurso de compra (desktop + telemóvel)" node --env-file=.env.local scripts/mariadb/rehearsal/hosting-page-e2e.cjs

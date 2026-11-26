@@ -1,5 +1,7 @@
 'use client'
-import { useRef, useEffect, useState } from 'react'
+import { Component, useCallback, useRef, useEffect, useState, type ComponentType, type ReactNode } from 'react'
+import { LBL, OPP, connections, flagSrc, labelBox, nd, nodes } from './globalPresenceData'
+import type { GlobeProps } from './GlobalPresenceGlobe'
 
 const stats = [
   { value: 20,   suffix: '+',  label: 'Países Atendidos' },
@@ -7,70 +9,6 @@ const stats = [
   { value: 99.9, suffix: '%',  label: 'Uptime Garantido', decimal: true },
   { value: 24,   suffix: '/7', label: 'Suporte Disponível' },
 ]
-
-/*
-  Mercator projection: viewBox="0 0 1000 500"
-  x = (lon + 180) * 2.7778
-  y = (90  - lat) * 2.7778
-  Reference anchors:
-    lon=0   → x=500   lat=0  → y=250
-    lon=-180→ x=0     lat=90 → y=0
-    lon=180 → x=1000  lat=-90→ y=500
-*/
-
-// Localizações: código ISO 3166-1 alfa-2 (GB = Reino Unido, HK = Hong Kong) → bandeira local em /flags/<id>.png
-// (flag-icons, MIT, rasterizadas a 96×72). pos = lado do rótulo (bandeira + código) em relação ao ponto, escolhido
-// para não se sobreporem nas zonas densas (Europa, Cone Sul, Sudeste Asiático).
-type Side = 't'|'b'|'l'|'r'
-const nodes: { id:string; code:string; pos:Side; name:string; x:number; y:number }[] = [
-  { id:'ao', code:'AO', pos:'t', name:'Angola',      x:551, y:283 },
-  { id:'br', code:'BR', pos:'t', name:'Brasil',      x:360, y:278 },
-  { id:'pt', code:'PT', pos:'l', name:'Portugal',    x:475, y:148 },
-  { id:'us', code:'US', pos:'t', name:'EUA',         x:210, y:155 },
-  { id:'gb', code:'GB', pos:'t', name:'Reino Unido', x:489, y:108 },
-  { id:'ca', code:'CA', pos:'t', name:'Canadá',      x:225, y:92  },
-  { id:'fr', code:'FR', pos:'b', name:'França',      x:508, y:122 },
-  { id:'de', code:'DE', pos:'r', name:'Alemanha',    x:527, y:110 },
-  { id:'mx', code:'MX', pos:'l', name:'México',      x:215, y:200 },
-  { id:'co', code:'CO', pos:'t', name:'Colômbia',    x:285, y:244 },
-  { id:'cl', code:'CL', pos:'l', name:'Chile',       x:302, y:345 },
-  { id:'pe', code:'PE', pos:'l', name:'Peru',        x:276, y:275 },
-  { id:'bo', code:'BO', pos:'r', name:'Bolívia',     x:318, y:305 },
-  { id:'uy', code:'UY', pos:'r', name:'Uruguai',     x:348, y:352 },
-  { id:'ar', code:'AR', pos:'b', name:'Argentina',   x:318, y:360 },
-  { id:'tr', code:'TR', pos:'r', name:'Turquia',     x:597, y:143 },
-  { id:'ru', code:'RU', pos:'t', name:'Rússia',      x:660, y:82  },
-  { id:'in', code:'IN', pos:'t', name:'Índia',       x:708, y:208 },
-  { id:'cn', code:'CN', pos:'t', name:'China',       x:775, y:155 },
-  { id:'hk', code:'HK', pos:'r', name:'Hong Kong',   x:800, y:202 },
-  { id:'my', code:'MY', pos:'r', name:'Malásia',     x:790, y:248 },
-  { id:'sg', code:'SG', pos:'l', name:'Singapura',   x:775, y:258 },
-  { id:'id', code:'ID', pos:'b', name:'Indonésia',   x:830, y:268 },
-]
-
-const connections: [string,string][] = [
-  ['pt','ao'],['pt','br'],['pt','gb'],['pt','fr'],['pt','de'],
-  ['us','ca'],['us','mx'],['us','gb'],['us','fr'],
-  ['br','co'],['br','ar'],['br','pe'],['br','uy'],['br','bo'],['ao','br'],
-  ['cn','hk'],['cn','sg'],['cn','my'],['cn','id'],['cn','in'],
-  ['ru','cn'],['ru','de'],['tr','de'],['tr','ru'],['in','sg'],
-]
-
-function nd(id:string){ return nodes.find(n=>n.id===id)! }
-const flagSrc = (id:string) => `/flags/${id}.png`
-
-/* Rótulo dos marcadores com tamanho em PIXELS de ecrã (convertidos para unidades do viewBox com k = 1000/largura),
-   para ficar legível tanto no desktop como no telemóvel. */
-const LBL = { flagW:16, flagH:12, font:10.5, pad:4, gap:4, h:18, dist:7 }
-function labelBox(n:{x:number;y:number;code:string;pos:Side}, k:number, hasFlag:boolean, side:Side = n.pos, text = n.code, font = LBL.font) {
-  // largura aproximada por letra (fonte a negrito): M/W largas, I estreita
-  const textW = [...text].reduce((t, ch) => t + font * (/[MW]/.test(ch) ? 0.98 : /[Iil]/.test(ch) ? 0.36 : ch === ' ' ? 0.3 : 0.74), 0)
-  const w = (LBL.pad*2 + (hasFlag ? LBL.flagW + LBL.gap : 0) + textW) * k, h = LBL.h * k, d = LBL.dist * k
-  const x = side==='l' ? n.x - d - w : side==='r' ? n.x + d : n.x - w/2
-  const y = side==='t' ? n.y - d - h : side==='b' ? n.y + d : n.y - h/2
-  return { x, y, w, h }
-}
-const OPP: Record<Side,Side> = { t:'b', b:'t', l:'r', r:'l' }
 
 /*
   Real geographic continent paths (simplified Mercator, viewBox 0 0 1000 500)
@@ -253,15 +191,60 @@ function AnimatedCounter({value,suffix,decimal}:{value:number;suffix:string;deci
   return <span ref={ref}>{decimal?count.toFixed(1):count.toLocaleString('pt-BR')}{suffix}</span>
 }
 
+/* Se a renderização do globo falhar a meio, volta ao mapa plano em vez de partir a página */
+class GlobeBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch() { this.props.onError() }
+  render() { return this.state.failed ? null : this.props.children }
+}
+
+/* WebGL disponível e sem «poupança de dados»? (o globo descarrega uma textura de ~0,3–1 MB) */
+function globeSupported() {
+  try {
+    const nav = navigator as Navigator & { connection?: { saveData?: boolean } }
+    if (nav.connection?.saveData) return false
+    const c = document.createElement('canvas')
+    return !!(c.getContext('webgl2') || c.getContext('webgl'))
+  } catch { return false }
+}
+
 export function GlobalPresenceSection() {
   const [active, setActive] = useState<string|null>(null)
   const [visible, setVisible] = useState(false)
+  // 'pending' (servidor / antes de decidir) → 'globe' (3D) ou 'flat' (mapa plano: sem WebGL, poupança de dados ou erro)
+  const [mode, setMode] = useState<'pending'|'globe'|'flat'>('pending')
+  const [near, setNear] = useState(false)
+  const [Globe, setGlobe] = useState<ComponentType<GlobeProps>|null>(null)
+  const [focus, setFocus] = useState<{ id: string; n: number }|null>(null)
+  const stageBox = useRef<HTMLDivElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const mapScroll = useRef<HTMLDivElement>(null)
   const [k, setK] = useState(1000/1600)                 // unidades do viewBox por pixel de ecrã
   const [noFlag, setNoFlag] = useState<Record<string,boolean>>({})
   const flagFailed = (id:string) => setNoFlag(f => f[id] ? f : { ...f, [id]: true })
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- detecção de WebGL só existe no cliente
+  useEffect(()=>{ setMode(globeSupported() ? 'globe' : 'flat') },[])
+
+  // O globo (three.js + textura) só é pedido quando a secção se aproxima da área visível; o espaço fica reservado
+  useEffect(()=>{
+    if(mode !== 'globe') return
+    const el = stageBox.current; if(!el) return
+    const io = new IntersectionObserver(([e])=>{ if(e.isIntersecting){ setNear(true); io.disconnect() } },{ rootMargin:'700px 0px' })
+    io.observe(el)
+    return ()=>io.disconnect()
+  },[mode])
+  useEffect(()=>{
+    if(mode !== 'globe' || !near) return
+    let cancelled = false
+    import('./GlobalPresenceGlobe').then(m=>{ if(!cancelled) setGlobe(()=>m.default) }).catch(()=>{ if(!cancelled) setMode('flat') })
+    return ()=>{ cancelled = true }
+  },[mode, near])
+  const globeFailed = useCallback(()=>setMode('flat'),[])
+  const flagFailedCb = useCallback((id:string)=>setNoFlag(f => f[id] ? f : { ...f, [id]: true }),[])
+  const focusCountry = (id:string)=>{ setActive(id); setFocus(f=>({ id, n:(f?.n ?? 0)+1 })) }
 
   useEffect(()=>{
     const el = svgRef.current; if(!el) return
@@ -271,7 +254,7 @@ export function GlobalPresenceSection() {
     const sc = mapScroll.current
     if(sc && sc.scrollWidth > sc.clientWidth) sc.scrollLeft = (sc.scrollWidth - sc.clientWidth) * 0.42
     return ()=>ro.disconnect()
-  },[])
+  },[mode])
 
   useEffect(()=>{
     const obs = new IntersectionObserver(([e])=>{if(e.isIntersecting) setVisible(true)},{threshold:0.06})
@@ -302,6 +285,9 @@ export function GlobalPresenceSection() {
         .gp-dot  {animation:gp-pulse 2.8s ease-in-out infinite}
         .gp-flow {animation:gp-flow  1.8s linear infinite}
         .gp-show {animation:gp-fadein 0.65s ease both}
+        @media (prefers-reduced-motion: reduce) {
+          .gp-dot,.gp-flow,.gp-ring,.gp-show {animation:none!important}
+        }
       `}</style>
 
       <div className="container mx-auto px-4 relative">
@@ -334,6 +320,16 @@ export function GlobalPresenceSection() {
           className={`bg-white border border-[#E2E8F0] rounded-3xl shadow-lg overflow-hidden mb-10 ${visible?'gp-show':'opacity-0'}`}
           style={{animationDelay:'0.18s',padding:'1.5rem 1.5rem 1rem'}}
         >
+          {mode !== 'flat' && (
+            <div ref={stageBox} data-testid="gp-globe-stage"
+              className="relative rounded-2xl overflow-hidden h-[min(132vw,600px)] sm:h-[clamp(440px,50vw,620px)]"
+              style={{ background:'radial-gradient(ellipse at 50% 52%,#0d1d42 0%,#070f26 52%,#03060f 100%)' }}>
+              {Globe && mode === 'globe'
+                ? <GlobeBoundary onError={globeFailed}><Globe active={active} setActive={setActive} focus={focus} noFlag={noFlag} onFlagError={flagFailedCb} onFail={globeFailed}/></GlobeBoundary>
+                : <div className="absolute inset-0 flex items-center justify-center" aria-hidden="true"><span className="w-7 h-7 rounded-full border-2 border-white/20 border-t-[#F5B700] animate-spin"/></div>}
+            </div>
+          )}
+          {mode === 'flat' && <>
           <div ref={mapScroll} className="overflow-x-auto overscroll-x-contain -mx-2 px-2" data-testid="gp-map-scroll">
           <svg ref={svgRef} viewBox="0 0 1000 500" className="w-full min-w-[680px] sm:min-w-0" xmlns="http://www.w3.org/2000/svg" data-testid="gp-map">
             <defs>
@@ -452,6 +448,7 @@ export function GlobalPresenceSection() {
           </svg>
           </div>
           <p className="sm:hidden text-center text-[11px] text-gray-400 mt-1" data-testid="gp-map-hint">Deslize o mapa para ver todas as localizações ↔</p>
+          </>}
 
           {/* Legend */}
           <div className="flex items-center justify-center gap-8 mt-2 text-xs text-gray-400">
@@ -474,6 +471,8 @@ export function GlobalPresenceSection() {
             <button
               key={id}
               data-testid="gp-country" data-code={code}
+              onClick={()=>focusCountry(id)}
+              title={mode === 'globe' ? `Ver ${name} no globo` : undefined}
               onMouseEnter={()=>setActive(id)}
               onMouseLeave={()=>setActive(null)}
               className={`flex items-center gap-1.5 border rounded-full px-3.5 py-1.5 text-sm font-medium transition-all duration-200 ${
